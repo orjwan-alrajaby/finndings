@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* ========================================
+   FINN LENS DESIGN TOKENS
+   Colors pulled straight from finn.com's brand system.
+======================================== */
+@theme {
+  /* -- Brand colors -- */
+  --color-finn-accent-blue:  #0072ea;
+  --color-finn-highlight-navy: #003087;
+  --color-finn-iron: #707070;
+  --color-finn-black: #191919;
+  --color-finn-cotton: #f3f3f3;
+  --color-finn-snow: #f8f8f8;
+
+  /* -- Breakpoints --
+     Redeclaring these overrides Tailwind's defaults and generates
+     2xs:, xs:, sm:, md:, lg:, xl:, 2xl:, 3xl:, 4xl:, 5xl: variants. */
+  --breakpoint-2xs: 480px;
+  --breakpoint-xs: 640px;
+  --breakpoint-sm: 768px;
+  --breakpoint-md: 991px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1440px;
+  --breakpoint-3xl: 1650px;
+  --breakpoint-4xl: 1780px;
+  --breakpoint-5xl: 1920px;
+}
+
+/* ========================================
+   GLOBAL BASE STYLES
+======================================== */
+@layer base {}
