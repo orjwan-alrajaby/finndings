@@ -4,17 +4,19 @@ export function injectPinBtnIntoDetailsPage() {
   const root = document.body.querySelector<HTMLDivElement>(
     'div[data-appid="product-details"]'
   );
+
   if (!root || root.dataset.finnLensInjected === "true") return;
 
-  const anchorElement = Array.from(root.querySelectorAll("div")).find((div) =>
-    Array.from(div.children).some((child) => child.nodeName.toLowerCase() === "h1")
-  );
+  const anchorElements = Array.from<HTMLDivElement>(
+    root.querySelectorAll('[id^="product-"]')
+  ).filter((el) => /^product-\d+$/.test(el.id)); // match to elements of id values of e.g product-32710
+  console.log("anchorElements", anchorElements);
 
-  if (!anchorElement) return;
+  const buttons = anchorElements.map(element => injectPinCarButtonIntoNode(element))
 
-  const button = injectPinCarButtonIntoNode(anchorElement);
-
-  if (button) {
-    root.dataset.finnLensInjected = "true";
+  if (buttons.length > 0) {
+    anchorElements.forEach(element => element.dataset.finnLensInjected = "true");
+    const compareBtns = Array.from<HTMLButtonElement>(root.querySelectorAll('button[aria-label="Vergleichen"]'));
+    compareBtns.forEach(btn => btn.classList.add("right-unset", "left-4"));
   }
 }
