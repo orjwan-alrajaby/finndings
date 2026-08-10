@@ -2,11 +2,37 @@ import "@/assets/tailwind.css";
 import { injectPinBtnIntoDetailsPage } from "./injectors/inject-pin-button/injectPinBtnIntoDetailsPage";
 import { injectPinBtnIntoCarListItem } from "./injectors/inject-pin-button/injectPinBtnIntoCarListItem";
 import { HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR, DETAILS_PAGE_SELECTOR } from "./constants";
+import { mapFinnConfigToAll } from "./manipulateApiData";
 
 export default defineContentScript({
   matches: ["https://www.finn.com/*"],
 
   async main() {
+    let allLoadedSoFar = { cars: {}, total: 0 };
+
+    try {
+      await injectScript("/network-interceptor.js");
+      console.info("[FinnLens] interceptor injected");
+    } catch (e) {
+      console.error("[FinnLens] injection failed", e);
+    }
+
+    window.addEventListener("message", async (event) => {
+      if (event.source !== window) return;
+      if (event.data?.source !== "finn-lens") return;
+      if (event.data?.type !== "FINN_CARS_RESPONSE") return;
+
+      const batchLoaded = event.data.payload.results;
+      const formatted = mapFinnConfigToAll(batchLoaded);
+
+      allLoadedSoFar = {
+        cars: { ...allLoadedSoFar.cars, ...formatted },
+        total: allLoadedSoFar.total + batchLoaded.length,
+      };
+
+      await browser.storage.local.set({ loadedCarsFromFinnApi: allLoadedSoFar });
+    });
+
     let activeObserver: MutationObserver | null = null;
     let mutationDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     let navDebounceTimer: ReturnType<typeof setTimeout> | null = null;
