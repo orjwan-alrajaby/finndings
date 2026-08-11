@@ -1,4 +1,5 @@
-import { createToast } from "../../../creators";
+import {createToast} from "../../../creators/Toast";
+import type { ToastType, ToastCarDetails } from "../../../types.dom";
 
 const CONFIG_ID_PATTERN = /\d{5}/;
 
@@ -23,8 +24,6 @@ export function buildCarUrl(baseUrl: string, carConfigId: number): string {
   }
 }
 
-export function showToast(message: string, variant: "success" | "info" | "error") {
-  const toast = createToast(message, variant);
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
-}
+export function showToast(message: string, type: ToastType, carDetails: ToastCarDetails | null) {
+  return createToast(message, type, carDetails).showToast();
+} 

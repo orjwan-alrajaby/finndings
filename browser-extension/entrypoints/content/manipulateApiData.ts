@@ -23,6 +23,7 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
     trim: config.trim_name,
     year: config.model_year,
     engine: config.engine,
+    equipmentLine: config.equipment_line ?? "",
 
     fuelType,
     transmission: germanToEnglish[config.gearshift] as Transmission,

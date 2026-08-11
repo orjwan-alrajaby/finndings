@@ -12,6 +12,7 @@ export type FinnApiConfig = {
   model: string;
   model_year: string;
   engine: string;
+  equipment_line: string | null;
   trim_name: string;
 
   fuel: "Benzin" | "Diesel" | "Elektro" | "Plug-in Hybrid";
@@ -111,6 +112,7 @@ export interface FinnCar {
   trim: string;
   year: string;
   engine: string;
+  equipmentLine: string;
 
   fuelType: FuelType;
   transmission: Transmission;

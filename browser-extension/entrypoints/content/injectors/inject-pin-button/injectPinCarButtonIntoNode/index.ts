@@ -1,9 +1,10 @@
-import { createAddButton, setPinButtonPinnedState } from "../../../creators";
+import { createAddButton, setPinButtonPinnedState } from "../../../creators/PinButton";
 import { getPageContext, resolveCarConfigId } from "./page-context";
 import { loadCarsFromFinnApi } from "./api";
 import { updatePinnedCars, mergeLoadedCars, getPinnedCars, getLoadedCars } from "./storage";
 import { buildCarUrl, showToast } from "./utils";
 import { mapFinnConfigToAll } from "../../../manipulateApiData";
+import type { FinnCar } from "@/lib/types";
 
 let pinQueue = Promise.resolve();
 
@@ -28,7 +29,7 @@ async function doHandlePinButtonClick(
   const carConfigId = resolveCarConfigId(anchorElement, context);
 
   if (!carConfigId) {
-    showToast("Couldn't determine which car to pin.", "error");
+    showToast("Couldn't determine which car to pin.", "error", null);
     return;
   }
 
@@ -36,8 +37,10 @@ async function doHandlePinButtonClick(
     ? window.location.href
     : anchorElement.querySelector<HTMLAnchorElement>("h3 a[href]")?.href ?? "";
 
+  let carDetails: FinnCar | null = null;
+
   try {
-    let carDetails = (await getLoadedCars())[carConfigId] ?? null;
+    carDetails = (await getLoadedCars())[carConfigId] ?? null;
 
     if (!carDetails) {
       const response = await loadCarsFromFinnApi({ ...context, anchorElement, carConfigId });
@@ -62,12 +65,29 @@ async function doHandlePinButtonClick(
 
     setPinButtonPinnedState(button, !wasPinned);
     showToast(
-      wasPinned ? `Unpinned: ${carDetails.name}` : `Pinned: ${carDetails.name}`,
-      wasPinned ? "info" : "success"
+      wasPinned ? `Unpinned:` : `Pinned:`,
+      wasPinned ? "info" : "success",
+      {
+        name: carDetails.name,
+        engine: carDetails.engine,
+        trim: carDetails.trim ?? "",
+        equipmentLine: carDetails.equipmentLine ?? "",
+      }
     );
   } catch (error) {
     console.error("Failed to pin/unpin car:", error);
-    showToast("Something went wrong while pinning this car.", "error");
+    showToast(
+      "Something went wrong while pinning this car.",
+      "error",
+      carDetails
+        ? {
+            name: carDetails.name,
+            engine: carDetails.engine,
+            trim: carDetails.trim ?? "",
+            equipmentLine: carDetails.equipmentLine ?? "",
+          }
+        : null
+    );
   }
 }
 
