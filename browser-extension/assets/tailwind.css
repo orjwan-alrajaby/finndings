@@ -4,14 +4,19 @@
    FINN LENS DESIGN TOKENS
    Colors pulled straight from finn.com's brand system.
 ======================================== */
+
 @theme {
   /* -- Brand colors -- */
-  --color-finn-accent-blue:  #0072ea;
+  --color-finn-accent-blue: #0072ea;
   --color-finn-highlight-navy: #003087;
   --color-finn-iron: #707070;
   --color-finn-black: #191919;
   --color-finn-cotton: #f3f3f3;
   --color-finn-snow: #f8f8f8;
+   --color-finn-success: #26bc58;
+  --color-finn-warning: #f0a500;
+  --color-finn-error: #e71d3f;
+
 
   /* -- Breakpoints --
      Redeclaring these overrides Tailwind's defaults and generates
@@ -31,4 +36,76 @@
 /* ========================================
    GLOBAL BASE STYLES
 ======================================== */
+
 @layer base {}
+
+/* ========================================
+   COMPONENT STYLES
+======================================== */
+@layer components {
+  .finn-lens-toast {
+    @apply rounded-2xl text-sm text-white shadow-lg relative;
+    min-width: 320px;
+    max-width: 420px;
+    padding: 16px 16px !important;
+  }
+
+  .finn-lens-toast > .toast-close {
+    @apply absolute top-4 right-4;
+  }
+
+  .finn-lens-toast-info {
+    background: linear-gradient(
+      135deg,
+      #005bbd,
+      #003f8f
+    ) !important;
+  }
+
+  .finn-lens-toast-success {
+    background: linear-gradient(
+      135deg,
+      #168f3e,
+      #0d682d
+    ) !important;
+  }
+
+  .finn-lens-toast-warning {
+    background: linear-gradient(
+      135deg,
+      #c47f00,
+      #8f5c00
+    ) !important;
+  }
+
+  .finn-lens-toast-error {
+    background: linear-gradient(
+      135deg,
+      #c41432,
+      #8f0e25
+    ) !important;
+  }
+
+  .finn-lens-toast-message {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .finn-lens-toast-car-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .finn-lens-toast-car-details {
+    margin-top: 0.125rem;
+    font-size: 0.8rem;
+    opacity: 0.9;
+  }
+
+  .finn-lens-toast-config {
+    margin-top: 0.375rem;
+    font-size: 0.7rem;
+    opacity: 0.75;
+    font-family: monospace;
+  }
+}
