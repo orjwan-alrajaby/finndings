@@ -3,6 +3,7 @@ import { injectPinBtnIntoDetailsPage } from "./injectors/inject-pin-button/injec
 import { injectPinBtnIntoCarListItem } from "./injectors/inject-pin-button/injectPinBtnIntoCarListItem";
 import { HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR, DETAILS_PAGE_SELECTOR } from "./constants";
 import { mapFinnConfigToAll } from "./manipulateApiData";
+import { getPinnedCars } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 
 export default defineContentScript({
   matches: ["https://www.finn.com/*"],
@@ -17,6 +18,20 @@ export default defineContentScript({
       console.error("[FinnLens] injection failed", e);
     }
 
+    browser.runtime.onMessage.addListener(async (message) => {
+      if (message.type !== "GET_PAGE_STATS") return;
+
+      const pinnedCars = await getPinnedCars();
+
+      return {
+        detectedCount: document.querySelectorAll(
+          '[data-finn-lens-processed="true"]'
+        ).length,
+        pinnedCount: Object.keys(pinnedCars ?? {}).length,
+        pinnedCars,
+      };
+    });
+
     window.addEventListener("message", async (event) => {
       if (event.source !== window) return;
       if (event.data?.source !== "finn-lens") return;
@@ -30,7 +45,9 @@ export default defineContentScript({
         total: allLoadedSoFar.total + batchLoaded.length,
       };
 
-      await browser.storage.local.set({ loadedCarsFromFinnApi: allLoadedSoFar });
+      await browser.storage.local.set({
+        loadedCarsFromFinnApi: allLoadedSoFar,
+      });
     });
 
     let activeObserver: MutationObserver | null = null;
@@ -39,6 +56,7 @@ export default defineContentScript({
 
     const patchHistory = (method: "pushState" | "replaceState") => {
       const original = history[method].bind(history);
+
       history[method] = (...args: Parameters<typeof history.pushState>) => {
         original(...args);
         window.dispatchEvent(new Event("finnlens:navigate"));
@@ -47,6 +65,7 @@ export default defineContentScript({
 
     patchHistory("pushState");
     patchHistory("replaceState");
+
     window.addEventListener("popstate", () =>
       window.dispatchEvent(new Event("finnlens:navigate"))
     );
@@ -61,13 +80,23 @@ export default defineContentScript({
 
     const startObserving = () => {
       activeObserver?.disconnect();
+
       activeObserver = new MutationObserver(() => {
-        if (mutationDebounceTimer !== null) clearTimeout(mutationDebounceTimer);
+        if (mutationDebounceTimer !== null) {
+          clearTimeout(mutationDebounceTimer);
+        }
+
         mutationDebounceTimer = setTimeout(() => {
           mutationDebounceTimer = null;
+
           runInjections();
+
+          browser.runtime.sendMessage({
+            type: "CARDS_LOADED",
+          });
         }, 100);
       });
+
       activeObserver.observe(document.documentElement, {
         childList: true,
         subtree: true,
@@ -88,7 +117,10 @@ export default defineContentScript({
     };
 
     const onNavigate = () => {
-      if (navDebounceTimer !== null) clearTimeout(navDebounceTimer);
+      if (navDebounceTimer !== null) {
+        clearTimeout(navDebounceTimer);
+      }
+
       navDebounceTimer = setTimeout(() => {
         navDebounceTimer = null;
         handleNavigation();
