@@ -1,9 +1,4 @@
-import { FINN_BASE_URL } from "./constants";
 import type { PinnedFinnCar, AvailabilityType } from "./types";
-
-export function createFullUrl(partialUrl: string) {
-  return `${FINN_BASE_URL}${partialUrl}`;
-}
 
 function pluralize(count: number, unit: string) {
   return `${count} ${unit}${count === 1 ? "" : "s"}`;

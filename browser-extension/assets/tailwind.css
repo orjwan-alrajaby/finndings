@@ -16,7 +16,7 @@
    --color-finn-success: #26bc58;
   --color-finn-warning: #f0a500;
   --color-finn-error: #e71d3f;
-
+  --color-finn-pale-blue: #eaf4ff;
 
   /* -- Breakpoints --
      Redeclaring these overrides Tailwind's defaults and generates
