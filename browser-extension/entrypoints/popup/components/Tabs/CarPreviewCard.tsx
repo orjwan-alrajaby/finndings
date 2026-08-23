@@ -25,7 +25,7 @@ export function CarPreviewCard({
             className={`group flex w-full items-center gap-3 rounded-[18px] border text-left transition-all duration-200 border-finn-accent-blue/10 bg-white shadow-sm hover:shadow-md active:scale-[0.99] p-2.5 sm:p-3 ${accent ? "hover:border-finn-accent-blue/30" : ""
                 }`}
         >
-            <div className="flex-1/3 h-full overflow-hidden rounded-[18px] bg-finn-accent-blue/10">
+            <div className="flex-1/3 h-full overflow-hidden rounded-[18px] bg-finn-pale-blue">
                 <img
                     src={imgUrl}
                     alt={name}

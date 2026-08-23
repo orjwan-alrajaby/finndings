@@ -25,7 +25,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
             className="mt-3 overflow-hidden rounded-[22px] bg-white shadow-sm"
         >
             <RadixTabs.List
-                className="flex gap-1 p-1.5"
+                className={["flex gap-1 m-1.5 rounded-[22px]", accent ? "bg-finn-pale-blue" : "bg-finn-cotton"].join(" ")}
                 aria-label="FINN Lens views"
             >
                 {(["pinned", "actions"] as const).map((val) => (
@@ -36,6 +36,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                             flex-1 rounded-full py-2 text-xs font-bold capitalize transition-all
                             text-finn-iron
                             hover:text-finn-black
+                            ${accent ? "data-[state=inactive]:text-finn-accent-blue" : "data-[state=inactive]:text-finn-black"}
                             ${accent ? "data-[state=active]:bg-finn-accent-blue" : "data-[state=active]:bg-finn-black"}
                             data-[state=active]:text-white
                             data-[state=active]:shadow-sm

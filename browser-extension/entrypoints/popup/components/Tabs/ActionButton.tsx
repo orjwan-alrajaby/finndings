@@ -36,7 +36,7 @@ export function ActionButton({
                     disabled
                         ? "bg-white text-finn-iron"
                         : accent
-                            ? "bg-finn-accent-blue/10 text-finn-accent-blue group-hover:bg-finn-accent-blue group-hover:text-white"
+                            ? "bg-finn-pale-blue text-finn-accent-blue group-hover:bg-finn-accent-blue group-hover:text-white"
                             : "bg-finn-black/10 text-finn-black group-hover:bg-finn-black group-hover:text-white",
                 ].join(" ")}
             >
