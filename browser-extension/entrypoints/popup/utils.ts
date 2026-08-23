@@ -1,13 +1,11 @@
 import toast from "react-hot-toast";
    
-type ActionType = "OPEN_REVIEW_TAB" | "OPEN_COMPARE_TAB" | "OPEN_DOWNLOAD_AS_PDF_PAGE" | "OPEN_SETTINGS_TAB";
+type ActionType = "OPEN_COMPARE_PAGE" | "OPEN_SETTINGS_PAGE";
 
 export const openBrowserTab = async (actionType: ActionType) => {
         const map = {
-            "OPEN_REVIEW_TAB": "review",
-            "OPEN_COMPARE_TAB": "compare",
-            "OPEN_DOWNLOAD_AS_PDF_PAGE": "download as pdf",
-            "OPEN_SETTINGS_TAB": "settings"
+            "OPEN_COMPARE_PAGE": "compare",
+            "OPEN_SETTINGS_PAGE": "settings"
         }
         try {
             await browser.runtime.sendMessage({ type: actionType });

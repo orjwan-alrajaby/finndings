@@ -1,4 +1,5 @@
-import type { PinnedFinnCar, AvailabilityType } from "./types";
+import toast from "react-hot-toast";
+import type { PinnedFinnCar, AvailabilityType, ActionType } from "./types";
 
 function pluralize(count: number, unit: string) {
   return `${count} ${unit}${count === 1 ? "" : "s"}`;
@@ -119,3 +120,16 @@ export function formatIsoDate(dateString: string): string {
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${day}.${month}.${date.getUTCFullYear()}`;
 }
+   
+export const openBrowserTab = async (actionType: ActionType) => {
+        const map = {
+            "OPEN_COMPARE_PAGE": "compare",
+            "OPEN_SETTINGS_PAGE": "settings"
+        }
+        try {
+            await browser.runtime.sendMessage({ type: actionType });
+        } catch {
+            const pageName = map[actionType];
+            toast.error(`Something went wrong. Couldn't open the "${pageName}" page.`);
+        }
+    };

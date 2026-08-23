@@ -1,8 +1,7 @@
 import {
     ScaleIcon,
-    DocumentArrowDownIcon,
     ArrowTopRightOnSquareIcon,
-    EyeIcon,
+    CogIcon,
 } from "@heroicons/react/24/outline";
 import * as RadixTabs from "@radix-ui/react-tabs";
 import { ActionButton } from "./ActionButton";
@@ -82,7 +81,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                             })
                         }
                         <button
-                            onClick={() => openBrowserTab("OPEN_REVIEW_TAB")}
+                            onClick={() => { }}
                             className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-[0.99] sm:col-span-2 ${accent
                                 ? "bg-finn-accent-blue hover:bg-finn-highlight-navy"
                                 : "bg-finn-black hover:bg-finn-black/90"
@@ -94,34 +93,32 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     </div>
                 )}
             </RadixTabs.Content>
-
-            {/* Actions tab */}
             <RadixTabs.Content value="actions" className="p-4 focus-visible:outline-none sm:p-5">
                 <div className="space-y-2 sm:grid sm:grid-cols-1 sm:gap-2 sm:space-y-0">
-                    <ActionButton
-                        title="Review Pinned Cars"
-                        description="Compare pricing and key details."
-                        icon={<EyeIcon className="h-5 w-5" />}
-                        disabled={!pinnedCount}
-                        onClick={() => openBrowserTab("OPEN_REVIEW_TAB")}
-                        accent={accent}
-                    />
                     <ActionButton
                         title="Compare Pinned Cars"
                         description="Compare pricing and key details."
                         icon={<ScaleIcon className="h-5 w-5" />}
                         disabled={!pinnedCount}
-                        onClick={() => openBrowserTab("OPEN_COMPARE_TAB")}
+                        onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                         accent={accent}
                     />
                     <ActionButton
-                        title="Download as PDF"
+                        title="Go To Settings"
+                        description="Compare pricing and key details."
+                        icon={<CogIcon className="h-5 w-5" />}
+                        disabled={!pinnedCount}
+                        onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
+                        accent={accent}
+                    />
+                    {/* <ActionButton
+                        title="Edit/Add Profiles"
                         description="Export your selected vehicles."
                         icon={<DocumentArrowDownIcon className="h-5 w-5" />}
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_DOWNLOAD_AS_PDF_PAGE")}
                         accent={accent}
-                    />
+                    /> */}
                 </div>
             </RadixTabs.Content>
         </RadixTabs.Root>

@@ -21,6 +21,7 @@
   /* -- Breakpoints --
      Redeclaring these overrides Tailwind's defaults and generates
      2xs:, xs:, sm:, md:, lg:, xl:, 2xl:, 3xl:, 4xl:, 5xl: variants. */
+  --breakpoint-3xs: 375px;
   --breakpoint-2xs: 480px;
   --breakpoint-xs: 640px;
   --breakpoint-sm: 768px;

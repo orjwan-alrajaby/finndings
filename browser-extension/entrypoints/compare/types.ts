@@ -1,0 +1,1 @@
+export type CompareStep = "priorities" | "order" | "preferences" | "advice";

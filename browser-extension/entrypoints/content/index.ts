@@ -37,14 +37,39 @@ export default defineContentScript({
       if (event.data?.source !== "finn-lens") return;
       if (event.data?.type !== "FINN_CARS_RESPONSE") return;
 
-      const batchLoaded = event.data.payload.results;
-      const formatted = mapFinnConfigToAll(batchLoaded);
+      browser.runtime.onMessage.addListener(async (message) => {
+        if (message.type !== "GET_PAGE_STATS") return;
 
-      allLoadedSoFar = {
-        cars: { ...allLoadedSoFar.cars, ...formatted },
-        total: allLoadedSoFar.total + batchLoaded.length,
-      };
+        const pinnedCars = await getPinnedCars();
 
+      await browser.storage.local.set({
+        loadedCarsFromFinnApi: allLoadedSoFar,
+      });
+        
+        return {
+          detectedCount: document.querySelectorAll(
+            '[data-finn-lens-processed="true"]'
+          ).length,
+          pinnedCount: Object.keys(pinnedCars ?? {}).length,
+          pinnedCars,
+        };
+      });
+
+      window.addEventListener("message", async (event) => {
+        if (event.source !== window) return;
+        if (event.data?.source !== "finn-lens") return;
+        if (event.data?.type !== "FINN_CARS_RESPONSE") return;
+
+        const batchLoaded = event.data.payload.results;
+        const formatted = mapFinnConfigToAll(batchLoaded);
+
+        allLoadedSoFar = {
+          cars: { ...allLoadedSoFar.cars, ...formatted },
+          total: allLoadedSoFar.total + batchLoaded.length,
+        };
+
+        await browser.storage.local.set({ loadedCarsFromFinnApi: allLoadedSoFar });
+      });
       await browser.storage.local.set({
         loadedCarsFromFinnApi: allLoadedSoFar,
       });
