@@ -4,6 +4,7 @@ import type {
     CostFactSource,
     CostLine,
 } from "@/lib/reasoning-engine/types";
+import type { CostReasoning } from "@/lib/reasoning-engine/narrative";
 import { formatEUR } from "@/lib/reasoning-engine";
 
 /**
@@ -88,7 +89,18 @@ function Line({ line }: { line: CostLine }) {
     );
 }
 
-export function CostAnalysis({ analysis }: { analysis: CostAnalysisData }) {
+export function CostAnalysis({
+    analysis,
+    reasoning,
+}: {
+    analysis: CostAnalysisData;
+    /**
+     * The comparative half of the cost story — what this car costs *next to*
+     * the alternatives the user pinned, which is the question a monthly
+     * figure on its own can't answer.
+     */
+    reasoning: CostReasoning;
+}) {
     const { breakdown } = analysis;
     const overBudget = breakdown.budgetStatus === "over";
 
@@ -102,9 +114,16 @@ export function CostAnalysis({ analysis }: { analysis: CostAnalysisData }) {
                 What {analysis.vehicleName} costs you
             </h2>
 
-            <p className="mt-2 text-sm leading-6 text-finn-iron">
-                {analysis.headline}
-            </p>
+            <div className="mt-2 space-y-2">
+                {reasoning.sentences.map((sentence) => (
+                    <p
+                        key={sentence}
+                        className="text-sm leading-6 text-finn-iron"
+                    >
+                        {sentence}
+                    </p>
+                ))}
+            </div>
 
             <p className="mt-4 text-xs font-black uppercase tracking-[0.14em] text-finn-iron">
                 Here's how we got there

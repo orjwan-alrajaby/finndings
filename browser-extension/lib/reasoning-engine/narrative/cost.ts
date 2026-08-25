@@ -1,0 +1,240 @@
+import type { PinnedFinnCar } from "@/lib/types";
+import type { CostBreakdown, ReasoningContext } from "../types";
+import type { CostPosition, CostReasoning } from "./types";
+
+import { formatEUR, formatKm } from "../format";
+import { classifyMonthlyCostGap, isEffectivelyLevel } from "./magnitude";
+import { paragraph, sentence, shortName } from "./phrase";
+
+/**
+ * Money, said precisely.
+ *
+ * Three rules run through this file:
+ *
+ * - a rental price, an energy estimate and a total are three different
+ *   numbers, and the reader is told which one they're looking at;
+ * - an estimate is never presented as a certainty;
+ * - what we couldn't calculate is named, not rounded to zero.
+ *
+ * Cost is not one of the user's ranked priorities — in this product the
+ * budget is a hard eligibility constraint the user set explicitly. That is
+ * why cost reasoning always appears: the user asked for it directly.
+ */
+
+function position(
+  vehicle: PinnedFinnCar,
+  breakdown: CostBreakdown | undefined,
+): CostPosition | null {
+  if (!breakdown) return null;
+
+  return {
+    vehicleId: vehicle.id,
+    name: vehicle.name,
+    total: breakdown.totalMonthly,
+    subscription: breakdown.subscription.amount,
+    energy: breakdown.energy.amount,
+    excessMileage: breakdown.excessMileage.amount,
+    complete: breakdown.complete,
+    budgetStatus: breakdown.budgetStatus,
+  };
+}
+
+/**
+ * The cheapest pinned car we can fully cost.
+ *
+ * Restricted to complete estimates on purpose: a car with an unknown energy
+ * cost must never be presented as the cheap option just because part of its
+ * total is missing.
+ */
+function cheapestComparable(
+  context: ReasoningContext,
+  excludeIds: number[],
+): CostPosition | null {
+  const candidates = context.vehicles
+    .map((vehicle) => position(vehicle, context.costs[vehicle.id]))
+    .filter(
+      (item): item is CostPosition =>
+        item != null && item.complete && !excludeIds.includes(item.vehicleId),
+    );
+
+  if (!candidates.length) return null;
+
+  return candidates.reduce((cheapest, item) =>
+    item.total < cheapest.total ? item : cheapest,
+  );
+}
+
+const UNKNOWN_LABEL: Record<string, string> = {
+  missingSubscriptionPrice: "the monthly subscription price",
+  missingConsumption: "the fuel or electricity it uses",
+  missingEnergyPrice: "the energy price to apply",
+  missingExtraKmPrice: "the price of kilometres beyond the included allowance",
+};
+
+/** Splits the total into the parts it's actually made of. */
+function describeComposition(
+  subject: CostPosition,
+  monthlyKm: number,
+): string | null {
+  const parts: string[] = [];
+
+  if (subject.subscription != null) {
+    parts.push(`${formatEUR(subject.subscription)} subscription`);
+  }
+
+  if (subject.energy != null) {
+    parts.push(`about ${formatEUR(subject.energy)} of estimated energy`);
+  }
+
+  if (subject.excessMileage != null && subject.excessMileage > 0) {
+    parts.push(
+      `about ${formatEUR(subject.excessMileage)} for kilometres beyond FINN's allowance`,
+    );
+  }
+
+  if (parts.length < 2) return null;
+
+  const [first, ...rest] = parts;
+
+  return sentence(
+    `That's ${first}, plus ${rest.join(", plus ")}, at the`,
+    `${formatKm(monthlyKm)}/month you told us you drive`,
+  );
+}
+
+/** How this car's monthly total compares with one specific alternative. */
+function describeAgainst(
+  subject: CostPosition,
+  other: CostPosition,
+  role: "rival" | "cheapest",
+): string | null {
+  if (!subject.complete || !other.complete) return null;
+
+  const difference = subject.total - other.total;
+  const magnitude = classifyMonthlyCostGap(difference, other.total);
+
+  if (isEffectivelyLevel(magnitude)) {
+    return sentence(
+      `${shortName(other.name)} works out at roughly the same —`,
+      `${formatEUR(other.total)}/month against ${formatEUR(subject.total)}`,
+    );
+  }
+
+  const amount = formatEUR(Math.abs(difference));
+
+  if (difference > 0) {
+    return sentence(
+      role === "cheapest"
+        ? `${shortName(other.name)} is the cheapest car you pinned that we can fully cost:`
+        : `${shortName(other.name)} costs less:`,
+      `${formatEUR(other.total)}/month, about ${amount} less than this one`,
+    );
+  }
+
+  /*
+   * Nothing we can fully cost came in lower than the subject, so the
+   * "cheapest alternative" line is really a statement about the subject.
+   */
+  return role === "cheapest"
+    ? sentence(
+        "Nothing else you pinned that we can fully cost comes in lower —",
+        `the nearest is ${shortName(other.name)} at ${formatEUR(other.total)}/month`,
+      )
+    : sentence(
+        `That's about ${amount}/month less than ${shortName(other.name)}`,
+      );
+}
+
+function describeBudget(
+  subject: CostPosition,
+  budget: number | null,
+  difference: number | null,
+): string | null {
+  if (budget == null || difference == null) return null;
+
+  if (subject.budgetStatus === "over") {
+    return sentence(
+      `You set a ${formatEUR(budget)}/month budget, and this comes to about`,
+      `${formatEUR(Math.abs(difference))} over it`,
+    );
+  }
+
+  if (subject.budgetStatus === "unknown") {
+    return sentence(
+      `You set a ${formatEUR(budget)}/month budget. What we could calculate fits inside it,`,
+      "but part of the estimate is missing, so we can't confirm that it does",
+    );
+  }
+
+  return sentence(
+    `You set a ${formatEUR(budget)}/month budget, so this leaves about`,
+    `${formatEUR(Math.abs(difference))} of room`,
+  );
+}
+
+export function reasonAboutCost(
+  vehicle: PinnedFinnCar,
+  rivalVehicle: PinnedFinnCar | null,
+  context: ReasoningContext,
+): CostReasoning {
+  const breakdown = context.costs[vehicle.id];
+
+  const subject =
+    position(vehicle, breakdown) ??
+    ({
+      vehicleId: vehicle.id,
+      name: vehicle.name,
+      total: 0,
+      subscription: null,
+      energy: null,
+      excessMileage: null,
+      complete: false,
+      budgetStatus: "unknown",
+    } satisfies CostPosition);
+
+  const rival = rivalVehicle
+    ? position(rivalVehicle, context.costs[rivalVehicle.id])
+    : null;
+
+  const cheapest = cheapestComparable(context, [
+    vehicle.id,
+    ...(rival ? [rival.vehicleId] : []),
+  ]);
+
+  const unknowns = (breakdown?.missing ?? []).map(
+    (reason) => UNKNOWN_LABEL[reason] ?? reason,
+  );
+
+  const headline = subject.complete
+    ? sentence(
+        `At your mileage we estimate ${formatEUR(subject.total)}/month in total`,
+      )
+    : sentence(
+        `We can only account for ${formatEUR(subject.total)}/month of this car's cost`,
+      );
+
+  const sentences = paragraph(
+    headline,
+    describeComposition(subject, context.preferences.monthlyKm),
+    unknowns.length
+      ? sentence(
+          `We couldn't work out ${unknowns.join(" or ")}, so the real figure is higher`,
+          "than the number above — we've left it out rather than counting it as zero",
+        )
+      : null,
+    rival ? describeAgainst(subject, rival, "rival") : null,
+    cheapest ? describeAgainst(subject, cheapest, "cheapest") : null,
+    describeBudget(subject, context.budget.budget, breakdown?.budgetDifference ?? null),
+  );
+
+  return {
+    subject,
+    rival,
+    cheapest,
+    budget: context.budget.budget,
+    budgetDifference: breakdown?.budgetDifference ?? null,
+    monthlyKm: context.preferences.monthlyKm,
+    unknowns,
+    sentences,
+  };
+}

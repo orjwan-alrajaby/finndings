@@ -7,7 +7,8 @@ import {
   hotSeatOptions,
   migratePreferences,
 } from "./index";
-import { explainPriority, explainVerdict } from "./explain";
+import { explainVerdict } from "./explain";
+import { buildAdviceNarrative } from "./narrative";
 import type { CategoryId, FeatureWeight } from "./types";
 import {
   CATEGORY_IDS,
@@ -117,7 +118,9 @@ describe("buildRecommendation", () => {
 
     expect(safety?.rank).toBe(1);
     expect(safety?.versus?.difference).toBeGreaterThan(0);
-    expect(safety?.versus?.onlySubjectHas).toContain("Blind spot warning");
+    expect(
+      safety?.versus?.onlySubjectHas.map((item) => item.key),
+    ).toContain("hasBlindSpotAssist");
   });
 
   it("does not let an over-budget car beat an in-budget one", () => {
@@ -589,25 +592,28 @@ describe("comparative reasoning", () => {
     ]);
   });
 
-  it("names both scores, the features behind them and the weighted swing", () => {
+  it("names the equipment behind a category gap rather than the points", () => {
     const result = setup();
-    const safety = result.evaluation.priorities.find(
+    const narrative = buildAdviceNarrative(result.evaluation, result.context);
+
+    const safety = narrative.priorities.find(
       (item) => item.priority === "safety",
     )!;
 
-    const sentences = explainPriority(safety, result.winner.name).join(" ");
+    const prose = safety.sentences.join(" ");
 
-    // Both cars' scores are stated, not just the winner's.
-    expect(sentences).toContain(`${safety.score}/100`);
-    expect(sentences).toContain(`${safety.versus!.score}/100`);
+    // The specific equipment difference is named, and carries its tier.
+    expect(safety.rival!.onlySubjectHas.map((item) => item.label)).toContain(
+      "Blind spot warning",
+    );
+    expect(prose.toLowerCase()).toContain("blind spot warning");
+    expect(
+      safety.features.essentialPresent.map((item) => item.label),
+    ).toContain("Blind spot warning");
 
-    // The specific equipment difference is named.
-    expect(safety.versus!.onlySubjectHas).toContain("Blind spot warning");
-    expect(sentences).toContain("Blind spot warning");
-
-    // The consequence of the ordering is quantified, not hand-waved.
-    expect(sentences).toContain("#1 priority");
-    expect(sentences).toContain(`${safety.weightPercent}%`);
+    // The score recital the old copy leant on is gone.
+    expect(prose).not.toContain("/100");
+    expect(prose).not.toContain(`${safety.weightPercent}%`);
   });
 
   it("surfaces where the losing car is actually better, with the numbers", () => {
@@ -622,18 +628,22 @@ describe("comparative reasoning", () => {
     expect(concession.versus?.numeric?.value).toBe(520);
     expect(concession.numeric?.value).toBe(390);
 
-    expect(result.evaluation.comparison!.summary).toContain("Practicality");
-    expect(result.evaluation.comparison!.summary).toContain("not enough");
+    // Named by the equipment behind it, not by the points it was worth.
+    const summary = result.evaluation.comparison!.summary;
+
+    expect(summary).toContain("practicality");
+    expect(summary).toContain("split-folding rear seats");
+    expect(summary).toContain("isn't enough to close the gap");
   });
 
   it("never says a car won because 'your other priorities matter more'", () => {
     const result = setup();
+    const narrative = buildAdviceNarrative(result.evaluation, result.context);
 
     const prose = [
       result.evaluation.comparison!.summary,
-      ...result.evaluation.priorities.flatMap((item) =>
-        explainPriority(item, result.winner.name),
-      ),
+      ...narrative.verdict.sentences,
+      ...narrative.priorities.flatMap((item) => item.sentences),
     ].join(" ");
 
     expect(prose).not.toMatch(/other priorities matter more/i);

@@ -1,48 +1,82 @@
-import type { PriorityBreakdown } from "@/lib/reasoning-engine/types";
-import { explainPriority } from "@/lib/reasoning-engine";
+import type {
+    FeatureFact,
+    MeasurementFact,
+    PriorityReasoning,
+    PriorityStanding,
+} from "@/lib/reasoning-engine/narrative";
+import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
 
 /**
- * One priority, explained with the actual scores and features behind it.
+ * One priority, answering one question: what does this car actually give me
+ * for the thing I said mattered?
  *
- * The prose comes from `explainPriority`, which builds every sentence from
- * the numbers on the breakdown — so nothing here can claim more than the
- * data supports.
+ * The prose is composed by the narrative layer from established facts. This
+ * component's only job is to lay it out and put the named features and
+ * figures within reach of the sentence that mentions them.
  */
+
+const STANDING_LABEL: Record<PriorityStanding, string> = {
+    leads: "Best of your pinned cars",
+    levelWithLeader: "Level with the best",
+    closeToLeader: "Just behind the best",
+    behindLeader: "Another car is stronger",
+    unsupported: "Not enough data",
+};
+
+const STANDING_CLASS: Record<PriorityStanding, string> = {
+    leads: "bg-finn-pale-blue text-finn-accent-blue",
+    levelWithLeader: "bg-finn-pale-blue text-finn-accent-blue",
+    closeToLeader: "bg-finn-cotton text-finn-iron",
+    behindLeader: "bg-finn-warning/10 text-finn-warning",
+    unsupported: "bg-finn-cotton text-finn-iron",
+};
+
 export function PrioritySection({
-    breakdown,
-    subjectName,
+    reasoning,
 }: {
-    breakdown: PriorityBreakdown;
-    subjectName: string;
+    reasoning: PriorityReasoning;
 }) {
-    const sentences = explainPriority(breakdown, subjectName);
-    const versus = breakdown.versus;
+    const { features } = reasoning;
+
+    const hasChips =
+        features.essentialPresent.length ||
+        features.essentialMissing.length ||
+        features.optionalPresent.length ||
+        features.optionalMissing.length ||
+        (reasoning.rival?.onlyRivalHas.length ?? 0);
 
     return (
         <section className="border-t border-finn-cotton pt-6">
             <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-sm font-black text-finn-accent-blue">
-                    {breakdown.icon}
+                    {reasoning.icon}
                 </div>
 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-finn-accent-blue">
-                                Priority #{breakdown.rank} ·{" "}
-                                {breakdown.weightPercent}% of the result
+                                Priority #{reasoning.rank} ·{" "}
+                                {reasoning.weightPercent}% of the result
                             </p>
 
                             <h3 className="mt-1 text-lg font-black text-finn-black">
-                                {breakdown.label}
+                                {reasoning.label}
                             </h3>
                         </div>
 
-                        <ScoreBar breakdown={breakdown} subjectName={subjectName} />
+                        <span
+                            className={[
+                                "rounded-full px-2.5 py-1 text-[10px] font-black",
+                                STANDING_CLASS[reasoning.standing],
+                            ].join(" ")}
+                        >
+                            {STANDING_LABEL[reasoning.standing]}
+                        </span>
                     </div>
 
                     <div className="mt-2 space-y-2">
-                        {sentences.map((sentence) => (
+                        {reasoning.sentences.map((sentence) => (
                             <p
                                 key={sentence}
                                 className="text-sm leading-6 text-finn-iron"
@@ -52,33 +86,38 @@ export function PrioritySection({
                         ))}
                     </div>
 
-                    {(breakdown.matchedLabels.length > 0 ||
-                        breakdown.missingLabels.length > 0) && (
-                        <dl className="mt-3 space-y-1.5">
-                            {breakdown.matchedLabels.length > 0 && (
-                                <FeatureRow
-                                    label="Present"
-                                    items={breakdown.matchedLabels}
-                                    tone="text-finn-black"
-                                />
-                            )}
+                    {reasoning.measurements.length > 0 && (
+                        <MeasurementTable facts={reasoning.measurements} />
+                    )}
 
-                            {breakdown.missingLabels.length > 0 && (
-                                <FeatureRow
-                                    label="Not present"
-                                    items={breakdown.missingLabels}
-                                    tone="text-finn-warning"
-                                />
-                            )}
+                    {Boolean(hasChips) && (
+                        <div className="mt-3 space-y-2">
+                            <ChipRow
+                                label="You get"
+                                facts={[
+                                    ...features.essentialPresent,
+                                    ...features.optionalPresent,
+                                ]}
+                                tone="present"
+                            />
 
-                            {versus && versus.onlyOtherHas.length > 0 && (
-                                <FeatureRow
-                                    label={`Only ${versus.name} has`}
-                                    items={versus.onlyOtherHas}
-                                    tone="text-finn-iron"
+                            <ChipRow
+                                label="You don't"
+                                facts={[
+                                    ...features.essentialMissing,
+                                    ...features.optionalMissing,
+                                ]}
+                                tone="missing"
+                            />
+
+                            {reasoning.rival && (
+                                <ChipRow
+                                    label={`Only ${reasoning.rival.name} has`}
+                                    facts={reasoning.rival.onlyRivalHas}
+                                    tone="rivalOnly"
                                 />
                             )}
-                        </dl>
+                        </div>
                     )}
                 </div>
             </div>
@@ -86,46 +125,65 @@ export function PrioritySection({
     );
 }
 
-function ScoreBar({
-    breakdown,
-    subjectName,
+function ChipRow({
+    label,
+    facts,
+    tone,
 }: {
-    breakdown: PriorityBreakdown;
-    subjectName: string;
+    label: string;
+    facts: FeatureFact[];
+    tone: FeatureChipTone;
 }) {
-    const versus = breakdown.versus;
+    if (!facts.length) return null;
 
     return (
-        <div className="text-right">
-            <p className="font-mono text-lg font-black text-finn-black">
-                {breakdown.score}
-                <span className="text-xs text-finn-iron">/100</span>
-            </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                {label}
+            </span>
 
-            <p className="text-[10px] font-bold text-finn-iron">
-                {versus
-                    ? `${subjectName.split(" ")[0]} ${breakdown.score} · ${
-                          versus.name.split(" ")[0]
-                      } ${versus.score}`
-                    : "no comparison available"}
-            </p>
+            {facts.map((fact) => (
+                <FeatureChip key={fact.key} fact={fact} tone={tone} />
+            ))}
         </div>
     );
 }
 
-function FeatureRow({
-    label,
-    items,
-    tone,
-}: {
-    label: string;
-    items: string[];
-    tone: string;
-}) {
+/**
+ * The measured figures, side by side with the rival's.
+ *
+ * Marked when a number feeds the score and when it doesn't, so the reader can
+ * tell the evidence apart from the context.
+ */
+function MeasurementTable({ facts }: { facts: MeasurementFact[] }) {
     return (
-        <div className="flex flex-wrap gap-x-2 text-xs">
-            <dt className="font-black text-finn-iron">{label}:</dt>
-            <dd className={`font-semibold ${tone}`}>{items.join(", ")}</dd>
-        </div>
+        <dl className="mt-3 grid gap-1.5 sm:grid-cols-2">
+            {facts.map((fact) => (
+                <div
+                    key={fact.label}
+                    className="rounded-xl bg-finn-snow px-3 py-2"
+                >
+                    <dt className="flex items-baseline justify-between gap-2 text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                        {fact.label}
+
+                        {!fact.scored && (
+                            <span className="font-bold normal-case tracking-normal opacity-70">
+                                context only
+                            </span>
+                        )}
+                    </dt>
+
+                    <dd className="mt-0.5 text-sm font-black text-finn-black">
+                        {fact.display}
+
+                        {fact.rival && (
+                            <span className="ml-2 text-xs font-bold text-finn-iron">
+                                vs {fact.rival.display} ({fact.rival.name})
+                            </span>
+                        )}
+                    </dd>
+                </div>
+            ))}
+        </dl>
     );
 }

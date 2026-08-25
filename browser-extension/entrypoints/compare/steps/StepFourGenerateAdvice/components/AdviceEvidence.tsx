@@ -6,13 +6,16 @@ import type {
     ReasoningContext,
     VehicleEvaluation,
 } from "@/lib/reasoning-engine/types";
+import type { AdviceNarrative } from "@/lib/reasoning-engine/narrative";
 import { explainVerdict } from "@/lib/reasoning-engine";
 import { PrioritySection } from "./PrioritySection";
+import { Tradeoffs } from "./Tradeoffs";
 import { HeadToHeadSummary } from "./HeadToHeadSummary";
 import { RecommendationRanking } from "./RecommendationRanking";
 
 interface AdviceEvidenceProps {
     evaluation: VehicleEvaluation;
+    narrative: AdviceNarrative;
     context: ReasoningContext;
     recommendedId: number;
     expanded: boolean;
@@ -22,12 +25,17 @@ interface AdviceEvidenceProps {
 /**
  * The evidence panel for whichever car is currently in the hot seat.
  *
+ * The order is the argument: what this car gives the reader for each thing
+ * they ranked, then what they're giving up to take it, then the arithmetic
+ * for anyone who wants to check it.
+ *
  * It reads identically for the recommended car and for one the user picked —
- * the only thing that changes is the verdict line, which never claims a car
- * won unless it did.
+ * the only thing that changes is the framing, which never claims a car won
+ * unless it did.
  */
 export function AdviceEvidence({
     evaluation,
+    narrative,
     context,
     recommendedId,
     expanded,
@@ -46,24 +54,39 @@ export function AdviceEvidence({
 
                 <h2 className="mt-2 text-2xl font-black">
                     {evaluation.isRecommendation
-                        ? "The evidence, in your order."
+                        ? "What you told us, and what this car does about it."
                         : `How ${subjectName} measures up.`}
                 </h2>
 
-                <p className="mt-2 text-sm leading-6 text-finn-iron">
+                <p className="mt-2 text-sm font-semibold leading-6 text-finn-black">
                     {explainVerdict(evaluation)}
                 </p>
+
+                <div className="mt-2 space-y-2">
+                    {narrative.verdict.sentences.map((sentence) => (
+                        <p
+                            key={sentence}
+                            className="text-sm leading-6 text-finn-iron"
+                        >
+                            {sentence}
+                        </p>
+                    ))}
+                </div>
             </div>
 
             <div className="space-y-6">
-                {evaluation.priorities.map((breakdown) => (
+                {narrative.priorities.map((reasoning) => (
                     <PrioritySection
-                        key={breakdown.priority}
-                        breakdown={breakdown}
-                        subjectName={subjectName}
+                        key={reasoning.priority}
+                        reasoning={reasoning}
                     />
                 ))}
             </div>
+
+            <Tradeoffs
+                tradeoffs={narrative.tradeoffs}
+                isRecommendation={evaluation.isRecommendation}
+            />
 
             {evaluation.comparison && (
                 <HeadToHeadSummary comparison={evaluation.comparison} />
@@ -97,6 +120,7 @@ export function AdviceEvidence({
                         context={context}
                         recommendedId={recommendedId}
                         selectedId={evaluation.vehicle.id}
+                        margin={narrative.verdict.margin}
                     />
                 )}
             </section>

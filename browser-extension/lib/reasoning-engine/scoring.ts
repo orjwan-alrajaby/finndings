@@ -250,6 +250,7 @@ export function categoryDetail(
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,
+    hasEvidence: featureScore != null || numeric != null,
   };
 }
 

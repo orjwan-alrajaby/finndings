@@ -4,154 +4,76 @@ import type {
   VehicleEvaluation,
 } from "./types";
 
-import { formatEUR, joinList } from "./format";
+import { formatEUR } from "./format";
+import { featureLabel } from "./scoring";
+import {
+  classifyTotalGap,
+  isEffectivelyLevel,
+} from "./narrative/magnitude";
+import {
+  inSentence,
+  joinCapped,
+  phraseLabel,
+  sentence,
+  shortName,
+} from "./narrative/phrase";
 
 /**
- * Prose builders.
+ * The head-to-head summary and the placement line.
  *
- * Every sentence in here is assembled from numbers that already exist on the
- * structured result. Nothing states a claim the data can't back — if a
- * comparison, a feature list or a measurement is missing, the sentence that
- * would have used it is simply not produced.
+ * Per-priority prose lives in `narrative/` — this file covers only the two
+ * statements that are about the pair as a whole.
+ *
+ * The rule both obey: name the thing. A gap is explained by the equipment or
+ * the measurement behind it, not by reciting the points it was worth. The
+ * weighted arithmetic is still available to the reader, in the contribution
+ * table, where a number is what they came for.
  */
 
 /* -------------------------------------------------------------------------- */
-/* Priorities                                                                 */
+/* What separates two cars in one priority                                    */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Explains how one car performs in one priority, and what separates it from
- * the car it's being compared with.
+ * The concrete difference behind a category gap: the equipment one has and
+ * the other doesn't, or the measurement that separates them.
  *
- * Returns an array of sentences so the UI can lay them out however it likes.
+ * Returns null when the data supports nothing more specific than the score,
+ * so the caller can leave the claim unmade rather than dress it up.
  */
-export function explainPriority(
+function whatSeparates(
   breakdown: PriorityBreakdown,
-  subjectName: string,
-): string[] {
-  const sentences: string[] = [];
-  const { versus } = breakdown;
-
-  /* Score, side by side with the rival when there is one. */
-  if (versus) {
-    sentences.push(
-      `${subjectName} scores ${breakdown.score}/100 for ${breakdown.label} while ` +
-        `${versus.name} scores ${versus.score}/100.`,
-    );
-  } else {
-    sentences.push(
-      `${subjectName} scores ${breakdown.score}/100 for ${breakdown.label}.`,
-    );
-  }
-
-  /* The equipment behind those scores. */
-  const featureSentence = describeFeatures(breakdown, subjectName);
-  if (featureSentence) sentences.push(featureSentence);
-
-  /* The measurement behind those scores. */
-  const numericSentence = describeNumeric(breakdown, subjectName);
-  if (numericSentence) sentences.push(numericSentence);
-
-  /* What the ordering does with that gap. */
-  if (versus && versus.difference !== 0) {
-    const ahead = versus.difference > 0;
-    const gap = Math.abs(versus.difference);
-
-    sentences.push(
-      `${breakdown.label} is your #${breakdown.rank} priority, accounting for about ` +
-        `${breakdown.weightPercent}% of the overall result, so this ${gap}-point ` +
-        `${ahead ? "lead" : "deficit"} moves the total by roughly ` +
-        `${Math.abs(versus.weightedDifference).toFixed(1)} points.`,
-    );
-  } else if (!versus) {
-    sentences.push(
-      `${breakdown.label} is your #${breakdown.rank} priority, accounting for about ` +
-        `${breakdown.weightPercent}% of the overall result.`,
-    );
-  }
-
-  /* Where it stands against the whole set, when the rival isn't the leader. */
-  if (
-    !breakdown.isLeader &&
-    breakdown.leader &&
-    breakdown.leader.vehicleId !== versus?.vehicleId
-  ) {
-    sentences.push(
-      `${breakdown.leader.name} leads this category outright at ` +
-        `${breakdown.leader.score}/100, ${breakdown.gapToLeader} points ahead of ${subjectName}.`,
-    );
-  }
-
-  return sentences;
-}
-
-function describeFeatures(
-  breakdown: PriorityBreakdown,
-  subjectName: string,
+  fromSubject: boolean,
+  behindName: string,
 ): string | null {
-  const { versus } = breakdown;
+  const versus = breakdown.versus;
+  if (!versus) return null;
 
-  if (versus && (versus.onlySubjectHas.length || versus.onlyOtherHas.length)) {
-    const parts: string[] = [];
+  const theirs = fromSubject ? versus.onlySubjectHas : versus.onlyOtherHas;
 
-    if (versus.onlySubjectHas.length) {
-      parts.push(
-        `${subjectName} has ${joinList(versus.onlySubjectHas)}, which ${versus.name} does not`,
-      );
+  if (theirs.length) {
+    return `it has ${joinCapped(
+      theirs.map((item) => inSentence(featureLabel(item.key))),
+    )}, which ${behindName} doesn't`;
+  }
+
+  const mine = breakdown.numeric;
+  const other = versus.numeric;
+
+  if (mine && other && mine.value !== other.value) {
+    const ahead = mine.lowerIsBetter
+      ? mine.value < other.value
+      : mine.value > other.value;
+
+    /* Only offered as the separator when it points the right way. */
+    if (ahead === fromSubject) {
+      const [better, worse] = ahead ? [mine, other] : [other, mine];
+
+      return `${inSentence(mine.label)} is ${better?.display} against ${worse?.display}`;
     }
-
-    if (versus.onlyOtherHas.length) {
-      parts.push(
-        `${versus.name} has ${joinList(versus.onlyOtherHas)}, which ${subjectName} does not`,
-      );
-    }
-
-    return `${parts.join("; ")}.`;
-  }
-
-  if (breakdown.matchedLabels.length && breakdown.missingLabels.length) {
-    return (
-      `It has ${joinList(breakdown.matchedLabels)}, but not ` +
-      `${joinList(breakdown.missingLabels)} from the features you selected here.`
-    );
-  }
-
-  if (breakdown.matchedLabels.length) {
-    return `It covers every feature you selected here: ${joinList(breakdown.matchedLabels)}.`;
-  }
-
-  if (breakdown.missingLabels.length) {
-    return `None of the features you selected here are present: ${joinList(breakdown.missingLabels)}.`;
   }
 
   return null;
-}
-
-function describeNumeric(
-  breakdown: PriorityBreakdown,
-  subjectName: string,
-): string | null {
-  const mine = breakdown.numeric;
-  if (!mine) return null;
-
-  const theirs = breakdown.versus?.numeric;
-
-  if (theirs && breakdown.versus) {
-    if (theirs.value === mine.value) {
-      return `Both are at ${mine.display} for ${mine.label.toLowerCase()}.`;
-    }
-
-    const better = mine.lowerIsBetter
-      ? mine.value < theirs.value
-      : mine.value > theirs.value;
-
-    return (
-      `${mine.label}: ${subjectName} ${mine.display} versus ${breakdown.versus.name} ` +
-      `${theirs.display} — ${better ? "in" : "against"} ${subjectName}'s favour.`
-    );
-  }
-
-  return `${mine.label}: ${mine.display}.`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -159,61 +81,82 @@ function describeNumeric(
 /* -------------------------------------------------------------------------- */
 
 /**
- * The one-paragraph answer to "why did this come out on top?", built entirely
- * from the weighted differences that actually decided it.
+ * The one-paragraph answer to "why did this come out on top?".
+ *
+ * Every claim traces to a feature list, a measurement or the budget. Where
+ * the two cars are a point or two apart, that is stated rather than papered
+ * over — a reader looking at 82 next to 81 will notice either way.
  */
-export function explainHeadToHead(
-  head: Omit<HeadToHead, "summary">,
-): string {
+export function explainHeadToHead(head: Omit<HeadToHead, "summary">): string {
   const { subject, other, totalDifference, decidingAdvantage, biggestConcession } =
     head;
 
+  const budget = describeBudgetOutcome(head);
+
   if (totalDifference === 0) {
-    const level =
-      `${subject.name} and ${other.name} finish level at ${subject.total}/100 ` +
-      "under your current priority order.";
-
-    const budget = describeBudgetOutcome(head);
-
-    return budget ? `${level} ${budget}` : level;
+    return sentence(
+      `${shortName(subject.name)} and ${shortName(other.name)} finish level`,
+      "under your current priority order",
+      budget ? `. ${budget}` : "",
+    );
   }
 
   const ahead = totalDifference > 0;
-  const leadName = ahead ? subject.name : other.name;
-  const trailName = ahead ? other.name : subject.name;
+  const leadName = shortName(ahead ? subject.name : other.name);
+  const trailName = shortName(ahead ? other.name : subject.name);
 
-  const sentences: string[] = [
-    `${leadName} finishes ahead of ${trailName}, ${Math.max(
-      subject.total,
-      other.total,
-    )}/100 against ${Math.min(subject.total, other.total)}/100.`,
-  ];
+  const magnitude = classifyTotalGap(totalDifference);
+  const sentences: string[] = [];
 
-  /* The advantage that did the most work, named with its actual numbers. */
+  /* The advantage that did the most work, named by what it actually is. */
   const driver = ahead ? decidingAdvantage : biggestConcession;
+  const driverEvidence = driver ? whatSeparates(driver, ahead, trailName) : null;
 
-  if (driver?.versus) {
-    sentences.push(
-      `The largest single factor is ${driver.label} — your #${driver.rank} priority at about ` +
-        `${driver.weightPercent}% of the result — where the gap is ` +
-        `${Math.abs(driver.versus.difference)} points ` +
-        `(${Math.max(driver.score, driver.versus.score)}/100 against ` +
-        `${Math.min(driver.score, driver.versus.score)}/100), ` +
-        `worth roughly ${Math.abs(driver.versus.weightedDifference).toFixed(1)} points overall.`,
-    );
+  sentences.push(
+    isEffectivelyLevel(magnitude)
+      ? sentence(
+          `${leadName} and ${trailName} are close to level —`,
+          `${Math.abs(totalDifference)} point${
+            Math.abs(totalDifference) === 1 ? "" : "s"
+          } apart`,
+          driver
+            ? `— and ${phraseLabel(driver.label)}, your #${driver.rank} priority, is what tips it`
+            : "",
+        )
+      : sentence(
+          `${leadName} finishes ahead of ${trailName}, mainly on`,
+          driver ? phraseLabel(driver.label) : "your ranked priorities",
+          driver ? `, your #${driver.rank} priority` : "",
+        ),
+  );
+
+  if (driver && driverEvidence) {
+    sentences.push(sentence(`There, ${driverEvidence}`));
   }
 
   /* Where the trailing car is genuinely better, and why it wasn't enough. */
   const counter = ahead ? biggestConcession : decidingAdvantage;
+  const counterEvidence = counter ? whatSeparates(counter, !ahead, leadName) : null;
 
-  if (counter?.versus && Math.abs(counter.versus.difference) > 0) {
+  if (counter?.versus && counter.versus.difference !== 0) {
+    /*
+     * The deciding advantage is the one that moved the total most, which is
+     * not always the higher-ranked priority. Saying "below X" when it sits
+     * above X is the kind of error that costs a reader their trust in
+     * everything else on the page.
+     */
+    const rankedLower = driver != null && counter.rank > driver.rank;
+
     sentences.push(
-      `${trailName} does beat ${leadName} on ${counter.label} ` +
-        `(${Math.max(counter.score, counter.versus.score)}/100 against ` +
-        `${Math.min(counter.score, counter.versus.score)}/100), but ${counter.label} is your ` +
-        `#${counter.rank} priority at about ${counter.weightPercent}% of the result, ` +
-        `so that advantage is worth about ` +
-        `${Math.abs(counter.versus.weightedDifference).toFixed(1)} points — not enough to close the gap.`,
+      sentence(
+        `${trailName} does beat ${leadName} on ${phraseLabel(counter.label)}`,
+        counterEvidence ? `— ${counterEvidence}` : "",
+        rankedLower && driver
+          ? `— but you ranked it #${counter.rank}, below ${phraseLabel(
+              driver.label,
+            )}, so that isn't enough to close the gap`
+          : "— but the gap there is narrower, so that isn't enough to close the gap",
+      ),
     );
   }
 
@@ -222,7 +165,6 @@ export function explainHeadToHead(
    * budget is a hard constraint. Saying so is the difference between a result
    * the user can check and one they have to take on faith.
    */
-  const budget = describeBudgetOutcome(head);
   if (budget) sentences.push(budget);
 
   return sentences.join(" ");
@@ -269,12 +211,16 @@ function describeBudgetOutcome(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Verdict                                                                    */
+/* Placement                                                                  */
 /* -------------------------------------------------------------------------- */
 
 /**
- * The headline for a car in the hot seat — states plainly whether it is the
- * recommendation or not, and where it actually placed.
+ * The status line for a car in the hot seat — states plainly whether it is
+ * the recommendation and where it actually placed.
+ *
+ * Kept deliberately short and factual. The reasoning that follows it is the
+ * narrative layer's job; this is the one sentence that has to be unambiguous
+ * before any of it is read.
  */
 export function explainVerdict(evaluation: VehicleEvaluation): string {
   const { vehicle, rank, score, isRecommendation, cost } = evaluation;
@@ -301,8 +247,7 @@ export function explainVerdict(evaluation: VehicleEvaluation): string {
     return `${vehicle.name} is your strongest match at ${score.total}/100 and fits your budget.`;
   }
 
-  const placement =
-    rank === 2 ? "second overall" : `#${rank} overall`;
+  const placement = rank === 2 ? "second overall" : `#${rank} overall`;
 
   const budgetClause =
     status === "over"

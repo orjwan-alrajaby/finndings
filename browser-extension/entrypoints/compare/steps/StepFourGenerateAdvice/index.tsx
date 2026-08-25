@@ -8,6 +8,7 @@ import type {
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 import {
+    buildAdviceNarrative,
     buildRecommendation,
     evaluateVehicle,
     hotSeatOptions,
@@ -92,6 +93,18 @@ export function StepFourGenerateAdvice({
                   recommendedId: winner.id,
               });
 
+    /*
+     * All of the reasoning for the car under examination, derived in one pass
+     * so the hero, the evidence and the tradeoffs can never disagree with
+     * each other about what the data says.
+     */
+    const narrative = buildAdviceNarrative(evaluation, context);
+
+    const winnerNarrative =
+        selected.id === winner.id
+            ? narrative
+            : buildAdviceNarrative(recommendation.evaluation, context);
+
     const options = hotSeatOptions(context, selected.id, winner.id);
     const winnerCost = context.costs[winner.id];
 
@@ -126,6 +139,7 @@ export function StepFourGenerateAdvice({
                     {winnerCost && (
                         <AdviceHero
                             evaluation={recommendation.evaluation}
+                            narrative={winnerNarrative}
                             cost={winnerCost}
                             priorities={context.priorities}
                             isFallback={isFallback}
@@ -142,6 +156,7 @@ export function StepFourGenerateAdvice({
                         <div className="space-y-6">
                             <AdviceEvidence
                                 evaluation={evaluation}
+                                narrative={narrative}
                                 context={context}
                                 recommendedId={winner.id}
                                 expanded={expanded}
@@ -150,7 +165,10 @@ export function StepFourGenerateAdvice({
                                 }
                             />
 
-                            <CostAnalysis analysis={evaluation.cost} />
+                            <CostAnalysis
+                                analysis={evaluation.cost}
+                                reasoning={narrative.cost}
+                            />
                         </div>
 
                         <AdviceSidebar

@@ -1,0 +1,539 @@
+import { describe, expect, it } from "vitest";
+
+import { buildRecommendation, evaluateVehicle } from "./index";
+import { buildAdviceNarrative } from "./narrative";
+import { classifyMonthlyCostGap, classifyScoreGap } from "./narrative/magnitude";
+import { coverage, inSentence, phraseLabel, shortName } from "./narrative/phrase";
+import { DEFAULT_CATEGORY_FEATURES, FEATURES } from "./constants";
+import { makeCar, prefs } from "./test-fixtures";
+import type { AdviceNarrative } from "./narrative";
+import type { CategoryId, FeatureWeight } from "./types";
+
+/* -------------------------------------------------------------------------- */
+/* Fixtures                                                                   */
+/* -------------------------------------------------------------------------- */
+
+const wellEquipped = makeCar({
+  id: 1,
+  name: "Ford Puma",
+  customerMonthly: 299,
+  consumption: 5.4,
+  trunk: 456,
+  co2: 124,
+  features: [
+    "hasEmergencyBrakingAssist",
+    "hasAdaptiveCruiseControl",
+    "hasLaneKeepingAssist",
+    "hasParkingAssistant",
+    "hasTrafficSignRecognition",
+    "hasCruiseControl",
+    "hasBlindSpotAssist",
+    "hasEmergencyCallSystem",
+    "hasIsofix",
+    "hasSplitFoldingRearSeats",
+    "hasHeatedSeats",
+    "hasAirConditioning",
+  ],
+});
+
+const bigBoot = makeCar({
+  id: 2,
+  name: "Hyundai i30",
+  customerMonthly: 279,
+  consumption: 5.9,
+  trunk: 1650,
+  co2: 133,
+  features: [
+    "hasEmergencyBrakingAssist",
+    "hasLaneKeepingAssist",
+    "hasBlindSpotAssist",
+    "hasEmergencyCallSystem",
+    "hasIsofix",
+    "hasSplitFoldingRearSeats",
+    "hasRoofRails",
+    "hasAirConditioning",
+  ],
+});
+
+const cheapAndClean = makeCar({
+  id: 3,
+  name: "MG 3",
+  customerMonthly: 219,
+  consumption: 4.4,
+  trunk: 293,
+  co2: 100,
+  features: [
+    "hasEmergencyBrakingAssist",
+    "hasLaneKeepingAssist",
+    "hasIsofix",
+    "hasSplitFoldingRearSeats",
+    "hasAirConditioning",
+  ],
+});
+
+const cars = [wellEquipped, bigBoot, cheapAndClean];
+
+const preferences = prefs({ monthlyKm: 1000, monthlyBudget: 600 });
+
+function adviceFor(
+  priorities: CategoryId[],
+  vehicles = cars,
+  overrides: Partial<Record<CategoryId, FeatureWeight[]>> = {},
+): AdviceNarrative {
+  const result = buildRecommendation(
+    vehicles,
+    priorities,
+    preferences,
+    { ...DEFAULT_CATEGORY_FEATURES, ...overrides },
+  )!;
+
+  return buildAdviceNarrative(result.evaluation, result.context);
+}
+
+/** Every sentence the Advice would put in front of the reader. */
+function allProse(narrative: AdviceNarrative): string {
+  return [
+    narrative.verdict.headline,
+    ...narrative.verdict.sentences,
+    ...narrative.priorities.flatMap((item) => item.sentences),
+    ...narrative.tradeoffs.flatMap((item) => [item.headline, ...item.sentences]),
+    ...narrative.cost.sentences,
+  ].join(" ");
+}
+
+/* -------------------------------------------------------------------------- */
+/* What you read is what you get                                              */
+/* -------------------------------------------------------------------------- */
+
+describe("the Advice never asks the reader to infer what it meant", () => {
+  /**
+   * Phrases that describe a conclusion without ever stating the evidence for
+   * it. If one of these appears, the sentence around it is telling the reader
+   * a car is good without telling them what it has.
+   */
+  const VAGUE = [
+    "useful everyday equipment",
+    "strong equipment advantage",
+    "standout equipment",
+    "good overall package",
+    "well equipped",
+    "well-equipped",
+    "practical features",
+    "strong performance",
+    "better fit",
+    "good value",
+    "great choice",
+    "perfect for",
+    "aligns with your needs",
+    "optimal choice",
+    "overall fit",
+    "other priorities matter more",
+  ];
+
+  const ORDERS: CategoryId[][] = [
+    ["safety", "familyFriendly", "practicality"],
+    ["driverAssistance", "safety", "comfort"],
+    ["environmental", "safety", "practicality"],
+    ["practicality", "familyFriendly", "longDistance"],
+    ["climateSuitability", "comfort", "safety"],
+  ];
+
+  it.each(ORDERS)("stays concrete for %s-first", (...priorities) => {
+    const prose = allProse(adviceFor(priorities as CategoryId[])).toLowerCase();
+
+    for (const phrase of VAGUE) {
+      expect(prose).not.toContain(phrase);
+    }
+  });
+
+  it("explains priorities without reciting the internal score", () => {
+    for (const priorities of ORDERS) {
+      const narrative = adviceFor(priorities);
+
+      for (const reasoning of narrative.priorities) {
+        const prose = reasoning.sentences.join(" ");
+
+        /* "/100km" is a consumption unit; "82/100" is the score recital. */
+        expect(prose).not.toMatch(/\d\/100(?!km)/);
+        expect(prose).not.toMatch(/\bscores?\b/i);
+      }
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The same car, explained differently                                        */
+/* -------------------------------------------------------------------------- */
+
+describe("the reasoning follows the user's priorities, not a template", () => {
+  it("explains the same car differently when the priorities change", () => {
+    const safetyFirst = adviceFor(["safety", "practicality"]);
+    const practicalityFirst = adviceFor(["practicality", "safety"]);
+
+    /* Same comparison set, so the winner shouldn't have to change for the
+       explanation to. */
+    const safetyProse = allProse(safetyFirst);
+    const practicalityProse = allProse(practicalityFirst);
+
+    expect(safetyProse).not.toEqual(practicalityProse);
+
+    /* Each leads with the evidence for the priority the user put first. */
+    expect(safetyFirst.priorities[0]!.priority).toBe("safety");
+    expect(practicalityFirst.priorities[0]!.priority).toBe("practicality");
+  });
+
+  it("cites the measurements a practicality-led reader actually asked about", () => {
+    const narrative = adviceFor(["practicality", "familyFriendly"]);
+
+    const practicality = narrative.priorities.find(
+      (item) => item.priority === "practicality",
+    )!;
+
+    const prose = practicality.sentences.join(" ");
+
+    expect(prose).toContain("boot space");
+    expect(prose).toMatch(/\d/);
+
+    /* Seat count is reported as context, never as something that scored. */
+    const seats = practicality.measurements.find((item) => item.label === "Seats");
+    expect(seats?.scored).toBe(false);
+  });
+
+  it("cites CO₂ and the drivetrain for an environment-led reader", () => {
+    const narrative = adviceFor(["environmental", "safety"]);
+
+    const environmental = narrative.priorities.find(
+      (item) => item.priority === "environmental",
+    )!;
+
+    expect(environmental.sentences.join(" ")).toContain("CO₂");
+    expect(environmental.traits.map((item) => item.label)).toContain("Drivetrain");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Tradeoffs                                                                  */
+/* -------------------------------------------------------------------------- */
+
+describe("tradeoffs are filtered by what the user told us", () => {
+  it("does not raise CO₂ with a reader who never ranked the environment", () => {
+    const narrative = adviceFor(["safety", "familyFriendly", "practicality"]);
+
+    const prose = narrative.tradeoffs
+      .flatMap((item) => [item.headline, ...item.sentences])
+      .join(" ");
+
+    expect(prose).not.toContain("CO₂");
+    expect(prose).not.toMatch(/emission/i);
+  });
+
+  it("raises CO₂ evidence once the environment is ranked", () => {
+    const narrative = adviceFor(["environmental", "safety"]);
+
+    const prose = [
+      ...narrative.priorities.flatMap((item) => item.sentences),
+      ...narrative.tradeoffs.flatMap((item) => item.sentences),
+    ].join(" ");
+
+    expect(prose).toContain("CO₂");
+  });
+
+  it("anchors every tradeoff to a ranked priority or to the budget", () => {
+    for (const priorities of [
+      ["safety", "practicality"],
+      ["driverAssistance", "comfort"],
+      ["environmental", "longDistance"],
+    ] as CategoryId[][]) {
+      const narrative = adviceFor(priorities);
+
+      for (const tradeoff of narrative.tradeoffs) {
+        const anchored =
+          tradeoff.priority != null
+            ? priorities.includes(tradeoff.priority)
+            : tradeoff.kind === "cost" || tradeoff.kind === "budget";
+
+        expect(anchored).toBe(true);
+      }
+    }
+  });
+
+  it("stays short enough to be usable", () => {
+    for (const priorities of [
+      ["safety", "driverAssistance", "comfort", "practicality"],
+      ["comfort", "climateSuitability", "longDistance"],
+    ] as CategoryId[][]) {
+      expect(adviceFor(priorities).tradeoffs.length).toBeLessThanOrEqual(4);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Missing essentials                                                         */
+/* -------------------------------------------------------------------------- */
+
+describe("a missing essential is surfaced, not used to disqualify", () => {
+  /*
+   * MG 3 leads on emissions and so wins for an environment-led reader, while
+   * lacking two of the safety features that reader marked essential.
+   */
+  const narrative = adviceFor(["environmental", "safety"]);
+
+  it("still recommends a car that misses one", () => {
+    const missing = narrative.priorities.flatMap(
+      (item) => item.features.essentialMissing,
+    );
+
+    expect(missing.length).toBeGreaterThan(0);
+    expect(narrative.isRecommendation).toBe(true);
+  });
+
+  it("names the feature and says plainly that the car doesn't have it", () => {
+    const gap = narrative.tradeoffs.find(
+      (item) => item.kind === "missingEssential",
+    )!;
+
+    expect(gap).toBeDefined();
+    expect(gap.severity).toBe("high");
+    expect(gap.sentences.join(" ")).toMatch(/you marked .+ as essential/i);
+    expect(gap.sentences.join(" ")).toMatch(/doesn't have/i);
+  });
+
+  it("says why it still placed where it did, rather than hiding the gap", () => {
+    const gap = narrative.tradeoffs.find(
+      (item) => item.kind === "missingEssential",
+    )!;
+
+    expect(gap.sentences.join(" ")).toMatch(/real compromise/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Ties and missing data                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("the language matches the size of the difference", () => {
+  it("distinguishes a tie, a small gap and a large one", () => {
+    expect(classifyScoreGap(0)).toBe("tie");
+    expect(classifyScoreGap(3)).toBe("negligible");
+    expect(classifyScoreGap(20)).toBe("clear");
+    expect(classifyScoreGap(60)).toBe("decisive");
+  });
+
+  it("calls a narrow lead narrow instead of decisive", () => {
+    const near = makeCar({ id: 10, name: "Alpha One", co2: 100, trunk: 400 });
+    const alsoNear = makeCar({ id: 11, name: "Beta Two", co2: 103, trunk: 400 });
+
+    const narrative = adviceFor(["environmental"], [near, alsoNear]);
+
+    const environmental = narrative.priorities[0]!;
+
+    expect(environmental.standing).toBe("leads");
+    expect(environmental.sentences.join(" ")).toMatch(/only just|level with/i);
+  });
+
+  it("says so plainly when the data can't answer the question", () => {
+    /* A priority the user selected but configured no features for, on cars
+       that carry no measurement for it either. */
+    const narrative = adviceFor(["comfort", "safety"], cars, { comfort: [] });
+
+    const comfort = narrative.priorities.find(
+      (item) => item.priority === "comfort",
+    )!;
+
+    expect(comfort.standing).toBe("unsupported");
+    expect(comfort.hasEvidence).toBe(false);
+    expect(comfort.sentences.join(" ")).toContain(
+      "We don't have enough data",
+    );
+
+    /* And it is not dressed up as a finding elsewhere. */
+    expect(narrative.tradeoffs.some((item) => item.priority === "comfort")).toBe(
+      false,
+    );
+    expect(narrative.unsupported.map((item) => item.priority)).toContain("comfort");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Money                                                                      */
+/* -------------------------------------------------------------------------- */
+
+describe("financial reasoning is specific", () => {
+  const narrative = adviceFor(["safety", "practicality"]);
+
+  it("separates the subscription, the energy estimate and the total", () => {
+    const prose = narrative.cost.sentences.join(" ");
+
+    expect(prose).toMatch(/subscription/i);
+    expect(prose).toMatch(/estimated energy/i);
+    expect(prose).toMatch(/in total/i);
+    expect(narrative.cost.subject.subscription).not.toBeNull();
+  });
+
+  it("states the mileage the estimate was built on", () => {
+    expect(narrative.cost.monthlyKm).toBe(1000);
+    expect(narrative.cost.sentences.join(" ")).toContain("1.000 km");
+  });
+
+  it("quantifies the gap to the cheapest alternative in euros", () => {
+    const money = narrative.tradeoffs.find((item) => item.kind === "cost");
+
+    if (money) {
+      expect(money.headline).toMatch(/€\d/);
+      expect(money.sentences.join(" ")).toMatch(/€\d+.*more than/);
+    }
+  });
+
+  it("never reports an uncalculable component as €0", () => {
+    const noPrice = makeCar({ id: 20, name: "Alpha One", consumption: null });
+    const priced = makeCar({ id: 21, name: "Beta Two", consumption: 5 });
+
+    const narrative = adviceFor(["safety"], [noPrice, priced]);
+
+    if (!narrative.cost.subject.complete) {
+      expect(narrative.cost.unknowns.length).toBeGreaterThan(0);
+      expect(narrative.cost.sentences.join(" ")).toContain(
+        "rather than counting it as zero",
+      );
+    }
+  });
+
+  it("scales its language to the size of the monthly difference", () => {
+    expect(classifyMonthlyCostGap(0.4, 300)).toBe("tie");
+    expect(classifyMonthlyCostGap(6, 300)).toBe("negligible");
+    expect(classifyMonthlyCostGap(55, 300)).toBe("clear");
+    expect(classifyMonthlyCostGap(200, 300)).toBe("decisive");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Ranking coherence                                                          */
+/* -------------------------------------------------------------------------- */
+
+describe("the ranking and the explanation agree", () => {
+  it("acknowledges a near-tie instead of implying a clear win", () => {
+    const first = makeCar({
+      id: 30,
+      name: "Alpha One",
+      trunk: 400,
+      features: ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"],
+    });
+
+    const second = makeCar({
+      id: 31,
+      name: "Beta Two",
+      trunk: 405,
+      features: ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"],
+    });
+
+    const narrative = adviceFor(["safety", "practicality"], [first, second]);
+
+    expect(narrative.verdict.margin).not.toBeNull();
+
+    if (narrative.verdict.margin!.magnitude === "negligible" ||
+        narrative.verdict.margin!.magnitude === "tie") {
+      expect(narrative.verdict.sentences.join(" ")).toMatch(
+        /close|level/i,
+      );
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Feature explanations                                                       */
+/* -------------------------------------------------------------------------- */
+
+describe("feature terminology is explained in the product", () => {
+  it("carries a plain-English explanation for every feature it can name", () => {
+    const narrative = adviceFor(["safety", "driverAssistance", "practicality"]);
+
+    const named = narrative.priorities.flatMap((item) => [
+      ...item.features.essentialPresent,
+      ...item.features.essentialMissing,
+      ...item.features.optionalPresent,
+      ...item.features.optionalMissing,
+    ]);
+
+    expect(named.length).toBeGreaterThan(0);
+
+    for (const fact of named) {
+      expect(fact.explanation.length).toBeGreaterThan(20);
+      expect(fact.label).toBe(FEATURES[fact.key].label);
+    }
+  });
+
+  it("covers the jargon a normal driver would have to look up", () => {
+    const jargon = [
+      "hasAdaptiveCruiseControl",
+      "hasEmergencyBrakingAssist",
+      "hasBlindSpotAssist",
+      "hasLaneKeepingAssist",
+      "hasParkingAssistant",
+      "hasEmergencyCallSystem",
+      "hasTrafficSignRecognition",
+    ] as const;
+
+    for (const key of jargon) {
+      expect(FEATURES[key].explanation).toBeTruthy();
+      expect(FEATURES[key].explanation.length).toBeGreaterThan(30);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Language primitives                                                        */
+/* -------------------------------------------------------------------------- */
+
+describe("language primitives", () => {
+  it("counts coverage the way a person would say it", () => {
+    expect(coverage(3, 3)).toBe("all three");
+    expect(coverage(2, 2)).toBe("both");
+    expect(coverage(2, 3)).toBe("two of the three");
+    expect(coverage(0, 2)).toBe("neither");
+    expect(coverage(0, 4)).toBe("none of the four");
+  });
+
+  it("lowercases labels without mangling acronyms or symbols", () => {
+    expect(inSentence("Blind spot warning")).toBe("blind spot warning");
+    expect(inSentence("ISOFIX child seat anchors")).toBe(
+      "ISOFIX child seat anchors",
+    );
+    expect(inSentence("360° camera")).toBe("360° camera");
+    expect(phraseLabel("Family Friendly")).toBe("family friendly");
+    expect(phraseLabel("CO₂ Impact")).toBe("CO₂ impact");
+  });
+
+  it("shortens a car name only when what's left still names a car", () => {
+    expect(shortName("Ford Puma")).toBe("Puma");
+    expect(shortName("Hyundai i30")).toBe("i30");
+    expect(shortName("MG 3")).toBe("MG 3");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The hot seat                                                               */
+/* -------------------------------------------------------------------------- */
+
+describe("a car in the hot seat is explained on its own terms", () => {
+  it("never claims a car won when it didn't", () => {
+    const result = buildRecommendation(
+      cars,
+      ["safety", "practicality"],
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const other = result.context.ranked.find(
+      (car) => car.id !== result.winner.id,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      evaluateVehicle(other, result.context, { recommendedId: result.winner.id }),
+      result.context,
+    );
+
+    expect(narrative.isRecommendation).toBe(false);
+    expect(narrative.verdict.headline).toContain("places #");
+    expect(narrative.verdict.headline).not.toMatch(/comes out on top/i);
+  });
+});

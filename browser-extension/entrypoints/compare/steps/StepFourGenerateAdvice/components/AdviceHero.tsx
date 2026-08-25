@@ -4,10 +4,12 @@ import type {
     CostBreakdown,
     VehicleEvaluation,
 } from "@/lib/reasoning-engine/types";
+import type { AdviceNarrative } from "@/lib/reasoning-engine/narrative";
 import { formatEUR, getCategory } from "@/lib/reasoning-engine";
 
 interface AdviceHeroProps {
     evaluation: VehicleEvaluation;
+    narrative: AdviceNarrative;
     cost: CostBreakdown;
     priorities: CategoryId[];
     isFallback: boolean;
@@ -31,6 +33,7 @@ function determineSubtitle(
  */
 export function AdviceHero({
     evaluation,
+    narrative,
     cost,
     priorities,
     isFallback,
@@ -38,8 +41,14 @@ export function AdviceHero({
 }: AdviceHeroProps) {
     const winner = evaluation.vehicle;
 
-    /* The single strongest piece of evidence, taken from the head-to-head. */
-    const driver = evaluation.comparison?.decidingAdvantage;
+    /*
+     * The headline is the reason, not the score. The score is still on the
+     * card to the right for anyone who wants it — it just isn't the argument.
+     */
+    const headline = narrative.verdict.headline;
+
+    /* The most consequential thing the reader is accepting in exchange. */
+    const tradeoff = narrative.tradeoffs[0];
 
     return (
         <section className="overflow-hidden rounded-[30px] bg-finn-highlight-navy text-white shadow-xl">
@@ -69,23 +78,19 @@ export function AdviceHero({
                     </p>
 
                     <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-white/90">
-                        {driver?.versus
-                            ? `${winner.name} comes out on top mainly on ${driver.label}, your #${driver.rank} priority: ${driver.score}/100 against ${driver.versus.name}'s ${driver.versus.score}/100.`
-                            : `${winner.name} scores ${evaluation.score.total}/100 against the priorities you set.`}
+                        {headline}
                     </p>
 
-                    {evaluation.comparison?.biggestConcession?.versus && (
-                        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65">
-                            It is not the best at everything.{" "}
-                            {evaluation.comparison.biggestConcession.versus.name}{" "}
-                            beats it on{" "}
-                            {evaluation.comparison.biggestConcession.label} by{" "}
-                            {Math.abs(
-                                evaluation.comparison.biggestConcession.versus
-                                    .difference,
-                            )}{" "}
-                            points — the full arithmetic is below.
-                        </p>
+                    {tradeoff && (
+                        <div className="mt-3 max-w-2xl rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">
+                                What you're accepting in exchange
+                            </p>
+
+                            <p className="mt-1.5 text-sm leading-6 text-white/85">
+                                {tradeoff.sentences[0]}
+                            </p>
+                        </div>
                     )}
 
                     <div className="mt-6 flex flex-wrap gap-2">

@@ -73,13 +73,17 @@ export {
   winnerForCategory,
 } from "./scoring";
 
-export {
-  explainHeadToHead,
-  explainPriority,
-  explainVerdict,
-} from "./explain";
+export { explainHeadToHead, explainVerdict } from "./explain";
 
-export { formatEUR, formatKm, formatNumber } from "./format";
+export { buildAdviceNarrative } from "./narrative";
+
+export {
+  formatEUR,
+  formatKm,
+  formatNumber,
+  formatPrice,
+  joinList,
+} from "./format";
 
 /* -------------------------------------------------------------------------- */
 /* Reasoning context                                                          */
@@ -151,6 +155,9 @@ function scoreRef(
     vehicleId: vehicle.id,
     name: vehicle.name,
     score: scoreFor(scores, vehicle.id, category),
+    numeric:
+      scores.find((score) => score.vehicleId === vehicle.id)?.details[category]
+        ?.numeric ?? null,
   };
 }
 
@@ -203,6 +210,7 @@ function priorityBreakdown(
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
+    hasEvidence: detail.hasEvidence,
     leader,
     isLeader: leader?.vehicleId === subject.id,
     gapToLeader: leader ? Math.max(0, leader.score - score) : 0,
@@ -228,15 +236,15 @@ function comparePriority(
 
   const configured = categoryFeatures[category] ?? getCategory(category)?.features ?? [];
 
-  const onlySubjectHas: string[] = [];
-  const onlyOtherHas: string[] = [];
+  const onlySubjectHas: FeatureWeight[] = [];
+  const onlyOtherHas: FeatureWeight[] = [];
 
   for (const feature of configured) {
     const subjectHas = Boolean(subject.features?.[feature.key]);
     const otherHas = Boolean(other.features?.[feature.key]);
 
-    if (subjectHas && !otherHas) onlySubjectHas.push(featureLabel(feature.key));
-    if (otherHas && !subjectHas) onlyOtherHas.push(featureLabel(feature.key));
+    if (subjectHas && !otherHas) onlySubjectHas.push(feature);
+    if (otherHas && !subjectHas) onlyOtherHas.push(feature);
   }
 
   const difference = subjectScore - otherDetail.score;

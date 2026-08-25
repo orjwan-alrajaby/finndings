@@ -134,6 +134,15 @@ export interface CategoryDetail {
   /** Score derived from vehicle data alone, when the category has a numeric signal. */
   numericScore: number | null;
   numeric: NumericEvidence | null;
+  /**
+   * False when neither a feature list nor a measurement was available and the
+   * score is the neutral placeholder rather than a measured result.
+   *
+   * Scoring is unchanged by this flag. It exists so an explanation can say
+   * "we don't have enough data here" instead of dressing up a default as
+   * evidence.
+   */
+  hasEvidence: boolean;
 }
 
 export interface VehicleScore {
@@ -285,6 +294,8 @@ export interface ScoreRef {
   vehicleId: number;
   name: string;
   score: number;
+  /** The measurement behind that score, when the category has one. */
+  numeric: NumericEvidence | null;
 }
 
 /**
@@ -308,6 +319,8 @@ export interface PriorityBreakdown {
   matchedLabels: string[];
   missingLabels: string[];
   numeric: NumericEvidence | null;
+  /** See `CategoryDetail.hasEvidence`. */
+  hasEvidence: boolean;
 
   leader: ScoreRef | null;
   isLeader: boolean;
@@ -327,10 +340,15 @@ export interface PriorityComparison {
   /** difference × weight — how much this gap moved the overall result. */
   weightedDifference: number;
   numeric: NumericEvidence | null;
-  /** Features the subject has that the other vehicle does not. */
-  onlySubjectHas: string[];
+  /**
+   * Features the subject has that the other vehicle does not.
+   *
+   * Carries the tier the user assigned, because "it has one more essential"
+   * and "it has one more luxury extra" are not the same finding.
+   */
+  onlySubjectHas: FeatureWeight[];
   /** Features the other vehicle has that the subject does not. */
-  onlyOtherHas: string[];
+  onlyOtherHas: FeatureWeight[];
 }
 
 export interface HeadToHead {
