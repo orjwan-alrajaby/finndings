@@ -1,5 +1,5 @@
 import "@/assets/tailwind.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
@@ -7,11 +7,17 @@ import type {
     FeatureWeight,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
-import { buildRecommendation, filterByBudget } from "@/lib/reasoning-engine";
+import {
+    buildRecommendation,
+    evaluateVehicle,
+    hotSeatOptions,
+} from "@/lib/reasoning-engine";
 import { AdviceHero } from "./components/AdviceHero";
 import { AdviceEvidence } from "./components/AdviceEvidence";
 import { AdviceSidebar } from "./components/AdviceSidebar";
-import { NothingFitsBudget } from "./components/NothingFitsBudget";
+import { BudgetNotice } from "./components/BudgetNotice";
+import { CostAnalysis } from "./components/CostAnalysis";
+import { HotSeatPicker } from "./components/HotSeatPicker";
 
 export function StepFourGenerateAdvice({
     cars,
@@ -19,14 +25,23 @@ export function StepFourGenerateAdvice({
     preferences,
     categoryFeatures,
     onBack,
+    onSettings,
 }: {
     cars: PinnedFinnCar[];
     priorities: CategoryId[];
     preferences: LensPreferences;
     categoryFeatures: Record<CategoryId, FeatureWeight[]>;
     onBack: () => void;
+    onSettings: () => void;
 }) {
     const [expanded, setExpanded] = useState(false);
+
+    /*
+     * The car currently under examination. This is deliberately separate from
+     * the recommendation: selecting another car changes what we explain, never
+     * what we recommend.
+     */
+    const [hotSeatId, setHotSeatId] = useState<number | null>(null);
 
     const recommendation = useMemo(
         () =>
@@ -39,17 +54,46 @@ export function StepFourGenerateAdvice({
         [cars, priorities, preferences, categoryFeatures],
     );
 
-    if (!recommendation) {
-        const { overBudget } = filterByBudget(cars, preferences);
+    /* A new comparison run puts the recommendation back in the hot seat. */
+    useEffect(() => {
+        setHotSeatId(recommendation?.winner.id ?? null);
+    }, [recommendation]);
 
+    if (!recommendation) {
         return (
-            <NothingFitsBudget
-                overBudget={overBudget}
-                preferences={preferences}
-                onBack={onBack}
-            />
+            <main className="min-h-screen bg-finn-snow px-4 py-12 text-center text-finn-black">
+                <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 shadow-sm">
+                    <h1 className="text-2xl font-black">
+                        Nothing to evaluate yet
+                    </h1>
+
+                    <p className="mt-2 text-sm leading-6 text-finn-iron">
+                        Pin a few cars on finn.com and FINN Lens will compare
+                        them here.
+                    </p>
+                </div>
+            </main>
         );
     }
+
+    const { context, winner, isFallback, fallbackReason } = recommendation;
+
+    const selected =
+        context.ranked.find((car) => car.id === hotSeatId) ?? winner;
+
+    /*
+     * The winner's own evaluation is prebuilt on the recommendation, so we
+     * only recompute when the user is examining a different car.
+     */
+    const evaluation =
+        selected.id === winner.id
+            ? recommendation.evaluation
+            : evaluateVehicle(selected, context, {
+                  recommendedId: winner.id,
+              });
+
+    const options = hotSeatOptions(context, selected.id, winner.id);
+    const winnerCost = context.costs[winner.id];
 
     return (
         <Tooltip.Provider delayDuration={350}>
@@ -61,7 +105,7 @@ export function StepFourGenerateAdvice({
                         </p>
 
                         <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                            Here’s the car that fits you best.
+                            Here's the car that fits you best.
                         </h1>
 
                         <p className="mt-2 text-sm text-finn-iron">
@@ -70,28 +114,50 @@ export function StepFourGenerateAdvice({
                         </p>
                     </header>
 
-                    <AdviceHero
-                        winner={recommendation.winner}
-                        score={recommendation.score}
-                        priorities={priorities}
-                        preferences={preferences}
-                        onBack={onBack}
+                    {isFallback && fallbackReason && (
+                        <BudgetNotice
+                            winner={winner}
+                            context={context}
+                            reason={fallbackReason}
+                            onAdjustSettings={onSettings}
+                        />
+                    )}
+
+                    {winnerCost && (
+                        <AdviceHero
+                            evaluation={recommendation.evaluation}
+                            cost={winnerCost}
+                            priorities={context.priorities}
+                            isFallback={isFallback}
+                            onBack={onBack}
+                        />
+                    )}
+
+                    <HotSeatPicker
+                        options={options}
+                        onSelect={setHotSeatId}
                     />
 
                     <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-                        <AdviceEvidence
-                            reasons={recommendation.reasons}
-                            tradeoffs={recommendation.tradeoffs}
-                            ranked={recommendation.ranked}
-                            scores={recommendation.scores}
-                            preferences={preferences}
-                            expanded={expanded}
-                            onToggleExpanded={() =>
-                                setExpanded((value) => !value)
-                            }
-                        />
+                        <div className="space-y-6">
+                            <AdviceEvidence
+                                evaluation={evaluation}
+                                context={context}
+                                recommendedId={winner.id}
+                                expanded={expanded}
+                                onToggleExpanded={() =>
+                                    setExpanded((value) => !value)
+                                }
+                            />
 
-                        <AdviceSidebar priorities={priorities} />
+                            <CostAnalysis analysis={evaluation.cost} />
+                        </div>
+
+                        <AdviceSidebar
+                            weights={context.weights}
+                            preferences={preferences}
+                            onAdjustSettings={onSettings}
+                        />
                     </div>
                 </div>
             </main>

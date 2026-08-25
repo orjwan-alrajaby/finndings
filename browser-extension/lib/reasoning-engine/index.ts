@@ -1,25 +1,28 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
-  CategoryDetail,
-  CategoryDef,
+  BudgetPartition,
   CategoryId,
   CostBreakdown,
   FeatureWeight,
+  HeadToHead,
+  HotSeatOption,
+  LegacyLensPreferences,
   LensPreferences,
   LensSettings,
+  PriorityBreakdown,
+  PriorityComparison,
   PriorityDefinition,
-  PriorityReason,
   Profile,
   ProfileId,
+  ReasoningContext,
   Recommendation,
-  Tradeoff,
+  ScoreRef,
+  VehicleEvaluation,
   VehicleScore,
 } from "./types";
 
 import {
   CATEGORIES,
-  FEATURES,
-  TIERS,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
   DEFAULT_PREFERENCES,
@@ -28,854 +31,374 @@ import {
   DEFAULT_PROFILES,
 } from "./constants";
 
-/* -------------------------------------------------------------------------- */
-/* Runtime category registry                                                  */
-/* -------------------------------------------------------------------------- */
+import {
+  buildCostAnalysis,
+  calculateCost,
+  partitionByBudget,
+} from "./cost";
 
-/**
- * Built-in categories are immutable.
- *
- * Custom categories live here instead of being added directly to CATEGORIES.
- * This keeps CATEGORIES as the single source of truth for built-in product
- * configuration while still allowing user-created priorities at runtime.
- */
-const CUSTOM_CATEGORIES: Record<string, CategoryDef> = {};
+import {
+  categoryDetail,
+  computeAllScores,
+  featureLabel,
+  getCategory,
+  priorityWeights,
+  registerCategoryMeta,
+  scoreFor,
+  totalFor,
+  unregisterCategoryMeta,
+  winnerForCategory,
+} from "./scoring";
 
-/**
- * Resolves either a built-in or custom category.
- */
-function getCategory(category: CategoryId): CategoryDef | undefined {
-  return CATEGORIES[category as keyof typeof CATEGORIES] ?? CUSTOM_CATEGORIES[category];
-}
-
-/**
- * Registers or updates metadata for a custom category.
- */
-export function registerCategoryMeta(
-  id: CategoryId,
-  meta: CategoryDef,
-): void {
-  if (id in CATEGORIES) return;
-  CUSTOM_CATEGORIES[id] = meta;
-}
-
-/**
- * Removes a custom category.
- *
- * Built-in categories can never be removed from the registry.
- */
-export function unregisterCategoryMeta(id: CategoryId): void {
-  if (id in CATEGORIES) return;
-  delete CUSTOM_CATEGORIES[id];
-}
+import { explainHeadToHead } from "./explain";
 
 /* -------------------------------------------------------------------------- */
-/* Helpers                                                                    */
+/* Re-exports                                                                 */
 /* -------------------------------------------------------------------------- */
 
-const featureLabel = (key: string): string =>
-  FEATURES[key as keyof typeof FEATURES]?.label ?? key;
+export {
+  buildCostAnalysis,
+  calculateCost,
+  partitionByBudget,
+} from "./cost";
 
-const tierWeight = (tier: FeatureWeight["tier"]): number =>
-  TIERS[tier].weight;
+export {
+  categoryDetail,
+  computeAllScores,
+  getCategory,
+  priorityWeights,
+  registerCategoryMeta,
+  scoreFor,
+  unregisterCategoryMeta,
+  winnerForCategory,
+} from "./scoring";
 
-const fuelPrice = (
-  vehicle: PinnedFinnCar,
-  preferences: LensPreferences,
-): number =>
-  vehicle.fuelType === "Diesel"
-    ? preferences.dieselPrice
-    : preferences.petrolPrice;
+export {
+  explainHeadToHead,
+  explainPriority,
+  explainVerdict,
+} from "./explain";
 
-/* -------------------------------------------------------------------------- */
-/* Cost                                                                       */
-/* -------------------------------------------------------------------------- */
-/**
- * Estimates the vehicle's total monthly and annual cost.
- *
- * The calculation combines:
- * - monthly rental cost
- * - estimated fuel/electricity cost based on the user's annual mileage
- *
- * This total monthly cost is used for two different purposes:
- *
- * 1. Affordability scoring
- *    When affordability is one of the user's priorities, vehicles are compared
- *    against one another based on their estimated total monthly cost.
- *
- * 2. Budget eligibility
- *    When the user has configured a monthly budget, this same total is compared
- *    against that budget as a hard constraint.
- *
- * A missing or invalid consumption value does not result in a guessed running
- * cost. In that case, the rental price is still returned, but running cost is
- * marked as unavailable.
- */
-
-export function calculateCost(
-  vehicle: PinnedFinnCar,
-  preferences: LensPreferences,
-): CostBreakdown {
-  const rental = vehicle.pricing.customerMonthly.price ?? 0;
-  const annualKm = Math.max(1, preferences.annualKm);
-  const consumption = Number(vehicle.consumption.combined);
-
-  if (!Number.isFinite(consumption) || consumption <= 0) {
-    return {
-      rental,
-      running: 0,
-      totalMonthly: rental,
-      annual: rental * 12,
-      costPer100Km: null,
-      energyLabel: "Running cost unavailable",
-    };
-  }
-
-  const isElectric = vehicle.fuelType === "Electric";
-  const price = isElectric
-    ? preferences.electricityPrice
-    : fuelPrice(vehicle, preferences);
-
-  const costPer100Km = consumption * price;
-  const running = (annualKm / 12 / 100) * costPer100Km;
-
-  return {
-    rental,
-    running,
-    totalMonthly: rental + running,
-    annual: (rental + running) * 12,
-    costPer100Km,
-    energyLabel: isElectric ? "electricity" : "fuel",
-  };
-}
-
-/**
- * Determines whether a vehicle fits within the user's maximum monthly car budget.
- *
- * The budget represents the user's total monthly car expense, including:
- * - monthly rental cost
- * - estimated fuel/electricity cost based on their expected annual mileage
- *
- * This is a hard financial constraint, not a scoring factor.
- *
- * A vehicle that exceeds the budget is considered ineligible for the normal
- * recommendation and should not participate in the scoring comparison.
- */
-function isWithinBudget(
-  vehicle: PinnedFinnCar,
-  preferences: LensPreferences,
-): boolean {
-  const budget = preferences.monthlyBudget;
-
-  // No budget configured means there is no budget constraint.
-  if (
-    !Number.isFinite(budget) ||
-    budget <= 0
-  ) {
-    return true;
-  }
-
-  const cost = calculateCost(
-    vehicle,
-    preferences,
-  );
-
-  return cost.totalMonthly <= budget;
-}
-
-/**
- * Separates vehicles into those that fit the user's monthly budget and those
- * that exceed it.
- *
- * Budget-eligible vehicles are used for normal scoring and recommendation.
- * Over-budget vehicles are retained separately so the UI can explain when
- * nothing selected fits the user's budget.
- */
-export function filterByBudget(
-  vehicles: PinnedFinnCar[],
-  preferences: LensPreferences,
-): {
-  eligible: PinnedFinnCar[];
-  overBudget: PinnedFinnCar[];
-} {
-  const eligible: PinnedFinnCar[] = [];
-  const overBudget: PinnedFinnCar[] = [];
-
-  vehicles.forEach((vehicle) => {
-    if (isWithinBudget(vehicle, preferences)) {
-      eligible.push(vehicle);
-    } else {
-      overBudget.push(vehicle);
-    }
-  });
-
-  return {
-    eligible,
-    overBudget,
-  };
-}
+export { formatEUR, formatKm, formatNumber } from "./format";
 
 /* -------------------------------------------------------------------------- */
-/* Numeric scoring                                                            */
-/* -------------------------------------------------------------------------- */
-
-function relativeScore(
-  value: number,
-  values: number[],
-  lowerIsBetter: boolean,
-): number {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  if (max === min) return 80;
-
-  const ratio = (value - min) / (max - min);
-
-  return Math.round(
-    (lowerIsBetter ? 1 - ratio : ratio) * 100,
-  );
-}
-
-function numericScore(
-  category: CategoryId,
-  vehicle: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-  preferences: LensPreferences,
-): number | null {
-  switch (category) {
-    case "affordability": {
-      const values = vehicles.map(
-        (item) => calculateCost(item, preferences).totalMonthly,
-      );
-
-      return relativeScore(
-        calculateCost(vehicle, preferences).totalMonthly,
-        values,
-        true,
-      );
-    }
-
-    case "practicality": {
-      const values = vehicles
-        .map((item) => Number.parseFloat(item.capacity.trunk))
-        .filter(Number.isFinite);
-
-      const trunk = Number.parseFloat(vehicle.capacity.trunk);
-
-      return Number.isFinite(trunk) && values.length > 1
-        ? relativeScore(trunk, values, false)
-        : null;
-    }
-
-    case "longDistance": {
-      const ranges = vehicles
-        .map((item) =>
-          item.electric?.range && item.electric.range !== "Unknown"
-            ? Number(item.electric.range)
-            : null,
-        )
-        .filter(
-          (value): value is number =>
-            value != null && Number.isFinite(value),
-        );
-
-      if (
-        vehicle.electric?.range &&
-        vehicle.electric.range !== "Unknown" &&
-        ranges.length > 1
-      ) {
-        return relativeScore(
-          Number(vehicle.electric.range),
-          ranges,
-          false,
-        );
-      }
-
-      const consumption = Number(vehicle.consumption.combined);
-
-      const values = vehicles
-        .map((item) => Number(item.consumption.combined))
-        .filter(Number.isFinite);
-
-      return Number.isFinite(consumption) && values.length > 1
-        ? relativeScore(consumption, values, true)
-        : null;
-    }
-
-    case "environmental": {
-      const values = vehicles
-        .map((item) => Number(item.co2.value))
-        .filter(
-          (value) => Number.isFinite(value) && value > 0,
-        );
-
-      const co2 = Number(vehicle.co2.value);
-
-      return Number.isFinite(co2) && values.length > 1
-        ? relativeScore(co2, values, true)
-        : null;
-    }
-
-    default:
-      return null;
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Category scoring                                                           */
-/* -------------------------------------------------------------------------- */
-
-export function categoryDetail(
-  category: CategoryId,
-  vehicle: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-  preferences: LensPreferences,
-  categoryFeatures: Record<CategoryId, FeatureWeight[]> = DEFAULT_CATEGORY_FEATURES,
-): CategoryDetail {
-  const configured =
-    categoryFeatures[category] ??
-    getCategory(category)?.features ??
-    [];
-
-  const matched: FeatureWeight[] = [];
-  const missing: FeatureWeight[] = [];
-
-  const max = configured.reduce(
-    (sum, item) => sum + tierWeight(item.tier),
-    0,
-  );
-
-  const earned = configured.reduce((sum, item) => {
-    if (vehicle.features?.[item.key]) {
-      matched.push(item);
-      return sum + tierWeight(item.tier);
-    }
-
-    missing.push(item);
-    return sum;
-  }, 0);
-
-  const featureScore = max
-    ? Math.round((earned / max) * 100)
-    : null;
-
-  const numeric = numericScore(
-    category,
-    vehicle,
-    vehicles,
-    preferences,
-  );
-
-  if (numeric != null && featureScore != null) {
-    return {
-      score: Math.round((numeric + featureScore) / 2),
-      matched,
-      missing,
-    };
-  }
-
-  return {
-    score: numeric ?? featureScore ?? 50,
-    matched,
-    missing,
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Vehicle scoring                                                            */
+/* Reasoning context                                                          */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Calculates the complete score for every vehicle across the user's ordered
- * priorities.
+ * Builds the shared frame of reference for one comparison run.
  *
- * This function is intentionally unaware of the user's budget.
- * Budget eligibility must be resolved before calling this function.
+ * Costs and scores are calculated once, over **every** pinned car, so that:
  *
- * Priority #1 receives the highest weight.
- * Priority #2 receives the next highest weight, and so on.
+ * - the recommendation and any hot-seat inspection use identical numbers;
+ * - an over-budget car the user wants to inspect still has a real score;
+ * - relative scoring (boot space, range, CO₂) is measured against the same
+ *   set no matter which car is being looked at.
  *
- * Each vehicle receives:
- * - an overall weighted score
- * - an individual score for every priority
- * - detailed information about the features and numeric data behind each score
- *
- * The scoring comparison is relative to the vehicles passed into this function.
- * Therefore, callers should pass only vehicles that are eligible for the
- * recommendation.
+ * Budget never touches scoring. It only partitions the set afterwards.
  */
-export function computeAllScores(
+export function buildReasoningContext(
   vehicles: PinnedFinnCar[],
   priorities: CategoryId[],
   preferences: LensPreferences,
-  categoryFeatures: Record<CategoryId, FeatureWeight[]> = DEFAULT_CATEGORY_FEATURES,
-): VehicleScore[] {
-  const ordered = priorities.length
-    ? priorities
-    : DEFAULT_PRIORITIES;
+  categoryFeatures: Record<
+    CategoryId,
+    FeatureWeight[]
+  > = DEFAULT_CATEGORY_FEATURES,
+): ReasoningContext {
+  const ordered = priorities.length ? priorities : DEFAULT_PRIORITIES;
 
-  const denominator =
-    (ordered.length * (ordered.length + 1)) / 2;
+  const costs: Record<number, CostBreakdown> = {};
 
-  return vehicles.map((vehicle) => {
-    const byCategory = {} as Record<CategoryId, number>;
-    const details: Partial<Record<CategoryId, CategoryDetail>> = {};
+  for (const vehicle of vehicles) {
+    costs[vehicle.id] = calculateCost(vehicle, preferences);
+  }
 
-    let total = 0;
-
-    ordered.forEach((category, index) => {
-      const detail = categoryDetail(
-        category,
-        vehicle,
-        vehicles,
-        preferences,
-        categoryFeatures,
-      );
-
-      const weight =
-        (ordered.length - index) / denominator;
-
-      byCategory[category] = detail.score;
-      details[category] = detail;
-
-      total += detail.score * weight;
-    });
-
-    return {
-      vehicleId: vehicle.id,
-      total: Math.round(total),
-      byCategory,
-      details,
-    };
-  });
-}
-
-/* -------------------------------------------------------------------------- */
-/* Score helpers                                                              */
-/* -------------------------------------------------------------------------- */
-
-function scoreFor(
-  scores: VehicleScore[],
-  vehicleId: number,
-  category: CategoryId,
-): number {
-  return (
-    scores.find((score) => score.vehicleId === vehicleId)
-      ?.byCategory[category] ?? 0
+  const scores = computeAllScores(
+    vehicles,
+    ordered,
+    preferences,
+    categoryFeatures,
   );
+
+  const ranked = [...vehicles].sort(
+    (a, b) => totalFor(scores, b.id) - totalFor(scores, a.id),
+  );
+
+  return {
+    vehicles,
+    priorities: ordered,
+    preferences,
+    categoryFeatures,
+    scores,
+    costs,
+    weights: priorityWeights(ordered),
+    ranked,
+    budget: partitionByBudget(vehicles, costs, preferences),
+  };
 }
 
-function winnerForCategory(
-  vehicles: PinnedFinnCar[],
+/* -------------------------------------------------------------------------- */
+/* Comparative reasoning                                                      */
+/* -------------------------------------------------------------------------- */
+
+function scoreRef(
+  vehicle: PinnedFinnCar,
   scores: VehicleScore[],
   category: CategoryId,
-): PinnedFinnCar | undefined {
-  return [...vehicles].sort(
+): ScoreRef {
+  return {
+    vehicleId: vehicle.id,
+    name: vehicle.name,
+    score: scoreFor(scores, vehicle.id, category),
+  };
+}
+
+/**
+ * Builds the full evidence record for one vehicle in one priority, including
+ * the head-to-head against a specific rival.
+ */
+function priorityBreakdown(
+  category: CategoryId,
+  rank: number,
+  weight: number,
+  subject: PinnedFinnCar,
+  other: PinnedFinnCar | null,
+  context: ReasoningContext,
+): PriorityBreakdown {
+  const { scores, vehicles, preferences, categoryFeatures } = context;
+  const meta = getCategory(category);
+
+  const detail =
+    scores.find((score) => score.vehicleId === subject.id)?.details[category] ??
+    categoryDetail(
+      category,
+      subject,
+      vehicles,
+      preferences,
+      categoryFeatures,
+    );
+
+  const score = detail.score;
+
+  const leaderVehicle = winnerForCategory(vehicles, scores, category);
+  const leader = leaderVehicle
+    ? scoreRef(leaderVehicle, scores, category)
+    : null;
+
+  const matchedLabels = detail.matched.map((item) => featureLabel(item.key));
+  const missingLabels = detail.missing.map((item) => featureLabel(item.key));
+
+  return {
+    priority: category,
+    label: meta?.label ?? category,
+    icon: meta?.icon ?? "•",
+    rank,
+    weight,
+    weightPercent: Math.round(weight * 100),
+    score,
+    weightedContribution: score * weight,
+    matched: detail.matched,
+    missing: detail.missing,
+    matchedLabels,
+    missingLabels,
+    numeric: detail.numeric,
+    leader,
+    isLeader: leader?.vehicleId === subject.id,
+    gapToLeader: leader ? Math.max(0, leader.score - score) : 0,
+    versus: other
+      ? comparePriority(category, subject, other, score, weight, context)
+      : null,
+  };
+}
+
+function comparePriority(
+  category: CategoryId,
+  subject: PinnedFinnCar,
+  other: PinnedFinnCar,
+  subjectScore: number,
+  weight: number,
+  context: ReasoningContext,
+): PriorityComparison {
+  const { scores, vehicles, preferences, categoryFeatures } = context;
+
+  const otherDetail =
+    scores.find((score) => score.vehicleId === other.id)?.details[category] ??
+    categoryDetail(category, other, vehicles, preferences, categoryFeatures);
+
+  const configured = categoryFeatures[category] ?? getCategory(category)?.features ?? [];
+
+  const onlySubjectHas: string[] = [];
+  const onlyOtherHas: string[] = [];
+
+  for (const feature of configured) {
+    const subjectHas = Boolean(subject.features?.[feature.key]);
+    const otherHas = Boolean(other.features?.[feature.key]);
+
+    if (subjectHas && !otherHas) onlySubjectHas.push(featureLabel(feature.key));
+    if (otherHas && !subjectHas) onlyOtherHas.push(featureLabel(feature.key));
+  }
+
+  const difference = subjectScore - otherDetail.score;
+
+  return {
+    vehicleId: other.id,
+    name: other.name,
+    score: otherDetail.score,
+    difference,
+    weightedDifference: difference * weight,
+    numeric: otherDetail.numeric,
+    onlySubjectHas,
+    onlyOtherHas,
+  };
+}
+
+function buildHeadToHead(
+  subject: PinnedFinnCar,
+  other: PinnedFinnCar,
+  breakdowns: PriorityBreakdown[],
+  context: ReasoningContext,
+): HeadToHead {
+  const subjectTotal = totalFor(context.scores, subject.id);
+  const otherTotal = totalFor(context.scores, other.id);
+
+  /* Ordered by how much each priority actually moved the result. */
+  const categories = [...breakdowns].sort(
     (a, b) =>
-      scoreFor(scores, b.id, category) -
-      scoreFor(scores, a.id, category),
-  )[0];
-}
-
-/* -------------------------------------------------------------------------- */
-/* Feature explanations                                                       */
-/* -------------------------------------------------------------------------- */
-
-function featureSentence(
-  detail: CategoryDetail,
-  category: CategoryId,
-): string {
-  const categoryMeta = getCategory(category);
-
-  if (!categoryMeta) {
-    return "The available data does not support a detailed explanation for this priority.";
-  }
-
-  const label = categoryMeta.label;
-
-  const essential = detail.matched.filter(
-    (item) => item.tier === "essential",
+      Math.abs(b.versus?.weightedDifference ?? 0) -
+      Math.abs(a.versus?.weightedDifference ?? 0),
   );
 
-  const missingEssential = detail.missing.filter(
-    (item) => item.tier === "essential",
+  const advantages = categories.filter(
+    (item) => (item.versus?.difference ?? 0) > 0,
   );
 
-  if (essential.length || missingEssential.length) {
-    const present = essential.map((item) =>
-      featureLabel(item.key),
-    );
-
-    const missing = missingEssential.map((item) =>
-      featureLabel(item.key),
-    );
-
-    if (missing.length === 0) {
-      return `For ${label.toLowerCase()}, it covers all ${present.length} features you've marked as essential: ${present.join(", ")}.`;
-    }
-
-    if (present.length) {
-      return `For ${label.toLowerCase()}, it has ${present.join(", ")}, but is missing ${missing.join(", ")} from your essential list.`;
-    }
-
-    return `For ${label.toLowerCase()}, none of the essential features in your current setup are present.`;
-  }
-
-  const matched = detail.matched
-    .slice(0, 4)
-    .map((item) => featureLabel(item.key));
-
-  return matched.length
-    ? `For ${label.toLowerCase()}, the useful equipment includes ${matched.join(", ")}.`
-    : `For ${label.toLowerCase()}, the available data does not show a standout equipment advantage.`;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Formatting                                                                 */
-/* -------------------------------------------------------------------------- */
-
-function formatEUR(value: number): string {
-  return `€${Math.round(value).toLocaleString("de-DE")}`;
-}
-
-function costComparison(
-  winner: PinnedFinnCar,
-  alternative: PinnedFinnCar | undefined,
-  preferences: LensPreferences,
-): string {
-  const winnerCost = calculateCost(
-    winner,
-    preferences,
+  const concessions = categories.filter(
+    (item) => (item.versus?.difference ?? 0) < 0,
   );
 
-  if (!alternative) {
-    return `Its estimated monthly cost is ${formatEUR(
-      winnerCost.totalMonthly,
-    )}, including the rental price and estimated energy cost at your selected mileage.`;
-  }
+  const subjectCost = context.costs[subject.id];
+  const otherCost = context.costs[other.id];
 
-  const alternativeCost = calculateCost(
-    alternative,
-    preferences,
-  );
-
-  const diff =
-    alternativeCost.totalMonthly -
-    winnerCost.totalMonthly;
-
-  if (Math.abs(diff) < 1) {
-    return `Its estimated monthly cost is ${formatEUR(
-      winnerCost.totalMonthly,
-    )}, including rental and estimated energy at your selected mileage.`;
-  }
-
-  return diff > 0
-    ? `Its estimated monthly cost is ${formatEUR(
-        winnerCost.totalMonthly,
-      )}, about ${formatEUR(diff)} less than the next option.`
-    : `Its estimated monthly cost is ${formatEUR(
-        winnerCost.totalMonthly,
-      )}; the next option is ${formatEUR(
-        Math.abs(diff),
-      )} cheaper, so this win comes from more than price alone.`;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Priority explanations                                                      */
-/* -------------------------------------------------------------------------- */
-
-function buildPriorityReason(
-  category: CategoryId,
-  winner: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-  scores: VehicleScore[],
-  preferences: LensPreferences,
-): PriorityReason {
-  const categoryMeta = getCategory(category);
-
-  const detail = scores.find(
-    (score) => score.vehicleId === winner.id,
-  )?.details[category];
-
-  const categoryWinner = winnerForCategory(
-    vehicles,
-    scores,
-    category,
-  );
-
-  const runnerUp = [...vehicles]
-    .filter((vehicle) => vehicle.id !== winner.id)
-    .sort(
-      (a, b) =>
-        scoreFor(scores, b.id, category) -
-        scoreFor(scores, a.id, category),
-    )[0];
-
-  if (!categoryMeta || !detail) {
-    return {
-      priority: category,
-      title: categoryMeta?.label ?? category,
-      text: "The available data does not support a detailed explanation for this priority.",
-      evidence: [],
-    };
-  }
-
-  if (category === "affordability") {
-    const cost = calculateCost(
-      winner,
-      preferences,
-    );
-
-    const runnerCost = runnerUp
-      ? calculateCost(runnerUp, preferences)
-      : null;
-
-    const evidence = [
-      `Rental: ${formatEUR(cost.rental)}/month`,
-      cost.costPer100Km != null
-        ? `Estimated energy: ${formatEUR(
-            cost.costPer100Km,
-          )} per 100 km`
-        : "Running cost unavailable from the supplied data",
-      `Estimated total: ${formatEUR(
-        cost.totalMonthly,
-      )}/month`,
-    ];
-
-    return {
-      priority: category,
-      title: categoryMeta.label,
-      text: `${costComparison(
-        winner,
-        runnerUp,
-        preferences,
-      )} ${
-        cost.costPer100Km != null
-          ? `At ${preferences.annualKm.toLocaleString(
-              "de-DE",
-            )} km/year, the estimated running portion is ${formatEUR(
-              cost.running,
-            )}/month.`
-          : ""
-      }`,
-      evidence: runnerCost
-        ? [
-            ...evidence,
-            `Next option: ${formatEUR(
-              runnerCost.totalMonthly,
-            )}/month`,
-          ]
-        : evidence,
-    };
-  }
-
-  const categoryScore = scoreFor(
-    scores,
-    winner.id,
-    category,
-  );
-
-  const winnerIsCategoryLeader =
-    categoryWinner?.id === winner.id;
-
-  const comparison = runnerUp
-    ? scoreFor(scores, runnerUp.id, category)
-    : categoryScore;
-
-  const evidence: string[] = [];
-
-  if (detail.matched.length) {
-    evidence.push(
-      `Present: ${detail.matched
-        .slice(0, 6)
-        .map((item) => featureLabel(item.key))
-        .join(", ")}`,
-    );
-  }
-
-  if (detail.missing.length) {
-    evidence.push(
-      `Not present: ${detail.missing
-        .slice(0, 4)
-        .map((item) => featureLabel(item.key))
-        .join(", ")}`,
-    );
-  }
-
-  if (category === "practicality") {
-    const trunk = Number.parseFloat(
-      winner.capacity.trunk,
-    );
-
-    if (Number.isFinite(trunk)) {
-      evidence.unshift(
-        `Boot: ${Math.round(trunk).toLocaleString(
-          "de-DE",
-        )} L`,
-      );
-    }
-
-    if (winner.capacity.seats) {
-      evidence.unshift(
-        `${winner.capacity.seats} seats`,
-      );
-    }
-  }
-
-  if (
-    category === "longDistance" &&
-    winner.electric?.range &&
-    winner.electric.range !== "Unknown"
-  ) {
-    evidence.unshift(
-      `Electric range: ${winner.electric.range} km`,
-    );
-  }
-
-  if (category === "environmental") {
-    evidence.unshift(
-      winner.fuelType === "Electric"
-        ? "Electric powertrain"
-        : `${winner.fuelType} · ${
-            winner.co2.value || "unknown"
-          } g CO₂/km`,
-    );
-  }
+  const partial = {
+    subject: {
+      vehicleId: subject.id,
+      name: subject.name,
+      total: subjectTotal,
+    },
+    other: {
+      vehicleId: other.id,
+      name: other.name,
+      total: otherTotal,
+    },
+    totalDifference: subjectTotal - otherTotal,
+    categories,
+    decidingAdvantage: advantages[0] ?? null,
+    biggestConcession: concessions[0] ?? null,
+    budget: {
+      budget: context.budget.budget,
+      subject: subjectCost?.budgetStatus ?? "unknown",
+      other: otherCost?.budgetStatus ?? "unknown",
+      subjectDifference: subjectCost?.budgetDifference ?? null,
+      otherDifference: otherCost?.budgetDifference ?? null,
+    },
+  };
 
   return {
-    priority: category,
-    title: categoryMeta.label,
-    text: winnerIsCategoryLeader
-      ? `${featureSentence(
-          detail,
-          category,
-        )} It leads this comparison on ${categoryMeta.label.toLowerCase()} with a score of ${categoryScore}/100, ahead of the next option at ${comparison}/100.`
-      : `${featureSentence(
-          detail,
-          category,
-        )} It scores ${categoryScore}/100 here; another car leads this category, but its stronger performance on your higher-ranked priorities is why it still wins overall.`,
-    evidence,
+    ...partial,
+    summary: explainHeadToHead(partial),
   };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Tradeoffs                                                                  */
-/* -------------------------------------------------------------------------- */
+/**
+ * Produces the complete verdict on one vehicle under the user's settings.
+ *
+ * Called identically for the recommended car and for any car the user puts in
+ * the hot seat. Nothing about the user's configuration changes between the
+ * two — the same priorities, ordering, features, mileage, prices, budget and
+ * contract type apply, and the recommendation itself is not affected.
+ *
+ * `compareWith` defaults to the most useful rival: the recommendation for a
+ * hot-seated car, or the runner-up when the subject *is* the recommendation.
+ */
+export function evaluateVehicle(
+  vehicle: PinnedFinnCar,
+  context: ReasoningContext,
+  options: {
+    recommendedId?: number;
+    compareWith?: PinnedFinnCar | null;
+  } = {},
+): VehicleEvaluation {
+  const { scores, ranked, weights, preferences, costs } = context;
 
-function buildTradeoff(
-  category: CategoryId,
-  winner: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-  scores: VehicleScore[],
-  preferences: LensPreferences,
-): Tradeoff | null {
-  const winnerScore = scoreFor(
-    scores,
-    winner.id,
-    category,
+  const score =
+    scores.find((item) => item.vehicleId === vehicle.id) ??
+    ({
+      vehicleId: vehicle.id,
+      total: 0,
+      byCategory: {} as Record<CategoryId, number>,
+      details: {},
+    } satisfies VehicleScore);
+
+  const rank = ranked.findIndex((item) => item.id === vehicle.id) + 1;
+  const isRecommendation = options.recommendedId === vehicle.id;
+
+  const other =
+    options.compareWith !== undefined
+      ? options.compareWith
+      : defaultComparison(vehicle, context, options.recommendedId);
+
+  const priorities = weights.map(({ priority, rank: priorityRank, weight }) =>
+    priorityBreakdown(
+      priority,
+      priorityRank,
+      weight,
+      vehicle,
+      other,
+      context,
+    ),
   );
 
-  const categoryLeader = winnerForCategory(
-    vehicles,
-    scores,
-    category,
+  const byImpact = [...priorities].sort(
+    (a, b) =>
+      Math.abs(b.versus?.weightedDifference ?? 0) -
+      Math.abs(a.versus?.weightedDifference ?? 0),
   );
-
-  if (!categoryLeader || categoryLeader.id === winner.id) {
-    return null;
-  }
-
-  if (category === "affordability") {
-    const winnerCost = calculateCost(
-      winner,
-      preferences,
-    );
-
-    const bestCostCar = [...vehicles].sort(
-      (a, b) =>
-        calculateCost(a, preferences).totalMonthly -
-        calculateCost(b, preferences).totalMonthly,
-    )[0];
-
-    if (!bestCostCar || bestCostCar.id === winner.id) {
-      return null;
-    }
-
-    const bestCost = calculateCost(
-      bestCostCar,
-      preferences,
-    );
-
-    const diff =
-      winnerCost.totalMonthly -
-      bestCost.totalMonthly;
-
-    if (diff < 10) {
-      return null;
-    }
-
-    return {
-      priority: category,
-      title: "A little more to run",
-      text: `Because affordability is one of your top priorities, this is worth knowing: ${winner.name} is about ${formatEUR(
-        diff,
-      )}/month more expensive to run than ${bestCostCar.name} at your selected mileage. It wins overall because the extra cost is outweighed by its stronger fit elsewhere in your priority order.`,
-    };
-  }
-
-  if (winnerScore >= 72) {
-    return null;
-  }
-
-  const leaderScore = scoreFor(
-    scores,
-    categoryLeader.id,
-    category,
-  );
-
-  if (leaderScore - winnerScore < 12) {
-    return null;
-  }
-
-  const detail = scores.find(
-    (score) => score.vehicleId === winner.id,
-  )?.details[category];
-
-  if (!detail) {
-    return null;
-  }
-
-  const missing = detail.missing
-    .slice(0, 2)
-    .map((item) => featureLabel(item.key));
-
-  const present = detail.matched
-    .slice(0, 2)
-    .map((item) => featureLabel(item.key));
-
-  const categoryMeta = getCategory(category);
-
-  if (!categoryMeta) {
-    return null;
-  }
-
-  const exchange = present.length
-    ? `You do get ${present.join(
-        " and ",
-      )} in return.`
-    : "Its advantage comes from the stronger fit on your higher-ranked priorities.";
 
   return {
-    priority: category,
-    title: `One compromise on ${categoryMeta.label.toLowerCase()}`,
-    text: `${winner.name} trails ${categoryLeader.name} on ${categoryMeta.label.toLowerCase()} (${winnerScore}/100 vs ${leaderScore}/100). ${
-      missing.length
-        ? `The clearest gap is ${missing.join(
-            " and ",
-          )}. `
-        : ""
-    }${exchange}`,
+    vehicle,
+    score,
+    rank: rank > 0 ? rank : ranked.length,
+    isRecommendation,
+    cost: buildCostAnalysis(vehicle, preferences, costs[vehicle.id]),
+    priorities,
+    strengths: byImpact.filter((item) => (item.versus?.difference ?? 0) > 0),
+    weaknesses: byImpact.filter((item) => (item.versus?.difference ?? 0) < 0),
+    comparison: other
+      ? buildHeadToHead(vehicle, other, priorities, context)
+      : null,
   };
+}
+
+/**
+ * Picks the rival that makes the comparison informative.
+ *
+ * For a car the user is inspecting, that's the recommendation — "how does
+ * this stack up against the one Lens picked?". For the recommendation itself
+ * it's the next-best car, which is the choice the user is really weighing.
+ */
+function defaultComparison(
+  vehicle: PinnedFinnCar,
+  context: ReasoningContext,
+  recommendedId?: number,
+): PinnedFinnCar | null {
+  const { ranked } = context;
+
+  if (recommendedId != null && recommendedId !== vehicle.id) {
+    return ranked.find((item) => item.id === recommendedId) ?? null;
+  }
+
+  return ranked.find((item) => item.id !== vehicle.id) ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -883,139 +406,237 @@ function buildTradeoff(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Builds the complete user-facing recommendation.
+ * Picks the recommended vehicle and explains it.
  *
- * The recommendation process has two distinct stages:
+ * The order is deliberate and the two systems never mix:
  *
- * 1. Eligibility
- *    Vehicles are first checked against the user's monthly budget.
- *    Vehicles that exceed the budget are excluded from the normal ranking.
+ *   1. cost is calculated for every vehicle;
+ *   2. budget eligibility is resolved from that cost;
+ *   3. every vehicle is scored against the user's priorities — budget plays
+ *      no part in this;
+ *   4. the winner is the highest-scoring vehicle that is *allowed* to win;
+ *   5. the winner is explained against its closest rival.
  *
- * 2. Recommendation
- *    Only budget-eligible vehicles are scored and ranked according to the
- *    user's ordered priorities.
+ * Who is allowed to win, in order of preference:
  *
- * The monthly budget is therefore a hard constraint rather than another
- * scoring factor.
+ *   - a vehicle confirmed to fit the budget;
+ *   - failing that, a vehicle whose cost couldn't be fully calculated — it
+ *     is not confirmed affordable, so it can't jump ahead of one that is;
+ *   - failing that, every vehicle, and the result is flagged `isFallback`.
  *
- * If at least one vehicle fits the budget:
- * - the eligible vehicles are scored
- * - the highest-scoring vehicle becomes the winner
- * - reasons and tradeoffs are generated for that winner
- *
- * If no vehicle fits the budget:
- * - no vehicle is recommended
- * - the result can still expose the over-budget vehicles so the UI can explain
- *   that none of the selected cars fit the user's budget
+ * A fallback winner is never presented as fitting the budget. Over-budget
+ * vehicles are never hidden — they stay in `ranked` and remain inspectable.
  */
 export function buildRecommendation(
   vehicles: PinnedFinnCar[],
   priorities: CategoryId[],
   preferences: LensPreferences,
-  categoryFeatures: Record<CategoryId, FeatureWeight[]> = DEFAULT_CATEGORY_FEATURES,
+  categoryFeatures: Record<
+    CategoryId,
+    FeatureWeight[]
+  > = DEFAULT_CATEGORY_FEATURES,
 ): Recommendation | null {
-  if (!vehicles.length) {
-    return null;
-  }
+  if (!vehicles.length) return null;
 
-  const ordered = priorities.length
-    ? priorities
-    : DEFAULT_PRIORITIES;
-
-  const { eligible } = filterByBudget(
+  const context = buildReasoningContext(
     vehicles,
-    preferences,
-  );
-
-  /*
-   * No vehicle fits the user's budget.
-   *
-   * We deliberately do not choose the cheapest over-budget vehicle as the
-   * winner. Doing so would violate the user's explicit financial constraint.
-   *
-   * For now, return null. The UI can separately use the overBudget vehicles
-   * if it wants to display a "nothing fits your budget" state.
-   */
-  if (!eligible.length) {
-    return null;
-  }
-
-  const scores = computeAllScores(
-    eligible,
-    ordered,
+    priorities,
     preferences,
     categoryFeatures,
   );
 
-  const ranked = [...eligible].sort(
-    (a, b) =>
-      (scores.find(
-        (score) => score.vehicleId === b.id,
-      )?.total ?? 0) -
-      (scores.find(
-        (score) => score.vehicleId === a.id,
-      )?.total ?? 0),
+  return recommendFrom(context);
+}
+
+/** The same selection, when a context has already been built. */
+export function recommendFrom(
+  context: ReasoningContext,
+): Recommendation | null {
+  const { budget, ranked, scores } = context;
+
+  if (!ranked.length) return null;
+
+  const eligible = pickEligible(budget, ranked);
+
+  const winner = ranked.find((vehicle) =>
+    eligible.some((item) => item.id === vehicle.id),
   );
 
-  const [winner] = ranked;
-
-  if (!winner) {
-    return null;
-  }
+  if (!winner) return null;
 
   const winnerScore = scores.find(
     (score) => score.vehicleId === winner.id,
-  )!;
+  ) as VehicleScore;
 
-  const reasons = ordered.map((category) =>
-    buildPriorityReason(
-      category,
-      winner,
-      eligible,
-      scores,
-      preferences,
-    ),
-  );
+  /*
+   * Fallback means: the user set a budget, nothing was confirmed to fit it,
+   * and we're presenting the strongest priority match anyway — clearly
+   * marked, rather than returning nothing.
+   */
+  const winnerStatus = context.costs[winner.id]?.budgetStatus;
 
-  const tradeoffs = ordered
-    .slice(0, 3)
-    .map((category) =>
-      buildTradeoff(
-        category,
-        winner,
-        eligible,
-        scores,
-        preferences,
-      ),
-    )
-    .filter(
-      (tradeoff): tradeoff is Tradeoff =>
-        Boolean(tradeoff),
-    );
+  const isFallback =
+    budget.budget != null && !budget.anyFits && winnerStatus !== "within";
 
   return {
     winner,
     score: winnerScore,
     ranked,
     scores,
-    reasons,
-    tradeoffs,
+    isFallback,
+    fallbackReason: !isFallback
+      ? null
+      : winnerStatus === "over"
+        ? "allOverBudget"
+        : "costUnconfirmed",
+    budget,
+    evaluation: evaluateVehicle(winner, context, {
+      recommendedId: winner.id,
+    }),
+    context,
   };
 }
+
+/**
+ * The pool a winner may be drawn from, preferring certainty about the budget.
+ */
+function pickEligible(
+  budget: BudgetPartition,
+  ranked: PinnedFinnCar[],
+): PinnedFinnCar[] {
+  if (budget.within.length) return budget.within;
+  if (budget.unknown.length) return budget.unknown;
+  return ranked;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hot seat                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** How many cars the hot-seat picker exposes, including the selected one. */
+export const HOT_SEAT_WINDOW = 5;
+
+/**
+ * The bounded set of cars the user can switch between.
+ *
+ * The selected car always comes first, followed by its closest-ranked
+ * neighbours — the cars it is genuinely competing with — rather than the
+ * whole catalogue. Ties in distance break towards the better-ranked car.
+ */
+export function hotSeatOptions(
+  context: ReasoningContext,
+  selectedId: number,
+  recommendedId: number,
+  limit: number = HOT_SEAT_WINDOW,
+): HotSeatOption[] {
+  const { ranked, scores, costs } = context;
+
+  const selectedIndex = ranked.findIndex(
+    (vehicle) => vehicle.id === selectedId,
+  );
+
+  if (selectedIndex === -1) return [];
+
+  const neighbours = ranked
+    .map((vehicle, index) => ({ vehicle, index }))
+    .filter((item) => item.index !== selectedIndex)
+    .sort((a, b) => {
+      const distance =
+        Math.abs(a.index - selectedIndex) - Math.abs(b.index - selectedIndex);
+
+      return distance !== 0 ? distance : a.index - b.index;
+    })
+    .slice(0, Math.max(0, limit - 1));
+
+  const window = [
+    { vehicle: ranked[selectedIndex] as PinnedFinnCar, index: selectedIndex },
+    ...neighbours,
+  ];
+
+  return window.map(({ vehicle, index }) => ({
+    vehicle,
+    rank: index + 1,
+    total: totalFor(scores, vehicle.id),
+    isRecommendation: vehicle.id === recommendedId,
+    isSelected: vehicle.id === selectedId,
+    budgetStatus: costs[vehicle.id]?.budgetStatus ?? "unknown",
+    totalMonthly: costs[vehicle.id]?.totalMonthly ?? 0,
+  }));
+}
+
 /* -------------------------------------------------------------------------- */
 /* Settings persistence                                                       */
 /* -------------------------------------------------------------------------- */
 
+const STORAGE_KEYS = [
+  "finnLensPreferences",
+  "finnLensPriorities",
+  "finnLensPriorityDefinitions",
+  "finnLensProfiles",
+  "finnLensCategoryFeatures",
+  "finnLensDefaultProfileId",
+] as const;
+
+/**
+ * Priority ids that existed in earlier builds and no longer do.
+ *
+ * `affordability` used to be a ranked priority. It is now a budget constraint
+ * instead, so any stored order, profile or feature map still referencing it is
+ * cleaned up on load rather than left to produce a broken priority card.
+ */
+const RETIRED_PRIORITIES: string[] = ["affordability"];
+
+const isLivePriority = (id: string): boolean =>
+  !RETIRED_PRIORITIES.includes(id);
+
+/**
+ * Brings stored preferences up to the current shape.
+ *
+ * Migrations, all non-destructive:
+ * - `annualKm` → `monthlyKm` (÷ 12), so existing users keep their mileage
+ *   without re-entering it;
+ * - `contractType` defaults to private;
+ * - anything missing or unusable falls back to the product default.
+ */
+export function migratePreferences(
+  stored: LegacyLensPreferences | undefined,
+): LensPreferences {
+  if (!stored) return { ...DEFAULT_PREFERENCES };
+
+  const number = (value: unknown, fallback: number): number =>
+    typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? value
+      : fallback;
+
+  const monthlyKm =
+    stored.monthlyKm != null
+      ? number(stored.monthlyKm, DEFAULT_PREFERENCES.monthlyKm)
+      : stored.annualKm != null
+        ? Math.round(number(stored.annualKm, DEFAULT_PREFERENCES.monthlyKm * 12) / 12)
+        : DEFAULT_PREFERENCES.monthlyKm;
+
+  return {
+    monthlyKm,
+    monthlyBudget: number(
+      stored.monthlyBudget,
+      DEFAULT_PREFERENCES.monthlyBudget,
+    ),
+    petrolPrice: number(stored.petrolPrice, DEFAULT_PREFERENCES.petrolPrice),
+    dieselPrice: number(stored.dieselPrice, DEFAULT_PREFERENCES.dieselPrice),
+    electricityPrice: number(
+      stored.electricityPrice,
+      DEFAULT_PREFERENCES.electricityPrice,
+    ),
+    contractType:
+      stored.contractType === "business" ? "business" : "private",
+  };
+}
+
 export async function loadLensSettings(): Promise<LensSettings> {
   const stored = (await browser.storage.local.get([
-    "finnLensPreferences",
-    "finnLensPriorities",
-    "finnLensPriorityDefinitions",
-    "finnLensProfiles",
-    "finnLensCategoryFeatures",
-    "finnLensDefaultProfileId",
+    ...STORAGE_KEYS,
   ])) as Record<string, unknown> as {
-    finnLensPreferences?: LensPreferences;
+    finnLensPreferences?: LensPreferences & LegacyLensPreferences;
     finnLensPriorities?: CategoryId[];
     finnLensPriorityDefinitions?: PriorityDefinition[];
     finnLensProfiles?: Profile[];
@@ -1023,9 +644,9 @@ export async function loadLensSettings(): Promise<LensSettings> {
     finnLensDefaultProfileId?: ProfileId;
   };
 
-  const priorityDefinitions: PriorityDefinition[] =
-    stored.finnLensPriorityDefinitions ??
-    DEFAULT_PRIORITY_DEFINITIONS;
+  const priorityDefinitions: PriorityDefinition[] = (
+    stored.finnLensPriorityDefinitions ?? DEFAULT_PRIORITY_DEFINITIONS
+  ).filter((definition) => isLivePriority(definition.id));
 
   /**
    * Restore persisted custom categories into the runtime registry.
@@ -1033,10 +654,7 @@ export async function loadLensSettings(): Promise<LensSettings> {
    * Built-ins are deliberately ignored because CATEGORIES already owns them.
    */
   for (const definition of priorityDefinitions) {
-    if (
-      definition.isCustom &&
-      !(definition.id in CATEGORIES)
-    ) {
+    if (definition.isCustom && !(definition.id in CATEGORIES)) {
       registerCategoryMeta(definition.id, {
         label: definition.label,
         icon: definition.icon,
@@ -1049,28 +667,31 @@ export async function loadLensSettings(): Promise<LensSettings> {
     }
   }
 
+  const priorities = (stored.finnLensPriorities ?? DEFAULT_PRIORITIES).filter(
+    isLivePriority,
+  );
+
+  const profiles = (stored.finnLensProfiles ?? DEFAULT_PROFILES).map(
+    (profile) => ({
+      ...profile,
+      priorities: profile.priorities.filter(isLivePriority),
+    }),
+  );
+
+  const categoryFeatures = Object.fromEntries(
+    Object.entries(
+      stored.finnLensCategoryFeatures ?? DEFAULT_CATEGORY_FEATURES,
+    ).filter(([id]) => isLivePriority(id)),
+  ) as Record<CategoryId, FeatureWeight[]>;
+
   return {
-    preferences:
-      stored.finnLensPreferences ??
-      DEFAULT_PREFERENCES,
-
-    priorities:
-      stored.finnLensPriorities ??
-      DEFAULT_PRIORITIES,
-
+    preferences: migratePreferences(stored.finnLensPreferences),
+    priorities: priorities.length ? priorities : DEFAULT_PRIORITIES,
     priorityDefinitions,
-
-    profiles:
-      stored.finnLensProfiles ??
-      DEFAULT_PROFILES,
-
-    categoryFeatures:
-      stored.finnLensCategoryFeatures ??
-      DEFAULT_CATEGORY_FEATURES,
-
+    profiles,
+    categoryFeatures,
     defaultProfileId:
-      stored.finnLensDefaultProfileId ??
-      DEFAULT_DEFAULT_PROFILE_ID,
+      stored.finnLensDefaultProfileId ?? DEFAULT_DEFAULT_PROFILE_ID,
   };
 }
 
@@ -1079,45 +700,25 @@ export async function saveLensSettings(
 ): Promise<void> {
   await browser.storage.local.set({
     ...(settings.preferences
-      ? {
-          finnLensPreferences:
-            settings.preferences,
-        }
+      ? { finnLensPreferences: settings.preferences }
       : {}),
 
     ...(settings.priorities
-      ? {
-          finnLensPriorities:
-            settings.priorities,
-        }
+      ? { finnLensPriorities: settings.priorities }
       : {}),
 
     ...(settings.priorityDefinitions
-      ? {
-          finnLensPriorityDefinitions:
-            settings.priorityDefinitions,
-        }
+      ? { finnLensPriorityDefinitions: settings.priorityDefinitions }
       : {}),
 
-    ...(settings.profiles
-      ? {
-          finnLensProfiles:
-            settings.profiles,
-        }
-      : {}),
+    ...(settings.profiles ? { finnLensProfiles: settings.profiles } : {}),
 
     ...(settings.categoryFeatures
-      ? {
-          finnLensCategoryFeatures:
-            settings.categoryFeatures,
-        }
+      ? { finnLensCategoryFeatures: settings.categoryFeatures }
       : {}),
 
     ...(settings.defaultProfileId
-      ? {
-          finnLensDefaultProfileId:
-            settings.defaultProfileId,
-        }
+      ? { finnLensDefaultProfileId: settings.defaultProfileId }
       : {}),
   });
 }

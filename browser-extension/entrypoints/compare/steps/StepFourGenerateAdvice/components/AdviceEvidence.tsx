@@ -2,88 +2,71 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
 } from "@heroicons/react/24/outline";
-import type { PinnedFinnCar } from "@/lib/types";
 import type {
-    LensPreferences,
-    PriorityReason,
-    Tradeoff,
-    VehicleScore,
+    ReasoningContext,
+    VehicleEvaluation,
 } from "@/lib/reasoning-engine/types";
+import { explainVerdict } from "@/lib/reasoning-engine";
 import { PrioritySection } from "./PrioritySection";
-import { TradeoffCard } from "./TradeoffCard";
+import { HeadToHeadSummary } from "./HeadToHeadSummary";
 import { RecommendationRanking } from "./RecommendationRanking";
 
 interface AdviceEvidenceProps {
-    reasons: PriorityReason[];
-    tradeoffs: Tradeoff[];
-    ranked: PinnedFinnCar[];
-    scores: VehicleScore[];
-    preferences: LensPreferences;
+    evaluation: VehicleEvaluation;
+    context: ReasoningContext;
+    recommendedId: number;
     expanded: boolean;
     onToggleExpanded: () => void;
 }
 
+/**
+ * The evidence panel for whichever car is currently in the hot seat.
+ *
+ * It reads identically for the recommended car and for one the user picked —
+ * the only thing that changes is the verdict line, which never claims a car
+ * won unless it did.
+ */
 export function AdviceEvidence({
-    reasons,
-    tradeoffs,
-    ranked,
-    scores,
-    preferences,
+    evaluation,
+    context,
+    recommendedId,
     expanded,
     onToggleExpanded,
 }: AdviceEvidenceProps) {
+    const subjectName = evaluation.vehicle.name;
+
     return (
         <div className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
             <div className="mb-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
-                    Why it wins
+                    {evaluation.isRecommendation
+                        ? "Why it wins"
+                        : "In the hot seat"}
                 </p>
 
                 <h2 className="mt-2 text-2xl font-black">
-                    The evidence, in your order.
+                    {evaluation.isRecommendation
+                        ? "The evidence, in your order."
+                        : `How ${subjectName} measures up.`}
                 </h2>
+
+                <p className="mt-2 text-sm leading-6 text-finn-iron">
+                    {explainVerdict(evaluation)}
+                </p>
             </div>
 
             <div className="space-y-6">
-                {reasons.map((reason, index) => (
+                {evaluation.priorities.map((breakdown) => (
                     <PrioritySection
-                        key={reason.priority}
-                        priority={reason.priority}
-                        index={index}
-                        text={reason.text}
-                        evidence={reason.evidence}
+                        key={breakdown.priority}
+                        breakdown={breakdown}
+                        subjectName={subjectName}
                     />
                 ))}
             </div>
 
-            {tradeoffs.length > 0 && (
-                <section className="mt-8 border-t border-finn-cotton pt-6">
-                    <div className="mb-4">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-warning">
-                            Worth knowing
-                        </p>
-
-                        <h2 className="mt-2 text-2xl font-black">
-                            The compromises that actually matter to you.
-                        </h2>
-
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                            These are limited to your first three priorities.
-                            We deliberately leave unrelated weaknesses out.
-                        </p>
-                    </div>
-
-                    <div className="space-y-3">
-                        {tradeoffs.map((tradeoff) => (
-                            <TradeoffCard
-                                key={`${tradeoff.priority}-${tradeoff.title}`}
-                                title={tradeoff.title}
-                                text={tradeoff.text}
-                                priority={tradeoff.priority}
-                            />
-                        ))}
-                    </div>
-                </section>
+            {evaluation.comparison && (
+                <HeadToHeadSummary comparison={evaluation.comparison} />
             )}
 
             <section className="mt-8 border-t border-finn-cotton pt-6">
@@ -98,7 +81,7 @@ export function AdviceEvidence({
                         </p>
 
                         <p className="mt-1 text-sm font-black">
-                            See how the other cars compared
+                            See how every car compared
                         </p>
                     </div>
 
@@ -111,9 +94,9 @@ export function AdviceEvidence({
 
                 {expanded && (
                     <RecommendationRanking
-                        ranked={ranked}
-                        scores={scores}
-                        preferences={preferences}
+                        context={context}
+                        recommendedId={recommendedId}
+                        selectedId={evaluation.vehicle.id}
                     />
                 )}
             </section>

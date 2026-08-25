@@ -170,7 +170,7 @@ function App() {
             type="button"
             className="rounded-full border border-white/20 bg-white/10 p-1.5 text-white/70 backdrop-blur-sm transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
             aria-label="Settings"
-            onClick={() => openBrowserTab("OPEN_SETTINGS_TAB")}
+            onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
           >
             <Cog6ToothIcon className="h-4 w-4" />
           </button>

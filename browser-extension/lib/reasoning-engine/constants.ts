@@ -305,22 +305,6 @@ type FeatureId = keyof typeof FEATURES;
 /* -------------------------------------------------------------------------- */
 
 export const CATEGORIES = {
-  affordability: {
-    label: "Affordability",
-    icon: "💶",
-    color: "#0F9D58",
-    question: "Can I comfortably afford this, month after month?",
-    description:
-      "Total monthly cost of renting — base price, estimated extra-kilometre charges, and fuel or electricity.",
-    recommendedFor: [
-      "Budget-conscious renters",
-      "First-time FINN customers",
-      "Anyone comparing monthly payments closely",
-    ],
-    numericOnly: true,
-    features: [],
-  },
-
   safety: {
     label: "Safety",
     icon: "🛡️",
@@ -519,7 +503,7 @@ export const PROFILES = {
     forWhom:
       "Drivers who want maximum reassurance behind the wheel — safety and assistance systems doing the heavy lifting.",
     assumes:
-      "Weighs safety and driver assistance far above everything else, even cost.",
+      "Weighs safety and driver assistance far above everything else.",
     priorities: [
       "safety",
       "driverAssistance",
@@ -535,12 +519,11 @@ export const PROFILES = {
     forWhom:
       "People who spend lots of time in traffic and dislike parking.",
     assumes:
-      "Prioritizes tech that reduces daily friction, but keeps cost in the top 5.",
+      "Prioritizes tech that reduces daily friction on short, repetitive journeys.",
     priorities: [
       "driverAssistance",
       "safety",
       "practicality",
-      "affordability",
       "longDistance",
     ],
   },
@@ -551,7 +534,7 @@ export const PROFILES = {
     forWhom:
       "Parents who need to safely and comfortably transport children on a regular basis.",
     assumes:
-      "Safety and family practicality dominate — cost matters less if the fit is right.",
+      "Safety and family practicality dominate everything else.",
     priorities: [
       "safety",
       "familyFriendly",
@@ -583,11 +566,10 @@ export const PROFILES = {
     forWhom:
       "Drivers who want their car choice to reflect their environmental values.",
     assumes:
-      "Environmental impact leads, with cost close behind.",
+      "Environmental impact leads, with safety close behind.",
     priorities: [
       "environmental",
       "safety",
-      "affordability",
       "driverAssistance",
       "practicality",
     ],
@@ -647,7 +629,6 @@ export const DEFAULT_PROFILES: Profile[] = (
 
 export const DEFAULT_PRIORITIES: CategoryId[] = [
   "safety",
-  "affordability",
   "driverAssistance",
   "practicality",
   "comfort",
@@ -660,12 +641,26 @@ export const DEFAULT_DEFAULT_PROFILE_ID: ProfileId = "balanced";
 /* Preferences                                                                */
 /* -------------------------------------------------------------------------- */
 
-export const DEFAULT_FINN_MONTHLY_KM = 500;
+/**
+ * Kilometres FINN's base subscription currently includes each month.
+ *
+ * This is an assumption about the FINN offer, not a user preference, so it
+ * deliberately lives outside LensPreferences. Anything driven beyond it is
+ * charged at the vehicle's own `pricing.extraKmPrice`.
+ */
+export const FINN_INCLUDED_MONTHLY_KM = 500;
+
+/**
+ * Placeholder starting point for a brand-new install — not a claim about what
+ * anyone can or should spend. The user is expected to edit it.
+ */
+export const DEFAULT_MONTHLY_BUDGET = 300;
 
 export const DEFAULT_PREFERENCES: LensPreferences = {
-  annualKm: 12_000,
+  monthlyKm: 1_000,
   petrolPrice: 1.75,
   dieselPrice: 1.7,
   electricityPrice: 0.32,
-  monthlyBudget: 300,
+  monthlyBudget: DEFAULT_MONTHLY_BUDGET,
+  contractType: "private",
 };

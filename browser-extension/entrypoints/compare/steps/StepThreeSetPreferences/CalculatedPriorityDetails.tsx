@@ -19,9 +19,8 @@ export function CalculatedPriorityDetails({
             </p>
 
             <p className="mt-2 text-xs leading-5 text-finn-iron">
-                {categoryId === "affordability"
-                    ? "Lens calculates affordability automatically from the vehicle's available financial data, including its pricing and relevant running-cost information."
-                    : "Lens calculates Environmental Impact automatically from the vehicle's available emissions and efficiency data."}
+                Lens calculates {category.label} automatically from the
+                vehicle's available emissions and efficiency data.
             </p>
 
             <div className="mt-4 rounded-2xl bg-white p-3">

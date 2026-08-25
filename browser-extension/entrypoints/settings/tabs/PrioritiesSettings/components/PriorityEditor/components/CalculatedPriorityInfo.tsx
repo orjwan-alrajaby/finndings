@@ -9,9 +9,6 @@ export function CalculatedPriorityInfo({
     priority,
     onClose,
 }: CalculatedPriorityInfoProps) {
-    const isAffordability =
-        priority.id === "affordability";
-
     return (
         <div className="space-y-4 border-t border-white p-4">
             <div className="rounded-2xl bg-white p-4">
@@ -21,9 +18,8 @@ export function CalculatedPriorityInfo({
                 </p>
 
                 <p className="mt-2 text-xs leading-5 text-finn-black">
-                    {isAffordability
-                        ? "This priority is calculated automatically from the vehicle's financial data, including its price and relevant running costs."
-                        : "This priority is calculated automatically from the vehicle's emissions and efficiency data."}
+                    This priority is calculated automatically from the
+                    vehicle's emissions and efficiency data.
                 </p>
             </div>
 

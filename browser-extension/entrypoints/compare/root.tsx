@@ -245,6 +245,7 @@ export default function CompareTab({
                   onBack={() =>
                     setStep("preferences")
                   }
+                  onSettings={onSettings}
                 />
               )}
             </div>

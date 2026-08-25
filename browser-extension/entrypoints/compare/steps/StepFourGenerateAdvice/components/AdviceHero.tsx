@@ -1,19 +1,17 @@
 import { ArrowTopRightOnSquareIcon, SparklesIcon } from "@heroicons/react/24/outline";
-import type { PinnedFinnCar } from "@/lib/types";
-import type { CategoryId, LensPreferences, VehicleScore } from "@/lib/reasoning-engine/types";
-import { CATEGORIES } from "@/lib/reasoning-engine/constants";
-import { calculateCost } from "@/lib/reasoning-engine";
+import type {
+    CategoryId,
+    CostBreakdown,
+    VehicleEvaluation,
+} from "@/lib/reasoning-engine/types";
+import { formatEUR, getCategory } from "@/lib/reasoning-engine";
 
 interface AdviceHeroProps {
-    winner: PinnedFinnCar;
-    score: VehicleScore;
+    evaluation: VehicleEvaluation;
+    cost: CostBreakdown;
     priorities: CategoryId[];
-    preferences: LensPreferences;
+    isFallback: boolean;
     onBack: () => void;
-}
-
-function money(value: number) {
-    return `€${Math.round(value).toLocaleString("de-DE")}`;
 }
 
 function determineSubtitle(
@@ -27,14 +25,21 @@ function determineSubtitle(
     return equipmentLine;
 }
 
+/**
+ * The recommendation itself. Always the recommended car, never the hot-seat
+ * selection — the two are separate concepts and the hero owns the first one.
+ */
 export function AdviceHero({
-    winner,
-    score,
+    evaluation,
+    cost,
     priorities,
-    preferences,
+    isFallback,
     onBack,
 }: AdviceHeroProps) {
-    const winnerCost = calculateCost(winner, preferences);
+    const winner = evaluation.vehicle;
+
+    /* The single strongest piece of evidence, taken from the head-to-head. */
+    const driver = evaluation.comparison?.decidingAdvantage;
 
     return (
         <section className="overflow-hidden rounded-[30px] bg-finn-highlight-navy text-white shadow-xl">
@@ -42,7 +47,9 @@ export function AdviceHero({
                 <div className="p-6 sm:p-8 lg:p-10">
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold ring-1 ring-white/10">
                         <SparklesIcon className="h-4 w-4 text-finn-accent-blue" />
-                        Strongest match
+                        {isFallback
+                            ? "Strongest match — over budget"
+                            : "Strongest match"}
                     </div>
 
                     <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">
@@ -62,15 +69,24 @@ export function AdviceHero({
                     </p>
 
                     <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-white/90">
-                        According to your priorities, {winner.name} is your
-                        strongest match.
+                        {driver?.versus
+                            ? `${winner.name} comes out on top mainly on ${driver.label}, your #${driver.rank} priority: ${driver.score}/100 against ${driver.versus.name}'s ${driver.versus.score}/100.`
+                            : `${winner.name} scores ${evaluation.score.total}/100 against the priorities you set.`}
                     </p>
 
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65">
-                        It wins because the things you put at the top of the
-                        list carry the most weight. It is not pretending to be
-                        the best at everything.
-                    </p>
+                    {evaluation.comparison?.biggestConcession?.versus && (
+                        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65">
+                            It is not the best at everything.{" "}
+                            {evaluation.comparison.biggestConcession.versus.name}{" "}
+                            beats it on{" "}
+                            {evaluation.comparison.biggestConcession.label} by{" "}
+                            {Math.abs(
+                                evaluation.comparison.biggestConcession.versus
+                                    .difference,
+                            )}{" "}
+                            points — the full arithmetic is below.
+                        </p>
+                    )}
 
                     <div className="mt-6 flex flex-wrap gap-2">
                         {priorities.slice(0, 3).map((priority, index) => (
@@ -78,7 +94,7 @@ export function AdviceHero({
                                 key={priority}
                                 className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold ring-1 ring-white/10"
                             >
-                                #{index + 1} {CATEGORIES[priority].label}
+                                #{index + 1} {getCategory(priority)?.label ?? priority}
                             </span>
                         ))}
                     </div>
@@ -117,12 +133,20 @@ export function AdviceHero({
                         <div className="flex items-end justify-between gap-4">
                             <div>
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                                    Estimated monthly
+                                    {cost.complete
+                                        ? "Estimated monthly"
+                                        : "Estimated monthly (partial)"}
                                 </p>
 
                                 <p className="mt-1 text-2xl font-black">
-                                    {money(winnerCost.totalMonthly)}
+                                    {formatEUR(cost.totalMonthly)}
                                 </p>
+
+                                {cost.budget != null && (
+                                    <p className="mt-0.5 text-[10px] font-bold text-white/60">
+                                        budget {formatEUR(cost.budget)}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="text-right">
@@ -131,7 +155,7 @@ export function AdviceHero({
                                 </p>
 
                                 <p className="mt-1 text-2xl font-black">
-                                    {score.total}/100
+                                    {evaluation.score.total}/100
                                 </p>
                             </div>
                         </div>
