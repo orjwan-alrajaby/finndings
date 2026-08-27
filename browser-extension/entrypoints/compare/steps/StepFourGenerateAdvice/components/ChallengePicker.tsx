@@ -92,15 +92,15 @@ export function ChallengePicker({
                             {option.vehicle.name}
                         </p>
 
+                        {/*
+                          * Rank, not "68/100". The score is a comparison
+                          * artefact — a share of the equipment we happen to
+                          * check — and printing it as a mark out of a hundred
+                          * invites the reader to read it as a grade the data
+                          * can't support.
+                          */}
                         <p className="mt-0.5 text-[10px] font-bold text-finn-iron">
-                            {option.total}/100 overall
-                            {option.differenceToWinner !== 0 && (
-                                <>
-                                    {" · "}
-                                    {option.differenceToWinner > 0 ? "+" : ""}
-                                    {option.differenceToWinner} vs {winnerName}
-                                </>
-                            )}
+                            #{option.rank} of your pinned cars
                         </p>
 
                         <p

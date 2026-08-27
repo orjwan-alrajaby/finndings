@@ -46,15 +46,16 @@ export function PrioritySection({
     const { features } = reasoning;
 
     /*
-     * When the user singled features out, both lists are theirs and both are
-     * worth showing. When they didn't, the lists are the whole category
-     * catalogue — showing fifteen struck-through chips of equipment nobody
-     * asked about would be a dump, so only what the car actually has is shown.
+     * Two questions, shown separately.
+     *
+     * The reader's own picks come first and carry both halves, present and
+     * missing, because a gap in something they asked for is the point. The
+     * category coverage below it shows only what the car has — fifteen
+     * struck-through chips of equipment nobody asked about is a dump, not
+     * evidence.
      */
-    const fromSelection = features.basis === "selected";
-
-    const present = features.present;
-    const missing = fromSelection ? features.missing : [];
+    const picked = features.picked;
+    const hasPicks = picked.present.length + picked.missing.length > 0;
 
     return (
         <section className="border-t border-finn-cotton pt-6">
@@ -100,25 +101,43 @@ export function PrioritySection({
                         <MeasurementTable facts={reasoning.measurements} />
                     )}
 
-                    {(present.length > 0 || missing.length > 0) && (
-                        <div className="mt-3 space-y-2">
-                            <ChipRow
-                                label={
-                                    fromSelection
-                                        ? "You picked out, and it has"
-                                        : "It has"
-                                }
-                                facts={present}
-                                tone="present"
-                            />
+                    <div className="mt-3 space-y-2">
+                        {hasPicks && (
+                            <>
+                                <ChipRow
+                                    label="You picked out, and it has"
+                                    facts={picked.present}
+                                    tone="present"
+                                />
 
-                            <ChipRow
-                                label="You picked out, but it doesn't have"
-                                facts={missing}
-                                tone="missing"
-                            />
-                        </div>
-                    )}
+                                <ChipRow
+                                    label="You picked out, but it doesn't have"
+                                    facts={picked.missing}
+                                    tone="missing"
+                                />
+                            </>
+                        )}
+
+                        <ChipRow
+                            label={
+                                hasPicks
+                                    ? "Everything else it has here"
+                                    : "It has"
+                            }
+                            facts={
+                                hasPicks
+                                    ? features.coverage.present.filter(
+                                          (fact) =>
+                                              !picked.present.some(
+                                                  (item) =>
+                                                      item.key === fact.key,
+                                              ),
+                                      )
+                                    : features.coverage.present
+                            }
+                            tone="rivalOnly"
+                        />
+                    </div>
                 </div>
             </div>
         </section>

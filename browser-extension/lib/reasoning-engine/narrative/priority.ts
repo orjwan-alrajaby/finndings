@@ -69,20 +69,17 @@ const joinSelection = (facts: FeatureFact[]): string =>
   joinCapped(labelsOf(facts), 5);
 
 /**
- * What the user singled out, and whether they got it.
+ * What the user picked out, and whether they got it.
  *
- * Names the features rather than counting them, because "two of the three"
- * sends the reader off to work out which two. Nothing here grades them: the
- * user said these matter, and the only question left is whether the car has
- * them.
+ * This leads the section when there is a selection, because it is the part
+ * the reader wrote themselves. It moves no number — the sentence after it
+ * says what the category actually scored on.
  */
 function describeSelection(
   features: FeatureEvidence,
   rival: RivalDifference | null,
 ): string | null {
-  if (features.basis !== "selected") return null;
-
-  const { present, missing } = features;
+  const { present, missing } = features.picked;
   const total = present.length + missing.length;
 
   if (total === 0) return null;
@@ -112,41 +109,63 @@ function describeSelection(
     missing.some((item) => item.key === fact.key),
   );
 
-  return sentence(
-    opener,
-    `This car has ${coverage(present.length, total)} —`,
-    `it doesn't have ${joinSelection(missing)}`,
-    rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
-  );
+  /*
+   * Name whichever side is shorter. Listing four missing features straight
+   * after listing all five is the same sentence twice.
+   */
+  return present.length < missing.length
+    ? sentence(
+        opener,
+        `This car has ${coverage(present.length, total)} of them:`,
+        joinSelection(present),
+      )
+    : sentence(
+        opener,
+        `This car has ${coverage(present.length, total)} —`,
+        `it doesn't have ${joinSelection(missing)}`,
+        rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
+      );
 }
 
 /**
- * How the car does on the category as a whole, when the user singled nothing
- * out.
+ * How the car does across the category as a whole.
  *
- * This is not a gap in their setup and must not read like one. "I want the
- * safest car, I just don't have opinions about which systems it has" is a
- * complete answer, and the honest reply is to say what was measured instead.
+ * Always said, because this is what the score actually counted — the picks
+ * above it are evidence the reader supplied, not the measurement. Stating the
+ * two separately is what stops "it has two of the three things you wanted"
+ * from being mistaken for "it is two-thirds of a safe car".
+ *
+ * Phrased as a count rather than a percentage on purpose. "12 of the 15
+ * systems this priority covers" is a fact the reader can check; "80/100 for
+ * safety" is a grade the data doesn't support.
  */
-function describeCategoryBasis(
+function describeCoverage(
   features: FeatureEvidence,
   label: string,
-): string[] {
-  if (features.basis !== "category") return [];
+  hasPicks: boolean,
+): string | null {
+  if (features.basis !== "category") return null;
 
-  const total = features.present.length + features.missing.length;
+  const { present, missing } = features.coverage;
+  const total = present.length + missing.length;
 
-  if (total === 0) return [];
+  if (total === 0) return null;
 
-  return paragraph(
-    sentence(
-      `You didn't single out particular ${phraseLabel(label)} features, so this`,
-      `car is judged on the equipment as a whole: it has`,
-      `${features.present.length} of the ${total} systems we look at here`,
-    ),
-    features.present.length
-      ? sentence(`It has ${joinCapped(labelsOf(features.present))}`)
-      : null,
+  const figure = `it has ${present.length} of the ${total} systems this priority covers`;
+
+  /*
+   * A car with none of the category's equipment is a real finding, and
+   * "it has 0 of the 14 systems" says it plainly. What must not happen is the
+   * standing line calling that "the best of the close alternatives" because
+   * every other car has none either — see `describeStanding`.
+   */
+  if (hasPicks) {
+    return sentence(`Across the category as a whole, ${figure}`);
+  }
+
+  return sentence(
+    `You didn't pick out particular ${phraseLabel(label)} features, so cars`,
+    `are compared across the category as a whole and ${figure}`,
   );
 }
 
@@ -268,6 +287,21 @@ function describeStanding(
   const runnerUp = breakdown.runnerUp;
 
   /*
+   * Nobody having any of the equipment is not a lead. Saying "none of the
+   * closest alternatives does better here" when every car scored zero is
+   * technically true and completely misleading — the honest statement is
+   * that this priority can't separate these cars.
+   */
+  if (breakdown.matched.length === 0 && breakdown.numeric == null) {
+    return runnerUp && runnerUp.score === breakdown.score
+      ? sentence(
+          "None of the close alternatives has any of this equipment either, so",
+          "this priority isn't separating them",
+        )
+      : null;
+  }
+
+  /*
    * Leading by a hair is still leading, but presenting it as a reason to
    * choose the car would be manufacturing a difference out of noise. For a
    * category decided by one measurement, the measurement is the honest test —
@@ -290,6 +324,13 @@ function describeStanding(
    * caveat is made — without naming the car, which is the tradeoff
    * section's job.
    */
+  if (runnerUp && runnerUp.score === breakdown.score) {
+    return sentence(
+      "It's level with the closest alternatives here, so this priority isn't",
+      "separating them",
+    );
+  }
+
   if (level) {
     return sentence(
       "It's the best of the close alternatives here, but only just",
@@ -371,7 +412,11 @@ export function reasonAboutPriority(
       ? describeMissingData(breakdown)
       : paragraph(
           describeSelection(features, rival),
-          ...describeCategoryBasis(features, breakdown.label),
+          describeCoverage(
+            features,
+            breakdown.label,
+            features.selectedCount > 0,
+          ),
           describeScoredMeasurement(
             measurements.find((fact) => fact.scored) ?? null,
           ),

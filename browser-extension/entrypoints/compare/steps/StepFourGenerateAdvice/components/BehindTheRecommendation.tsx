@@ -110,6 +110,14 @@ function Weighting({ weights }: { weights: PriorityWeight[] }) {
                 cars are eligible to win and never changes a score.
             </p>
 
+            <p className="mt-1.5 text-sm leading-6 text-finn-iron">
+                A category score is the share of the equipment we check for
+                that priority which the car actually has, blended with any
+                measurement it has. It ranks these cars against each other —
+                it isn't a mark out of a hundred, and a low one usually means
+                the category covers a lot of equipment few cars carry.
+            </p>
+
             <div className="mt-3 space-y-1.5">
                 {weights.map((weight) => (
                     <div

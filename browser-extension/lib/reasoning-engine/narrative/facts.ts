@@ -44,22 +44,27 @@ export function featureFact(key: FeatureId): FeatureFact {
 }
 
 /**
- * What the car has and hasn't, of whatever this priority was measured on.
+ * What the car has and hasn't, on both questions the reader cares about.
  *
- * Where the old version split four ways by tier, there is nothing to split
- * by: a feature is either something the user singled out or it isn't, and
- * that distinction lives on `basis` for the whole list rather than on each
- * entry. What matters to an explanation is which list was measured, not how
- * loudly each item in it was graded.
+ * Nothing is graded, because the reader grades nothing. The split that
+ * matters is between what the score counted (the category's catalogue) and
+ * what the reader asked for (their picks) — two different questions that an
+ * explanation has to be able to answer separately.
  */
 export function featureEvidence(breakdown: PriorityBreakdown): FeatureEvidence {
-  const { matched, missing, basis } = breakdown;
+  const { matched, missing, basis, pickedMatched, pickedMissing } = breakdown;
 
   return {
     basis,
-    present: matched.map(featureFact),
-    missing: missing.map(featureFact),
-    selectedCount: basis === "selected" ? matched.length + missing.length : 0,
+    coverage: {
+      present: matched.map(featureFact),
+      missing: missing.map(featureFact),
+    },
+    picked: {
+      present: pickedMatched.map(featureFact),
+      missing: pickedMissing.map(featureFact),
+    },
+    selectedCount: pickedMatched.length + pickedMissing.length,
   };
 }
 

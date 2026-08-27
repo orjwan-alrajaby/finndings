@@ -32,23 +32,37 @@ export interface FeatureFact {
   explanation: string;
 }
 
+/** A set of features split by whether the car has them. */
+export interface FeatureSplit {
+  present: FeatureFact[];
+  missing: FeatureFact[];
+}
+
 /**
- * What the car has and hasn't, of whatever this priority was judged on.
+ * What the car has and hasn't, on two separate questions.
  *
  * There is no importance grading here, because the user isn't asked for one:
- * how much the category matters is the priority order, and which things
- * inside it they care about is the selection. `basis` says which of the two
- * lists below was measured, so an explanation can tell "you asked for this
- * and it's missing" apart from "here's how it does on safety kit generally".
+ * how much a category matters is the priority order, and which things inside
+ * it they care about is the selection.
+ *
+ * The two splits answer different questions and are kept apart so the
+ * explanation can give both without conflating them:
+ *
+ * - `coverage` is what the score counted — the category's whole catalogue.
+ * - `picked` is what the user asked for. It moves no number; it decides what
+ *   the explanation leads with and which tradeoffs surface.
+ *
+ * A car can be strong on `coverage` and still miss two things in `picked`,
+ * and saying exactly that is the whole point.
  */
 export interface FeatureEvidence {
   /** See `CategoryDetail.basis`. */
   basis: FeatureBasis;
-  /** Present, of whatever was looked at. */
-  present: FeatureFact[];
-  /** Absent, of whatever was looked at. */
-  missing: FeatureFact[];
-  /** How many features the user singled out. Zero is a valid answer. */
+  /** Every feature the category covers. What the score measured. */
+  coverage: FeatureSplit;
+  /** The features the user picked out. Both lists empty when they picked none. */
+  picked: FeatureSplit;
+  /** How many features the user picked out. Zero is a valid answer. */
   selectedCount: number;
 }
 

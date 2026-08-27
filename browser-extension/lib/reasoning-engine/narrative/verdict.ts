@@ -57,9 +57,11 @@ function summarisePriority(
       ? `You put ${phraseLabel(reasoning.label)} first`
       : `${toSentenceStart(phraseLabel(reasoning.label))} is your #${reasoning.rank}`;
 
-  const { basis, present, missing } = reasoning.features;
+  const { basis, picked, coverage: cover } = reasoning.features;
+  const { present, missing } = picked;
 
-  if (basis === "selected") {
+  /* What the reader asked for leads, because they wrote it. */
+  if (present.length + missing.length > 0) {
     const total = present.length + missing.length;
 
     if (!missing.length) {
@@ -90,8 +92,8 @@ function summarisePriority(
   }
 
   /*
-   * No features singled out. The measurement is the answer where there is
-   * one, and otherwise how much of the category's equipment the car carries.
+   * Nothing picked out. The measurement is the answer where there is one, and
+   * otherwise how much of the category's equipment the car carries.
    */
   const measured = reasoning.measurements.find((fact) => fact.scored);
 
@@ -101,13 +103,13 @@ function summarisePriority(
     );
   }
 
-  const total = present.length + missing.length;
+  const total = cover.present.length + cover.missing.length;
 
   if (basis === "category" && total > 0) {
     return sentence(
-      `${opener}. You didn't single out particular features there, so it's`,
-      `judged on the equipment overall — this car has ${present.length} of the`,
-      `${total} systems we look at`,
+      `${opener}. You didn't pick out particular features there, so cars are`,
+      `compared across the category — this one has ${cover.present.length} of`,
+      `the ${total} systems it covers`,
     );
   }
 

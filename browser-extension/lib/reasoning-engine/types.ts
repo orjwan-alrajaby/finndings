@@ -144,25 +144,37 @@ export interface NumericEvidence {
 }
 
 /**
- * Which yardstick a category's feature score was measured against.
+ * What a category's feature score was measured against.
  *
- * - `selected` — the user singled features out, and the score is the share of
- *   *those* the car has.
- * - `category` — they singled none out, so the car is judged on how much of
- *   the category's whole catalogue it carries. Picking nothing means "judge
- *   this category on its own terms", not "skip this category".
- * - `none` — the category has no feature catalogue at all and is measured
- *   from vehicle data instead (see `numericOnly`).
+ * - `category` — the category's whole catalogue, which is always the answer
+ *   when it has one.
+ * - `none` — the category has no feature catalogue and is measured from
+ *   vehicle data instead (see `numericOnly`).
+ *
+ * There is deliberately no "selected" case. A category score always measures
+ * the category; what the user picked out decides what gets *said* about it,
+ * not what gets counted. See `categoryDetail`.
  */
-export type FeatureBasis = "selected" | "category" | "none";
+export type FeatureBasis = "category" | "none";
 
 export interface CategoryDetail {
   score: number;
+  /** Catalogue features the car has. This is what `featureScore` counts. */
   matched: FeatureId[];
+  /** Catalogue features it doesn't. */
   missing: FeatureId[];
   /** What `featureScore` was measured against. */
   basis: FeatureBasis;
-  /** Score derived from the features looked at, when there were any. */
+  /**
+   * The features the user picked out, split by whether the car has them.
+   *
+   * Evidence, not arithmetic: these never move the score. They decide what
+   * the explanation highlights and which tradeoffs surface, and they break an
+   * exact tie in the ranking. Empty when the user picked nothing.
+   */
+  pickedMatched: FeatureId[];
+  pickedMissing: FeatureId[];
+  /** Score derived from the catalogue, when the category has one. */
   featureScore: number | null;
   /** Score derived from vehicle data alone, when the category has a numeric signal. */
   numericScore: number | null;
@@ -351,6 +363,9 @@ export interface PriorityBreakdown {
   missing: FeatureId[];
   /** See `CategoryDetail.basis`. */
   basis: FeatureBasis;
+  /** See `CategoryDetail.pickedMatched`. */
+  pickedMatched: FeatureId[];
+  pickedMissing: FeatureId[];
   matchedLabels: string[];
   missingLabels: string[];
   numeric: NumericEvidence | null;

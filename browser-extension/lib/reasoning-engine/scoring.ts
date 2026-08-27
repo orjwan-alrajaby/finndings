@@ -3,7 +3,6 @@ import type {
   CategoryDef,
   CategoryDetail,
   CategoryId,
-  FeatureBasis,
   FeatureId,
   FeatureSelection,
   LensPreferences,
@@ -239,9 +238,10 @@ function numericScore(
  * combined `score` so an explanation can point at whichever actually drove
  * the result.
  *
- * Features are never a filter. A car missing something the user singled out
- * scores lower here and stays in the running — the gap becomes a tradeoff the
- * reader weighs, not a disqualification the engine makes on their behalf.
+ * Features the user picked out are never a filter and never a score. A car
+ * missing one stays in the running with its category score untouched, and the
+ * gap becomes a tradeoff the reader weighs — not a decision the engine makes
+ * on their behalf.
  */
 export function categoryDetail(
   category: CategoryId,
@@ -253,47 +253,58 @@ export function categoryDetail(
     FeatureSelection
   > = DEFAULT_CATEGORY_FEATURES,
 ): CategoryDetail {
-  const selected = categoryFeatures[category] ?? [];
-
   /*
-   * Which list the car is judged against.
+   * The category is always measured against its own catalogue.
    *
-   * Singling nothing out is a real answer — "I want the safest car, I just
-   * don't have opinions about which systems it has" — so it falls back to the
-   * category's whole catalogue rather than abstaining. The measure is the same
-   * either way (what share of the relevant equipment is actually fitted); only
-   * the scope changes, which is what keeps this from becoming a second
-   * weighting system sitting on top of the priority order.
+   * Measuring it against the user's picks instead — which is what an earlier
+   * version did — fails in two directions at once. Pick one common feature
+   * and every car scores 100, so the priority silently stops separating
+   * anything. Pick one rare feature and a car with twelve of the fifteen
+   * safety systems scores 0 because it lacks the thirteenth, which is a hard
+   * requirement in all but name.
+   *
+   * Both come from the same category error: one to five picks out of a
+   * fifteen-feature catalogue is a statement of interest, not a measurement
+   * of the category. So the catalogue does the measuring, and the picks do
+   * the explaining.
    */
   const catalogue =
     AVAILABLE_CATEGORY_FEATURES[category] ??
     getCategory(category)?.features ??
     [];
 
-  const looksAt: FeatureId[] = selected.length ? selected : catalogue;
-
-  const basis: FeatureBasis = looksAt.length
-    ? selected.length
-      ? "selected"
-      : "category"
-    : "none";
-
   const matched: FeatureId[] = [];
   const missing: FeatureId[] = [];
 
-  for (const key of looksAt) {
+  for (const key of catalogue) {
     if (vehicle.features?.[key]) matched.push(key);
     else missing.push(key);
   }
 
   /*
-   * Every feature counts the same. The user already said how much this
-   * category matters by where they ranked it; grading the features inside it
-   * as well would apply the same preference twice.
+   * Share of the category's equipment the car actually carries. Every feature
+   * counts the same: the user said how much this category matters by where
+   * they ranked it, and was never asked to grade anything inside it.
+   *
+   * Kept as an absolute share rather than normalised across the pinned set,
+   * because normalising manufactures difference where there is none — five
+   * cars carrying 8, 8, 7, 7 and 7 systems are much the same, and stretching
+   * that to 100, 100, 0, 0, 0 would be a lie the reader can't see through.
    */
-  const featureScore = looksAt.length
-    ? Math.round((matched.length / looksAt.length) * 100)
+  const featureScore = catalogue.length
+    ? Math.round((matched.length / catalogue.length) * 100)
     : null;
+
+  /* What the user picked out, for the explanation to work from. */
+  const selected = categoryFeatures[category] ?? [];
+
+  const pickedMatched: FeatureId[] = [];
+  const pickedMissing: FeatureId[] = [];
+
+  for (const key of selected) {
+    if (vehicle.features?.[key]) pickedMatched.push(key);
+    else pickedMissing.push(key);
+  }
 
   const numeric = numericScore(category, vehicle, vehicles);
 
@@ -306,7 +317,9 @@ export function categoryDetail(
     score,
     matched,
     missing,
-    basis,
+    basis: catalogue.length ? "category" : "none",
+    pickedMatched,
+    pickedMissing,
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,

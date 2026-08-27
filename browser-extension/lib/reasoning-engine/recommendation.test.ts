@@ -810,7 +810,10 @@ describe("comparative reasoning", () => {
     const prose = safety.sentences.join(" ");
 
     /* Every feature the user picked out is named, present or missing. */
-    const named = [...safety.features.present, ...safety.features.missing];
+    const named = [
+      ...safety.features.picked.present,
+      ...safety.features.picked.missing,
+    ];
 
     expect(named.length).toBeGreaterThan(0);
 

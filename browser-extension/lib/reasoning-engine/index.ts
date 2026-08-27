@@ -133,9 +133,13 @@ export function buildReasoningContext(
     categoryFeatures,
   );
 
-  const ranked = [...vehicles].sort(
-    (a, b) => totalFor(scores, b.id) - totalFor(scores, a.id),
-  );
+  const ranked = [...vehicles].sort((a, b) => {
+    const difference = totalFor(scores, b.id) - totalFor(scores, a.id);
+
+    return difference !== 0
+      ? difference
+      : breakTieOnPicks(a, b, ordered, categoryFeatures);
+  });
 
   return {
     vehicles,
@@ -148,6 +152,38 @@ export function buildReasoningContext(
     ranked,
     budget: partitionByBudget(vehicles, costs, preferences),
   };
+}
+
+/**
+ * Separates two cars that finished on exactly the same score.
+ *
+ * This is the only place the features a user picked out touch the ranking,
+ * and it deliberately adds no weight to anything: it applies when — and only
+ * when — the arithmetic has said the two cars are identical. At that point
+ * the honest way to order them is by what the user actually asked for.
+ *
+ * Resolved priority by priority, in the user's own order, so a pick under
+ * their #1 settles it before their #3 is consulted. Nothing here is a
+ * constant, a multiplier or a grade; it is their ordering applied twice.
+ */
+function breakTieOnPicks(
+  a: PinnedFinnCar,
+  b: PinnedFinnCar,
+  priorities: CategoryId[],
+  categoryFeatures: Record<CategoryId, FeatureSelection>,
+): number {
+  for (const priority of priorities) {
+    const selected = categoryFeatures[priority] ?? [];
+    if (!selected.length) continue;
+
+    const held = (vehicle: PinnedFinnCar): number =>
+      selected.filter((key) => Boolean(vehicle.features?.[key])).length;
+
+    const difference = held(b) - held(a);
+    if (difference !== 0) return difference;
+  }
+
+  return 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -230,6 +266,8 @@ function priorityBreakdown(
     matched: detail.matched,
     missing: detail.missing,
     basis: detail.basis,
+    pickedMatched: detail.pickedMatched,
+    pickedMissing: detail.pickedMissing,
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
@@ -259,22 +297,23 @@ function comparePriority(
     categoryDetail(category, other, vehicles, preferences, categoryFeatures);
 
   /*
-   * Compared over whatever the category was actually judged on: the features
-   * the user singled out, or the whole catalogue when they singled out none.
-   * Anything else would let the comparison cite equipment the score ignored.
+   * Compared over the category's whole catalogue, which is what the score
+   * counted. Narrowing this to the user's picks would let a head-to-head
+   * report "nothing separates them" while the scores differ by thirty points
+   * on equipment the picks didn't happen to mention.
+   *
+   * Which of these differences the user actually asked about is a separate
+   * question, answered by `pickedMatched` / `pickedMissing`.
    */
-  const selected = categoryFeatures[category] ?? [];
-
-  const looksAt = selected.length
-    ? selected
-    : (AVAILABLE_CATEGORY_FEATURES[category] ??
-      getCategory(category)?.features ??
-      []);
+  const catalogue =
+    AVAILABLE_CATEGORY_FEATURES[category] ??
+    getCategory(category)?.features ??
+    [];
 
   const onlySubjectHas: FeatureId[] = [];
   const onlyOtherHas: FeatureId[] = [];
 
-  for (const key of looksAt) {
+  for (const key of catalogue) {
     const subjectHas = Boolean(subject.features?.[key]);
     const otherHas = Boolean(other.features?.[key]);
 

@@ -286,8 +286,8 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
   const narrative = adviceFor(["environmental", "safetyAssistance"]);
 
   it("still recommends a car that misses one", () => {
-    const missing = narrative.priorities.flatMap((item) =>
-      item.features.basis === "selected" ? item.features.missing : [],
+    const missing = narrative.priorities.flatMap(
+      (item) => item.features.picked.missing,
     );
 
     expect(missing.length).toBeGreaterThan(0);
@@ -304,7 +304,11 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
     expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
 
     /* A pick is an interest, never a requirement — the copy must say so. */
-    expect(gap.sentences.join(" ")).toMatch(/not a reason the car is ruled out/i);
+    /* Framed as something to weigh, never as a rule the car broke. */
+    expect(gap.sentences.join(" ")).toMatch(/worth weighing/i);
+    expect(gap.sentences.join(" ")).not.toMatch(
+      /essential|required|must|disqualif|unacceptable/i,
+    );
 
     /* The car that does have it is named, so the gap is a choice. */
     expect(gap.rival).not.toBeNull();
@@ -365,8 +369,8 @@ describe("the language matches the size of the difference", () => {
     /* And it says which yardstick it used, without implying a mistake. */
     const prose = comfort.sentences.join(" ");
 
-    expect(prose).toMatch(/didn't single out/i);
-    expect(prose).toMatch(/judged on the equipment as a whole/i);
+    expect(prose).toMatch(/didn't pick out/i);
+    expect(prose).toMatch(/across the category as a whole/i);
     expect(prose).not.toMatch(/should|need to|missing from your/i);
   });
 
@@ -507,8 +511,8 @@ describe("feature terminology is explained in the product", () => {
     ]);
 
     const named = narrative.priorities.flatMap((item) => [
-      ...item.features.present,
-      ...item.features.missing,
+      ...item.features.coverage.present,
+      ...item.features.coverage.missing,
     ]);
 
     expect(named.length).toBeGreaterThan(0);

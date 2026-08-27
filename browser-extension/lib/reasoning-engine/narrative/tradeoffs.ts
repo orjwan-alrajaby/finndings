@@ -98,9 +98,7 @@ function missingSelected(
   context: ReasoningContext,
 ): Tradeoff | null {
   /* Only the user's own picks. Catalogue coverage isn't a broken promise. */
-  if (reasoning.features.basis !== "selected") return null;
-
-  const missing = reasoning.features.missing;
+  const missing = reasoning.features.picked.missing;
   if (!missing.length) return null;
 
   const labels = joinCapped(missing.map((fact) => fact.phrase), 5);
@@ -132,8 +130,8 @@ function missingSelected(
 
   const relevance = sentence(
     `You picked ${missing.length === 1 ? "it" : "them"} out under`,
-    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority —`,
-    "so this is worth weighing, not a reason the car is ruled out",
+    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
+    "so it's worth weighing before you decide",
   );
 
   const placement = whyItStillWon(reasoning, evaluation, priorities, context);
