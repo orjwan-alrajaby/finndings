@@ -8,11 +8,14 @@ import {
   DEFAULT_DEFAULT_PROFILE_ID,
   DEFAULT_PRIORITIES,
   DEFAULT_PROFILES,
+  FEATURE_IMPORTANCE,
   FEATURES,
+  IMPORTANCE_LEVELS,
   MAX_FEATURES_PER_CATEGORY,
   NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
   PROFILES,
+  SUGGESTED_CATEGORY_FEATURES,
 } from "./constants";
 
 import { validatePriorityDraft } from "@/entrypoints/settings/utils/PriorityValidation";
@@ -66,55 +69,38 @@ describe("feature selection", () => {
     (id) => !NUMERIC_ONLY_CATEGORIES.includes(id),
   );
 
-  it("never enables more than the maximum by default", () => {
-    for (const id of CATEGORY_IDS) {
-      expect(
-        DEFAULT_CATEGORY_FEATURES[id].length,
-      ).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
-    }
-  });
-
-  /* Five is a cap, not a quota — a short catalogue starts fully enabled. */
-  it("enables the whole catalogue when it is shorter than the maximum", () => {
-    for (const id of CATEGORY_IDS) {
-      const available = AVAILABLE_CATEGORY_FEATURES[id];
-
-      if (available.length <= MAX_FEATURES_PER_CATEGORY) {
-        expect(DEFAULT_CATEGORY_FEATURES[id]).toHaveLength(available.length);
-      } else {
-        expect(DEFAULT_CATEGORY_FEATURES[id]).toHaveLength(
-          MAX_FEATURES_PER_CATEGORY,
-        );
-      }
-    }
-  });
-
   /*
-   * Picking nothing is valid, but the *opening* selection is a suggestion
-   * rather than an empty form, so every feature-based priority ships with one.
+   * Nothing is picked on the user's behalf. A pick now says "this matters to
+   * me" and carries an importance they chose, so pre-selecting five would be
+   * the product inventing preferences and then reasoning from them.
    */
-  it("opens with a suggested selection on every feature-based priority", () => {
-    for (const id of featureCategories) {
-      expect(DEFAULT_CATEGORY_FEATURES[id].length).toBeGreaterThan(0);
+  it("picks nothing for the user", () => {
+    for (const id of CATEGORY_IDS) {
+      expect(DEFAULT_CATEGORY_FEATURES[id]).toEqual([]);
     }
   });
 
-  it("defaults to the front of the catalogue, so relevance order matters", () => {
-    for (const id of CATEGORY_IDS) {
-      expect(DEFAULT_CATEGORY_FEATURES[id]).toEqual(
-        AVAILABLE_CATEGORY_FEATURES[id].slice(0, MAX_FEATURES_PER_CATEGORY),
+  /* Suggestions are a starting point, and stay clearly separate from picks. */
+  it("suggests a handful without selecting them", () => {
+    for (const id of featureCategories) {
+      const suggested = SUGGESTED_CATEGORY_FEATURES[id];
+
+      expect(suggested.length).toBeGreaterThan(0);
+      expect(suggested.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
+
+      /* Drawn from the front of the catalogue, which is relevance-ordered. */
+      expect(suggested).toEqual(
+        AVAILABLE_CATEGORY_FEATURES[id].slice(0, suggested.length),
       );
     }
   });
 
-  it("offers more than it enables, so there is something to swap in", () => {
-    const swappable = featureCategories.filter(
-      (id) =>
-        AVAILABLE_CATEGORY_FEATURES[id].length >
-        DEFAULT_CATEGORY_FEATURES[id].length,
-    );
-
-    expect(swappable.length).toBe(featureCategories.length);
+  it("offers more than it suggests, so there is something to explore", () => {
+    for (const id of featureCategories) {
+      expect(
+        AVAILABLE_CATEGORY_FEATURES[id].length,
+      ).toBeGreaterThan(SUGGESTED_CATEGORY_FEATURES[id].length);
+    }
   });
 
   it("only offers features that actually exist in the data", () => {
@@ -135,7 +121,7 @@ describe("feature selection", () => {
 
   /*
    * The only rule left is the ceiling. There is deliberately no floor: an
-   * empty selection means "judge this category on its own terms", which the
+   * empty selection means "compare on the category as a whole", which the
    * editors must accept rather than treat as an unfinished form.
    */
   it("accepts an empty selection and refuses one over the cap", () => {
@@ -143,16 +129,37 @@ describe("feature selection", () => {
 
     expect(validatePriorityDraft([], id)).toBeNull();
 
-    expect(
-      validatePriorityDraft(
-        AVAILABLE_CATEGORY_FEATURES[id].slice(0, 6),
-        id,
-      ),
-    ).toMatch(/at most/i);
+    const overCap = AVAILABLE_CATEGORY_FEATURES[id]
+      .slice(0, MAX_FEATURES_PER_CATEGORY + 1)
+      .map((key) => ({ key, importance: "medium" }) as const);
 
-    expect(
-      validatePriorityDraft(DEFAULT_CATEGORY_FEATURES[id], id),
-    ).toBeNull();
+    expect(validatePriorityDraft([...overCap], id)).toMatch(/at most/i);
+  });
+
+  /* Three levels, and none of them reads as a hard requirement. */
+  it("describes importance as preference, never as a requirement", () => {
+    expect(Object.keys(FEATURE_IMPORTANCE)).toEqual([
+      "high",
+      "medium",
+      "low",
+    ]);
+
+    for (const level of IMPORTANCE_LEVELS) {
+      const meta = FEATURE_IMPORTANCE[level];
+
+      expect(meta.label).not.toMatch(/essential|required|must/i);
+      expect(meta.hint.length).toBeGreaterThan(0);
+      expect(meta.weight).toBeGreaterThan(0);
+    }
+
+    /* Ordered, and gentler than the 5-to-1 the old tier system used. */
+    expect(FEATURE_IMPORTANCE.high.weight).toBeGreaterThan(
+      FEATURE_IMPORTANCE.medium.weight,
+    );
+    expect(FEATURE_IMPORTANCE.medium.weight).toBeGreaterThan(
+      FEATURE_IMPORTANCE.low.weight,
+    );
+    expect(FEATURE_IMPORTANCE.high.weight).toBeLessThan(5);
   });
 
   /* A calculated priority has nothing to enable, so the rule doesn't apply. */

@@ -251,12 +251,12 @@ function CategoryReadonlyDetails({
 
                     {features.length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
-                            {features.map((key) => (
+                            {features.map((preference) => (
                                 <span
-                                    key={key}
+                                    key={preference.key}
                                     className="rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-bold text-finn-highlight-navy"
                                 >
-                                    {FEATURES[key].label}
+                                    {FEATURES[preference.key].label}
                                 </span>
                             ))}
                         </div>

@@ -56,17 +56,34 @@ export interface LegacyLensPreferences {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The features a user has singled out within one priority.
+ * How much one picked-out feature matters to the user.
  *
- * Deliberately a plain list of ids. There is no per-feature importance to
- * store: how much a category matters is the priority order's job, and which
- * things inside it the user cares about is this list's. Grading individual
- * features on top of that asked the reader to express the same preference
- * twice, in two different units.
- *
- * An empty list is a valid, meaningful answer — see `CategoryDetail.basis`.
+ * Deliberately not "essential". A feature nobody would buy the car without is
+ * a hard requirement, and Lens has none — a car missing a high-priority
+ * feature stays in the running and the gap is reported as a tradeoff. These
+ * words describe strength of preference, nothing more.
  */
-export type FeatureSelection = FeatureId[];
+export type FeatureImportance = "high" | "medium" | "low";
+
+/** One feature the user picked out, and how strongly they want it. */
+export interface FeaturePreference {
+  key: FeatureId;
+  importance: FeatureImportance;
+}
+
+/**
+ * What the user picked out within one priority, at most five entries.
+ *
+ * This is not the old tier system returning. That asked the reader to grade
+ * every feature in a catalogue of up to fifteen, most of which they had no
+ * opinion about, and called the top grade "essential" — which read as a hard
+ * requirement it never was. Here they grade only the handful they chose to
+ * name, and the grade adjusts weight rather than gating anything.
+ *
+ * An empty list is a valid, meaningful answer: the category is then judged on
+ * its catalogue alone. See `CategoryDetail`.
+ */
+export type FeatureSelection = FeaturePreference[];
 
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
@@ -159,22 +176,36 @@ export type FeatureBasis = "category" | "none";
 
 export interface CategoryDetail {
   score: number;
-  /** Catalogue features the car has. This is what `featureScore` counts. */
+  /** Catalogue features the car has. */
   matched: FeatureId[];
   /** Catalogue features it doesn't. */
   missing: FeatureId[];
-  /** What `featureScore` was measured against. */
+  /** What the feature score was measured against. */
   basis: FeatureBasis;
   /**
-   * The features the user picked out, split by whether the car has them.
+   * The features the user picked out, split by whether the car has them, each
+   * carrying the importance they gave it.
    *
-   * Evidence, not arithmetic: these never move the score. They decide what
-   * the explanation highlights and which tradeoffs surface, and they break an
-   * exact tie in the ranking. Empty when the user picked nothing.
+   * Reported separately from the catalogue lists because they answer a
+   * different question — "does it have the things I asked for?" rather than
+   * "how well equipped is it here?" — and the Advice says both.
    */
-  pickedMatched: FeatureId[];
-  pickedMissing: FeatureId[];
-  /** Score derived from the catalogue, when the category has one. */
+  pickedMatched: FeaturePreference[];
+  pickedMissing: FeaturePreference[];
+  /**
+   * Plain share of the category's catalogue the car carries, ignoring what
+   * the user picked. The figure behind "12 of the 15 systems we check".
+   */
+  coverageScore: number | null;
+  /**
+   * The share that actually feeds the ranking: the same catalogue, with the
+   * features the user picked out counting for more.
+   *
+   * Equal to `coverageScore` when nothing was picked. Because the whole
+   * catalogue remains the denominator, no single feature can drive this to 0
+   * or 100 — which is exactly what went wrong when the picks *were* the
+   * denominator.
+   */
   featureScore: number | null;
   /** Score derived from vehicle data alone, when the category has a numeric signal. */
   numericScore: number | null;
@@ -364,8 +395,10 @@ export interface PriorityBreakdown {
   /** See `CategoryDetail.basis`. */
   basis: FeatureBasis;
   /** See `CategoryDetail.pickedMatched`. */
-  pickedMatched: FeatureId[];
-  pickedMissing: FeatureId[];
+  pickedMatched: FeaturePreference[];
+  pickedMissing: FeaturePreference[];
+  /** See `CategoryDetail.coverageScore`. */
+  coverageScore: number | null;
   matchedLabels: string[];
   missingLabels: string[];
   numeric: NumericEvidence | null;

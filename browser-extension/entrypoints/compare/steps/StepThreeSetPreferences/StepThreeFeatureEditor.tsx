@@ -1,11 +1,13 @@
 import type {
     CategoryId,
     FeatureId,
+    FeatureImportance,
     FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import {
     CATEGORIES,
     MAX_FEATURES_PER_CATEGORY,
+    SUGGESTED_CATEGORY_FEATURES,
 } from "@/lib/reasoning-engine/constants";
 import { CalculatedPriorityDetails } from "./CalculatedPriorityDetails";
 import { FeatureOption } from "@/components/FeatureOption";
@@ -15,21 +17,22 @@ interface StepThreeFeatureEditorProps {
     /** What the user has picked out for this run. May legitimately be empty. */
     features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureSelection;
+    availableFeatures: FeatureId[];
     /** Where this priority sits in the user's order, for the empty-state hint. */
     rank: number;
     onToggleFeature: (feature: FeatureId) => void;
+    onImportanceChange: (
+        feature: FeatureId,
+        importance: FeatureImportance,
+    ) => void;
 }
 
 /**
- * Picking out what matters within one priority.
+ * Picking out what matters within one priority, and how much.
  *
- * One question, asked once: does this feature matter to you? The reader used
- * to be asked a second one — grade each feature Essential / Good to have /
- * Luxury extra — which is the same preference expressed twice in two units,
- * and which nobody has a reliable answer to in the abstract.
- *
- * Picking nothing is a supported answer, not an incomplete form.
+ * Two questions, in order, and the second only ever appears on rows answering
+ * yes to the first. Picking nothing is a supported answer rather than an
+ * incomplete form.
  */
 export function StepThreeFeatureEditor({
     categoryId,
@@ -37,6 +40,7 @@ export function StepThreeFeatureEditor({
     availableFeatures,
     rank,
     onToggleFeature,
+    onImportanceChange,
 }: StepThreeFeatureEditorProps) {
     const category = CATEGORIES[categoryId];
 
@@ -48,7 +52,11 @@ export function StepThreeFeatureEditor({
         );
     }
 
-    const selected = new Set(features);
+    const importanceOf = new Map(
+        features.map((preference) => [preference.key, preference.importance]),
+    );
+
+    const suggested = new Set(SUGGESTED_CATEGORY_FEATURES[categoryId] ?? []);
     const atMax = features.length >= MAX_FEATURES_PER_CATEGORY;
 
     return (
@@ -61,8 +69,9 @@ export function StepThreeFeatureEditor({
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-finn-iron">
-                        Optional — skip it and we'll judge this priority on the
-                        equipment overall. Tap the ⓘ if a name means nothing to
+                        Optional — skip it and we'll compare cars on the
+                        category as a whole. Pick something and you can say how
+                        much it matters. Tap the ⓘ if a name means nothing to
                         you.
                     </p>
                 </div>
@@ -84,10 +93,14 @@ export function StepThreeFeatureEditor({
                     <FeatureOption
                         key={feature}
                         feature={feature}
-                        selected={selected.has(feature)}
-                        disabled={!selected.has(feature) && atMax}
+                        importance={importanceOf.get(feature) ?? null}
+                        disabled={!importanceOf.has(feature) && atMax}
                         disabledReason={`You've picked ${MAX_FEATURES_PER_CATEGORY} already — unpick one to swap`}
+                        suggested={suggested.has(feature)}
                         onToggle={() => onToggleFeature(feature)}
+                        onImportanceChange={(importance) =>
+                            onImportanceChange(feature, importance)
+                        }
                     />
                 ))}
             </div>

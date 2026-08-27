@@ -69,8 +69,12 @@ function featureGap(
   const selected = context.categoryFeatures[priority] ?? [];
 
   return selected
-    .filter((key) => Boolean(other.features?.[key]) && !subject.features?.[key])
-    .map(featureFact);
+    .filter(
+      (preference) =>
+        Boolean(other.features?.[preference.key]) &&
+        !subject.features?.[preference.key],
+    )
+    .map((preference) => featureFact(preference.key, preference.importance));
 }
 
 /** Why the reader should care, said in their own ranking. */
@@ -128,11 +132,21 @@ function missingSelected(
       : "",
   );
 
-  const relevance = sentence(
-    `You picked ${missing.length === 1 ? "it" : "them"} out under`,
-    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
-    "so it's worth weighing before you decide",
-  );
+  const high = missing.filter((fact) => fact.importance === "high");
+
+  const relevance = high.length
+    ? sentence(
+        high.length === missing.length && missing.length === 1
+          ? `You marked it a high priority under`
+          : `You marked ${joinCapped(high.map((fact) => fact.phrase), 5)} a high priority under`,
+        `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
+        "so this is the compromise here most worth weighing",
+      )
+    : sentence(
+        `You picked ${missing.length === 1 ? "it" : "them"} out under`,
+        `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
+        "so it's worth weighing before you decide",
+      );
 
   const placement = whyItStillWon(reasoning, evaluation, priorities, context);
 
@@ -141,7 +155,14 @@ function missingSelected(
     priority: reasoning.priority,
     priorityLabel: reasoning.label,
     rank: reasoning.rank,
-    severity: severityFor(reasoning.rank),
+    /*
+     * Loud when the reader ranked the priority highly *or* marked the pick a
+     * high priority. Either on its own is enough to earn the top of the list.
+     */
+    severity:
+      missing.some((fact) => fact.importance === "high")
+        ? "high"
+        : severityFor(reasoning.rank),
     headline: `No ${missing.map((fact) => inSentence(fact.label)).join(", no ")}`,
     evidence,
     relevance,
@@ -304,16 +325,14 @@ function whatTheExtraBuys(
      * them" for a reader who picked nothing — which is the opposite of true,
      * since the score separated them on the catalogue.
      */
-    const looksAt = context.categoryFeatures[reasoning.priority]?.length
-      ? context.categoryFeatures[reasoning.priority]
-      : (AVAILABLE_CATEGORY_FEATURES[reasoning.priority] ?? []);
+    const looksAt = AVAILABLE_CATEGORY_FEATURES[reasoning.priority] ?? [];
 
-    const gained = looksAt?.filter(
+    const gained = looksAt.filter(
       (key) =>
         Boolean(evaluation.vehicle.features?.[key]) && !other.features?.[key],
     );
 
-    if (gained?.length) {
+    if (gained.length) {
       wins.push(
         `${joinCapped(
           gained.map((key) => featureFact(key).phrase),

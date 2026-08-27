@@ -1,5 +1,10 @@
 import type { PinnedFinnCar } from "@/lib/types";
-import type { FeatureId, PriorityBreakdown } from "../types";
+import type {
+  FeatureId,
+  FeatureImportance,
+  FeaturePreference,
+  PriorityBreakdown,
+} from "../types";
 import type {
   FeatureEvidence,
   FeatureFact,
@@ -32,7 +37,10 @@ import {
 /* Features                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export function featureFact(key: FeatureId): FeatureFact {
+export function featureFact(
+  key: FeatureId,
+  importance: FeatureImportance | null = null,
+): FeatureFact {
   const meta = FEATURES[key];
 
   return {
@@ -40,8 +48,13 @@ export function featureFact(key: FeatureId): FeatureFact {
     label: featureLabel(key),
     phrase: featurePhrase(key),
     explanation: meta?.explanation ?? "",
+    importance,
   };
 }
+
+/** A picked feature keeps the importance the user gave it. */
+const pickedFact = (preference: FeaturePreference): FeatureFact =>
+  featureFact(preference.key, preference.importance);
 
 /**
  * What the car has and hasn't, on both questions the reader cares about.
@@ -54,17 +67,20 @@ export function featureFact(key: FeatureId): FeatureFact {
 export function featureEvidence(breakdown: PriorityBreakdown): FeatureEvidence {
   const { matched, missing, basis, pickedMatched, pickedMissing } = breakdown;
 
+  const picked = {
+    present: pickedMatched.map(pickedFact),
+    missing: pickedMissing.map(pickedFact),
+  };
+
   return {
     basis,
     coverage: {
-      present: matched.map(featureFact),
-      missing: missing.map(featureFact),
+      present: matched.map((key) => featureFact(key)),
+      missing: missing.map((key) => featureFact(key)),
     },
-    picked: {
-      present: pickedMatched.map(featureFact),
-      missing: pickedMissing.map(featureFact),
-    },
-    selectedCount: pickedMatched.length + pickedMissing.length,
+    picked,
+    highMisses: picked.missing.filter((fact) => fact.importance === "high"),
+    selectedCount: picked.present.length + picked.missing.length,
   };
 }
 
@@ -258,8 +274,8 @@ export function rivalDifference(
     difference: versus.difference,
     magnitude: classifyScoreGap(versus.difference),
     subjectAhead: versus.difference > 0,
-    onlySubjectHas: versus.onlySubjectHas.map(featureFact),
-    onlyRivalHas: versus.onlyOtherHas.map(featureFact),
+    onlySubjectHas: versus.onlySubjectHas.map((key) => featureFact(key)),
+    onlyRivalHas: versus.onlyOtherHas.map((key) => featureFact(key)),
   };
 }
 

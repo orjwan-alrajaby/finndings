@@ -1,9 +1,83 @@
 import type {
   CategoryDef,
+  FeatureImportance,
+  FeatureSelection,
   LensPreferences,
   PriorityDefinition,
   Profile,
 } from "./types";
+
+/* -------------------------------------------------------------------------- */
+/* Feature importance                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How much weight a picked-out feature carries.
+ *
+ * Read the numbers like this: every feature in a category's catalogue counts
+ * once, because it is relevant equipment. A feature the user picked out
+ * counts again for how much they said it matters — once more for low, twice
+ * for medium, three times for high. Hence 2, 3 and 4 against a base of 1.
+ *
+ * The ratios matter, not the absolute figures. What they have to achieve is
+ * narrow: a high-priority pick should visibly outweigh a low-priority one,
+ * and the whole catalogue must stay the denominator so that no single feature
+ * can push a category to 0 or 100. Anything much steeper (the old system's
+ * 5-to-1) starts letting five picks drown out the ten to fifteen other things
+ * the category is actually made of.
+ *
+ * There is deliberately no "essential". Nothing here gates a car out.
+ */
+export const FEATURE_IMPORTANCE = {
+  high: {
+    label: "High",
+    /** For "you marked it as a high priority". */
+    inSentence: "a high priority",
+    hint: "Matters a lot to me",
+    weight: 4,
+    activeClass: "bg-finn-accent-blue text-white",
+  },
+  medium: {
+    label: "Medium",
+    inSentence: "a medium priority",
+    hint: "I'd like to have it",
+    weight: 3,
+    activeClass: "bg-finn-accent-blue/70 text-white",
+  },
+  low: {
+    label: "Low",
+    inSentence: "a low priority",
+    hint: "A bonus, not a need",
+    weight: 2,
+    /* The quietest of the three, so visual weight tracks stated weight. */
+    activeClass: "bg-finn-iron text-white",
+  },
+} as const satisfies Record<
+  FeatureImportance,
+  {
+    label: string;
+    inSentence: string;
+    hint: string;
+    weight: number;
+    activeClass: string;
+  }
+>;
+
+/** Every catalogue feature counts once for being relevant equipment. */
+export const BASE_FEATURE_WEIGHT = 1;
+
+/**
+ * What a feature gets when the user picks it without touching the importance
+ * control.
+ *
+ * Neutral on purpose: picking something already says it matters, and
+ * defaulting either high or low would put words in their mouth. Leaving every
+ * pick at medium reproduces plain equal weighting, so the importance layer is
+ * refinement the user opts into rather than a form they must fill in.
+ */
+export const DEFAULT_FEATURE_IMPORTANCE: FeatureImportance = "medium";
+
+export const IMPORTANCE_LEVELS = ["high", "medium", "low"] as const;
 
 /* -------------------------------------------------------------------------- */
 /* Features                                                                   */
@@ -541,9 +615,19 @@ type CategoryId = keyof typeof CATEGORIES;
  * A cap on how many things they can single out, not a quota to fill. Picking
  * none is a real answer — "I want the safest car, I just don't have opinions
  * about which systems it has" — and is handled by judging the category on its
- * whole catalogue instead. See `categoryDetail`.
+ * catalogue alone. See `categoryDetail`.
  */
 export const MAX_FEATURES_PER_CATEGORY = 5;
+
+/**
+ * How many of a catalogue's leading entries are flagged as commonly picked.
+ *
+ * A hint about where to start, shown as a label beside the feature. It is
+ * explicitly not a selection: nothing is picked on the user's behalf, because
+ * picking something now means "I care about this" and Lens has no business
+ * asserting that for them.
+ */
+export const SUGGESTED_FEATURE_COUNT = 5;
 
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
@@ -683,20 +767,30 @@ export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
 ) as Record<CategoryId, FeatureId[]>;
 
 /**
- * What a category starts with picked out.
+ * What a category starts with picked out: nothing.
  *
- * The first five of the catalogue when there are more than five, and all of
- * them when there aren't — a sensible opening guess the user is free to clear
- * entirely. The order in `CATEGORIES` is therefore load-bearing: it is the
- * answer to "which five would most people single out?".
+ * An earlier build pre-selected the five most relevant features. That was
+ * defensible when a pick was a weightless hint, and isn't now: a pick says
+ * "this matters to me" and carries an importance the user chose, so putting
+ * five of them in their mouth before they have said anything is the product
+ * inventing preferences and then reasoning from them.
+ *
+ * Starting empty means a reader who configures nothing is compared on each
+ * category's whole catalogue, which is the honest reading of having told us
+ * nothing.
  */
 export const DEFAULT_CATEGORY_FEATURES = Object.fromEntries(
+  CATEGORY_IDS.map((id) => [id, [] as FeatureSelection])
+) as Record<CategoryId, FeatureSelection>;
+
+/**
+ * The leading catalogue entries for each category, flagged in the picker as
+ * a starting point. Suggestions, never selections.
+ */
+export const SUGGESTED_CATEGORY_FEATURES = Object.fromEntries(
   CATEGORY_IDS.map((id) => [
     id,
-    (CATEGORIES[id].features as FeatureId[]).slice(
-      0,
-      MAX_FEATURES_PER_CATEGORY
-    ),
+    (CATEGORIES[id].features as FeatureId[]).slice(0, SUGGESTED_FEATURE_COUNT),
   ])
 ) as Record<CategoryId, FeatureId[]>;
 

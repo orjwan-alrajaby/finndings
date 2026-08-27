@@ -283,7 +283,13 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
    * MG 3 leads on emissions and so wins for an environment-led reader, while
    * lacking two of the safety features that reader picked out.
    */
-  const narrative = adviceFor(["environmental", "safetyAssistance"]);
+  const narrative = adviceFor(["environmental", "safetyAssistance"], cars, {
+    safetyAssistance: [
+      { key: "hasEmergencyBrakingAssist", importance: "high" },
+      { key: "hasBlindSpotAssist", importance: "high" },
+      { key: "hasEmergencyCallSystem", importance: "medium" },
+    ],
+  });
 
   it("still recommends a car that misses one", () => {
     const missing = narrative.priorities.flatMap(
@@ -300,7 +306,10 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
     )!;
 
     expect(gap).toBeDefined();
-    expect(gap.sentences.join(" ")).toMatch(/you picked (it|them) out/i);
+    /* Named in the reader's own terms, at the importance they gave it. */
+    expect(gap.sentences.join(" ")).toMatch(
+      /you (picked (it|them) out|marked .+ a high priority)/i,
+    );
     expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
 
     /* A pick is an interest, never a requirement — the copy must say so. */

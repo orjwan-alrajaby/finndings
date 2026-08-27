@@ -196,10 +196,10 @@ function ProfilePriority({
                                 </p>
 
                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                    {features.map((feature) => (
+                                    {features.map((preference) => (
                                         <FeatureChip
-                                            key={feature}
-                                            feature={feature}
+                                            key={preference.key}
+                                            feature={preference.key}
                                         />
                                     ))}
                                 </div>

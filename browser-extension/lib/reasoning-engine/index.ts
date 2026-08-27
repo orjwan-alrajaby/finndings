@@ -2,6 +2,8 @@ import type { PinnedFinnCar } from "@/lib/types";
 import type {
   AlternativeOption,
   FeatureId,
+  FeatureImportance,
+  FeaturePreference,
   BudgetPartition,
   CategoryId,
   CostBreakdown,
@@ -25,6 +27,8 @@ import type {
 import {
   AVAILABLE_CATEGORY_FEATURES,
   CATEGORIES,
+  DEFAULT_FEATURE_IMPORTANCE,
+  FEATURE_IMPORTANCE,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
   DEFAULT_PREFERENCES,
@@ -177,7 +181,13 @@ function breakTieOnPicks(
     if (!selected.length) continue;
 
     const held = (vehicle: PinnedFinnCar): number =>
-      selected.filter((key) => Boolean(vehicle.features?.[key])).length;
+      selected.reduce(
+        (sum, preference) =>
+          vehicle.features?.[preference.key]
+            ? sum + FEATURE_IMPORTANCE[preference.importance].weight
+            : sum,
+        0,
+      );
 
     const difference = held(b) - held(a);
     if (difference !== 0) return difference;
@@ -268,6 +278,7 @@ function priorityBreakdown(
     basis: detail.basis,
     pickedMatched: detail.pickedMatched,
     pickedMissing: detail.pickedMissing,
+    coverageScore: detail.coverageScore,
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
@@ -559,13 +570,21 @@ function alternativeHook(
   for (const { priority } of weights) {
     const selected = categoryFeatures[priority] ?? [];
 
-    const gained = selected.filter(
-      (key) =>
-        Boolean(alternative.features?.[key]) && !winner.features?.[key],
-    );
+    /* Highest importance first: it is the pick they'd most notice missing. */
+    const gained = [...selected]
+      .sort(
+        (a, b) =>
+          FEATURE_IMPORTANCE[b.importance].weight -
+          FEATURE_IMPORTANCE[a.importance].weight,
+      )
+      .filter(
+        (preference) =>
+          Boolean(alternative.features?.[preference.key]) &&
+          !winner.features?.[preference.key],
+      );
 
     if (gained.length) {
-      return `Adds ${featurePhrase(gained[0]!)}`;
+      return `Adds ${featurePhrase(gained[0]!.key)}`;
     }
   }
 
@@ -854,35 +873,69 @@ function migratePriorityOrder(stored: string[]): CategoryId[] {
 }
 
 /**
- * A stored feature entry, in either shape this product has used.
+ * A stored feature entry, in any shape this product has used.
  *
- * Builds up to and including the tier system stored `{ key, tier }`; the
- * current one stores the id alone. Both are read so an existing user's
- * selections survive the change — only the grading is dropped, never the
- * choice of what they cared about.
+ * Three so far: the original tier system's `{ key, tier }`, the flat
+ * `FeatureId` of the selection-only build, and the current
+ * `{ key, importance }`. All three are read so that nobody loses what they
+ * told us across an upgrade.
  */
-type StoredFeature = FeatureId | { key?: FeatureId };
+type StoredFeature =
+  | FeatureId
+  | {
+      key?: FeatureId;
+      importance?: string;
+      /** essential | good | luxury, from the original tier system. */
+      tier?: string;
+    };
 
-const featureIdOf = (stored: StoredFeature): FeatureId | null =>
-  typeof stored === "string" ? stored : (stored?.key ?? null);
+/**
+ * Old tiers map onto importance by intent rather than by name.
+ *
+ * "Essential" becomes high rather than something stronger, on purpose: it was
+ * never a hard requirement in the engine, and preserving it as one now would
+ * import a meaning the product deliberately doesn't have.
+ */
+const TIER_TO_IMPORTANCE: Record<string, FeatureImportance> = {
+  essential: "high",
+  good: "medium",
+  luxury: "low",
+};
+
+function readStoredFeature(stored: StoredFeature): FeaturePreference | null {
+  if (typeof stored === "string") {
+    return { key: stored, importance: DEFAULT_FEATURE_IMPORTANCE };
+  }
+
+  if (!stored?.key) return null;
+
+  const importance =
+    stored.importance && stored.importance in FEATURE_IMPORTANCE
+      ? (stored.importance as FeatureImportance)
+      : stored.tier
+        ? (TIER_TO_IMPORTANCE[stored.tier] ?? DEFAULT_FEATURE_IMPORTANCE)
+        : DEFAULT_FEATURE_IMPORTANCE;
+
+  return { key: stored.key, importance };
+}
 
 /**
  * Brings a stored feature selection up to the current rules.
  *
- * Tiers are discarded, ids the catalogue no longer offers are dropped,
- * duplicates created by the safety merge collapse to one, and the result is
- * capped at the maximum.
+ * Ids the catalogue no longer offers are dropped, duplicates created by the
+ * safety merge collapse to one keeping the stronger importance, and the
+ * result is capped at the maximum.
  *
- * A category that ends up empty stays empty. Under the tier system an empty
- * list meant the category could not tell two cars apart, so it was refilled
- * from the defaults; it now means "judge this category on its own terms",
- * which is a preference to respect rather than repair.
+ * A category that ends up empty stays empty, and so does a fresh install:
+ * picking nothing means "judge this category on its catalogue", which is a
+ * preference to respect rather than a form to fill in on the user's behalf.
  */
 function migrateCategoryFeatures(
   stored: Record<string, StoredFeature[]> | undefined,
 ): Record<CategoryId, FeatureSelection> {
-  /* Nothing stored at all is a fresh install, not a cleared selection. */
-  if (!stored) return { ...DEFAULT_CATEGORY_FEATURES };
+  const result = { ...DEFAULT_CATEGORY_FEATURES };
+
+  if (!stored) return result;
 
   const merged: Record<string, StoredFeature[]> = {};
 
@@ -895,25 +948,33 @@ function migrateCategoryFeatures(
     merged[current] = [...(merged[current] ?? []), ...(features ?? [])];
   }
 
-  const result = { ...DEFAULT_CATEGORY_FEATURES };
-
   for (const [id, features] of Object.entries(merged)) {
     const category = id as CategoryId;
     const catalogue = AVAILABLE_CATEGORY_FEATURES[category] ?? [];
 
-    const kept: FeatureId[] = [];
+    const kept = new Map<FeatureId, FeaturePreference>();
 
     for (const entry of features) {
-      const key = featureIdOf(entry);
+      const preference = readStoredFeature(entry);
 
-      if (key == null) continue;
-      if (!catalogue.includes(key)) continue;
-      if (kept.includes(key)) continue;
+      if (!preference) continue;
+      if (!catalogue.includes(preference.key)) continue;
 
-      kept.push(key);
+      const existing = kept.get(preference.key);
+
+      /* The safety merge can bring one feature in twice. Keep the louder. */
+      if (
+        existing &&
+        FEATURE_IMPORTANCE[existing.importance].weight >=
+          FEATURE_IMPORTANCE[preference.importance].weight
+      ) {
+        continue;
+      }
+
+      kept.set(preference.key, preference);
     }
 
-    result[category] = kept.slice(0, MAX_FEATURES_PER_CATEGORY);
+    result[category] = [...kept.values()].slice(0, MAX_FEATURES_PER_CATEGORY);
   }
 
   return result;

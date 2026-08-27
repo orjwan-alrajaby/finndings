@@ -4,6 +4,7 @@ import type {
   CategoryId,
   FeatureBasis,
   FeatureId,
+  FeatureImportance,
   NumericEvidence,
 } from "../types";
 import type { Magnitude } from "./magnitude";
@@ -30,6 +31,11 @@ export interface FeatureFact {
   phrase: string;
   /** Short, jargon-free description, for the UI's information affordance. */
   explanation: string;
+  /**
+   * How much the user said this one matters. Null for a feature they never
+   * picked out, which is most of a catalogue.
+   */
+  importance: FeatureImportance | null;
 }
 
 /** A set of features split by whether the car has them. */
@@ -58,10 +64,12 @@ export interface FeatureSplit {
 export interface FeatureEvidence {
   /** See `CategoryDetail.basis`. */
   basis: FeatureBasis;
-  /** Every feature the category covers. What the score measured. */
+  /** Every feature the category covers. The plain count behind the score. */
   coverage: FeatureSplit;
   /** The features the user picked out. Both lists empty when they picked none. */
   picked: FeatureSplit;
+  /** Picks the car lacks that the user marked a high priority. */
+  highMisses: FeatureFact[];
   /** How many features the user picked out. Zero is a valid answer. */
   selectedCount: number;
 }

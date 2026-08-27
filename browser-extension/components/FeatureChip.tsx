@@ -1,4 +1,5 @@
 import type { FeatureFact } from "@/lib/reasoning-engine/narrative";
+import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { InfoTip } from "./InfoTip";
 
 /** What the chip is saying about this feature. */
@@ -13,9 +14,11 @@ const TONE_CLASS: Record<FeatureChipTone, string> = {
 /**
  * A named feature, with its explanation attached.
  *
- * Carries no importance marking. The reader is never asked to grade a feature,
- * so there is nothing to show — the row this sits in already says whether the
- * car has it, and the section says whether they asked for it.
+ * Importance is shown only where the user actually set one — that is, only on
+ * features they picked out — and only for high, which is the level that
+ * changes how the reader should weigh a gap. Labelling every chip "medium"
+ * would be noise, since medium is simply what a pick is until they say
+ * otherwise.
  */
 export function FeatureChip({
     fact,
@@ -24,6 +27,8 @@ export function FeatureChip({
     fact: FeatureFact;
     tone: FeatureChipTone;
 }) {
+    const flagged = fact.importance === "high";
+
     return (
         <span
             className={[
@@ -34,6 +39,15 @@ export function FeatureChip({
             <span className={tone === "missing" ? "line-through" : ""}>
                 {fact.label}
             </span>
+
+            {flagged && (
+                <span
+                    className="text-[9px] font-black uppercase tracking-wide opacity-70"
+                    title={`You marked this ${FEATURE_IMPORTANCE.high.inSentence}`}
+                >
+                    High
+                </span>
+            )}
 
             {fact.explanation && (
                 <InfoTip subject={fact.label}>{fact.explanation}</InfoTip>

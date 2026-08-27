@@ -623,7 +623,11 @@ describe("alternatives and the hot seat", () => {
       [winner, bigBoot],
       ["safetyAssistance", "practicality"],
       preferences,
-      features(),
+      features({
+        safetyAssistance: [
+          { key: "hasEmergencyCallSystem", importance: "high" },
+        ],
+      }),
     )!;
 
     const [option] = alternativeOptions(
@@ -781,7 +785,14 @@ describe("comparative reasoning", () => {
       [carC, carA],
       ["safetyAssistance", "practicality"],
       preferences,
-      features(),
+      features({
+        safetyAssistance: [
+          { key: "hasEmergencyBrakingAssist", importance: "high" },
+          { key: "hasBlindSpotAssist", importance: "high" },
+          { key: "hasLaneKeepingAssist", importance: "medium" },
+          { key: "hasEmergencyCallSystem", importance: "medium" },
+        ],
+      }),
     )!;
   };
 

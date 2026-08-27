@@ -4,6 +4,7 @@ import type {
   CategoryDetail,
   CategoryId,
   FeatureId,
+  FeaturePreference,
   FeatureSelection,
   LensPreferences,
   NumericEvidence,
@@ -13,9 +14,11 @@ import type {
 
 import {
   AVAILABLE_CATEGORY_FEATURES,
+  BASE_FEATURE_WEIGHT,
   CATEGORIES,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_PRIORITIES,
+  FEATURE_IMPORTANCE,
   FEATURES,
 } from "./constants";
 
@@ -238,10 +241,9 @@ function numericScore(
  * combined `score` so an explanation can point at whichever actually drove
  * the result.
  *
- * Features the user picked out are never a filter and never a score. A car
- * missing one stays in the running with its category score untouched, and the
- * gap becomes a tradeoff the reader weighs — not a decision the engine makes
- * on their behalf.
+ * Features the user picked out are never a filter. A car missing one stays in
+ * the running, scores lower than it otherwise would, and the gap surfaces as a
+ * tradeoff the reader weighs — not a decision the engine makes for them.
  */
 export function categoryDetail(
   category: CategoryId,
@@ -254,56 +256,82 @@ export function categoryDetail(
   > = DEFAULT_CATEGORY_FEATURES,
 ): CategoryDetail {
   /*
-   * The category is always measured against its own catalogue.
+   * The category is measured against its own catalogue, always.
    *
-   * Measuring it against the user's picks instead — which is what an earlier
-   * version did — fails in two directions at once. Pick one common feature
-   * and every car scores 100, so the priority silently stops separating
-   * anything. Pick one rare feature and a car with twelve of the fifteen
-   * safety systems scores 0 because it lacks the thirteenth, which is a hard
-   * requirement in all but name.
+   * Measuring it against the user's picks instead — which an earlier version
+   * did — fails in two directions at once. Pick one common feature and every
+   * car scores 100, so the priority silently stops separating anything. Pick
+   * one rare feature and a car with twelve of the fifteen safety systems
+   * scores 0 for want of the thirteenth, which is a hard requirement in all
+   * but name.
    *
-   * Both come from the same category error: one to five picks out of a
-   * fifteen-feature catalogue is a statement of interest, not a measurement
-   * of the category. So the catalogue does the measuring, and the picks do
-   * the explaining.
+   * So the catalogue is the denominator, and what the user picked out adjusts
+   * the weight of individual entries inside it. That keeps a picked feature
+   * genuinely influential while making it arithmetically impossible for any
+   * one of them to drive the category to either extreme.
    */
   const catalogue =
     AVAILABLE_CATEGORY_FEATURES[category] ??
     getCategory(category)?.features ??
     [];
 
+  const selected = categoryFeatures[category] ?? [];
+
+  const importanceOf = new Map(
+    selected.map((preference) => [preference.key, preference.importance]),
+  );
+
   const matched: FeatureId[] = [];
   const missing: FeatureId[] = [];
 
+  let earned = 0;
+  let total = 0;
+
   for (const key of catalogue) {
-    if (vehicle.features?.[key]) matched.push(key);
-    else missing.push(key);
+    const importance = importanceOf.get(key);
+
+    /*
+     * One count for being relevant equipment, plus one, two or three more for
+     * how much the user said it matters. See FEATURE_IMPORTANCE.
+     */
+    const weight = importance
+      ? FEATURE_IMPORTANCE[importance].weight
+      : BASE_FEATURE_WEIGHT;
+
+    total += weight;
+
+    if (vehicle.features?.[key]) {
+      matched.push(key);
+      earned += weight;
+    } else {
+      missing.push(key);
+    }
   }
 
-  /*
-   * Share of the category's equipment the car actually carries. Every feature
-   * counts the same: the user said how much this category matters by where
-   * they ranked it, and was never asked to grade anything inside it.
-   *
-   * Kept as an absolute share rather than normalised across the pinned set,
-   * because normalising manufactures difference where there is none — five
-   * cars carrying 8, 8, 7, 7 and 7 systems are much the same, and stretching
-   * that to 100, 100, 0, 0, 0 would be a lie the reader can't see through.
-   */
-  const featureScore = catalogue.length
+  /* The plain count, for the explanation to quote. */
+  const coverageScore = catalogue.length
     ? Math.round((matched.length / catalogue.length) * 100)
     : null;
 
-  /* What the user picked out, for the explanation to work from. */
-  const selected = categoryFeatures[category] ?? [];
+  /* The weighted share, which is what the ranking runs on. */
+  const featureScore = total ? Math.round((earned / total) * 100) : null;
 
-  const pickedMatched: FeatureId[] = [];
-  const pickedMissing: FeatureId[] = [];
+  /*
+   * The picks, split by presence and carrying their importance, so the Advice
+   * can answer "does it have the things I asked for?" separately from "how
+   * well equipped is it here?".
+   *
+   * Picks the catalogue no longer offers are ignored rather than counted as
+   * misses — the user cannot have meant a feature this category doesn't cover.
+   */
+  const pickedMatched: FeaturePreference[] = [];
+  const pickedMissing: FeaturePreference[] = [];
 
-  for (const key of selected) {
-    if (vehicle.features?.[key]) pickedMatched.push(key);
-    else pickedMissing.push(key);
+  for (const preference of selected) {
+    if (!catalogue.includes(preference.key)) continue;
+
+    if (vehicle.features?.[preference.key]) pickedMatched.push(preference);
+    else pickedMissing.push(preference);
   }
 
   const numeric = numericScore(category, vehicle, vehicles);
@@ -320,6 +348,7 @@ export function categoryDetail(
     basis: catalogue.length ? "category" : "none",
     pickedMatched,
     pickedMissing,
+    coverageScore,
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,

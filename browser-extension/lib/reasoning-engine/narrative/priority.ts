@@ -71,9 +71,12 @@ const joinSelection = (facts: FeatureFact[]): string =>
 /**
  * What the user picked out, and whether they got it.
  *
- * This leads the section when there is a selection, because it is the part
- * the reader wrote themselves. It moves no number — the sentence after it
- * says what the category actually scored on.
+ * Leads the section, because it is the part the reader wrote themselves.
+ *
+ * Importance is mentioned only where it changes what the sentence means — a
+ * high-priority miss is worth flagging, a medium-priority one carries its
+ * weight silently. Appending "which you marked medium priority" to every
+ * clause would be the mail-merge voice this layer exists to avoid.
  */
 function describeSelection(
   features: FeatureEvidence,
@@ -87,11 +90,17 @@ function describeSelection(
   if (total === 1) {
     const only = (present[0] ?? missing[0]) as FeatureFact;
 
-    return present.length
-      ? sentence(`You picked out ${only.phrase} here, and this car has it`)
-      : sentence(
-          `You picked out ${only.phrase} here, and this car doesn't have it`,
-        );
+    if (present.length) {
+      return sentence(
+        `You picked out ${only.phrase} here, and this car has it`,
+      );
+    }
+
+    return sentence(
+      `You picked out ${only.phrase} here`,
+      only.importance === "high" ? "as a high priority" : "",
+      `, and this car doesn't have it`,
+    );
   }
 
   const opener = `You picked out ${joinSelection([...present, ...missing])}.`;
@@ -113,18 +122,27 @@ function describeSelection(
    * Name whichever side is shorter. Listing four missing features straight
    * after listing all five is the same sentence twice.
    */
-  return present.length < missing.length
-    ? sentence(
-        opener,
-        `This car has ${coverage(present.length, total)} of them:`,
-        joinSelection(present),
-      )
-    : sentence(
-        opener,
-        `This car has ${coverage(present.length, total)} —`,
-        `it doesn't have ${joinSelection(missing)}`,
-        rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
-      );
+  if (present.length < missing.length) {
+    return sentence(
+      opener,
+      `This car has ${coverage(present.length, total)}:`,
+      joinSelection(present),
+    );
+  }
+
+  const highMisses = features.highMisses;
+
+  return sentence(
+    opener,
+    `This car has ${coverage(present.length, total)} —`,
+    `it doesn't have ${joinSelection(missing)}`,
+    highMisses.length && highMisses.length < missing.length
+      ? `, and ${joinSelection(highMisses)} ${
+          highMisses.length === 1 ? "was" : "were"
+        } among your high priorities`
+      : "",
+    rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
+  );
 }
 
 /**

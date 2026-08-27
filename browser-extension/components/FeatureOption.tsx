@@ -1,41 +1,53 @@
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { InfoTip } from "@/components/InfoTip";
-import { FEATURES } from "@/lib/reasoning-engine/constants";
-import type { FeatureId } from "@/lib/reasoning-engine/types";
+import {
+    FEATURE_IMPORTANCE,
+    FEATURES,
+    IMPORTANCE_LEVELS,
+} from "@/lib/reasoning-engine/constants";
+import type {
+    FeatureId,
+    FeatureImportance,
+} from "@/lib/reasoning-engine/types";
 
 interface FeatureOptionProps {
     feature: FeatureId;
-    selected: boolean;
-    /** True when this one can't be turned on right now — the cap is reached. */
+    /** The importance the user gave it, or null when it isn't picked. */
+    importance: FeatureImportance | null;
+    /** True when this one can't be picked right now — the cap is reached. */
     disabled: boolean;
     disabledReason?: string;
+    /** Shown on the leading catalogue entries as a starting point. */
+    suggested?: boolean;
     onToggle: () => void;
+    onImportanceChange: (importance: FeatureImportance) => void;
 }
 
 /**
- * One feature, picked out or not.
+ * One feature: pick it, then say how much it matters.
  *
- * A single binary choice, deliberately. This used to ask the reader to grade
- * every feature Essential / Good to have / Luxury extra, which asked them to
- * express the same preference twice: how much a category matters is already
- * the priority order's job, and no one has a reliable opinion about whether a
- * reversing camera is "good to have" or "a luxury" in the abstract.
- *
- * All that is left is the question worth asking — does this one matter to you?
+ * The importance control only appears once the feature is picked, which is
+ * what keeps this from being the old tier matrix. There, every feature in a
+ * catalogue of up to fifteen carried three radio buttons whether the reader
+ * cared about it or not; here at most five rows ever show one, because you
+ * only grade what you chose to name.
  */
 export function FeatureOption({
     feature,
-    selected,
+    importance,
     disabled,
     disabledReason,
+    suggested = false,
     onToggle,
+    onImportanceChange,
 }: FeatureOptionProps) {
     const { label, explanation } = FEATURES[feature];
+    const selected = importance != null;
 
     return (
         <div
             className={[
-                "flex items-start gap-2.5 rounded-2xl p-3 transition",
+                "rounded-2xl p-3 transition",
                 selected
                     ? "bg-finn-pale-blue ring-2 ring-finn-accent-blue"
                     : disabled
@@ -43,49 +55,115 @@ export function FeatureOption({
                       : "bg-white ring-1 ring-finn-iron/10 hover:ring-finn-iron/30",
             ].join(" ")}
         >
-            <button
-                type="button"
-                role="checkbox"
-                aria-checked={selected}
-                aria-label={label}
-                disabled={disabled}
-                title={disabled ? disabledReason : undefined}
-                onClick={onToggle}
-                className={[
-                    "flex min-w-0 flex-1 items-start gap-2.5 text-left",
-                    disabled ? "cursor-not-allowed" : "cursor-pointer",
-                ].join(" ")}
-            >
-                <span
+            <div className="flex items-start gap-2.5">
+                <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={selected}
+                    aria-label={label}
+                    disabled={disabled}
+                    title={disabled ? disabledReason : undefined}
+                    onClick={onToggle}
                     className={[
-                        "mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition",
-                        selected
-                            ? "border-finn-accent-blue bg-finn-accent-blue text-white"
-                            : "border-finn-iron/30 bg-white",
+                        "flex min-w-0 flex-1 items-start gap-2.5 text-left",
+                        disabled ? "cursor-not-allowed" : "cursor-pointer",
                     ].join(" ")}
                 >
-                    {selected && <CheckIcon className="h-3.5 w-3.5" />}
-                </span>
+                    <span
+                        className={[
+                            "mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition",
+                            selected
+                                ? "border-finn-accent-blue bg-finn-accent-blue text-white"
+                                : "border-finn-iron/30 bg-white",
+                        ].join(" ")}
+                    >
+                        {selected && <CheckIcon className="h-3.5 w-3.5" />}
+                    </span>
 
-                <span
-                    className={[
-                        "min-w-0 text-sm font-bold leading-5",
-                        selected
-                            ? "text-finn-highlight-navy"
-                            : disabled
-                              ? "text-finn-iron/60"
-                              : "text-finn-black",
-                    ].join(" ")}
-                >
-                    {label}
-                </span>
-            </button>
+                    <span className="min-w-0">
+                        <span
+                            className={[
+                                "block text-sm font-bold leading-5",
+                                selected
+                                    ? "text-finn-highlight-navy"
+                                    : disabled
+                                      ? "text-finn-iron/60"
+                                      : "text-finn-black",
+                            ].join(" ")}
+                        >
+                            {label}
+                        </span>
 
-            {explanation && (
-                <span className="mt-0.5 shrink-0">
-                    <InfoTip subject={label}>{explanation}</InfoTip>
-                </span>
+                        {suggested && !selected && (
+                            <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-finn-iron">
+                                Commonly picked
+                            </span>
+                        )}
+                    </span>
+                </button>
+
+                {explanation && (
+                    <span className="mt-0.5 shrink-0">
+                        <InfoTip subject={label}>{explanation}</InfoTip>
+                    </span>
+                )}
+            </div>
+
+            {selected && (
+                <ImportancePicker
+                    label={label}
+                    value={importance}
+                    onChange={onImportanceChange}
+                />
             )}
+        </div>
+    );
+}
+
+/**
+ * How much this one matters, on the three levels the engine understands.
+ *
+ * Nothing here is a requirement — a car missing a high-priority feature is
+ * still eligible to win, and says so in the Advice. These words describe
+ * strength of preference, which is why none of them is "essential".
+ */
+function ImportancePicker({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: FeatureImportance;
+    onChange: (importance: FeatureImportance) => void;
+}) {
+    return (
+        <div
+            role="radiogroup"
+            aria-label={`How much ${label} matters to you`}
+            className="mt-2.5 flex gap-1 rounded-lg bg-white/70 p-1"
+        >
+            {IMPORTANCE_LEVELS.map((level) => {
+                const active = value === level;
+
+                return (
+                    <button
+                        key={level}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        title={FEATURE_IMPORTANCE[level].hint}
+                        onClick={() => onChange(level)}
+                        className={[
+                            "flex-1 rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-wide transition",
+                            active
+                                ? FEATURE_IMPORTANCE[level].activeClass
+                                : "text-finn-iron hover:bg-white hover:text-finn-black",
+                        ].join(" ")}
+                    >
+                        {FEATURE_IMPORTANCE[level].label}
+                    </button>
+                );
+            })}
         </div>
     );
 }

@@ -6,11 +6,17 @@ import { categoryDetail, featurePhrase } from "./scoring";
 import {
   AVAILABLE_CATEGORY_FEATURES,
   DEFAULT_CATEGORY_FEATURES,
+  FEATURE_IMPORTANCE,
   FEATURES,
   MAX_FEATURES_PER_CATEGORY,
 } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
-import type { CategoryId, FeatureSelection } from "./types";
+import type {
+  CategoryId,
+  FeatureImportance,
+  FeaturePreference,
+  FeatureSelection,
+} from "./types";
 
 /**
  * The feature-selection model.
@@ -28,6 +34,10 @@ const features = (
   ...DEFAULT_CATEGORY_FEATURES,
   ...overrides,
 });
+
+/** A picked feature at a given importance. */
+const pick = (key: string, importance: FeatureImportance = "medium") =>
+  ({ key, importance }) as FeaturePreference;
 
 const detailFor = (
   vehicleFeatures: string[],
@@ -47,57 +57,157 @@ const detailFor = (
 };
 
 /* -------------------------------------------------------------------------- */
-/* Picks are evidence, not arithmetic                                         */
+/* Picks refine the category; they never replace it                           */
 /* -------------------------------------------------------------------------- */
 
-describe("what the user picks out never moves the score", () => {
+describe("what the user picks out refines the category score", () => {
   const car = ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"];
+  const CATALOGUE = AVAILABLE_CATEGORY_FEATURES.safetyAssistance.length;
 
   /*
-   * The measurement is the category, always. Measuring against the picks
-   * instead failed in two directions at once: pick one common feature and
-   * every car scores 100, so the priority stops separating anything; pick one
-   * rare feature and a car with twelve of the fifteen safety systems scores 0
-   * for want of the thirteenth.
+   * Measuring the category against the picks themselves — which an earlier
+   * build did — failed in two directions at once. Pick one common feature and
+   * every car scored 100, so the priority stopped separating anything. Pick
+   * one rare feature and a car with twelve of the fifteen safety systems
+   * scored 0 for want of the thirteenth.
+   *
+   * The catalogue is therefore always the denominator, and a pick adjusts the
+   * weight of one entry inside it.
    */
-  it("scores the category the same whatever was picked out", () => {
-    const none = detailFor(car, []);
+  it("keeps the whole catalogue as the denominator", () => {
+    expect(detailFor(car, []).coverageScore).toBe(
+      Math.round((2 / CATALOGUE) * 100),
+    );
 
-    const variants = [
-      detailFor(car, ["hasAdaptiveCruiseControl"]),
-      detailFor(car, [
-        "hasEmergencyBrakingAssist",
-        "hasBlindSpotAssist",
-        "hasAdaptiveCruiseControl",
-      ]),
-      detailFor(car, [
-        "hasEmergencyBrakingAssist",
-        "hasBlindSpotAssist",
-        "hasLaneKeepingAssist",
-        "hasEmergencyCallSystem",
-        "hasAdaptiveCruiseControl",
-      ]),
-    ];
+    /* Present or absent, one pick cannot reach either extreme. */
+    for (const selection of [
+      [pick("hasEmergencyBrakingAssist", "high")],
+      [pick("hasAdaptiveCruiseControl", "high")],
+    ]) {
+      const detail = detailFor(car, selection);
 
-    for (const detail of variants) {
-      expect(detail.featureScore).toBe(none.featureScore);
-      expect(detail.score).toBe(none.score);
+      expect(detail.featureScore).toBeGreaterThan(0);
+      expect(detail.featureScore).toBeLessThan(100);
     }
   });
 
-  it("measures the share of the category's own catalogue", () => {
-    const catalogue = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
+  it("reports the plain count separately from the weighted score", () => {
+    const detail = detailFor(car, [pick("hasEmergencyBrakingAssist", "high")]);
 
-    expect(detailFor(car, []).featureScore).toBe(
-      Math.round((2 / catalogue.length) * 100),
-    );
+    /* Coverage ignores the picks entirely. */
+    expect(detail.coverageScore).toBe(detailFor(car, []).coverageScore);
 
-    expect(detailFor([], []).featureScore).toBe(0);
-    expect(detailFor([...catalogue], []).featureScore).toBe(100);
+    /* The weighted score doesn't. */
+    expect(detail.featureScore).not.toBe(detail.coverageScore);
   });
 
-  /* One rare pick must not turn a well-equipped car into a zero. */
-  it("doesn't let a single pick collapse the category", () => {
+  it("is identical to plain coverage when nothing is picked", () => {
+    const detail = detailFor(car, []);
+
+    expect(detail.featureScore).toBe(detail.coverageScore);
+  });
+
+  /* Scenario 3: the same feature matters more to a reader who says so. */
+  it("weighs a high pick above a medium one, and medium above low", () => {
+    const held = (importance: FeatureImportance) =>
+      detailFor(car, [pick("hasEmergencyBrakingAssist", importance)])
+        .featureScore ?? 0;
+
+    expect(held("high")).toBeGreaterThan(held("medium"));
+    expect(held("medium")).toBeGreaterThan(held("low"));
+
+    const lacked = (importance: FeatureImportance) =>
+      detailFor(car, [pick("hasAdaptiveCruiseControl", importance)])
+        .featureScore ?? 0;
+
+    /* And a miss costs more the more it was wanted. */
+    expect(lacked("high")).toBeLessThan(lacked("medium"));
+    expect(lacked("medium")).toBeLessThan(lacked("low"));
+  });
+
+  /* Scenario 4: within one selection, the high picks pull harder. */
+  it("lets high picks outweigh medium ones inside a selection", () => {
+    const selection = [
+      pick("hasEmergencyBrakingAssist", "high"),
+      pick("hasBlindSpotAssist", "high"),
+      pick("hasAdaptiveCruiseControl", "medium"),
+    ];
+
+    /* Holds both highs, misses the medium. */
+    const highs = detailFor(
+      ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"],
+      selection,
+    );
+
+    /* Holds only the medium. */
+    const medium = detailFor(["hasAdaptiveCruiseControl"], selection);
+
+    expect(highs.featureScore).toBeGreaterThan(medium.featureScore ?? 0);
+  });
+
+  /* Scenario 6: five picks at one level is simply equal weighting. */
+  it("treats a uniform selection as equal weighting", () => {
+    const keys = AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5);
+
+    const allHigh = keys.map((key) => pick(key, "high"));
+    const allLow = keys.map((key) => pick(key, "low"));
+
+    /* Any two cars holding the same number of the picks must tie. */
+    const first = detailFor([keys[0]!, keys[1]!], allHigh).featureScore;
+    const second = detailFor([keys[2]!, keys[3]!], allHigh).featureScore;
+
+    expect(first).toBe(second);
+
+    /* And the level still shifts how much the whole selection counts. */
+    expect(detailFor([keys[0]!], allHigh).featureScore).not.toBe(
+      detailFor([keys[0]!], allLow).featureScore,
+    );
+  });
+
+  it("records the picks as evidence, carrying their importance", () => {
+    const detail = detailFor(car, [
+      pick("hasEmergencyBrakingAssist", "high"),
+      pick("hasAdaptiveCruiseControl", "low"),
+    ]);
+
+    expect(detail.pickedMatched).toEqual([
+      { key: "hasEmergencyBrakingAssist", importance: "high" },
+    ]);
+    expect(detail.pickedMissing).toEqual([
+      { key: "hasAdaptiveCruiseControl", importance: "low" },
+    ]);
+
+    /* The catalogue lists are untouched by the selection. */
+    expect(detail.matched).toEqual(car);
+  });
+
+  /* Scenario 7: a feature every car has is worth saying, not worth ranking on. */
+  it("doesn't manufacture a gap out of a universal feature", () => {
+    const strong = [
+      "hasEmergencyBrakingAssist",
+      "hasBlindSpotAssist",
+      "hasLaneKeepingAssist",
+      "hasEmergencyCallSystem",
+    ];
+
+    const weak = ["hasEmergencyBrakingAssist"];
+    const universal = [pick("hasEmergencyBrakingAssist", "high")];
+
+    const gapBefore =
+      (detailFor(strong, []).featureScore ?? 0) -
+      (detailFor(weak, []).featureScore ?? 0);
+
+    const gapAfter =
+      (detailFor(strong, universal).featureScore ?? 0) -
+      (detailFor(weak, universal).featureScore ?? 0);
+
+    /* Both hold it, so the gap must not widen. */
+    expect(gapAfter).toBeLessThanOrEqual(gapBefore);
+    expect(gapAfter).toBeGreaterThan(0);
+  });
+
+  /* Scenario 8: one rare feature is evidence, not a trump card. */
+  it("doesn't let one rare pick overpower the category", () => {
     const wellEquipped = [
       "hasEmergencyBrakingAssist",
       "hasBlindSpotAssist",
@@ -107,57 +217,20 @@ describe("what the user picks out never moves the score", () => {
       "hasTrafficSignRecognition",
     ];
 
-    const detail = detailFor(wellEquipped, ["hasAdaptiveCruiseControl"]);
+    const rare = [pick("hasAdaptiveCruiseControl", "high")];
 
-    expect(detail.pickedMatched).toHaveLength(0);
-    expect(detail.pickedMissing).toEqual(["hasAdaptiveCruiseControl"]);
+    /* Twelve-system car missing the pick still beats a bare car holding it. */
+    const broad = detailFor(wellEquipped, rare);
+    const narrow = detailFor(["hasAdaptiveCruiseControl"], rare);
 
-    /* Missing the one pick, and still clearly the stronger safety car. */
-    expect(detail.featureScore).toBe(
-      Math.round(
-        (6 / AVAILABLE_CATEGORY_FEATURES.safetyAssistance.length) * 100,
-      ),
-    );
+    expect(broad.pickedMissing).toHaveLength(1);
+    expect(broad.featureScore).toBeGreaterThan(narrow.featureScore ?? 0);
   });
 
-  /* And one common pick must not flatten the category to a constant. */
-  it("doesn't let a common pick erase the priority", () => {
-    const pick: FeatureSelection = ["hasEmergencyBrakingAssist"];
-
-    const strong = detailFor(
-      [
-        "hasEmergencyBrakingAssist",
-        "hasBlindSpotAssist",
-        "hasLaneKeepingAssist",
-        "hasEmergencyCallSystem",
-      ],
-      pick,
-    );
-
-    const weak = detailFor(["hasEmergencyBrakingAssist"], pick);
-
-    /* Both hold the pick; the category still tells them apart. */
-    expect(strong.pickedMatched).toEqual(weak.pickedMatched);
-    expect(strong.featureScore).toBeGreaterThan(weak.featureScore ?? 0);
-  });
-
-  it("records the picks as evidence, separately from the score", () => {
-    const detail = detailFor(car, [
-      "hasEmergencyBrakingAssist",
-      "hasAdaptiveCruiseControl",
-    ]);
-
-    expect(detail.pickedMatched).toEqual(["hasEmergencyBrakingAssist"]);
-    expect(detail.pickedMissing).toEqual(["hasAdaptiveCruiseControl"]);
-
-    /* The catalogue lists are untouched by the selection. */
-    expect(detail.matched).toEqual(car);
-  });
-
-  it("stores no importance alongside a pick", () => {
+  it("never stores an importance the engine doesn't know", () => {
     for (const id of Object.keys(DEFAULT_CATEGORY_FEATURES) as CategoryId[]) {
-      for (const entry of DEFAULT_CATEGORY_FEATURES[id]) {
-        expect(typeof entry).toBe("string");
+      for (const preference of DEFAULT_CATEGORY_FEATURES[id]) {
+        expect(FEATURE_IMPORTANCE[preference.importance]).toBeDefined();
       }
     }
   });
@@ -321,11 +394,11 @@ describe("the priority order decides importance, not the picks", () => {
   });
 
   /*
-   * The strong form: picks are not in the arithmetic at all, so no selection
-   * anywhere can change a single score. This is what makes a pick safe to
-   * make — the reader cannot wreck their ranking by expressing an interest.
+   * Picks refine the arithmetic, so scores do move — but the pick-blind
+   * coverage figure and the priority weights must not, because those are what
+   * the category and the ordering actually mean.
    */
-  it("produces identical scores however the picks are arranged", () => {
+  it("leaves coverage and the priority weights untouched", () => {
     const order: CategoryId[] = ["safetyAssistance", "practicality"];
 
     const baseline = buildReasoningContext(cars, order, preferences, features());
@@ -335,8 +408,10 @@ describe("the priority order decides importance, not the picks", () => {
       order,
       preferences,
       features({
-        safetyAssistance: ["hasAdaptiveCruiseControl"],
-        practicality: AVAILABLE_CATEGORY_FEATURES.practicality.slice(0, 5),
+        safetyAssistance: [pick("hasAdaptiveCruiseControl", "high")],
+        practicality: AVAILABLE_CATEGORY_FEATURES.practicality
+          .slice(0, 5)
+          .map((key) => pick(key, "high")),
       }),
     );
 
@@ -347,19 +422,15 @@ describe("the priority order decides importance, not the picks", () => {
       features({ safetyAssistance: [], practicality: [] }),
     );
 
-    /*
-     * Totals and category scores must be untouched. The picked lists on each
-     * detail do differ — that is the evidence the picks exist to produce.
-     */
-    const numbers = (context: typeof baseline) =>
+    const coverage = (context: typeof baseline) =>
       context.scores.map((score) => ({
         vehicleId: score.vehicleId,
-        total: score.total,
-        byCategory: score.byCategory,
+        safety: score.details.safetyAssistance?.coverageScore,
+        practicality: score.details.practicality?.coverageScore,
       }));
 
     for (const context of [lopsided, cleared]) {
-      expect(numbers(context)).toEqual(numbers(baseline));
+      expect(coverage(context)).toEqual(coverage(baseline));
       expect(context.weights).toEqual(baseline.weights);
     }
   });
@@ -429,9 +500,9 @@ describe("a pick is an interest, never a requirement", () => {
       preferences,
       features({
         safetyAssistance: [
-          "hasEmergencyBrakingAssist",
-          "hasBlindSpotAssist",
-          "hasAdaptiveCruiseControl",
+          pick("hasEmergencyBrakingAssist"),
+          pick("hasBlindSpotAssist"),
+          pick("hasAdaptiveCruiseControl"),
         ],
       }),
     )!;
@@ -459,8 +530,8 @@ describe("a pick is an interest, never a requirement", () => {
       preferences,
       features({
         safetyAssistance: [
-          "hasEmergencyBrakingAssist",
-          "hasAdaptiveCruiseControl",
+          pick("hasEmergencyBrakingAssist"),
+          pick("hasAdaptiveCruiseControl", "high"),
         ],
       }),
     )!;
@@ -532,24 +603,27 @@ describe("the cap is a ceiling on picks, not a quota", () => {
     }
   });
 
-  /* Picking fewer things must not be punished, or rewarded. */
-  it("treats a partial selection exactly like a full one", () => {
-    const car = ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"];
+  /*
+   * Scenario 10: picking five things in a category must not make the category
+   * matter more. The weighted score stays on 0–100 whatever the selection, so
+   * a priority's influence comes only from where the user ranked it.
+   */
+  it("cannot widen a category's range by picking more in it", () => {
+    const keys = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
 
-    const two = detailFor(car, [
-      "hasEmergencyBrakingAssist",
-      "hasBlindSpotAssist",
-    ]);
+    const fivePicks = keys.slice(0, 5).map((key) => pick(key, "high"));
 
-    const five = detailFor(car, [
-      "hasEmergencyBrakingAssist",
-      "hasBlindSpotAssist",
-      "hasLaneKeepingAssist",
-      "hasEmergencyCallSystem",
-      "hasAdaptiveCruiseControl",
-    ]);
+    /* Best and worst possible cars, with and without a full selection. */
+    const bestWith = detailFor([...keys], fivePicks).featureScore;
+    const worstWith = detailFor([], fivePicks).featureScore;
 
-    expect(two.featureScore).toBe(five.featureScore);
+    const bestWithout = detailFor([...keys], []).featureScore;
+    const worstWithout = detailFor([], []).featureScore;
+
+    expect(bestWith).toBe(bestWithout);
+    expect(worstWith).toBe(worstWithout);
+    expect(bestWith).toBe(100);
+    expect(worstWith).toBe(0);
   });
 });
 
@@ -558,11 +632,10 @@ describe("the cap is a ceiling on picks, not a quota", () => {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The same five cars under zero, one, three and five picks.
+ * The same four cars under zero, one, three and five picks.
  *
- * These are the cases that broke the previous model, so they are pinned end
- * to end rather than at the unit level: the ranking must not move when the
- * user expresses an interest, because an interest is not a measurement.
+ * These are the cases that broke earlier models, so they are pinned end to
+ * end rather than at the unit level.
  */
 describe("zero, one, three and five picks over a realistic set", () => {
   const pinned = [
@@ -598,29 +671,35 @@ describe("zero, one, three and five picks over a realistic set", () => {
     ).ranked.map((car) => car.name);
 
   const NONE: FeatureSelection = [];
-  const ONE_COMMON: FeatureSelection = ["hasEmergencyBrakingAssist"];
-  const ONE_RARE: FeatureSelection = ["hasAdaptiveCruiseControl"];
+  const ONE_COMMON: FeatureSelection = [
+    pick("hasEmergencyBrakingAssist", "high"),
+  ];
+  const ONE_RARE: FeatureSelection = [
+    pick("hasAdaptiveCruiseControl", "high"),
+  ];
   const THREE: FeatureSelection = [
-    "hasEmergencyBrakingAssist",
-    "hasBlindSpotAssist",
-    "hasAdaptiveCruiseControl",
+    pick("hasEmergencyBrakingAssist", "high"),
+    pick("hasBlindSpotAssist", "high"),
+    pick("hasAdaptiveCruiseControl", "medium"),
   ];
+  /* Scenario 5: two high, two medium, one low. */
   const FIVE: FeatureSelection = [
-    "hasEmergencyBrakingAssist",
-    "hasBlindSpotAssist",
-    "hasLaneKeepingAssist",
-    "hasEmergencyCallSystem",
-    "hasAdaptiveCruiseControl",
+    pick("hasEmergencyBrakingAssist", "high"),
+    pick("hasBlindSpotAssist", "high"),
+    pick("hasLaneKeepingAssist", "medium"),
+    pick("hasEmergencyCallSystem", "medium"),
+    pick("hasAdaptiveCruiseControl", "low"),
   ];
 
-  it("ranks the set on the category, not on the picks", () => {
-    const baseline = rank(NONE);
-
-    /* CX-60 carries the most safety equipment, so it leads a safety-first order. */
-    expect(baseline[0]).toBe("Mazda CX-60");
-
-    for (const selection of [ONE_COMMON, ONE_RARE, THREE, FIVE]) {
-      expect(rank(selection)).toEqual(baseline);
+  /*
+   * The winner is decided by breadth across the category, so expressing an
+   * interest refines the result without overturning it. CX-60 carries the
+   * most safety equipment by a distance and stays top throughout — including
+   * when the reader marks a feature it lacks a high priority.
+   */
+  it("keeps the broadly strongest car on top however the picks fall", () => {
+    for (const selection of [NONE, ONE_COMMON, ONE_RARE, THREE, FIVE]) {
+      expect(rank(selection)[0]).toBe("Mazda CX-60");
     }
   });
 
@@ -665,7 +744,9 @@ describe("zero, one, three and five picks over a realistic set", () => {
 
     /* It's still the strongest here, and still openly missing the pick. */
     expect(safety.isLeader).toBe(true);
-    expect(safety.pickedMissing).toEqual(["hasAdaptiveCruiseControl"]);
+    expect(safety.pickedMissing).toEqual([
+      { key: "hasAdaptiveCruiseControl", importance: "high" },
+    ]);
   });
 
   /* And the miss is reported, in the user's own terms. */
@@ -702,13 +783,9 @@ describe("zero, one, three and five picks over a realistic set", () => {
   it("moves nothing as picks are added one at a time", () => {
     const growing: FeatureSelection[] = [
       [],
-      ["hasEmergencyBrakingAssist"],
-      ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"],
-      ["hasEmergencyBrakingAssist", "hasBlindSpotAssist", "hasAdaptiveCruiseControl"],
-      [
-        "hasEmergencyBrakingAssist", "hasBlindSpotAssist",
-        "hasAdaptiveCruiseControl", "hasLaneKeepingAssist",
-      ],
+      [pick("hasEmergencyBrakingAssist")],
+      [pick("hasEmergencyBrakingAssist"), pick("hasBlindSpotAssist")],
+      THREE,
       FIVE,
     ];
 
@@ -743,34 +820,48 @@ describe("nothing has quietly become a tier system", () => {
   it("gives a pick no arithmetic effect of any size", () => {
     const car = ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"];
 
-    const withPick = detailFor(car, ["hasEmergencyBrakingAssist"]);
+    const withPick = detailFor(car, [pick("hasEmergencyBrakingAssist")]);
     const without = detailFor(car, []);
 
-    expect(withPick.score).toBe(without.score);
-    expect(withPick.featureScore).toBe(without.featureScore);
+    /* Coverage is the pick-blind figure and must be untouched. */
+    expect(withPick.coverageScore).toBe(without.coverageScore);
     expect(withPick.numericScore).toBe(without.numericScore);
   });
 
-  /* The one exception, and it is an ordering rule rather than a weight. */
-  it("breaks an exact tie on the picks, and only an exact tie", () => {
+  /*
+   * When the weighted arithmetic still lands on a dead heat, what the reader
+   * asked for settles it. One high pick weighs 4 against a base of 1, so a
+   * car holding just that pick ties one holding four features nobody named —
+   * and the tie goes to the car that has what was asked for.
+   *
+   * This is an ordering rule applied after the numbers are equal, not a
+   * weight of its own.
+   */
+  it("breaks a genuine dead heat on the picks", () => {
     const holdsPick = makeCar({
       id: 1,
       name: "Alpha One",
       features: ["hasEmergencyBrakingAssist"],
     });
 
-    /* Same catalogue count, so identical scores — a genuine dead heat. */
-    const lacksPick = makeCar({
+    const holdsFourOthers = makeCar({
       id: 2,
       name: "Beta Two",
-      features: ["hasBlindSpotAssist"],
+      features: [
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+        "hasEmergencyCallSystem",
+        "hasParkingSensors",
+      ],
     });
 
     const context = buildReasoningContext(
-      [lacksPick, holdsPick],
+      [holdsFourOthers, holdsPick],
       ["safetyAssistance"],
       preferences,
-      features({ safetyAssistance: ["hasEmergencyBrakingAssist"] }),
+      features({
+        safetyAssistance: [pick("hasEmergencyBrakingAssist", "high")],
+      }),
     );
 
     const totals = context.scores.map((score) => score.total);

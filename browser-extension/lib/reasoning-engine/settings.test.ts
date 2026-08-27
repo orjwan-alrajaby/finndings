@@ -107,33 +107,82 @@ describe("the safety merge reaches existing users without breaking them", () => 
     };
 
     const settings = await loadLensSettings();
-    const merged = settings.categoryFeatures.safetyAssistance;
+    const keys = settings.categoryFeatures.safetyAssistance.map((p) => p.key);
 
-    expect(merged).toContain("hasEmergencyBrakingAssist");
-    expect(merged).toContain("hasAdaptiveCruiseControl");
-    expect(merged.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
+    expect(keys).toContain("hasEmergencyBrakingAssist");
+    expect(keys).toContain("hasAdaptiveCruiseControl");
+    expect(keys.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
   });
 
-  /* The same feature sat in both old lists. It must arrive once. */
-  it("collapses a feature the merge duplicates", async () => {
+  /* The same feature sat in both old lists. It must arrive once, and loud. */
+  it("collapses a feature the merge duplicates, keeping the stronger", async () => {
     stored.finnLensCategoryFeatures = {
       safety: [{ key: "hasEmergencyBrakingAssist", tier: "essential" }],
-      driverAssistance: [{ key: "hasEmergencyBrakingAssist", tier: "good" }],
+      driverAssistance: [{ key: "hasEmergencyBrakingAssist", tier: "luxury" }],
     };
 
     const settings = await loadLensSettings();
 
     expect(settings.categoryFeatures.safetyAssistance).toEqual([
-      "hasEmergencyBrakingAssist",
+      { key: "hasEmergencyBrakingAssist", importance: "high" },
+    ]);
+  });
+
+  /*
+   * Old tiers map onto importance by intent. "Essential" becomes high rather
+   * than something stronger on purpose — it was never a hard requirement in
+   * the engine, and importing it as one now would add a meaning the product
+   * deliberately doesn't have.
+   */
+  it("carries the old tiers over as importance", async () => {
+    stored.finnLensCategoryFeatures = {
+      practicality: [
+        { key: "hasSplitFoldingRearSeats", tier: "essential" },
+        { key: "hasElectricTailgate", tier: "good" },
+        { key: "hasRoofRails", tier: "luxury" },
+      ],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.categoryFeatures.practicality).toEqual([
+      { key: "hasSplitFoldingRearSeats", importance: "high" },
+      { key: "hasElectricTailgate", importance: "medium" },
+      { key: "hasRoofRails", importance: "low" },
+    ]);
+  });
+
+  /* The selection-only build stored bare ids and no importance at all. */
+  it("reads a flat id list as an unrated selection", async () => {
+    stored.finnLensCategoryFeatures = {
+      practicality: ["hasSplitFoldingRearSeats", "hasRoofRails"],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.categoryFeatures.practicality).toEqual([
+      { key: "hasSplitFoldingRearSeats", importance: "medium" },
+      { key: "hasRoofRails", importance: "medium" },
+    ]);
+  });
+
+  it("keeps an importance the user already set", async () => {
+    stored.finnLensCategoryFeatures = {
+      practicality: [{ key: "hasRoofRails", importance: "low" }],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.categoryFeatures.practicality).toEqual([
+      { key: "hasRoofRails", importance: "low" },
     ]);
   });
 
   it("caps a merged list that overflows the maximum", async () => {
     stored.finnLensCategoryFeatures = {
-      safety: [...AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5)],
-      driverAssistance: [
-        ...AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(5, 10),
-      ],
+      safety: AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5),
+      driverAssistance:
+        AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(5, 10),
     };
 
     const settings = await loadLensSettings();
@@ -158,7 +207,7 @@ describe("stored feature lists are brought up to the current rules", () => {
     };
 
     const settings = await loadLensSettings();
-    const keys = settings.categoryFeatures.practicality;
+    const keys = settings.categoryFeatures.practicality.map((p) => p.key);
 
     expect(keys).toContain("hasSplitFoldingRearSeats");
     expect(keys).not.toContain("hasSomethingRemoved");
@@ -177,12 +226,12 @@ describe("stored feature lists are brought up to the current rules", () => {
     expect(settings.categoryFeatures.practicality).toEqual([]);
   });
 
-  it("still opens a fresh install on the suggested selection", async () => {
+  /* And a fresh install picks nothing on the user's behalf. */
+  it("opens a fresh install with nothing picked", async () => {
     const settings = await loadLensSettings();
 
-    expect(settings.categoryFeatures.practicality).toEqual(
-      DEFAULT_CATEGORY_FEATURES.practicality,
-    );
+    expect(settings.categoryFeatures.practicality).toEqual([]);
+    expect(DEFAULT_CATEGORY_FEATURES.practicality).toEqual([]);
   });
 
   it("leaves untouched categories on their defaults", async () => {

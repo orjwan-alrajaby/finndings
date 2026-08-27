@@ -1,10 +1,15 @@
 import { useState } from "react";
 import type {
     FeatureId,
+    FeatureImportance,
     FeatureSelection,
     PriorityDefinition,
 } from "@/lib/reasoning-engine/types";
-import { MAX_FEATURES_PER_CATEGORY } from "@/lib/reasoning-engine/constants";
+import {
+    DEFAULT_FEATURE_IMPORTANCE,
+    MAX_FEATURES_PER_CATEGORY,
+    SUGGESTED_CATEGORY_FEATURES,
+} from "@/lib/reasoning-engine/constants";
 import {
     isNumericOnlyPriority,
     validatePriorityDraft,
@@ -19,7 +24,7 @@ interface PriorityEditorProps {
     /** What the user has picked out. May legitimately be empty. */
     features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureSelection;
+    availableFeatures: FeatureId[];
     onSave: (
         priority: PriorityDefinition,
         features: FeatureSelection,
@@ -47,19 +52,43 @@ export function PriorityEditor({
     const [draftFeatures, setDraftFeatures] =
         useState<FeatureSelection>(features);
 
-    const selected = new Set(draftFeatures);
+    const importanceOf = new Map(
+        draftFeatures.map((preference) => [
+            preference.key,
+            preference.importance,
+        ]),
+    );
+
+    const suggested = new Set(
+        SUGGESTED_CATEGORY_FEATURES[priority.id] ?? [],
+    );
+
     const atMax = draftFeatures.length >= MAX_FEATURES_PER_CATEGORY;
 
     const toggleFeature = (feature: FeatureId) => {
         setDraftFeatures((current) => {
-            if (current.includes(feature)) {
-                return current.filter((item) => item !== feature);
+            if (current.some((item) => item.key === feature)) {
+                return current.filter((item) => item.key !== feature);
             }
 
             if (current.length >= MAX_FEATURES_PER_CATEGORY) return current;
 
-            return [...current, feature];
+            return [
+                ...current,
+                { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE },
+            ];
         });
+    };
+
+    const updateImportance = (
+        feature: FeatureId,
+        importance: FeatureImportance,
+    ) => {
+        setDraftFeatures((current) =>
+            current.map((item) =>
+                item.key === feature ? { ...item, importance } : item,
+            ),
+        );
     };
 
     const error = validatePriorityDraft(draftFeatures, priority.id);
@@ -80,9 +109,9 @@ export function PriorityEditor({
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-finn-iron">
-                        Optional. Pick none and Lens judges this priority on
-                        the equipment as a whole. Not sure what something is?
-                        Tap the ⓘ.
+                        Optional. Pick none and Lens compares cars on the
+                        category as a whole. Pick something and you can say how
+                        much it matters. Not sure what something is? Tap the ⓘ.
                     </p>
                 </div>
 
@@ -104,10 +133,14 @@ export function PriorityEditor({
                     <FeatureOption
                         key={feature}
                         feature={feature}
-                        selected={selected.has(feature)}
-                        disabled={!selected.has(feature) && atMax}
+                        importance={importanceOf.get(feature) ?? null}
+                        disabled={!importanceOf.has(feature) && atMax}
                         disabledReason={`You've picked ${MAX_FEATURES_PER_CATEGORY} already — unpick one to swap`}
+                        suggested={suggested.has(feature)}
                         onToggle={() => toggleFeature(feature)}
+                        onImportanceChange={(importance) =>
+                            updateImportance(feature, importance)
+                        }
                     />
                 ))}
             </div>

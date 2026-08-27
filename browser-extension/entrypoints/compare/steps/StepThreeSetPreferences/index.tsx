@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type {
     CategoryId,
     FeatureId,
+    FeatureImportance,
     FeatureSelection,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
@@ -17,6 +18,7 @@ import { StepThreeFeatureEditor } from "./StepThreeFeatureEditor";
 import {
     AVAILABLE_CATEGORY_FEATURES,
     CATEGORIES,
+    DEFAULT_FEATURE_IMPORTANCE,
     MAX_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
 
@@ -68,19 +70,19 @@ export function StepThreeSetPreferences({
     /**
      * Pick a feature out, or put it back.
      *
-     * Unpicking the last one is allowed: an empty selection means "judge this
-     * priority on the equipment overall", which is a preference rather than a
-     * hole in the form.
+     * Unpicking the last one is allowed: an empty selection means "compare
+     * these cars on the category as a whole", which is a preference rather
+     * than a hole in the form.
      */
     const toggleFeature = (categoryId: CategoryId, feature: FeatureId) => {
         setLocalFeatures((current) => {
             const currentFeatures = current[categoryId] ?? [];
 
-            if (currentFeatures.includes(feature)) {
+            if (currentFeatures.some((item) => item.key === feature)) {
                 return {
                     ...current,
                     [categoryId]: currentFeatures.filter(
-                        (item) => item !== feature,
+                        (item) => item.key !== feature,
                     ),
                 };
             }
@@ -91,9 +93,25 @@ export function StepThreeSetPreferences({
 
             return {
                 ...current,
-                [categoryId]: [...currentFeatures, feature],
+                [categoryId]: [
+                    ...currentFeatures,
+                    { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE },
+                ],
             };
         });
+    };
+
+    const updateImportance = (
+        categoryId: CategoryId,
+        feature: FeatureId,
+        importance: FeatureImportance,
+    ) => {
+        setLocalFeatures((current) => ({
+            ...current,
+            [categoryId]: (current[categoryId] ?? []).map((item) =>
+                item.key === feature ? { ...item, importance } : item,
+            ),
+        }));
     };
 
     const handleAdvice = () => {
@@ -105,18 +123,19 @@ export function StepThreeSetPreferences({
             {/* Header */}
             <div>
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue">
-                    Step 2
+                    Step 3
                 </p>
 
                 <h2 className="mt-2 text-3xl font-black tracking-tight text-finn-black sm:text-4xl">
-                    What matters most to you?
+                    Anything specific you want?
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                    Each priority starts with the features most
-                    people single out. Change them to whatever you
-                    actually care about — or clear them and let Lens
-                    judge the priority as a whole.
+                    You've said which categories matter and in what
+                    order. This step is optional: if there are
+                    particular features you want inside a category,
+                    name them and say how much they matter. Skip it
+                    and cars are compared on each category as a whole.
                 </p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
@@ -129,7 +148,7 @@ export function StepThreeSetPreferences({
                             Your order already tells us how much each priority
                             matters. This is the finer question: within a
                             priority, are there particular features you
-                            especially want? Pick up to{" "}
+                            especially want, and how badly? Pick up to{" "}
                             {MAX_FEATURES_PER_CATEGORY}, or none at all — a
                             car missing one isn't ruled out, it just shows up
                             as a tradeoff in your advice.
@@ -176,6 +195,16 @@ export function StepThreeSetPreferences({
                                             toggleFeature(
                                                 categoryId,
                                                 feature,
+                                            )
+                                        }
+                                        onImportanceChange={(
+                                            feature,
+                                            importance,
+                                        ) =>
+                                            updateImportance(
+                                                categoryId,
+                                                feature,
+                                                importance,
                                             )
                                         }
                                     />
