@@ -4,7 +4,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
     CategoryId,
-    FeatureWeight,
+    FeatureSelection,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 import {
@@ -51,7 +51,7 @@ export function StepFourGenerateAdvice({
     cars: PinnedFinnCar[];
     priorities: CategoryId[];
     preferences: LensPreferences;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onBack: () => void;
     onSettings: () => void;
 }) {

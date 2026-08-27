@@ -2,8 +2,8 @@ import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
 import type {
     CategoryId,
-    FeatureTier,
-    FeatureWeight,
+    FeatureId,
+    FeatureSelection,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 import {
@@ -18,7 +18,6 @@ import {
     AVAILABLE_CATEGORY_FEATURES,
     CATEGORIES,
     MAX_FEATURES_PER_CATEGORY,
-    MIN_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
 
 export function StepThreeSetPreferences({
@@ -32,14 +31,14 @@ export function StepThreeSetPreferences({
     priorities: CategoryId[];
     preferences: LensPreferences;
     setPreferences: (value: LensPreferences) => void;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onBack: () => void;
     onAdvice: (
-        categoryFeatures: Partial<Record<CategoryId, FeatureWeight[]>>,
+        categoryFeatures: Partial<Record<CategoryId, FeatureSelection>>,
     ) => void;
 }) {
     const [localFeatures, setLocalFeatures] = useState<
-        Partial<Record<CategoryId, FeatureWeight[]>>
+        Partial<Record<CategoryId, FeatureSelection>>
     >({});
 
     const [expandedPriority, setExpandedPriority] =
@@ -54,79 +53,45 @@ export function StepThreeSetPreferences({
      */
     useEffect(() => {
         setLocalFeatures((current) => {
-            const next: Partial<Record<CategoryId, FeatureWeight[]>> = {};
+            const next: Partial<Record<CategoryId, FeatureSelection>> = {};
 
             for (const categoryId of priorities) {
                 next[categoryId] =
                     current[categoryId] ??
-                    (categoryFeatures[categoryId] ?? []).map(
-                        (feature) => ({ ...feature }),
-                    );
+                    [...(categoryFeatures[categoryId] ?? [])];
             }
 
             return next;
         });
     }, [priorities, categoryFeatures]);
 
-    const updateFeatureTier = (
-        categoryId: CategoryId,
-        featureKey: FeatureWeight["key"],
-        tier: FeatureTier,
-    ) => {
-        setLocalFeatures((current) => ({
-            ...current,
-            [categoryId]: (current[categoryId] ?? []).map(
-                (feature) =>
-                    feature.key === featureKey
-                        ? {
-                            ...feature,
-                            tier,
-                        }
-                        : feature,
-            ),
-        }));
-    };
-
-    const toggleFeature = (
-        categoryId: CategoryId,
-        feature: FeatureWeight,
-    ) => {
+    /**
+     * Pick a feature out, or put it back.
+     *
+     * Unpicking the last one is allowed: an empty selection means "judge this
+     * priority on the equipment overall", which is a preference rather than a
+     * hole in the form.
+     */
+    const toggleFeature = (categoryId: CategoryId, feature: FeatureId) => {
         setLocalFeatures((current) => {
-            const currentFeatures =
-                current[categoryId] ?? [];
+            const currentFeatures = current[categoryId] ?? [];
 
-            const enabled = currentFeatures.some(
-                (item) => item.key === feature.key,
-            );
-
-            if (enabled) {
-                /* A priority with nothing enabled can't tell two cars apart. */
-                if (
-                    currentFeatures.length <= MIN_FEATURES_PER_CATEGORY
-                ) {
-                    return current;
-                }
-
+            if (currentFeatures.includes(feature)) {
                 return {
                     ...current,
                     [categoryId]: currentFeatures.filter(
-                        (item) => item.key !== feature.key,
+                        (item) => item !== feature,
                     ),
                 };
             }
 
-            if (
-                currentFeatures.length >= MAX_FEATURES_PER_CATEGORY
-            ) {
+            if (currentFeatures.length >= MAX_FEATURES_PER_CATEGORY) {
                 return current;
             }
 
             return {
                 ...current,
-                [categoryId]: [
-                    ...currentFeatures,
-                    { ...feature },
-                ],
+                [categoryId]: [...currentFeatures, feature],
             };
         });
     };
@@ -148,10 +113,10 @@ export function StepThreeSetPreferences({
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                    Each priority starts with the features that
-                    usually matter most for it. Swap in whatever
-                    you'd rather Lens looked for, and say how much
-                    each one matters.
+                    Each priority starts with the features most
+                    people single out. Change them to whatever you
+                    actually care about — or clear them and let Lens
+                    judge the priority as a whole.
                 </p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
@@ -161,19 +126,16 @@ export function StepThreeSetPreferences({
                         <InformationCircleIcon className="h-5 w-5 shrink-0 text-finn-accent-blue" />
 
                         <p className="text-xs leading-5 text-finn-iron">
-                            Up to {MAX_FEATURES_PER_CATEGORY} features per
-                            priority, and at least one. Mark something{" "}
-                            <strong className="font-black">Essential</strong>{" "}
-                            if you wouldn't buy the car without it,{" "}
-                            <strong className="font-black">Good to have</strong>{" "}
-                            if it would genuinely improve the car for you, and{" "}
-                            <strong className="font-black">Luxury extra</strong>{" "}
-                            if you'd enjoy it but don't need it. Essentials
-                            count for most in the result, luxury extras for
-                            least.
+                            Your order already tells us how much each priority
+                            matters. This is the finer question: within a
+                            priority, are there particular features you
+                            especially want? Pick up to{" "}
+                            {MAX_FEATURES_PER_CATEGORY}, or none at all — a
+                            car missing one isn't ruled out, it just shows up
+                            as a tradeoff in your advice.
                         </p>
                     </div>
-                    {priorities.map((categoryId) => {
+                    {priorities.map((categoryId, index) => {
                         const features =
                             localFeatures[categoryId] ??
                             categoryFeatures[categoryId] ??
@@ -209,20 +171,11 @@ export function StepThreeSetPreferences({
                                                 categoryId
                                             ] ?? []
                                         }
+                                        rank={index + 1}
                                         onToggleFeature={(feature) =>
                                             toggleFeature(
                                                 categoryId,
                                                 feature,
-                                            )
-                                        }
-                                        onUpdateFeatureTier={(
-                                            featureKey,
-                                            tier,
-                                        ) =>
-                                            updateFeatureTier(
-                                                categoryId,
-                                                featureKey,
-                                                tier,
                                             )
                                         }
                                     />

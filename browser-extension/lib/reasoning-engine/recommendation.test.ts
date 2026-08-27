@@ -11,7 +11,7 @@ import {
   selectAlternatives,
 } from "./index";
 import { buildAdviceNarrative, reasonAboutChallenge } from "./narrative";
-import type { CategoryId, FeatureWeight } from "./types";
+import type { CategoryId, FeatureSelection } from "./types";
 import {
   CATEGORY_IDS,
   DEFAULT_CATEGORY_FEATURES,
@@ -23,8 +23,8 @@ import { makeCar, prefs } from "./test-fixtures";
 const SAFETY_FIRST: CategoryId[] = ["safetyAssistance", "practicality"];
 
 const features = (
-  overrides: Partial<Record<CategoryId, FeatureWeight[]>> = {},
-): Record<CategoryId, FeatureWeight[]> => ({
+  overrides: Partial<Record<CategoryId, FeatureSelection>> = {},
+): Record<CategoryId, FeatureSelection> => ({
   ...DEFAULT_CATEGORY_FEATURES,
   ...overrides,
 });
@@ -124,18 +124,14 @@ describe("buildRecommendation", () => {
      * The winner is explained on its own merits rather than against a
      * runner-up, so the evidence is what the user asked for and got.
      */
-    expect(
-      safety?.matched.map((item) => item.key),
-    ).toContain("hasBlindSpotAssist");
+    expect(safety?.matched).toContain("hasBlindSpotAssist");
     expect(safety?.isLeader).toBe(true);
 
     /* And the car it's ahead of is only introduced deliberately. */
     const challenger = evaluateChallenger(cheapWeakSafety, result!);
 
     expect(
-      challenger.comparison?.biggestConcession?.versus?.onlyOtherHas.map(
-        (item) => item.key,
-      ),
+      challenger.comparison?.biggestConcession?.versus?.onlyOtherHas,
     ).toContain("hasBlindSpotAssist");
   });
 
@@ -813,11 +809,8 @@ describe("comparative reasoning", () => {
 
     const prose = safety.sentences.join(" ");
 
-    /* Every feature the user selected is named, present or missing. */
-    const named = [
-      ...safety.features.essentialPresent,
-      ...safety.features.essentialMissing,
-    ];
+    /* Every feature the user picked out is named, present or missing. */
+    const named = [...safety.features.present, ...safety.features.missing];
 
     expect(named.length).toBeGreaterThan(0);
 
@@ -841,7 +834,7 @@ describe("comparative reasoning", () => {
 
     expect(advantage.versus!.difference).toBeGreaterThan(0);
 
-    /* The equipment behind the gap is carried through, tier and all. */
+    /* The equipment behind the gap is carried through. */
     expect(
       advantage.versus!.onlySubjectHas.length +
         (advantage.numeric ? 1 : 0),

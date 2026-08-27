@@ -1,13 +1,12 @@
 import {
   CATEGORY_IDS,
   MAX_FEATURES_PER_CATEGORY,
-  MIN_FEATURES_PER_CATEGORY,
   NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
 } from "@/lib/reasoning-engine/constants";
 import type {
   CategoryId,
-  FeatureWeight,
+  FeatureSelection,
   PriorityDefinition,
   Profile,
 } from "@/lib/reasoning-engine/types";
@@ -48,16 +47,15 @@ export function getAffectedProfiles(priorityId: CategoryId, profiles: Profile[])
 }
 
 /**
- * The feature-selection rules, in one place.
+ * The feature-selection rule, in one place.
  *
- * At least one feature must stay on for any priority that scores from
- * features — with none enabled the engine has no way to tell two cars apart,
- * and the priority silently stops meaning anything. Five is the ceiling.
+ * There is only one: a cap on how many features the user may single out.
+ * Picking none is deliberately valid — the category is then judged on its
+ * whole catalogue rather than abstaining — so there is no floor to enforce.
  */
-export function validatePriorityDraft(features: FeatureWeight[], id: CategoryId): string | null {
+export function validatePriorityDraft(features: FeatureSelection, id: CategoryId): string | null {
   if (isNumericOnlyPriority(id)) return null;
-  if (features.length < MIN_FEATURES_PER_CATEGORY) return "Keep at least one feature enabled — otherwise this priority can't tell two cars apart.";
-  if (features.length > MAX_FEATURES_PER_CATEGORY) return `A priority can have at most ${MAX_FEATURES_PER_CATEGORY} features enabled.`;
+  if (features.length > MAX_FEATURES_PER_CATEGORY) return `You can pick out at most ${MAX_FEATURES_PER_CATEGORY} features here.`;
   return null;
 }
 

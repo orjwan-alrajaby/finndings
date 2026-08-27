@@ -6,7 +6,7 @@ import {
 import { useState } from "react";
 import {
     type CategoryId,
-    type FeatureWeight,
+    type FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import { CategoryCard } from "../components/CategoryCard";
 
@@ -19,7 +19,7 @@ export function StepTwoOrderPrioritiesStep({
 }: {
     priorities: CategoryId[];
     setPriorities: (value: CategoryId[]) => void;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onBack: () => void;
     onNext: () => void;
 }) {

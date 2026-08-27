@@ -1,49 +1,9 @@
 import type {
   CategoryDef,
-  FeatureWeight,
   LensPreferences,
   PriorityDefinition,
   Profile,
 } from "./types";
-
-/* -------------------------------------------------------------------------- */
-/* Tiers                                                                      */
-/* -------------------------------------------------------------------------- */
-
-/**
- * How much the user said a feature matters.
- *
- * The weights are deliberately far apart: a car that has everything the user
- * called essential should beat one that has five luxuries and none of them.
- */
-export const TIERS = {
-  essential: {
-    label: "Essential",
-    /** How the tier reads in a sentence: "you marked it essential". */
-    inSentence: "essential",
-    weight: 5,
-    activeClass: "bg-finn-accent-blue text-white",
-  },
-  good: {
-    label: "Good to have",
-    inSentence: "good to have",
-    weight: 3,
-    activeClass: "bg-[#14B8A6] text-white",
-  },
-  luxury: {
-    label: "Luxury extra",
-    inSentence: "a luxury extra",
-    weight: 1,
-    activeClass: "bg-[#8B5CF6] text-white",
-  },
-} as const;
-
-type FeatureTier = keyof typeof TIERS;
-
-const tier = (tier: FeatureTier, key: FeatureId): FeatureWeight => ({
-  key,
-  tier,
-});
 
 /* -------------------------------------------------------------------------- */
 /* Features                                                                   */
@@ -55,6 +15,12 @@ const tier = (tier: FeatureTier, key: FeatureId): FeatureWeight => ({
  * The explanations exist so a reader never has to leave Lens to look up a
  * term. Each one says what the system actually does — no marketing, no
  * "provides useful everyday assistance", and no claim the data can't support.
+ *
+ * `article` is set on the countable singulars, so prose reads "it doesn't
+ * have a towbar" rather than "it doesn't have towbar". It is data rather than
+ * a rule because no heuristic worth having can tell "a sunroof" from "privacy
+ * glass" — both are single words ending in a consonant, and only one takes an
+ * article. Features without it are plurals or mass nouns and need none.
  */
 export const FEATURES = {
   hadLedLights: {
@@ -73,11 +39,13 @@ export const FEATURES = {
       "Headlights split into segments that switch off individually. You can leave main beam on and the car blanks out just the part aimed at oncoming traffic.",
   },
   hasSunroof: {
+    article: "a",
     label: "Sunroof",
     explanation:
       "A glass panel in the roof. Depending on the car it either slides open or is fixed and only lets light in.",
   },
   hasTowbar: {
+    article: "a",
     label: "Towbar",
     explanation:
       "A fitted tow hitch at the rear, for pulling a trailer or caravan or carrying a bike rack.",
@@ -103,6 +71,7 @@ export const FEATURES = {
       "Sensors that start the wipers when the windscreen gets wet and switch the headlights on when it gets dark, without you touching either stalk.",
   },
   hasHeadlightCleaningSystem: {
+    article: "a",
     label: "Headlight washers",
     explanation:
       "Small jets that spray the headlight lenses clean. Road salt and winter grime dim a headlight quickly.",
@@ -154,11 +123,13 @@ export const FEATURES = {
       "An adjustable pad in the seat backrest that pushes into the curve of your lower back. It's what stops the ache on a long drive.",
   },
   hasHeatedSteeringWheel: {
+    article: "a",
     label: "Heated steering wheel",
     explanation:
       "The rim of the wheel warms up, so you can drive without gloves on a cold morning.",
   },
   hasHeadUpDisplay: {
+    article: "a",
     label: "Head-up display",
     explanation:
       "Projects your speed and navigation directions onto the windscreen in front of you, so you read them without looking down at the dials.",
@@ -170,11 +141,13 @@ export const FEATURES = {
       "Puts your phone's maps, music and messages on the car's own screen, so you use apps you already know instead of the car's built-in ones.",
   },
   hasWirelessChargingStation: {
+    article: "a",
     label: "Wireless phone charging",
     explanation:
       "A pad you rest a compatible phone on to charge it without plugging in a cable.",
   },
   hasPremiumSoundSystem: {
+    article: "a",
     label: "Premium sound system",
     explanation:
       "The manufacturer's upgraded audio system — typically more speakers and a separate amplifier than the standard fit.",
@@ -206,6 +179,7 @@ export const FEATURES = {
       "Watches the lane markings and nudges the steering back if you start drifting out of your lane without indicating.",
   },
   hasParkingAssistant: {
+    article: "a",
     label: "Parking assistant",
     explanation:
       "Finds a space and steers the car into it while you control the brake and accelerator.",
@@ -216,6 +190,7 @@ export const FEATURES = {
       "Sensors in the bumpers that beep faster as you get closer to an obstacle you can't see.",
   },
   hasAuxiliaryHeater: {
+    article: "an",
     label: "Auxiliary heater",
     explanation:
       "A heater that runs with the engine off, so the cabin is warm and the windows clear before you get in.",
@@ -231,11 +206,13 @@ export const FEATURES = {
       "Warns you about cars crossing behind you as you reverse out of a parking space between two vehicles.",
   },
   hasThreeSixtyDegreesCamera: {
+    article: "a",
     label: "360° camera",
     explanation:
       "Cameras around the car stitched into a bird's-eye view of the whole car and everything touching it.",
   },
   hasOneEightyDegreesReversingCamera: {
+    article: "a",
     label: "Reversing camera",
     explanation:
       "A camera that shows what's directly behind the car on the screen when you select reverse.",
@@ -262,11 +239,13 @@ export const FEATURES = {
       "Brakes the car by itself if it detects a collision coming and you haven't reacted. It can avoid the impact entirely at low speed and reduce it at higher speed.",
   },
   hasEmergencyCallSystem: {
+    article: "an",
     label: "Emergency call system (eCall)",
     explanation:
       "Calls the emergency services automatically after a serious crash and sends them your location, even if nobody in the car can speak. There's also a manual button.",
   },
   hasDriverAssistance: {
+    article: "a",
     label: "Driver assistance package",
     explanation:
       "FINN lists this car as carrying a driver assistance package, but not which individual systems are in it.",
@@ -278,6 +257,7 @@ export const FEATURES = {
       "The car unlocks when you touch the handle with the key in your pocket, and starts on a button — you never take the key out.",
   },
   hasElectricTailgate: {
+    article: "an",
     label: "Electric tailgate",
     explanation:
       "The boot lid opens and closes on a motor at the press of a button, useful when both your hands are full.",
@@ -297,11 +277,13 @@ export const FEATURES = {
     explanation: "USB sockets in the front of the cabin for charging.",
   },
   hasStartSlashStopSystem: {
+    article: "a",
     label: "Start/stop system",
     explanation:
       "Switches the engine off when you stop in traffic and restarts it when you pull away, to cut fuel use and idling emissions.",
   },
   hasElectricParkingBrake: {
+    article: "an",
     label: "Electric parking brake",
     explanation:
       "A switch replaces the handbrake lever. It usually holds the car automatically at a standstill and releases as you drive off.",
@@ -312,6 +294,7 @@ export const FEATURES = {
       "Cast metal wheels instead of steel wheels with plastic covers. Mostly a cosmetic difference.",
   },
   hasSpareWheel: {
+    article: "a",
     label: "Spare wheel",
     explanation:
       "An actual spare wheel in the boot, rather than only a tyre repair kit — so a serious puncture doesn't need a tow.",
@@ -325,13 +308,12 @@ type FeatureId = keyof typeof FEATURES;
 /* -------------------------------------------------------------------------- */
 
 /**
- * `features` is the **catalogue** — every feature the user may enable for the
- * category, ordered most relevant first. It is not what is enabled.
+ * `features` is the **catalogue** — every feature the user may pick out for
+ * this category, ordered most relevant first. It is not what they picked.
  *
- * The enabled set defaults to the first `MAX_FEATURES_PER_CATEGORY` of this
- * list (all of it, when the catalogue is shorter than that) and the user is
- * free to change both which features are on and what tier each one sits at.
- * See `DEFAULT_CATEGORY_FEATURES` below.
+ * Order is load-bearing twice over: it decides which five are offered as the
+ * starting selection, and it is the list a car is judged against when the
+ * user picks nothing at all.
  */
 export const CATEGORIES = {
   /**
@@ -357,22 +339,22 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasEmergencyBrakingAssist"),
-      tier("essential", "hasBlindSpotAssist"),
-      tier("essential", "hasLaneKeepingAssist"),
-      tier("essential", "hasEmergencyCallSystem"),
-      tier("good", "hasAdaptiveCruiseControl"),
-      /* Available, off by default. */
-      tier("good", "hasParkingSensors"),
-      tier("good", "hasOneEightyDegreesReversingCamera"),
-      tier("good", "hasTrafficSignRecognition"),
-      tier("good", "hasRearCrosswalkWarning"),
-      tier("good", "hasTirePressureMonitoringSystem"),
-      tier("good", "hasParkingAssistant"),
-      tier("good", "hasHillStartAssist"),
-      tier("good", "hasCruiseControl"),
-      tier("luxury", "hasThreeSixtyDegreesCamera"),
-      tier("luxury", "hasMatrixLedHeadlights"),
+      "hasEmergencyBrakingAssist",
+      "hasBlindSpotAssist",
+      "hasLaneKeepingAssist",
+      "hasEmergencyCallSystem",
+      "hasAdaptiveCruiseControl",
+      /* Offered, unselected by default. */
+      "hasParkingSensors",
+      "hasOneEightyDegreesReversingCamera",
+      "hasTrafficSignRecognition",
+      "hasRearCrosswalkWarning",
+      "hasTirePressureMonitoringSystem",
+      "hasParkingAssistant",
+      "hasHillStartAssist",
+      "hasCruiseControl",
+      "hasThreeSixtyDegreesCamera",
+      "hasMatrixLedHeadlights",
     ],
   },
 
@@ -391,17 +373,17 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasIsofix"),
-      tier("essential", "hasSplitFoldingRearSeats"),
-      tier("good", "hasParkingSensors"),
-      tier("good", "hasElectricTailgate"),
-      tier("good", "hasBackUSBPorts"),
-      /* Available, off by default. */
-      tier("good", "hasOneEightyDegreesReversingCamera"),
-      tier("good", "hasThreeZoneAutomaticClimateControls"),
-      tier("good", "hasRearCrosswalkWarning"),
-      tier("luxury", "hasThreeSixtyDegreesCamera"),
-      tier("luxury", "hasPrivacyGlass"),
+      "hasIsofix",
+      "hasSplitFoldingRearSeats",
+      "hasParkingSensors",
+      "hasElectricTailgate",
+      "hasBackUSBPorts",
+      /* Offered, unselected by default. */
+      "hasOneEightyDegreesReversingCamera",
+      "hasThreeZoneAutomaticClimateControls",
+      "hasRearCrosswalkWarning",
+      "hasThreeSixtyDegreesCamera",
+      "hasPrivacyGlass",
     ],
   },
 
@@ -419,17 +401,17 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasSplitFoldingRearSeats"),
-      tier("good", "hasElectricTailgate"),
-      tier("good", "hasRoofRails"),
-      tier("good", "hasTowbar"),
-      tier("good", "hasParkingSensors"),
-      /* Available, off by default. */
-      tier("good", "hasSpareWheel"),
-      tier("good", "hasKeylessEntryAndStart"),
-      tier("good", "hasElectricallyFoldingMirrors"),
-      tier("good", "hasFrontUSBPorts"),
-      tier("good", "hasBackUSBPorts"),
+      "hasSplitFoldingRearSeats",
+      "hasElectricTailgate",
+      "hasRoofRails",
+      "hasTowbar",
+      "hasParkingSensors",
+      /* Offered, unselected by default. */
+      "hasSpareWheel",
+      "hasKeylessEntryAndStart",
+      "hasElectricallyFoldingMirrors",
+      "hasFrontUSBPorts",
+      "hasBackUSBPorts",
     ],
   },
 
@@ -447,19 +429,19 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasAdaptiveCruiseControl"),
-      tier("good", "hasLumbarSupport"),
-      tier("good", "hasIntegratedNavigationSystem"),
-      tier("good", "hasHeatedSeats"),
-      tier("good", "hasElectricFrontSeatAdjustment"),
-      /* Available, off by default. */
-      tier("good", "hasCruiseControl"),
-      tier("good", "hasAppleCarPlaySlashAndroidAuto"),
-      tier("good", "hasRainSlashLightSensors"),
-      tier("luxury", "hasHeadUpDisplay"),
-      tier("luxury", "hasSeatCooling"),
-      tier("luxury", "hasMatrixLedHeadlights"),
-      tier("luxury", "hasPremiumSoundSystem"),
+      "hasAdaptiveCruiseControl",
+      "hasLumbarSupport",
+      "hasIntegratedNavigationSystem",
+      "hasHeatedSeats",
+      "hasElectricFrontSeatAdjustment",
+      /* Offered, unselected by default. */
+      "hasCruiseControl",
+      "hasAppleCarPlaySlashAndroidAuto",
+      "hasRainSlashLightSensors",
+      "hasHeadUpDisplay",
+      "hasSeatCooling",
+      "hasMatrixLedHeadlights",
+      "hasPremiumSoundSystem",
     ],
   },
 
@@ -478,18 +460,18 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasAirConditioning"),
-      tier("good", "hasHeatedSeats"),
-      tier("good", "hasHeatedSteeringWheel"),
-      tier("good", "hasRainSlashLightSensors"),
-      tier("luxury", "hasAuxiliaryHeater"),
-      /* Available, off by default. */
-      tier("good", "hasThreeZoneAutomaticClimateControls"),
-      tier("good", "hasSeatCooling"),
-      tier("good", "hasFogLights"),
-      tier("good", "hasCorneringLights"),
-      tier("good", "hasHeadlightCleaningSystem"),
-      tier("good", "hasElectricallyFoldingMirrors"),
+      "hasAirConditioning",
+      "hasHeatedSeats",
+      "hasHeatedSteeringWheel",
+      "hasRainSlashLightSensors",
+      "hasAuxiliaryHeater",
+      /* Offered, unselected by default. */
+      "hasThreeZoneAutomaticClimateControls",
+      "hasSeatCooling",
+      "hasFogLights",
+      "hasCorneringLights",
+      "hasHeadlightCleaningSystem",
+      "hasElectricallyFoldingMirrors",
     ],
   },
 
@@ -522,28 +504,28 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      tier("essential", "hasHeatedSeats"),
-      tier("essential", "hasThreeZoneAutomaticClimateControls"),
-      tier("good", "hasHeatedSteeringWheel"),
-      tier("good", "hasLumbarSupport"),
-      tier("good", "hasLeatherSeats"),
-      /* Available, off by default. */
-      tier("good", "hasSeatCooling"),
-      tier("good", "hasElectricFrontSeatAdjustment"),
-      tier("good", "hasKeylessEntryAndStart"),
-      tier("good", "hasAppleCarPlaySlashAndroidAuto"),
-      tier("luxury", "hasPremiumSoundSystem"),
-      tier("luxury", "hasAmbientInteriorLightning"),
-      tier("luxury", "hasWirelessChargingStation"),
-      tier("luxury", "hasHeadUpDisplay"),
-      tier("luxury", "hasSunroof"),
+      "hasHeatedSeats",
+      "hasThreeZoneAutomaticClimateControls",
+      "hasHeatedSteeringWheel",
+      "hasLumbarSupport",
+      "hasLeatherSeats",
+      /* Offered, unselected by default. */
+      "hasSeatCooling",
+      "hasElectricFrontSeatAdjustment",
+      "hasKeylessEntryAndStart",
+      "hasAppleCarPlaySlashAndroidAuto",
+      "hasPremiumSoundSystem",
+      "hasAmbientInteriorLightning",
+      "hasWirelessChargingStation",
+      "hasHeadUpDisplay",
+      "hasSunroof",
     ],
   },
 } satisfies Record<
   string,
   Omit<CategoryDef, "id"> & {
     numericOnly: boolean;
-    features: FeatureWeight[];
+    features: FeatureId[];
   }
 >;
 
@@ -554,20 +536,14 @@ type CategoryId = keyof typeof CATEGORIES;
 /* -------------------------------------------------------------------------- */
 
 /**
- * The most features one priority may have switched on at once.
+ * The most features a user may pick out within one priority.
  *
- * A cap, not a quota. A category whose catalogue is shorter than this simply
- * starts with all of it enabled.
+ * A cap on how many things they can single out, not a quota to fill. Picking
+ * none is a real answer — "I want the safest car, I just don't have opinions
+ * about which systems it has" — and is handled by judging the category on its
+ * whole catalogue instead. See `categoryDetail`.
  */
 export const MAX_FEATURES_PER_CATEGORY = 5;
-
-/**
- * The fewest.
- *
- * A feature-based priority with nothing enabled has no way to tell two cars
- * apart, so the UI never lets the user empty one.
- */
-export const MIN_FEATURES_PER_CATEGORY = 1;
 
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
@@ -699,28 +675,30 @@ export const NUMERIC_ONLY_CATEGORIES = CATEGORY_IDS.filter(
 /**
  * Every feature a category *offers*, in relevance order.
  *
- * This is the list the settings UI draws from. It is not what is enabled.
+ * Two jobs: it is the list the picker draws from, and it is what a car is
+ * judged against when the user singles out nothing.
  */
 export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
-  CATEGORY_IDS.map((id) => [id, CATEGORIES[id].features as FeatureWeight[]])
-) as Record<CategoryId, FeatureWeight[]>;
+  CATEGORY_IDS.map((id) => [id, CATEGORIES[id].features as FeatureId[]])
+) as Record<CategoryId, FeatureId[]>;
 
 /**
- * What a category starts with switched on.
+ * What a category starts with picked out.
  *
  * The first five of the catalogue when there are more than five, and all of
- * them when there aren't. The order in `CATEGORIES` is therefore load-bearing:
- * it is the answer to "which five are the sensible five?".
+ * them when there aren't — a sensible opening guess the user is free to clear
+ * entirely. The order in `CATEGORIES` is therefore load-bearing: it is the
+ * answer to "which five would most people single out?".
  */
 export const DEFAULT_CATEGORY_FEATURES = Object.fromEntries(
   CATEGORY_IDS.map((id) => [
     id,
-    (CATEGORIES[id].features as FeatureWeight[]).slice(
+    (CATEGORIES[id].features as FeatureId[]).slice(
       0,
       MAX_FEATURES_PER_CATEGORY
     ),
   ])
-) as Record<CategoryId, FeatureWeight[]>;
+) as Record<CategoryId, FeatureId[]>;
 
 export const DEFAULT_PRIORITY_DEFINITIONS: PriorityDefinition[] =
   CATEGORY_IDS.map((id) => ({

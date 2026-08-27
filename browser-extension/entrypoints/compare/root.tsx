@@ -23,7 +23,7 @@ import {
 
 import type {
   CategoryId,
-  FeatureWeight,
+  FeatureSelection,
   LensPreferences,
 } from "@/lib/reasoning-engine/types";
 
@@ -60,7 +60,7 @@ export default function CompareTab({
     useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
 
   const [categoryFeatures, setCategoryFeatures] =
-    useState<Record<CategoryId, FeatureWeight[]>>(
+    useState<Record<CategoryId, FeatureSelection>>(
       DEFAULT_CATEGORY_FEATURES,
     );
 

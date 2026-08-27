@@ -1,35 +1,42 @@
 import type {
     CategoryId,
-    FeatureTier,
-    FeatureWeight,
+    FeatureId,
+    FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import {
     CATEGORIES,
     MAX_FEATURES_PER_CATEGORY,
-    MIN_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
 import { CalculatedPriorityDetails } from "./CalculatedPriorityDetails";
 import { FeatureOption } from "@/components/FeatureOption";
 
 interface StepThreeFeatureEditorProps {
     categoryId: CategoryId;
-    /** What's switched on for this run. */
-    features: FeatureWeight[];
+    /** What the user has picked out for this run. May legitimately be empty. */
+    features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureWeight[];
-    onToggleFeature: (feature: FeatureWeight) => void;
-    onUpdateFeatureTier: (
-        featureKey: FeatureWeight["key"],
-        tier: FeatureTier,
-    ) => void;
+    availableFeatures: FeatureSelection;
+    /** Where this priority sits in the user's order, for the empty-state hint. */
+    rank: number;
+    onToggleFeature: (feature: FeatureId) => void;
 }
 
+/**
+ * Picking out what matters within one priority.
+ *
+ * One question, asked once: does this feature matter to you? The reader used
+ * to be asked a second one — grade each feature Essential / Good to have /
+ * Luxury extra — which is the same preference expressed twice in two units,
+ * and which nobody has a reliable answer to in the abstract.
+ *
+ * Picking nothing is a supported answer, not an incomplete form.
+ */
 export function StepThreeFeatureEditor({
     categoryId,
     features,
     availableFeatures,
+    rank,
     onToggleFeature,
-    onUpdateFeatureTier,
 }: StepThreeFeatureEditorProps) {
     const category = CATEGORIES[categoryId];
 
@@ -41,66 +48,103 @@ export function StepThreeFeatureEditor({
         );
     }
 
-    const enabledKeys = new Set(features.map((feature) => feature.key));
-
+    const selected = new Set(features);
     const atMax = features.length >= MAX_FEATURES_PER_CATEGORY;
-    const atMin = features.length <= MIN_FEATURES_PER_CATEGORY;
 
     return (
         <div className="space-y-4 border-t border-white p-4">
-            <div>
-                <p className="text-sm font-black text-finn-highlight-navy">
-                    {category.question}
-                </p>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="text-sm font-black text-finn-highlight-navy">
+                        Pick up to {MAX_FEATURES_PER_CATEGORY} features that
+                        matter most to you
+                    </p>
 
-                <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    These {MAX_FEATURES_PER_CATEGORY} are on by default because
-                    they're the ones that usually matter most here. Swap in
-                    anything else from the list, and tap the ⓘ if a name means
-                    nothing to you.
-                </p>
+                    <p className="mt-1 text-xs leading-5 text-finn-iron">
+                        Optional — skip it and we'll judge this priority on the
+                        equipment overall. Tap the ⓘ if a name means nothing to
+                        you.
+                    </p>
+                </div>
+
+                <span
+                    className={[
+                        "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
+                        features.length
+                            ? "bg-finn-pale-blue text-finn-accent-blue"
+                            : "bg-finn-cotton text-finn-iron",
+                    ].join(" ")}
+                >
+                    {features.length} / {MAX_FEATURES_PER_CATEGORY} selected
+                </span>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
-                {availableFeatures.map((feature) => {
-                    const enabled = enabledKeys.has(feature.key);
-
-                    const activeFeature =
-                        features.find((item) => item.key === feature.key) ??
-                        feature;
-
-                    return (
-                        <FeatureOption
-                            key={feature.key}
-                            feature={activeFeature}
-                            enabled={enabled}
-                            disabled={enabled ? atMin : atMax}
-                            disabledReason={
-                                enabled
-                                    ? "At least one feature has to stay on"
-                                    : `Turn one off first — ${MAX_FEATURES_PER_CATEGORY} is the maximum`
-                            }
-                            onToggle={() => onToggleFeature(feature)}
-                            onTierChange={(tier) =>
-                                onUpdateFeatureTier(feature.key, tier)
-                            }
-                        />
-                    );
-                })}
+                {availableFeatures.map((feature) => (
+                    <FeatureOption
+                        key={feature}
+                        feature={feature}
+                        selected={selected.has(feature)}
+                        disabled={!selected.has(feature) && atMax}
+                        disabledReason={`You've picked ${MAX_FEATURES_PER_CATEGORY} already — unpick one to swap`}
+                        onToggle={() => onToggleFeature(feature)}
+                    />
+                ))}
             </div>
 
-            <p className="text-center text-[11px] leading-4 text-finn-iron">
-                {features.length}/{MAX_FEATURES_PER_CATEGORY} enabled
-                {atMax && " — turn one off to swap in another"}
-                {atMin &&
-                    " — one has to stay on, or this priority can't tell two cars apart"}
-            </p>
-
-            {availableFeatures.length === 0 && (
-                <p className="text-xs leading-5 text-finn-iron">
-                    This priority doesn't offer any configurable features.
+            {atMax && (
+                <p className="text-center text-[11px] leading-4 text-finn-iron">
+                    That's {MAX_FEATURES_PER_CATEGORY} — unpick one to choose
+                    something else.
                 </p>
             )}
+
+            {features.length === 0 && (
+                <NothingPickedHint
+                    label={category.label}
+                    rank={rank}
+                    catalogueSize={category.features.length}
+                />
+            )}
         </div>
+    );
+}
+
+/**
+ * What happens when the user picks nothing.
+ *
+ * Deliberately not a warning. "I want the safest car, I just don't have
+ * opinions about which systems it has" is a complete preference, and the only
+ * thing the reader needs to know is what Lens does with it. Said slightly
+ * more prominently for a top-ranked priority, where the question is most
+ * likely to occur to them.
+ */
+function NothingPickedHint({
+    label,
+    rank,
+    catalogueSize,
+}: {
+    label: string;
+    rank: number;
+    catalogueSize: number;
+}) {
+    return (
+        <p className="rounded-2xl bg-finn-snow px-3.5 py-3 text-[11px] leading-5 text-finn-iron">
+            {rank === 1 ? (
+                <>
+                    <strong className="font-black text-finn-black">
+                        {label} is your top priority.
+                    </strong>{" "}
+                    You haven't picked out any particular features, so we'll
+                    compare cars across all {catalogueSize} systems this
+                    priority covers.
+                </>
+            ) : (
+                <>
+                    Nothing picked out here, so we'll compare cars across all{" "}
+                    {catalogueSize} systems this priority covers.
+                </>
+            )}
+        </p>
     );
 }

@@ -1,13 +1,10 @@
 import { useState } from "react";
 import type {
-    FeatureTier,
-    FeatureWeight,
+    FeatureId,
+    FeatureSelection,
     PriorityDefinition,
 } from "@/lib/reasoning-engine/types";
-import {
-    MAX_FEATURES_PER_CATEGORY,
-    MIN_FEATURES_PER_CATEGORY,
-} from "@/lib/reasoning-engine/constants";
+import { MAX_FEATURES_PER_CATEGORY } from "@/lib/reasoning-engine/constants";
 import {
     isNumericOnlyPriority,
     validatePriorityDraft,
@@ -19,27 +16,24 @@ import { PriorityEditorActions } from "./components/PriorityEditorActions";
 
 interface PriorityEditorProps {
     priority: PriorityDefinition;
-    /** What the user currently has switched on. */
-    features: FeatureWeight[];
+    /** What the user has picked out. May legitimately be empty. */
+    features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureWeight[];
+    availableFeatures: FeatureSelection;
     onSave: (
         priority: PriorityDefinition,
-        features: FeatureWeight[],
+        features: FeatureSelection,
     ) => void;
     onCancel: () => void;
     isOpen: boolean;
 }
 
 /**
- * Choosing what a priority actually looks at.
+ * Choosing what a priority pays particular attention to.
  *
- * Five is a ceiling, not a quota. A priority starts with the five most
- * relevant of its catalogue switched on — or all of them, where it offers
- * fewer than five — and the user is free to swap any of them for something
- * else in the list. One must always stay on: a priority scoring from an empty
- * feature list can't tell two cars apart, and would quietly stop meaning
- * anything while still appearing in their order.
+ * Five is a ceiling on how many things the user can single out, not a quota
+ * to fill. Picking none is a real answer — the category is then judged on its
+ * whole catalogue — so nothing here blocks an empty selection.
  */
 export function PriorityEditor({
     priority,
@@ -51,44 +45,20 @@ export function PriorityEditor({
     const numericOnly = isNumericOnlyPriority(priority.id);
 
     const [draftFeatures, setDraftFeatures] =
-        useState<FeatureWeight[]>(features);
+        useState<FeatureSelection>(features);
 
-    const enabledKeys = new Set(draftFeatures.map((feature) => feature.key));
-
+    const selected = new Set(draftFeatures);
     const atMax = draftFeatures.length >= MAX_FEATURES_PER_CATEGORY;
-    const atMin = draftFeatures.length <= MIN_FEATURES_PER_CATEGORY;
 
-    const updateTier = (key: string, tier: FeatureTier) => {
-        setDraftFeatures((current) =>
-            current.map((feature) =>
-                feature.key === key ? { ...feature, tier } : feature,
-            ),
-        );
-    };
-
-    const toggleFeature = (featureKey: string) => {
+    const toggleFeature = (feature: FeatureId) => {
         setDraftFeatures((current) => {
-            const enabled = current.some(
-                (feature) => feature.key === featureKey,
-            );
-
-            if (enabled) {
-                if (current.length <= MIN_FEATURES_PER_CATEGORY) return current;
-
-                return current.filter(
-                    (feature) => feature.key !== featureKey,
-                );
+            if (current.includes(feature)) {
+                return current.filter((item) => item !== feature);
             }
 
             if (current.length >= MAX_FEATURES_PER_CATEGORY) return current;
 
-            const fromCatalogue = availableFeatures.find(
-                (feature) => feature.key === featureKey,
-            );
-
-            if (!fromCatalogue) return current;
-
-            return [...current, { ...fromCatalogue }];
+            return [...current, feature];
         });
     };
 
@@ -102,67 +72,59 @@ export function PriorityEditor({
 
     return (
         <div className="space-y-4 border-t border-white p-4">
-            <div>
-                <p className="text-sm font-black text-finn-highlight-navy">
-                    Choose what matters
-                </p>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="text-sm font-black text-finn-highlight-navy">
+                        Pick up to {MAX_FEATURES_PER_CATEGORY} features that
+                        matter most to you
+                    </p>
 
-                <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    Turn on the {MAX_FEATURES_PER_CATEGORY} features you most
-                    want Lens to look for here, then say how much each one
-                    matters. Not sure what something is? Tap the ⓘ.
-                </p>
-            </div>
+                    <p className="mt-1 text-xs leading-5 text-finn-iron">
+                        Optional. Pick none and Lens judges this priority on
+                        the equipment as a whole. Not sure what something is?
+                        Tap the ⓘ.
+                    </p>
+                </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-                {availableFeatures.map((feature) => {
-                    const enabled = enabledKeys.has(feature.key);
-
-                    const activeFeature =
-                        draftFeatures.find(
-                            (item) => item.key === feature.key,
-                        ) ?? feature;
-
-                    return (
-                        <FeatureOption
-                            key={feature.key}
-                            feature={activeFeature}
-                            enabled={enabled}
-                            disabled={
-                                enabled ? atMin : atMax
-                            }
-                            disabledReason={
-                                enabled
-                                    ? "At least one feature has to stay on"
-                                    : `Turn one off first — ${MAX_FEATURES_PER_CATEGORY} is the maximum`
-                            }
-                            onToggle={() => toggleFeature(feature.key)}
-                            onTierChange={(tier) =>
-                                updateTier(feature.key, tier)
-                            }
-                        />
-                    );
-                })}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-finn-iron">
-                    {draftFeatures.length}/{MAX_FEATURES_PER_CATEGORY} enabled
+                <span
+                    className={[
+                        "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
+                        draftFeatures.length
+                            ? "bg-finn-pale-blue text-finn-accent-blue"
+                            : "bg-finn-cotton text-finn-iron",
+                    ].join(" ")}
+                >
+                    {draftFeatures.length} / {MAX_FEATURES_PER_CATEGORY}{" "}
+                    selected
                 </span>
-
-                {atMax && (
-                    <span className="text-[10px] text-finn-iron">
-                        That's the maximum — turn one off to swap in another.
-                    </span>
-                )}
-
-                {atMin && (
-                    <span className="text-[10px] text-finn-iron">
-                        One has to stay on, or this priority can't tell two
-                        cars apart.
-                    </span>
-                )}
             </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+                {availableFeatures.map((feature) => (
+                    <FeatureOption
+                        key={feature}
+                        feature={feature}
+                        selected={selected.has(feature)}
+                        disabled={!selected.has(feature) && atMax}
+                        disabledReason={`You've picked ${MAX_FEATURES_PER_CATEGORY} already — unpick one to swap`}
+                        onToggle={() => toggleFeature(feature)}
+                    />
+                ))}
+            </div>
+
+            {atMax && (
+                <p className="text-[11px] leading-4 text-finn-iron">
+                    That's {MAX_FEATURES_PER_CATEGORY} — unpick one to choose
+                    something else.
+                </p>
+            )}
+
+            {draftFeatures.length === 0 && (
+                <p className="rounded-2xl bg-white px-3.5 py-3 text-[11px] leading-5 text-finn-iron">
+                    Nothing picked out, so cars will be compared across all{" "}
+                    {availableFeatures.length} systems this priority covers.
+                </p>
+            )}
 
             <InlineError>{error}</InlineError>
 

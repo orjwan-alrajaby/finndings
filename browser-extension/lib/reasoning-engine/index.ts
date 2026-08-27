@@ -1,10 +1,11 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
   AlternativeOption,
+  FeatureId,
   BudgetPartition,
   CategoryId,
   CostBreakdown,
-  FeatureWeight,
+  FeatureSelection,
   HeadToHead,
   LegacyLensPreferences,
   LensPreferences,
@@ -44,6 +45,7 @@ import {
   categoryDetail,
   computeAllScores,
   featureLabel,
+  featurePhrase,
   getCategory,
   priorityWeights,
   registerCategoryMeta,
@@ -113,7 +115,7 @@ export function buildReasoningContext(
   preferences: LensPreferences,
   categoryFeatures: Record<
     CategoryId,
-    FeatureWeight[]
+    FeatureSelection
   > = DEFAULT_CATEGORY_FEATURES,
 ): ReasoningContext {
   const ordered = priorities.length ? priorities : DEFAULT_PRIORITIES;
@@ -213,8 +215,8 @@ function priorityBreakdown(
     ? scoreRef(runnerUpVehicle, scores, category)
     : null;
 
-  const matchedLabels = detail.matched.map((item) => featureLabel(item.key));
-  const missingLabels = detail.missing.map((item) => featureLabel(item.key));
+  const matchedLabels = detail.matched.map(featureLabel);
+  const missingLabels = detail.missing.map(featureLabel);
 
   return {
     priority: category,
@@ -227,6 +229,7 @@ function priorityBreakdown(
     weightedContribution: score * weight,
     matched: detail.matched,
     missing: detail.missing,
+    basis: detail.basis,
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
@@ -255,17 +258,28 @@ function comparePriority(
     scores.find((score) => score.vehicleId === other.id)?.details[category] ??
     categoryDetail(category, other, vehicles, preferences, categoryFeatures);
 
-  const configured = categoryFeatures[category] ?? getCategory(category)?.features ?? [];
+  /*
+   * Compared over whatever the category was actually judged on: the features
+   * the user singled out, or the whole catalogue when they singled out none.
+   * Anything else would let the comparison cite equipment the score ignored.
+   */
+  const selected = categoryFeatures[category] ?? [];
 
-  const onlySubjectHas: FeatureWeight[] = [];
-  const onlyOtherHas: FeatureWeight[] = [];
+  const looksAt = selected.length
+    ? selected
+    : (AVAILABLE_CATEGORY_FEATURES[category] ??
+      getCategory(category)?.features ??
+      []);
 
-  for (const feature of configured) {
-    const subjectHas = Boolean(subject.features?.[feature.key]);
-    const otherHas = Boolean(other.features?.[feature.key]);
+  const onlySubjectHas: FeatureId[] = [];
+  const onlyOtherHas: FeatureId[] = [];
 
-    if (subjectHas && !otherHas) onlySubjectHas.push(feature);
-    if (otherHas && !subjectHas) onlyOtherHas.push(feature);
+  for (const key of looksAt) {
+    const subjectHas = Boolean(subject.features?.[key]);
+    const otherHas = Boolean(other.features?.[key]);
+
+    if (subjectHas && !otherHas) onlySubjectHas.push(key);
+    if (otherHas && !subjectHas) onlyOtherHas.push(key);
   }
 
   const difference = subjectScore - otherDetail.score;
@@ -486,7 +500,7 @@ export function selectAlternatives(
  * The one concrete thing that would make a reader look at this car instead.
  *
  * Ordered by how directly it answers "what would I actually gain?": equipment
- * the user called essential beats a measurement, a measurement beats money,
+ * the user picked out beats a measurement, a measurement beats money,
  * and when none of the three separates the two cars it returns null rather
  * than inventing a reason.
  */
@@ -498,18 +512,21 @@ function alternativeHook(
 ): string | null {
   const { weights, categoryFeatures, scores } = context;
 
+  /*
+   * Something the user singled out that this car has and the winner doesn't,
+   * taken from their highest priority downwards. Only their own selections
+   * qualify — equipment nobody asked about is not a reason to look at a car.
+   */
   for (const { priority } of weights) {
-    const configured = categoryFeatures[priority] ?? [];
+    const selected = categoryFeatures[priority] ?? [];
 
-    const gained = configured.filter(
-      (feature) =>
-        feature.tier === "essential" &&
-        Boolean(alternative.features?.[feature.key]) &&
-        !winner.features?.[feature.key],
+    const gained = selected.filter(
+      (key) =>
+        Boolean(alternative.features?.[key]) && !winner.features?.[key],
     );
 
     if (gained.length) {
-      return `Adds ${inSentence(featureLabel(gained[0]!.key))}`;
+      return `Adds ${featurePhrase(gained[0]!)}`;
     }
   }
 
@@ -626,7 +643,7 @@ export function buildRecommendation(
   preferences: LensPreferences,
   categoryFeatures: Record<
     CategoryId,
-    FeatureWeight[]
+    FeatureSelection
   > = DEFAULT_CATEGORY_FEATURES,
 ): Recommendation | null {
   if (!vehicles.length) return null;
@@ -798,20 +815,39 @@ function migratePriorityOrder(stored: string[]): CategoryId[] {
 }
 
 /**
+ * A stored feature entry, in either shape this product has used.
+ *
+ * Builds up to and including the tier system stored `{ key, tier }`; the
+ * current one stores the id alone. Both are read so an existing user's
+ * selections survive the change — only the grading is dropped, never the
+ * choice of what they cared about.
+ */
+type StoredFeature = FeatureId | { key?: FeatureId };
+
+const featureIdOf = (stored: StoredFeature): FeatureId | null =>
+  typeof stored === "string" ? stored : (stored?.key ?? null);
+
+/**
  * Brings a stored feature selection up to the current rules.
  *
- * Anything the catalogue no longer offers is dropped, duplicates created by
- * the safety merge are collapsed keeping the higher tier the user assigned,
- * the result is capped at the maximum, and a category left with nothing falls
- * back to its defaults — the engine cannot tell two cars apart on an empty
- * feature list.
+ * Tiers are discarded, ids the catalogue no longer offers are dropped,
+ * duplicates created by the safety merge collapse to one, and the result is
+ * capped at the maximum.
+ *
+ * A category that ends up empty stays empty. Under the tier system an empty
+ * list meant the category could not tell two cars apart, so it was refilled
+ * from the defaults; it now means "judge this category on its own terms",
+ * which is a preference to respect rather than repair.
  */
 function migrateCategoryFeatures(
-  stored: Record<string, FeatureWeight[]> | undefined,
-): Record<CategoryId, FeatureWeight[]> {
-  const merged: Record<string, FeatureWeight[]> = {};
+  stored: Record<string, StoredFeature[]> | undefined,
+): Record<CategoryId, FeatureSelection> {
+  /* Nothing stored at all is a fresh install, not a cleared selection. */
+  if (!stored) return { ...DEFAULT_CATEGORY_FEATURES };
 
-  for (const [id, features] of Object.entries(stored ?? {})) {
+  const merged: Record<string, StoredFeature[]> = {};
+
+  for (const [id, features] of Object.entries(stored)) {
     if (!isLivePriority(id)) continue;
 
     const current = currentIdFor(id);
@@ -826,34 +862,23 @@ function migrateCategoryFeatures(
     const category = id as CategoryId;
     const catalogue = AVAILABLE_CATEGORY_FEATURES[category] ?? [];
 
-    const byKey = new Map<string, FeatureWeight>();
+    const kept: FeatureId[] = [];
 
-    for (const feature of features) {
-      if (!catalogue.some((item) => item.key === feature.key)) continue;
+    for (const entry of features) {
+      const key = featureIdOf(entry);
 
-      const existing = byKey.get(feature.key);
+      if (key == null) continue;
+      if (!catalogue.includes(key)) continue;
+      if (kept.includes(key)) continue;
 
-      /* The merge can bring the same feature in at two tiers. Keep the louder. */
-      byKey.set(
-        feature.key,
-        existing && tierRank(existing.tier) >= tierRank(feature.tier)
-          ? existing
-          : feature,
-      );
+      kept.push(key);
     }
 
-    const kept = [...byKey.values()].slice(0, MAX_FEATURES_PER_CATEGORY);
-
-    result[category] = kept.length
-      ? kept
-      : (DEFAULT_CATEGORY_FEATURES[category] ?? []);
+    result[category] = kept.slice(0, MAX_FEATURES_PER_CATEGORY);
   }
 
   return result;
 }
-
-const tierRank = (tier: FeatureWeight["tier"]): number =>
-  tier === "essential" ? 3 : tier === "good" ? 2 : 1;
 
 /**
  * Reconciles stored profiles with the shipped definitions.
@@ -934,7 +959,7 @@ export async function loadLensSettings(): Promise<LensSettings> {
     finnLensPriorities?: string[];
     finnLensPriorityDefinitions?: PriorityDefinition[];
     finnLensProfiles?: Profile[];
-    finnLensCategoryFeatures?: Record<string, FeatureWeight[]>;
+    finnLensCategoryFeatures?: Record<string, StoredFeature[]>;
     finnLensDefaultProfileId?: string;
   };
 

@@ -1,6 +1,6 @@
 import type { HeadToHead, PriorityBreakdown } from "./types";
 
-import { featureLabel } from "./scoring";
+import { featurePhrase } from "./scoring";
 import { classifyTotalGap, isEffectivelyLevel } from "./narrative/magnitude";
 import {
   inSentence,
@@ -48,7 +48,7 @@ function whatSeparates(
 
   if (theirs.length) {
     return `it has ${joinCapped(
-      theirs.map((item) => inSentence(featureLabel(item.key))),
+      theirs.map(featurePhrase),
     )}, which ${behindName} doesn't`;
   }
 

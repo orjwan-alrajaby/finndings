@@ -1,7 +1,7 @@
 import { SparklesIcon } from "@heroicons/react/24/outline";
 import type {
     CategoryId,
-    FeatureWeight,
+    FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import { CategoryCard } from "../../../components/CategoryCard";
 
@@ -22,7 +22,7 @@ export function PriorityColumn({
     chosen?: boolean;
     disabled?: boolean;
     expandedCat: CategoryId | null;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onToggle: (id: CategoryId) => void;
     onExpand: (id: CategoryId) => void;
 }) {

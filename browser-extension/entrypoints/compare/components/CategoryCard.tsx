@@ -4,15 +4,10 @@ import {
     ArrowRightIcon,
     ChevronDownIcon,
 } from "@heroicons/react/24/outline";
-import {
-    CATEGORIES,
-    FEATURES,
-    TIERS,
-} from "@/lib/reasoning-engine/constants";
+import { CATEGORIES, FEATURES } from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
-    FeatureTier,
-    FeatureWeight,
+    FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 
 interface CategoryCardProps {
@@ -23,7 +18,7 @@ interface CategoryCardProps {
 
     expanded?: boolean;
     onExpand?: () => void;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
 
     // Order mode
     draggable?: boolean;
@@ -215,20 +210,10 @@ function CategoryReadonlyDetails({
     categoryFeatures,
 }: {
     catId: CategoryId;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
 }) {
     const meta = CATEGORIES[catId];
     const features = categoryFeatures[catId] ?? [];
-
-    const groups: Record<FeatureTier, FeatureWeight[]> = {
-        essential: [],
-        good: [],
-        luxury: [],
-    };
-
-    features.forEach((feature) => {
-        groups[feature.tier].push(feature);
-    });
 
     return (
         <div className="space-y-4">
@@ -255,61 +240,33 @@ function CategoryReadonlyDetails({
                 </div>
             </div>
 
-            {/* Features */}
-            {features.length > 0 && (
-                <div className="space-y-3">
-                    {(
-                        ["essential", "good", "luxury"] as FeatureTier[]
-                    ).map((tier) => {
-                        if (groups[tier].length === 0) return null;
+            {/* What the user picked out here */}
+            {meta.features.length > 0 && (
+                <div>
+                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
+                        {features.length > 0
+                            ? "Features you picked out"
+                            : "Judged on the equipment overall"}
+                    </p>
 
-                        const colors = {
-                            essential: {
-                                text: "text-green-700",
-                                bg: "bg-green-50/70",
-                                border: "border-green-100",
-                            },
-                            good: {
-                                text: "text-amber-700",
-                                bg: "bg-amber-50/70",
-                                border: "border-amber-100",
-                            },
-                            luxury: {
-                                text: "text-finn-accent-blue",
-                                bg: "bg-finn-accent-blue/5",
-                                border: "border-finn-accent-blue/10",
-                            },
-                        }[tier];
-
-                        return (
-                            <div key={tier}>
-                                <p
-                                    className={[
-                                        "mb-1.5 text-[11px] font-black",
-                                        colors.text,
-                                    ].join(" ")}
+                    {features.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                            {features.map((key) => (
+                                <span
+                                    key={key}
+                                    className="rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-bold text-finn-highlight-navy"
                                 >
-                                    {TIERS[tier].label}
-                                </p>
-
-                                <div className="flex flex-wrap gap-1.5">
-                                    {groups[tier].map((feature) => (
-                                        <span
-                                            key={feature.key}
-                                            className={[
-                                                "rounded-full border px-2.5 py-1 text-[11px] font-bold",
-                                                colors.bg,
-                                                colors.text,
-                                                colors.border,
-                                            ].join(" ")}
-                                        >
-                                            {FEATURES[feature.key].label}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
+                                    {FEATURES[key].label}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-[11px] leading-5 text-finn-iron">
+                            You haven't singled out particular features here,
+                            so cars are compared across all{" "}
+                            {meta.features.length} systems this priority covers.
+                        </p>
+                    )}
                 </div>
             )}
         </div>

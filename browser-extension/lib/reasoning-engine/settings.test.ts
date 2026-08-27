@@ -109,34 +109,31 @@ describe("the safety merge reaches existing users without breaking them", () => 
     const settings = await loadLensSettings();
     const merged = settings.categoryFeatures.safetyAssistance;
 
-    const keys = merged.map((feature) => feature.key);
-
-    expect(keys).toContain("hasEmergencyBrakingAssist");
-    expect(keys).toContain("hasAdaptiveCruiseControl");
+    expect(merged).toContain("hasEmergencyBrakingAssist");
+    expect(merged).toContain("hasAdaptiveCruiseControl");
     expect(merged.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
   });
 
-  /* The same feature sat in both old lists, sometimes at different tiers. */
-  it("keeps the louder tier when a merge duplicates a feature", async () => {
+  /* The same feature sat in both old lists. It must arrive once. */
+  it("collapses a feature the merge duplicates", async () => {
     stored.finnLensCategoryFeatures = {
       safety: [{ key: "hasEmergencyBrakingAssist", tier: "essential" }],
       driverAssistance: [{ key: "hasEmergencyBrakingAssist", tier: "good" }],
     };
 
     const settings = await loadLensSettings();
-    const merged = settings.categoryFeatures.safetyAssistance;
 
-    expect(merged).toHaveLength(1);
-    expect(merged[0]?.tier).toBe("essential");
+    expect(settings.categoryFeatures.safetyAssistance).toEqual([
+      "hasEmergencyBrakingAssist",
+    ]);
   });
 
   it("caps a merged list that overflows the maximum", async () => {
     stored.finnLensCategoryFeatures = {
-      safety: AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5),
-      driverAssistance: AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(
-        5,
-        10,
-      ),
+      safety: [...AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5)],
+      driverAssistance: [
+        ...AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(5, 10),
+      ],
     };
 
     const settings = await loadLensSettings();
@@ -161,19 +158,26 @@ describe("stored feature lists are brought up to the current rules", () => {
     };
 
     const settings = await loadLensSettings();
-    const keys = settings.categoryFeatures.practicality.map((f) => f.key);
+    const keys = settings.categoryFeatures.practicality;
 
     expect(keys).toContain("hasSplitFoldingRearSeats");
     expect(keys).not.toContain("hasSomethingRemoved");
   });
 
   /*
-   * A priority with nothing enabled silently stops meaning anything while
-   * still appearing in the user's order, which is worse than resetting it.
+   * An empty selection used to mean the priority could not tell two cars
+   * apart, so it was refilled from the defaults. It now means "judge this
+   * category on its own terms" — a preference to respect, not repair.
    */
-  it("restores the defaults rather than leaving a priority with nothing", async () => {
+  it("respects a cleared selection instead of refilling it", async () => {
     stored.finnLensCategoryFeatures = { practicality: [] };
 
+    const settings = await loadLensSettings();
+
+    expect(settings.categoryFeatures.practicality).toEqual([]);
+  });
+
+  it("still opens a fresh install on the suggested selection", async () => {
     const settings = await loadLensSettings();
 
     expect(settings.categoryFeatures.practicality).toEqual(

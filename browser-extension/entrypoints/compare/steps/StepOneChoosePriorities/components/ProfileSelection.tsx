@@ -5,80 +5,33 @@ import {
     InformationCircleIcon,
     PencilSquareIcon,
 } from "@heroicons/react/24/outline";
-import {
-    CATEGORIES,
-    FEATURES,
-    TIERS,
-} from "@/lib/reasoning-engine/constants";
+import { CATEGORIES, FEATURES } from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
-    FeatureTier,
-    FeatureWeight,
+    FeatureId,
+    FeatureSelection,
     Profile,
 } from "@/lib/reasoning-engine/types";
-
-const TIER_COLORS: Record<
-    FeatureTier,
-    {
-        text: string;
-        bg: string;
-        border: string;
-        square: string;
-    }
-> = {
-    essential: {
-        text: "text-green-700",
-        bg: "bg-green-50/70",
-        border: "border-green-100",
-        square: "bg-green-500",
-    },
-    good: {
-        text: "text-amber-700",
-        bg: "bg-amber-50/70",
-        border: "border-amber-100",
-        square: "bg-amber-400",
-    },
-    luxury: {
-        text: "text-finn-accent-blue",
-        bg: "bg-finn-accent-blue/5",
-        border: "border-finn-accent-blue/10",
-        square: "bg-finn-accent-blue",
-    },
-};
-
-const TIER_EXPLANATIONS: Record<FeatureTier, string> = {
-    essential:
-        "Features in this group matter most when we score this category.",
-    good:
-        "Features in this group are useful and improve the score, but aren't as important as the essentials.",
-    luxury:
-        "These are nice extras. They improve the score, but have a smaller influence on the result.",
-};
 
 export function FeatureChip({
     feature,
     size = "sm",
 }: {
-    feature: FeatureWeight;
+    feature: FeatureId;
     size?: "sm" | "md";
 }) {
-    const explanation = FEATURES[feature.key].explanation;
+    const { label, explanation } = FEATURES[feature];
 
     return (
         <div
             className={[
-                "group inline-flex max-w-full items-center gap-1 rounded-full border font-bold",
-                TIER_COLORS[feature.tier].bg,
-                TIER_COLORS[feature.tier].border,
-                TIER_COLORS[feature.tier].text,
+                "group inline-flex max-w-full items-center gap-1 rounded-full bg-finn-pale-blue font-bold text-finn-highlight-navy",
                 size === "sm"
                     ? "px-2 py-1 text-[10px]"
                     : "px-2.5 py-1.5 text-[11px]",
             ].join(" ")}
         >
-            <span className="truncate">
-                {FEATURES[feature.key].label}
-            </span>
+            <span className="truncate">{label}</span>
 
             {explanation && (
                 <FeatureInfo
@@ -96,12 +49,12 @@ function FeatureInfo({
     explanation,
     size = "sm",
 }: {
-    feature: FeatureWeight;
+    feature: FeatureId;
     explanation: string;
     size?: "sm" | "md";
 }) {
     const [open, setOpen] = useState(false);
-    const label = FEATURES[feature.key].label;
+    const label = FEATURES[feature].label;
 
     return (
         <span className="relative shrink-0">
@@ -145,72 +98,6 @@ function FeatureInfo({
     );
 }
 
-function TierLegend({
-    activeTier,
-    onSelect,
-}: {
-    activeTier: FeatureTier | null;
-    onSelect: (tier: FeatureTier) => void;
-}) {
-    const tiers: FeatureTier[] = [
-        "essential",
-        "good",
-        "luxury",
-    ];
-
-    return (
-        <div className="flex items-center justify-end gap-1.5">
-            {tiers.map((tier) => {
-                const colors = TIER_COLORS[tier];
-                const active = activeTier === tier;
-                const label = TIERS[tier].label;
-
-                return (
-                    <div key={tier} className="relative">
-                        <button
-                            type="button"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                onSelect(tier);
-                            }}
-                            className={[
-                                "h-3 w-3 rounded-[3px] transition-all",
-                                colors.square,
-                                active
-                                    ? "scale-125 shadow-[0_0_0_2px_white,0_0_0_3px_rgba(0,0,0,0.15)]"
-                                    : "opacity-80 hover:scale-110 hover:opacity-100",
-                            ].join(" ")}
-                            aria-label={`About ${label} features`}
-                            aria-expanded={active}
-                        />
-
-                        {active && (
-                            <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-xl border border-finn-snow bg-white p-3 text-left shadow-lg">
-                                <div className="flex items-center gap-2">
-                                    <span
-                                        className={[
-                                            "h-2.5 w-2.5 rounded-[3px]",
-                                            colors.square,
-                                        ].join(" ")}
-                                    />
-
-                                    <p className="text-[11px] font-black text-finn-black">
-                                        {label}
-                                    </p>
-                                </div>
-
-                                <p className="mt-1.5 text-[11px] leading-5 text-finn-iron">
-                                    {TIER_EXPLANATIONS[tier]}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
 function ProfilePriority({
     categoryId,
     index,
@@ -223,31 +110,11 @@ function ProfilePriority({
     index: number;
     active: boolean;
     expanded: boolean;
-    /** What Lens will actually look at — the user's enabled set, not the defaults. */
-    features: FeatureWeight[];
+    /** What Lens will actually look at — the user's picks, not the defaults. */
+    features: FeatureSelection;
     onToggle: () => void;
 }) {
     const meta = CATEGORIES[categoryId];
-
-    const [activeTier, setActiveTier] = useState<FeatureTier | null>(
-        null,
-    );
-
-    const groups: Record<FeatureTier, FeatureWeight[]> = {
-        essential: [],
-        good: [],
-        luxury: [],
-    };
-
-    features.forEach((feature) => {
-        groups[feature.tier].push(feature);
-    });
-
-    const handleTierSelect = (tier: FeatureTier) => {
-        setActiveTier((current) =>
-            current === tier ? null : tier,
-        );
-    };
 
     return (
         <div
@@ -309,82 +176,40 @@ function ProfilePriority({
             {expanded && (
                 <div className="px-2 pb-3 pt-2">
                     <div className="rounded-xl bg-white p-3">
-                        <div className="flex items-center justify-between gap-4">
-                            <p className="text-xs font-black text-finn-black">
-                                What we look at
-                            </p>
-
-                            <TierLegend
-                                activeTier={activeTier}
-                                onSelect={handleTierSelect}
-                            />
-                        </div>
+                        <p className="text-xs font-black text-finn-black">
+                            What we look at
+                        </p>
 
                         <p className="mt-1 text-[11px] leading-5 text-finn-iron">
                             {meta.description}
                         </p>
 
-                        {features.length > 0 ? (
-                            <div className="mt-3 space-y-3">
-                                {(
-                                    [
-                                        "essential",
-                                        "good",
-                                        "luxury",
-                                    ] as FeatureTier[]
-                                ).map((tier) => {
-                                    if (
-                                        groups[tier].length === 0
-                                    ) {
-                                        return null;
-                                    }
+                        {meta.features.length === 0 ? (
+                            <p className="mt-3 text-[11px] italic leading-5 text-finn-iron">
+                                This priority is measured from the vehicle
+                                data itself rather than a feature list.
+                            </p>
+                        ) : features.length > 0 ? (
+                            <>
+                                <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                                    Features you picked out
+                                </p>
 
-                                    return (
-                                        <div key={tier}>
-                                            <div className="mb-1.5 flex items-center gap-1.5">
-                                                <span
-                                                    className={[
-                                                        "h-2 w-2 rounded-xs",
-                                                        TIER_COLORS[
-                                                            tier
-                                                        ].square,
-                                                    ].join(" ")}
-                                                />
-
-                                                <p
-                                                    className={[
-                                                        "text-[10px] font-black",
-                                                        TIER_COLORS[
-                                                            tier
-                                                        ].text,
-                                                    ].join(" ")}
-                                                >
-                                                    {TIERS[tier].label}
-                                                </p>
-                                            </div>
-
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {groups[tier].map(
-                                                    (feature) => (
-                                                        <FeatureChip
-                                                            key={
-                                                                feature.key
-                                                            }
-                                                            feature={
-                                                                feature
-                                                            }
-                                                        />
-                                                    ),
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {features.map((feature) => (
+                                        <FeatureChip
+                                            key={feature}
+                                            feature={feature}
+                                        />
+                                    ))}
+                                </div>
+                            </>
                         ) : (
-                            <p className="mt-3 text-[11px] italic text-finn-iron">
-                                This category is based on vehicle-level
-                                data rather than individual features.
+                            <p className="mt-3 text-[11px] leading-5 text-finn-iron">
+                                You haven't picked out particular features
+                                here, so cars are compared across all{" "}
+                                {meta.features.length} systems this priority
+                                covers.
                             </p>
                         )}
                     </div>
@@ -404,7 +229,7 @@ function ProfileCard({
     profile: Profile;
     active: boolean;
     isDefault: boolean;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onSelect: () => void;
 }) {
     const [expandedPriority, setExpandedPriority] = useState<
@@ -532,8 +357,8 @@ export function ProfileSelection({
     activeProfileId: string | null;
     /** The one Lens starts you on. Marked, so the badge means something. */
     defaultProfileId: string | null;
-    /** The user's enabled features, so a card shows what Lens will really check. */
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    /** The user's picks, so a card shows what Lens will really check. */
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onSelect: (profile: Profile) => void;
     onSettings: () => void;
     onChooseCustom: () => void;

@@ -10,14 +10,13 @@ import {
   DEFAULT_PROFILES,
   FEATURES,
   MAX_FEATURES_PER_CATEGORY,
-  MIN_FEATURES_PER_CATEGORY,
   NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
   PROFILES,
 } from "./constants";
 
 import { validatePriorityDraft } from "@/entrypoints/settings/utils/PriorityValidation";
-import type { CategoryId, FeatureWeight } from "./types";
+import type { CategoryId } from "./types";
 
 /* -------------------------------------------------------------------------- */
 /* One safety priority, not two                                               */
@@ -42,9 +41,7 @@ describe("safety and driver assistance are one priority", () => {
    * against itself.
    */
   it("carries the systems that used to be split across the two", () => {
-    const keys = AVAILABLE_CATEGORY_FEATURES.safetyAssistance.map(
-      (feature) => feature.key,
-    );
+    const keys = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
 
     expect(keys).toContain("hasEmergencyBrakingAssist");
     expect(keys).toContain("hasEmergencyCallSystem");
@@ -92,11 +89,13 @@ describe("feature selection", () => {
     }
   });
 
-  it("leaves every feature-based priority something to measure", () => {
+  /*
+   * Picking nothing is valid, but the *opening* selection is a suggestion
+   * rather than an empty form, so every feature-based priority ships with one.
+   */
+  it("opens with a suggested selection on every feature-based priority", () => {
     for (const id of featureCategories) {
-      expect(
-        DEFAULT_CATEGORY_FEATURES[id].length,
-      ).toBeGreaterThanOrEqual(MIN_FEATURES_PER_CATEGORY);
+      expect(DEFAULT_CATEGORY_FEATURES[id].length).toBeGreaterThan(0);
     }
   });
 
@@ -120,34 +119,33 @@ describe("feature selection", () => {
 
   it("only offers features that actually exist in the data", () => {
     for (const id of CATEGORY_IDS) {
-      for (const feature of AVAILABLE_CATEGORY_FEATURES[id]) {
-        expect(FEATURES[feature.key]).toBeDefined();
+      for (const key of AVAILABLE_CATEGORY_FEATURES[id]) {
+        expect(FEATURES[key]).toBeDefined();
       }
     }
   });
 
   it("never offers the same feature twice within one priority", () => {
     for (const id of CATEGORY_IDS) {
-      const keys = AVAILABLE_CATEGORY_FEATURES[id].map(
-        (feature) => feature.key,
-      );
+      const keys = AVAILABLE_CATEGORY_FEATURES[id];
 
       expect(new Set(keys).size).toBe(keys.length);
     }
   });
 
-  /* The rules the editors enforce, checked at their edges. */
-  it("refuses an empty feature list and one over the cap", () => {
-    const feature = (key: string): FeatureWeight =>
-      ({ key, tier: "good" }) as FeatureWeight;
-
+  /*
+   * The only rule left is the ceiling. There is deliberately no floor: an
+   * empty selection means "judge this category on its own terms", which the
+   * editors must accept rather than treat as an unfinished form.
+   */
+  it("accepts an empty selection and refuses one over the cap", () => {
     const id: CategoryId = "practicality";
 
-    expect(validatePriorityDraft([], id)).toMatch(/at least one/i);
+    expect(validatePriorityDraft([], id)).toBeNull();
 
     expect(
       validatePriorityDraft(
-        Array.from({ length: 6 }, (_, index) => feature(`f${index}`)),
+        AVAILABLE_CATEGORY_FEATURES[id].slice(0, 6),
         id,
       ),
     ).toMatch(/at most/i);
@@ -169,9 +167,7 @@ describe("feature selection", () => {
 
 describe("no reader should have to look a feature up elsewhere", () => {
   const offered = new Set(
-    CATEGORY_IDS.flatMap((id) =>
-      AVAILABLE_CATEGORY_FEATURES[id].map((feature) => feature.key),
-    ),
+    CATEGORY_IDS.flatMap((id) => AVAILABLE_CATEGORY_FEATURES[id]),
   );
 
   it("explains every feature it offers, specifically", () => {

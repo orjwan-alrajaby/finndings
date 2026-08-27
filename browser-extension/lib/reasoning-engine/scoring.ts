@@ -3,7 +3,9 @@ import type {
   CategoryDef,
   CategoryDetail,
   CategoryId,
-  FeatureWeight,
+  FeatureBasis,
+  FeatureId,
+  FeatureSelection,
   LensPreferences,
   NumericEvidence,
   PriorityWeight,
@@ -11,11 +13,11 @@ import type {
 } from "./types";
 
 import {
+  AVAILABLE_CATEGORY_FEATURES,
   CATEGORIES,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_PRIORITIES,
   FEATURES,
-  TIERS,
 } from "./constants";
 
 import { formatNumber } from "./format";
@@ -64,7 +66,38 @@ export function unregisterCategoryMeta(id: CategoryId): void {
 export const featureLabel = (key: string): string =>
   FEATURES[key as keyof typeof FEATURES]?.label ?? key;
 
-const tierWeight = (tier: FeatureWeight["tier"]): number => TIERS[tier].weight;
+/**
+ * A feature's name as it reads inside a sentence: "a towbar", "adaptive
+ * cruise control".
+ *
+ * Prose says "it doesn't have …" far more often now that features are a
+ * simple list, so the article matters. Chips and headings keep the bare
+ * label — "No towbar" is correct as a heading and wrong as a clause.
+ */
+export const featurePhrase = (key: string): string => {
+  const meta = FEATURES[key as keyof typeof FEATURES];
+
+  if (!meta) return key;
+
+  const name = sentenceCase(meta.label);
+
+  return "article" in meta ? `${meta.article} ${name}` : name;
+};
+
+/**
+ * Lowercases a label for mid-sentence use without mangling acronyms,
+ * symbols or brand names — "Heated seats" → "heated seats", but "ISOFIX
+ * child seat anchors" and "360° camera" are left alone.
+ */
+function sentenceCase(label: string): string {
+  const first = label.split(" ")[0] ?? label;
+
+  const isAcronymOrSymbol = first.length > 1 && first === first.toUpperCase();
+
+  if (isAcronymOrSymbol || !/^[A-Z]/.test(label)) return label;
+
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Numeric scoring                                                            */
@@ -205,6 +238,10 @@ function numericScore(
  * The returned feature and numeric sub-scores are kept separate from the
  * combined `score` so an explanation can point at whichever actually drove
  * the result.
+ *
+ * Features are never a filter. A car missing something the user singled out
+ * scores lower here and stays in the running — the gap becomes a tradeoff the
+ * reader weighs, not a disqualification the engine makes on their behalf.
  */
 export function categoryDetail(
   category: CategoryId,
@@ -213,28 +250,50 @@ export function categoryDetail(
   _preferences: LensPreferences,
   categoryFeatures: Record<
     CategoryId,
-    FeatureWeight[]
+    FeatureSelection
   > = DEFAULT_CATEGORY_FEATURES,
 ): CategoryDetail {
-  const configured =
-    categoryFeatures[category] ?? getCategory(category)?.features ?? [];
+  const selected = categoryFeatures[category] ?? [];
 
-  const matched: FeatureWeight[] = [];
-  const missing: FeatureWeight[] = [];
+  /*
+   * Which list the car is judged against.
+   *
+   * Singling nothing out is a real answer — "I want the safest car, I just
+   * don't have opinions about which systems it has" — so it falls back to the
+   * category's whole catalogue rather than abstaining. The measure is the same
+   * either way (what share of the relevant equipment is actually fitted); only
+   * the scope changes, which is what keeps this from becoming a second
+   * weighting system sitting on top of the priority order.
+   */
+  const catalogue =
+    AVAILABLE_CATEGORY_FEATURES[category] ??
+    getCategory(category)?.features ??
+    [];
 
-  const max = configured.reduce((sum, item) => sum + tierWeight(item.tier), 0);
+  const looksAt: FeatureId[] = selected.length ? selected : catalogue;
 
-  const earned = configured.reduce((sum, item) => {
-    if (vehicle.features?.[item.key]) {
-      matched.push(item);
-      return sum + tierWeight(item.tier);
-    }
+  const basis: FeatureBasis = looksAt.length
+    ? selected.length
+      ? "selected"
+      : "category"
+    : "none";
 
-    missing.push(item);
-    return sum;
-  }, 0);
+  const matched: FeatureId[] = [];
+  const missing: FeatureId[] = [];
 
-  const featureScore = max ? Math.round((earned / max) * 100) : null;
+  for (const key of looksAt) {
+    if (vehicle.features?.[key]) matched.push(key);
+    else missing.push(key);
+  }
+
+  /*
+   * Every feature counts the same. The user already said how much this
+   * category matters by where they ranked it; grading the features inside it
+   * as well would apply the same preference twice.
+   */
+  const featureScore = looksAt.length
+    ? Math.round((matched.length / looksAt.length) * 100)
+    : null;
 
   const numeric = numericScore(category, vehicle, vehicles);
 
@@ -247,6 +306,7 @@ export function categoryDetail(
     score,
     matched,
     missing,
+    basis,
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,
@@ -303,7 +363,7 @@ export function computeAllScores(
   preferences: LensPreferences,
   categoryFeatures: Record<
     CategoryId,
-    FeatureWeight[]
+    FeatureSelection
   > = DEFAULT_CATEGORY_FEATURES,
 ): VehicleScore[] {
   const weights = priorityWeights(priorities);

@@ -6,7 +6,7 @@ import {
 } from "@heroicons/react/24/outline";
 import {
     type CategoryId,
-    type FeatureWeight,
+    type FeatureSelection,
     type Profile,
 } from "@/lib/reasoning-engine/types";
 import {
@@ -34,7 +34,7 @@ export function StepOneChoosePrioritiesStep({
     defaultProfileId: string;
     onNext: () => void;
     onSettings: () => void;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
 }) {
     const [expandedCat, setExpandedCat] =
         useState<CategoryId | null>(null);

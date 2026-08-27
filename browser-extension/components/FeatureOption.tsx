@@ -1,75 +1,90 @@
-import { TierButton, Toggle } from "@/entrypoints/settings/components/primitives";
+import { CheckIcon } from "@heroicons/react/24/solid";
 import { InfoTip } from "@/components/InfoTip";
 import { FEATURES } from "@/lib/reasoning-engine/constants";
-import type {
-    FeatureTier,
-    FeatureWeight,
-} from "@/lib/reasoning-engine/types";
+import type { FeatureId } from "@/lib/reasoning-engine/types";
 
 interface FeatureOptionProps {
-    feature: FeatureWeight;
-    enabled: boolean;
-    /** True when this feature can't be switched right now, with the reason why. */
+    feature: FeatureId;
+    selected: boolean;
+    /** True when this one can't be turned on right now — the cap is reached. */
     disabled: boolean;
     disabledReason?: string;
     onToggle: () => void;
-    onTierChange: (tier: FeatureTier) => void;
 }
 
 /**
- * One feature, switchable and rankable.
+ * One feature, picked out or not.
  *
- * The explanation sits behind an `i` rather than under the label: a category
- * now offers up to fifteen features, and fifteen paragraphs is a wall the
- * reader scrolls past. The answer is one click away for the terms that need
- * it, which is the point — nobody should have to leave Lens to find out what
- * adaptive cruise control is.
+ * A single binary choice, deliberately. This used to ask the reader to grade
+ * every feature Essential / Good to have / Luxury extra, which asked them to
+ * express the same preference twice: how much a category matters is already
+ * the priority order's job, and no one has a reliable opinion about whether a
+ * reversing camera is "good to have" or "a luxury" in the abstract.
+ *
+ * All that is left is the question worth asking — does this one matter to you?
  */
 export function FeatureOption({
     feature,
-    enabled,
+    selected,
     disabled,
     disabledReason,
     onToggle,
-    onTierChange,
 }: FeatureOptionProps) {
-    const { label, explanation } = FEATURES[feature.key];
+    const { label, explanation } = FEATURES[feature];
 
     return (
         <div
             className={[
-                "flex flex-col justify-between gap-3 rounded-2xl p-3 transition-all drop-shadow-sm",
-                enabled ? "bg-white" : "bg-white/60",
+                "flex items-start gap-2.5 rounded-2xl p-3 transition",
+                selected
+                    ? "bg-finn-pale-blue ring-2 ring-finn-accent-blue"
+                    : disabled
+                      ? "bg-white/50"
+                      : "bg-white ring-1 ring-finn-iron/10 hover:ring-finn-iron/30",
             ].join(" ")}
         >
-            <div className="flex items-start justify-between gap-3">
+            <button
+                type="button"
+                role="checkbox"
+                aria-checked={selected}
+                aria-label={label}
+                disabled={disabled}
+                title={disabled ? disabledReason : undefined}
+                onClick={onToggle}
+                className={[
+                    "flex min-w-0 flex-1 items-start gap-2.5 text-left",
+                    disabled ? "cursor-not-allowed" : "cursor-pointer",
+                ].join(" ")}
+            >
                 <span
                     className={[
-                        "flex min-w-0 items-center gap-1.5 text-sm font-bold",
-                        enabled ? "text-finn-highlight-navy" : "text-finn-iron",
+                        "mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition",
+                        selected
+                            ? "border-finn-accent-blue bg-finn-accent-blue text-white"
+                            : "border-finn-iron/30 bg-white",
                     ].join(" ")}
                 >
-                    <span className="min-w-0">{label}</span>
-
-                    {explanation && (
-                        <InfoTip subject={label}>{explanation}</InfoTip>
-                    )}
+                    {selected && <CheckIcon className="h-3.5 w-3.5" />}
                 </span>
 
-                <Toggle
-                    checked={enabled}
-                    disabled={disabled}
-                    onChange={onToggle}
-                    label={
-                        disabled && disabledReason
-                            ? disabledReason
-                            : `${enabled ? "Disable" : "Enable"} ${label}`
-                    }
-                />
-            </div>
+                <span
+                    className={[
+                        "min-w-0 text-sm font-bold leading-5",
+                        selected
+                            ? "text-finn-highlight-navy"
+                            : disabled
+                              ? "text-finn-iron/60"
+                              : "text-finn-black",
+                    ].join(" ")}
+                >
+                    {label}
+                </span>
+            </button>
 
-            {enabled && (
-                <TierButton value={feature.tier} onChange={onTierChange} />
+            {explanation && (
+                <span className="mt-0.5 shrink-0">
+                    <InfoTip subject={label}>{explanation}</InfoTip>
+                </span>
             )}
         </div>
     );

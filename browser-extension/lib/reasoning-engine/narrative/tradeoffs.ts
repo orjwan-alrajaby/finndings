@@ -12,6 +12,7 @@ import type {
   Tradeoff,
 } from "./types";
 
+import { AVAILABLE_CATEGORY_FEATURES } from "../constants";
 import { formatEUR } from "../format";
 import { featureFact } from "./facts";
 import { classifyMonthlyCostGap, isNoticeable } from "./magnitude";
@@ -37,9 +38,10 @@ import {
  * Two filters keep it honest:
  *
  * - **Relevance.** A compromise is only surfaced when it answers to something
- *   the user told us — a priority they ranked, or the budget they set. High
- *   CO₂ is a fact about a car; it is only a tradeoff for someone who said the
- *   environment matters. Manufacturing importance is its own dishonesty.
+ *   the user told us — a priority they ranked, a feature they picked out, or
+ *   the budget they set. High CO₂ is a fact about a car; it is only a tradeoff
+ *   for someone who said the environment matters. Manufacturing importance is
+ *   its own dishonesty.
  *
  * - **Restraint.** Only the alternatives the recommendation is actually
  *   competing with can source a compromise, and only the most consequential
@@ -53,8 +55,10 @@ const severityFor = (rank: number): Tradeoff["severity"] =>
 /**
  * Equipment the alternative has for this priority and the subject doesn't.
  *
- * Restricted to the user's own enabled features, so a compromise can never be
- * built out of equipment nobody asked about.
+ * Restricted to the features the user singled out, so a compromise is never
+ * built out of equipment nobody asked about. Where they singled out nothing,
+ * there is no such claim to make and the measurement carries the tradeoff
+ * instead.
  */
 function featureGap(
   subject: PinnedFinnCar,
@@ -62,14 +66,10 @@ function featureGap(
   priority: CategoryId,
   context: ReasoningContext,
 ): FeatureFact[] {
-  const configured = context.categoryFeatures[priority] ?? [];
+  const selected = context.categoryFeatures[priority] ?? [];
 
-  return configured
-    .filter(
-      (feature) =>
-        Boolean(other.features?.[feature.key]) &&
-        !subject.features?.[feature.key],
-    )
+  return selected
+    .filter((key) => Boolean(other.features?.[key]) && !subject.features?.[key])
     .map(featureFact);
 }
 
@@ -78,27 +78,32 @@ const relevanceFor = (label: string, rank: number): string =>
   `You ranked ${phraseLabel(label)} #${rank}.`;
 
 /* -------------------------------------------------------------------------- */
-/* Essentials the car doesn't have                                            */
+/* Features the user picked out that the car doesn't have                     */
 /* -------------------------------------------------------------------------- */
 
 /**
- * A missing essential is surfaced, never used to disqualify.
+ * Something the user singled out that this car doesn't have.
  *
- * The product's position is that the user decides. Lens's job is to make sure
- * they decide knowing this, so the sentence states the gap plainly and then
- * accounts for why the car still placed where it did.
+ * Surfaced, never used to disqualify. A picked-out feature is a statement of
+ * interest, not a hard requirement — the product's position is that the user
+ * decides, and Lens's job is to make sure they decide knowing this. So the
+ * sentence states the gap plainly and then accounts for why the car still
+ * placed where it did.
  */
-function missingEssentials(
+function missingSelected(
   reasoning: PriorityReasoning,
   evaluation: VehicleEvaluation,
   priorities: PriorityReasoning[],
   alternatives: PinnedFinnCar[],
   context: ReasoningContext,
 ): Tradeoff | null {
-  const missing = reasoning.features.essentialMissing;
+  /* Only the user's own picks. Catalogue coverage isn't a broken promise. */
+  if (reasoning.features.basis !== "selected") return null;
+
+  const missing = reasoning.features.missing;
   if (!missing.length) return null;
 
-  const labels = joinCapped(missing.map((fact) => inSentence(fact.label)));
+  const labels = joinCapped(missing.map((fact) => fact.phrase), 5);
 
   /* Which alternative would give the reader the missing piece back. */
   const rescuer = alternatives.find((candidate) =>
@@ -109,28 +114,36 @@ function missingEssentials(
     ? missing.filter((fact) => rescuer.features?.[fact.key])
     : [];
 
+  const sameList =
+    rescued.length === missing.length &&
+    rescued.every((fact) => missing.some((item) => item.key === fact.key));
+
   const evidence = sentence(
     `This car doesn't have ${labels}`,
     rescuer
-      ? `— ${shortName(rescuer.name)} has ${joinCapped(
-          rescued.map((fact) => inSentence(fact.label)),
-        )}`
+      ? sameList
+        ? `— ${shortName(rescuer.name)} ${missing.length === 1 ? "has it" : "has them"}`
+        : `— ${shortName(rescuer.name)} has ${joinCapped(
+            rescued.map((fact) => fact.phrase),
+            5,
+          )}`
       : "",
   );
 
   const relevance = sentence(
-    `You marked ${labels} as essential under`,
-    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority`,
+    `You picked ${missing.length === 1 ? "it" : "them"} out under`,
+    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority —`,
+    "so this is worth weighing, not a reason the car is ruled out",
   );
 
   const placement = whyItStillWon(reasoning, evaluation, priorities, context);
 
   return {
-    kind: "missingEssential",
+    kind: "missingSelected",
     priority: reasoning.priority,
     priorityLabel: reasoning.label,
     rank: reasoning.rank,
-    severity: "high",
+    severity: severityFor(reasoning.rank),
     headline: `No ${missing.map((fact) => inSentence(fact.label)).join(", no ")}`,
     evidence,
     relevance,
@@ -140,7 +153,7 @@ function missingEssentials(
 }
 
 /**
- * Why the car still won despite a gap the user called essential.
+ * Why the car still won despite missing something the user asked for.
  *
  * Only stated when it is actually true. "It's stronger on the priorities you
  * ranked above this one" is a lie under the #1 priority, where there is
@@ -252,9 +265,9 @@ function priorityDeficit(
     headline:
       measured && behind.numeric
         ? `${measured.label}: ${measured.display} vs ${behind.numeric.display}`
-        : `${shortName(rival.name)} has ${inSentence(
-            gained[0]?.label ?? reasoning.label,
-          )}`,
+        : `${shortName(rival.name)} has ${
+            gained[0]?.phrase ?? phraseLabel(reasoning.label)
+          }`,
     evidence,
     relevance,
     rival: { vehicleId: rival.id, name: rival.name },
@@ -287,16 +300,25 @@ function whatTheExtraBuys(
   for (const reasoning of priorities) {
     if (reasoning.standing === "unsupported") continue;
 
-    const gained = context.categoryFeatures[reasoning.priority]?.filter(
-      (feature) =>
-        Boolean(evaluation.vehicle.features?.[feature.key]) &&
-        !other.features?.[feature.key],
+    /*
+     * Compared over whatever the category was actually judged on. Looking
+     * only at the user's picks would report "nothing you ranked separates
+     * them" for a reader who picked nothing — which is the opposite of true,
+     * since the score separated them on the catalogue.
+     */
+    const looksAt = context.categoryFeatures[reasoning.priority]?.length
+      ? context.categoryFeatures[reasoning.priority]
+      : (AVAILABLE_CATEGORY_FEATURES[reasoning.priority] ?? []);
+
+    const gained = looksAt?.filter(
+      (key) =>
+        Boolean(evaluation.vehicle.features?.[key]) && !other.features?.[key],
     );
 
     if (gained?.length) {
       wins.push(
         `${joinCapped(
-          gained.map((feature) => inSentence(featureFact(feature).label)),
+          gained.map((key) => featureFact(key).phrase),
           2,
         )} under ${phraseLabel(reasoning.label)}`,
       );
@@ -424,7 +446,7 @@ export function reasonAboutTradeoffs(
   for (const reasoning of priorities) {
     if (reasoning.standing === "unsupported") continue;
 
-    const essential = missingEssentials(
+    const wanted = missingSelected(
       reasoning,
       evaluation,
       priorities,
@@ -432,8 +454,8 @@ export function reasonAboutTradeoffs(
       context,
     );
 
-    if (essential) {
-      fromPriorities.push(essential);
+    if (wanted) {
+      fromPriorities.push(wanted);
       continue;
     }
 

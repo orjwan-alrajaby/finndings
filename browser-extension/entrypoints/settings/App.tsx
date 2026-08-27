@@ -18,7 +18,7 @@ import {
 } from "@/lib/reasoning-engine";
 import type {
   CategoryId,
-  FeatureWeight,
+  FeatureSelection,
   LensPreferences,
   LensSettings,
   PriorityDefinition,
@@ -50,7 +50,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
   const [preferences, setPreferences] = useState<LensPreferences>(DEFAULT_PREFERENCES);
   const [priorityDefinitions, setPriorityDefinitions] = useState<PriorityDefinition[]>(DEFAULT_PRIORITY_DEFINITIONS);
-  const [categoryFeatures, setCategoryFeatures] = useState<Record<CategoryId, FeatureWeight[]>>(DEFAULT_CATEGORY_FEATURES);
+  const [categoryFeatures, setCategoryFeatures] = useState<Record<CategoryId, FeatureSelection>>(DEFAULT_CATEGORY_FEATURES);
   const [profiles, setProfiles] = useState<Profile[]>(DEFAULT_PROFILES);
   const [defaultProfileId, setDefaultProfileId] = useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
 
@@ -91,7 +91,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
   // ── Priorities ──────────────────────────────────────────────────────────
 
-  const handleSavePriority = (priority: PriorityDefinition, features: FeatureWeight[], isNew: boolean) => {
+  const handleSavePriority = (priority: PriorityDefinition, features: FeatureSelection, isNew: boolean) => {
     setPriorityDefinitions((cur) => (isNew ? [...cur, priority] : cur.map((p) => (p.id === priority.id ? priority : p))));
     setCategoryFeatures((cur) => ({ ...cur, [priority.id]: features }));
     if (priority.isCustom) registerCustomMeta(priority);

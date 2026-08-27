@@ -1,9 +1,6 @@
 import type { ReactNode } from "react";
 import { ExclamationTriangleIcon, StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
-import { TIERS } from "@/lib/reasoning-engine/constants";
-import { type FeatureTier } from "@/lib/reasoning-engine/types";
-
 
 // Unchanged from the original settings page — same visual language.
 export function Section({ title, description, children }: {
@@ -24,56 +21,6 @@ export function Section({ title, description, children }: {
   );
 }
 
-interface TierButtonProps {
-  value: FeatureTier;
-  onChange: (tier: FeatureTier) => void;
-  disabled?: boolean
-}
-
-function determineTierBtnClasses(
-  disabled: boolean,
-  tier: FeatureTier,
-  active: boolean,
-) {
-  if (disabled) {
-    return "bg-finn-iron/15 text-finn-iron cursor-not-allowed";
-  }
-
-  if (active) {
-    return TIERS[tier].activeClass;
-  }
-
-  return "text-finn-iron hover:border-finn-black/15 hover:bg-white hover:text-finn-black";
-}
-
-export function TierButton({
-  value,
-  onChange,
-  disabled = false,
-}: TierButtonProps) {
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-finn-iron/15 bg-finn-snow p-1 2xs:flex-row 2xs:justify-between">
-      {(Object.keys(TIERS) as FeatureTier[]).map((tier) => (
-        <button
-          key={tier}
-          type="button"
-          onClick={() => onChange(tier)}
-          disabled={disabled}
-          className={[
-            "flex-1 rounded-md border border-transparent p-1 text-[10px] font-black uppercase transition",
-            determineTierBtnClasses(
-              disabled,
-              tier,
-              value === tier,
-            ),
-          ].join(" ")}
-        >
-          {TIERS[tier].label}
-        </button>
-      ))}
-    </div>
-  );
-}
 export function Toggle({ checked, onChange, disabled, label }: {
   checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; label?: string;
 }) {

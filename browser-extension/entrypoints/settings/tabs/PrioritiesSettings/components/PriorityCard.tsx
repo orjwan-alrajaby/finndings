@@ -1,12 +1,12 @@
 import type {
-    FeatureWeight,
+    FeatureSelection,
     PriorityDefinition,
 } from "@/lib/reasoning-engine/types";
 import { FeatureCard } from "@/components/FeatureCard";
 
 interface PriorityCardProps {
     priority: PriorityDefinition;
-    features: FeatureWeight[];
+    features: FeatureSelection;
     open: boolean;
     onToggle: () => void;
     children?: React.ReactNode;

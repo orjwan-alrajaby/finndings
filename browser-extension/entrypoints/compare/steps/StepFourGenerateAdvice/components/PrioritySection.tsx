@@ -16,6 +16,10 @@ import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
  * space against 1,726 L" tells them what they'd actually notice. The
  * arithmetic is still on the page, under *Behind the recommendation*, where a
  * number is what the reader came for.
+ *
+ * Features carry no importance marking either. The reader was never asked to
+ * grade one, so there is nothing to show beyond whether they asked for it and
+ * whether the car has it.
  */
 
 const STANDING_LABEL: Record<PriorityStanding, string> = {
@@ -41,8 +45,16 @@ export function PrioritySection({
 }) {
     const { features } = reasoning;
 
-    const present = [...features.essentialPresent, ...features.optionalPresent];
-    const missing = [...features.essentialMissing, ...features.optionalMissing];
+    /*
+     * When the user singled features out, both lists are theirs and both are
+     * worth showing. When they didn't, the lists are the whole category
+     * catalogue — showing fifteen struck-through chips of equipment nobody
+     * asked about would be a dump, so only what the car actually has is shown.
+     */
+    const fromSelection = features.basis === "selected";
+
+    const present = features.present;
+    const missing = fromSelection ? features.missing : [];
 
     return (
         <section className="border-t border-finn-cotton pt-6">
@@ -90,15 +102,18 @@ export function PrioritySection({
 
                     {(present.length > 0 || missing.length > 0) && (
                         <div className="mt-3 space-y-2">
-                            <TierKey />
                             <ChipRow
-                                label="It has"
+                                label={
+                                    fromSelection
+                                        ? "You picked out, and it has"
+                                        : "It has"
+                                }
                                 facts={present}
                                 tone="present"
                             />
 
                             <ChipRow
-                                label="It doesn't have"
+                                label="You picked out, but it doesn't have"
                                 facts={missing}
                                 tone="missing"
                             />
@@ -107,36 +122,6 @@ export function PrioritySection({
                 </div>
             </div>
         </section>
-    );
-}
-
-/**
- * What the colours on the chips mean, said once per priority rather than
- * stamped onto every chip.
- */
-function TierKey() {
-    return (
-        <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                You said
-            </span>
-
-            {(
-                [
-                    ["Essential", "bg-finn-accent-blue"],
-                    ["Good to have", "bg-[#14B8A6]"],
-                    ["Luxury extra", "bg-[#8B5CF6]"],
-                ] as const
-            ).map(([label, dot]) => (
-                <span
-                    key={label}
-                    className="flex items-center gap-1 text-[10px] font-bold text-finn-iron"
-                >
-                    <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
-                    {label}
-                </span>
-            ))}
-        </div>
     );
 }
 

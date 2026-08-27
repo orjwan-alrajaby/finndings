@@ -1,7 +1,7 @@
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import type {
     CategoryId,
-    FeatureWeight,
+    FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import { PriorityColumn } from "./PriorityColumn";
 
@@ -19,7 +19,7 @@ export function CustomPrioritySelection({
     available: CategoryId[];
     atLimit: boolean;
     expandedCat: CategoryId | null;
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onTogglePriority: (id: CategoryId) => void;
     onExpandCategory: (id: CategoryId) => void;
     onChooseProfile: () => void;

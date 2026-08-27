@@ -53,12 +53,17 @@ export function FeatureCard({
                                     : "text-finn-iron",
                             ].join(" ")}
                         >
+                            {/*
+                              * No features picked out is a real setting, not
+                              * an empty one — the card must not read like an
+                              * unfinished form.
+                              */}
                             {featureCount > 0
-                                ? `${featureCount} enabled ${featureCount === 1
+                                ? `${featureCount} ${featureCount === 1
                                     ? "feature"
                                     : "features"
-                                }`
-                                : "No features enabled"}
+                                } picked out`
+                                : "Judged on the category overall"}
                         </p>
                     </div>
                 </div>

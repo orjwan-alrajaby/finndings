@@ -1,8 +1,5 @@
 import type { PinnedFinnCar } from "@/lib/types";
-import type {
-  FeatureWeight,
-  PriorityBreakdown,
-} from "../types";
+import type { FeatureId, PriorityBreakdown } from "../types";
 import type {
   FeatureEvidence,
   FeatureFact,
@@ -14,7 +11,7 @@ import type {
 } from "./types";
 
 import { FEATURES } from "../constants";
-import { featureLabel } from "../scoring";
+import { featureLabel, featurePhrase } from "../scoring";
 import { formatNumber } from "../format";
 import {
   classifyMeasurementGap,
@@ -35,36 +32,34 @@ import {
 /* Features                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export function featureFact(feature: FeatureWeight): FeatureFact {
-  const meta = FEATURES[feature.key];
+export function featureFact(key: FeatureId): FeatureFact {
+  const meta = FEATURES[key];
 
   return {
-    key: feature.key,
-    label: featureLabel(feature.key),
-    tier: feature.tier,
+    key,
+    label: featureLabel(key),
+    phrase: featurePhrase(key),
     explanation: meta?.explanation ?? "",
   };
 }
 
-const isEssential = (feature: FeatureWeight): boolean =>
-  feature.tier === "essential";
-
 /**
- * Splits the user's selected features four ways.
+ * What the car has and hasn't, of whatever this priority was measured on.
  *
- * Tier matters more than presence here: a missing essential is the headline
- * of an explanation, a missing luxury extra is a footnote, and collapsing
- * them into one "missing" list is what made the old copy feel indifferent.
+ * Where the old version split four ways by tier, there is nothing to split
+ * by: a feature is either something the user singled out or it isn't, and
+ * that distinction lives on `basis` for the whole list rather than on each
+ * entry. What matters to an explanation is which list was measured, not how
+ * loudly each item in it was graded.
  */
 export function featureEvidence(breakdown: PriorityBreakdown): FeatureEvidence {
-  const { matched, missing } = breakdown;
+  const { matched, missing, basis } = breakdown;
 
   return {
-    essentialPresent: matched.filter(isEssential).map(featureFact),
-    essentialMissing: missing.filter(isEssential).map(featureFact),
-    optionalPresent: matched.filter((item) => !isEssential(item)).map(featureFact),
-    optionalMissing: missing.filter((item) => !isEssential(item)).map(featureFact),
-    selectedCount: matched.length + missing.length,
+    basis,
+    present: matched.map(featureFact),
+    missing: missing.map(featureFact),
+    selectedCount: basis === "selected" ? matched.length + missing.length : 0,
   };
 }
 

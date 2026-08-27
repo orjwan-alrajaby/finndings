@@ -43,6 +43,9 @@ import {
  *
  * - **Name the thing.** "It has a 360° camera", never "a strong equipment
  *   package". If the data doesn't say, the sentence says the data doesn't say.
+ * - **Never grade a feature.** The user said which ones they care about and
+ *   nothing more; "essential" and "luxury extra" were words Lens put in their
+ *   mouth, and no sentence here may reintroduce them under another name.
  * - **Quote the figure.** "1,726 L against 491 L", never "substantially more
  *   practical" on its own and never "practicality: 48/100".
  * - **Don't parade other cars.** The recommendation is explained on its own
@@ -59,101 +62,92 @@ import {
 /* -------------------------------------------------------------------------- */
 
 const labelsOf = (facts: FeatureFact[]): string[] =>
-  facts.map((fact) => inSentence(fact.label));
+  facts.map((fact) => fact.phrase);
+
+/** A selection is at most five, so it is always named in full. */
+const joinSelection = (facts: FeatureFact[]): string =>
+  joinCapped(labelsOf(facts), 5);
 
 /**
- * What the user marked essential, and whether they got it.
+ * What the user singled out, and whether they got it.
  *
- * Names the features rather than counting them, because "all 3 essentials"
- * sends the reader off to work out which three.
+ * Names the features rather than counting them, because "two of the three"
+ * sends the reader off to work out which two. Nothing here grades them: the
+ * user said these matter, and the only question left is whether the car has
+ * them.
  */
-function describeEssentials(
+function describeSelection(
   features: FeatureEvidence,
   rival: RivalDifference | null,
 ): string | null {
-  const { essentialPresent, essentialMissing } = features;
-  const total = essentialPresent.length + essentialMissing.length;
+  if (features.basis !== "selected") return null;
+
+  const { present, missing } = features;
+  const total = present.length + missing.length;
 
   if (total === 0) return null;
 
   if (total === 1) {
-    const only = (essentialPresent[0] ?? essentialMissing[0]) as FeatureFact;
+    const only = (present[0] ?? missing[0]) as FeatureFact;
 
-    return essentialPresent.length
-      ? sentence(
-          `You marked ${inSentence(only.label)} as essential, and this car has it`,
-        )
+    return present.length
+      ? sentence(`You picked out ${only.phrase} here, and this car has it`)
       : sentence(
-          `You marked ${inSentence(only.label)} as essential, and this car doesn't have it`,
+          `You picked out ${only.phrase} here, and this car doesn't have it`,
         );
   }
 
-  const all = joinCapped([
-    ...labelsOf(essentialPresent),
-    ...labelsOf(essentialMissing),
-  ]);
+  const opener = `You picked out ${joinSelection([...present, ...missing])}.`;
 
-  const opener = `You marked ${all} as essential.`;
-
-  if (!essentialMissing.length) {
+  if (!missing.length) {
     return sentence(opener, `This car has ${coverage(total, total)}`);
   }
 
-  if (!essentialPresent.length) {
+  if (!present.length) {
     return sentence(opener, `This car has ${coverage(0, total)}`);
   }
 
   /* Naming the car that does have it turns a gap into a choice. */
   const rivalHasIt = rival?.onlyRivalHas.some((fact) =>
-    essentialMissing.some((missing) => missing.key === fact.key),
+    missing.some((item) => item.key === fact.key),
   );
-
-  const gap = joinCapped(labelsOf(essentialMissing));
 
   return sentence(
     opener,
-    `This car has ${coverage(essentialPresent.length, total)} —`,
-    `it doesn't have ${gap}`,
+    `This car has ${coverage(present.length, total)} —`,
+    `it doesn't have ${joinSelection(missing)}`,
     rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
   );
 }
 
 /**
- * The nice-to-haves, in both directions and by name.
+ * How the car does on the category as a whole, when the user singled nothing
+ * out.
  *
- * Every feature named here is one the user themselves put on the list, so
- * there is no risk of reporting equipment nobody asked about.
+ * This is not a gap in their setup and must not read like one. "I want the
+ * safest car, I just don't have opinions about which systems it has" is a
+ * complete answer, and the honest reply is to say what was measured instead.
  */
-function describeOptional(
+function describeCategoryBasis(
   features: FeatureEvidence,
-  rival: RivalDifference | null,
-): string | null {
-  const { optionalPresent, optionalMissing } = features;
+  label: string,
+): string[] {
+  if (features.basis !== "category") return [];
 
-  if (!optionalPresent.length && !optionalMissing.length) return null;
+  const total = features.present.length + features.missing.length;
 
-  const had = optionalPresent.length
-    ? `It also has ${joinCapped(labelsOf(optionalPresent))}`
-    : "";
+  if (total === 0) return [];
 
-  const lacked = optionalMissing.length
-    ? `${had ? "but not" : "It doesn't have"} ${joinCapped(labelsOf(optionalMissing))}`
-    : "";
-
-  const rivalHas = rival
-    ? rival.onlyRivalHas.filter((fact) =>
-        optionalMissing.some((missing) => missing.key === fact.key),
-      )
-    : [];
-
-  const attribution =
-    rivalHas.length && rival
-      ? ` — ${shortName(rival.name)} has ${joinCapped(labelsOf(rivalHas))}`
-      : "";
-
-  if (had && lacked) return sentence(`${had}, ${lacked}${attribution}`);
-
-  return sentence(`${had || lacked}${attribution}`);
+  return paragraph(
+    sentence(
+      `You didn't single out particular ${phraseLabel(label)} features, so this`,
+      `car is judged on the equipment as a whole: it has`,
+      `${features.present.length} of the ${total} systems we look at here`,
+    ),
+    features.present.length
+      ? sentence(`It has ${joinCapped(labelsOf(features.present))}`)
+      : null,
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -330,7 +324,13 @@ function describeWhyItStillWins(
 /* Missing data                                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Says plainly that we can't answer, and why. */
+/**
+ * Says plainly that we can't answer, and why.
+ *
+ * Reached only when the data genuinely can't support a comparison — never
+ * because the user singled out no features, which is answered by measuring
+ * the category's whole catalogue instead.
+ */
 function describeMissingData(breakdown: PriorityBreakdown): string[] {
   const noFeatures = breakdown.matched.length + breakdown.missing.length === 0;
 
@@ -341,7 +341,7 @@ function describeMissingData(breakdown: PriorityBreakdown): string[] {
     ),
     noFeatures
       ? sentence(
-          "No features are enabled for this priority and the pinned cars carry no",
+          "This priority has no feature list to check and the pinned cars carry no",
           "measurement we can rank them on, so it isn't affecting your result",
         )
       : sentence(
@@ -370,8 +370,8 @@ export function reasonAboutPriority(
     standing === "unsupported"
       ? describeMissingData(breakdown)
       : paragraph(
-          describeEssentials(features, rival),
-          describeOptional(features, rival),
+          describeSelection(features, rival),
+          ...describeCategoryBasis(features, breakdown.label),
           describeScoredMeasurement(
             measurements.find((fact) => fact.scored) ?? null,
           ),

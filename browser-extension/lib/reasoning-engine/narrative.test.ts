@@ -8,7 +8,7 @@ import { coverage, inSentence, phraseLabel, shortName } from "./narrative/phrase
 import { DEFAULT_CATEGORY_FEATURES, FEATURES } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
 import type { AdviceNarrative } from "./narrative";
-import type { CategoryId, FeatureWeight } from "./types";
+import type { CategoryId, FeatureSelection } from "./types";
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures                                                                   */
@@ -79,7 +79,7 @@ const preferences = prefs({ monthlyKm: 1000, monthlyBudget: 600 });
 function adviceFor(
   priorities: CategoryId[],
   vehicles = cars,
-  overrides: Partial<Record<CategoryId, FeatureWeight[]>> = {},
+  overrides: Partial<Record<CategoryId, FeatureSelection>> = {},
 ): AdviceNarrative {
   const result = buildRecommendation(
     vehicles,
@@ -275,19 +275,19 @@ describe("tradeoffs are filtered by what the user told us", () => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* Missing essentials                                                         */
+/* Missing picks                                                              */
 /* -------------------------------------------------------------------------- */
 
-describe("a missing essential is surfaced, not used to disqualify", () => {
+describe("a feature the user picked out is surfaced, not used to disqualify", () => {
   /*
    * MG 3 leads on emissions and so wins for an environment-led reader, while
-   * lacking two of the safety features that reader marked essential.
+   * lacking two of the safety features that reader picked out.
    */
   const narrative = adviceFor(["environmental", "safetyAssistance"]);
 
   it("still recommends a car that misses one", () => {
-    const missing = narrative.priorities.flatMap(
-      (item) => item.features.essentialMissing,
+    const missing = narrative.priorities.flatMap((item) =>
+      item.features.basis === "selected" ? item.features.missing : [],
     );
 
     expect(missing.length).toBeGreaterThan(0);
@@ -296,13 +296,15 @@ describe("a missing essential is surfaced, not used to disqualify", () => {
 
   it("names the feature and says plainly that the car doesn't have it", () => {
     const gap = narrative.tradeoffs.find(
-      (item) => item.kind === "missingEssential",
+      (item) => item.kind === "missingSelected",
     )!;
 
     expect(gap).toBeDefined();
-    expect(gap.severity).toBe("high");
-    expect(gap.sentences.join(" ")).toMatch(/you marked .+ as essential/i);
+    expect(gap.sentences.join(" ")).toMatch(/you picked (it|them) out/i);
     expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
+
+    /* A pick is an interest, never a requirement — the copy must say so. */
+    expect(gap.sentences.join(" ")).toMatch(/not a reason the car is ruled out/i);
 
     /* The car that does have it is named, so the gap is a choice. */
     expect(gap.rival).not.toBeNull();
@@ -311,7 +313,7 @@ describe("a missing essential is surfaced, not used to disqualify", () => {
 
   it("says why it still placed where it did, rather than hiding the gap", () => {
     const gap = narrative.tradeoffs.find(
-      (item) => item.kind === "missingEssential",
+      (item) => item.kind === "missingSelected",
     )!;
 
     expect(gap.sentences.join(" ")).toMatch(/real compromise/i);
@@ -342,26 +344,70 @@ describe("the language matches the size of the difference", () => {
     expect(environmental.sentences.join(" ")).toMatch(/only just|level with/i);
   });
 
-  it("says so plainly when the data can't answer the question", () => {
-    /* A priority the user selected but configured no features for, on cars
-       that carry no measurement for it either. */
-    const narrative = adviceFor(["comfort", "safetyAssistance"], cars, { comfort: [] });
+  /*
+   * Picking no features is a preference, not a gap in the setup: "I want the
+   * safest car, I just don't have opinions about which systems it has" is a
+   * complete answer, and the category is judged on its whole catalogue.
+   */
+  it("judges a priority on the category when nothing was picked out", () => {
+    const narrative = adviceFor(["comfort", "safetyAssistance"], cars, {
+      comfort: [],
+    });
 
     const comfort = narrative.priorities.find(
       (item) => item.priority === "comfort",
     )!;
 
-    expect(comfort.standing).toBe("unsupported");
-    expect(comfort.hasEvidence).toBe(false);
-    expect(comfort.sentences.join(" ")).toContain(
+    expect(comfort.features.basis).toBe("category");
+    expect(comfort.standing).not.toBe("unsupported");
+    expect(comfort.hasEvidence).toBe(true);
+
+    /* And it says which yardstick it used, without implying a mistake. */
+    const prose = comfort.sentences.join(" ");
+
+    expect(prose).toMatch(/didn't single out/i);
+    expect(prose).toMatch(/judged on the equipment as a whole/i);
+    expect(prose).not.toMatch(/should|need to|missing from your/i);
+  });
+
+  /* An empty pick is never reported as a shortfall against the user. */
+  it("raises no compromise for a category nobody picked features in", () => {
+    const narrative = adviceFor(["comfort", "safetyAssistance"], cars, {
+      comfort: [],
+    });
+
+    const fromComfort = narrative.tradeoffs.filter(
+      (item) => item.priority === "comfort",
+    );
+
+    for (const tradeoff of fromComfort) {
+      expect(tradeoff.kind).not.toBe("missingSelected");
+    }
+  });
+
+  it("says so plainly when the data genuinely can't answer the question", () => {
+    /* No CO₂ figures at all, and no feature catalogue to fall back on. */
+    const blank = [
+      makeCar({ id: 60, name: "Alpha One", co2: 0 }),
+      makeCar({ id: 61, name: "Beta Two", co2: 0 }),
+    ];
+
+    const narrative = adviceFor(["environmental", "safetyAssistance"], blank);
+
+    const environmental = narrative.priorities.find(
+      (item) => item.priority === "environmental",
+    )!;
+
+    expect(environmental.standing).toBe("unsupported");
+    expect(environmental.hasEvidence).toBe(false);
+    expect(environmental.sentences.join(" ")).toContain(
       "FINN's data doesn't tell us enough",
     );
 
     /* And it is not dressed up as a finding elsewhere. */
-    expect(narrative.tradeoffs.some((item) => item.priority === "comfort")).toBe(
-      false,
-    );
-    expect(narrative.unsupported.map((item) => item.priority)).toContain("comfort");
+    expect(
+      narrative.tradeoffs.some((item) => item.priority === "environmental"),
+    ).toBe(false);
   });
 });
 
@@ -461,10 +507,8 @@ describe("feature terminology is explained in the product", () => {
     ]);
 
     const named = narrative.priorities.flatMap((item) => [
-      ...item.features.essentialPresent,
-      ...item.features.essentialMissing,
-      ...item.features.optionalPresent,
-      ...item.features.optionalMissing,
+      ...item.features.present,
+      ...item.features.missing,
     ]);
 
     expect(named.length).toBeGreaterThan(0);

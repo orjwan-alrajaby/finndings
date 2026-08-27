@@ -4,7 +4,7 @@ import {
 } from "@/lib/reasoning-engine/constants";
 import {
     type CategoryId,
-    type FeatureWeight,
+    type FeatureSelection,
     type PriorityDefinition,
 } from "@/lib/reasoning-engine/types";
 import { Section } from "../../components/primitives";
@@ -13,10 +13,10 @@ import { PriorityCard } from "./components/PriorityCard";
 
 interface PrioritiesSettingsProps {
     priorityDefinitions: PriorityDefinition[];
-    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
     onSavePriority: (
         priority: PriorityDefinition,
-        features: FeatureWeight[],
+        features: FeatureSelection,
         isNew: boolean,
     ) => void;
 }
@@ -41,7 +41,7 @@ export function PrioritiesSettings({
 
     const handleSavePriority = (
         priority: PriorityDefinition,
-        features: FeatureWeight[],
+        features: FeatureSelection,
     ) => {
         onSavePriority(
             priority,
@@ -55,7 +55,7 @@ export function PrioritiesSettings({
     return (
         <Section
             title="Priorities"
-            description="Each priority looks for a handful of specific features. Turn on the ones you actually want — up to five per priority — and say how much each one matters. Essential features count for most, luxury extras for least."
+            description="Your priority order says how much each category matters. This is the finer question: within a category, are there particular features you especially want? Pick up to five, or none — a car missing one you picked isn't ruled out, it just shows up as a tradeoff in your advice."
         >
             <div className="flex flex-col gap-3">
                 {priorityDefinitions.map(

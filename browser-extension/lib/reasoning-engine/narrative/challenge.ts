@@ -5,7 +5,7 @@ import type {
   VehicleEvaluation,
 } from "../types";
 
-import { featureLabel } from "../scoring";
+import { featurePhrase } from "../scoring";
 import { formatEUR } from "../format";
 import { classifyMonthlyCostGap, classifyScoreGap, isNoticeable } from "./magnitude";
 import {
@@ -79,7 +79,7 @@ function whatSeparates(
   if (theirs.length) {
     return sentence(
       `${aheadName} has`,
-      `${joinCapped(theirs.map((item) => inSentence(featureLabel(item.key))))},`,
+      `${joinCapped(theirs.map(featurePhrase))},`,
       `which ${behindName} doesn't`,
     );
   }

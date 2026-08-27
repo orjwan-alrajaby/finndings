@@ -57,50 +57,42 @@ function summarisePriority(
       ? `You put ${phraseLabel(reasoning.label)} first`
       : `${toSentenceStart(phraseLabel(reasoning.label))} is your #${reasoning.rank}`;
 
-  const { essentialPresent, essentialMissing } = reasoning.features;
-  const essentials = essentialPresent.length + essentialMissing.length;
+  const { basis, present, missing } = reasoning.features;
 
-  if (essentials > 0) {
-    const missing = joinCapped(
-      essentialMissing.map((fact) => inSentence(fact.label)),
-    );
+  if (basis === "selected") {
+    const total = present.length + missing.length;
 
-    if (!essentialMissing.length) {
-      const present = joinCapped(
-        essentialPresent.map((fact) => inSentence(fact.label)),
-      );
+    if (!missing.length) {
+      const named = joinCapped(present.map((fact) => fact.phrase), 5);
 
-      return essentials === 1
-        ? sentence(
-            `${opener}, and this car has ${present} — the one thing you marked`,
-            "essential there",
-          )
+      return total === 1
+        ? sentence(`${opener}, and this car has ${named}, the one feature you picked out`)
         : sentence(
-            `${opener}, and this car has everything you marked essential there:`,
-            present,
+            `${opener}, and this car has every feature you picked out there:`,
+            named,
           );
     }
 
-    if (!essentialPresent.length) {
+    const gap = joinCapped(missing.map((fact) => fact.phrase), 5);
+
+    if (!present.length) {
       return sentence(
-        `${opener}, and this car has none of what you marked essential there —`,
-        `it's missing ${missing}`,
+        `${opener}, and this car has none of what you picked out there —`,
+        `it's missing ${gap}`,
       );
     }
 
-    /*
-     * `coverage` already reads as a complete object ("two of the four"), so
-     * the sentence names what the shortfall actually is rather than appending
-     * another "of the features".
-     */
     return sentence(
       `${opener}, and this car has`,
-      `${coverage(essentialPresent.length, essentials)} features you marked`,
-      `essential there — it doesn't have ${missing}`,
+      `${coverage(present.length, total)} features you picked out there —`,
+      `it doesn't have ${gap}`,
     );
   }
 
-  /* No essentials configured: the measurement is the whole answer. */
+  /*
+   * No features singled out. The measurement is the answer where there is
+   * one, and otherwise how much of the category's equipment the car carries.
+   */
   const measured = reasoning.measurements.find((fact) => fact.scored);
 
   if (measured) {
@@ -109,14 +101,17 @@ function summarisePriority(
     );
   }
 
-  const present = reasoning.features.optionalPresent;
+  const total = present.length + missing.length;
 
-  return present.length
-    ? sentence(
-        `${opener}, and this car has`,
-        joinCapped(present.map((fact) => inSentence(fact.label))),
-      )
-    : null;
+  if (basis === "category" && total > 0) {
+    return sentence(
+      `${opener}. You didn't single out particular features there, so it's`,
+      `judged on the equipment overall — this car has ${present.length} of the`,
+      `${total} systems we look at`,
+    );
+  }
+
+  return null;
 }
 
 /**

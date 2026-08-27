@@ -2,8 +2,8 @@ import type { PinnedFinnCar } from "@/lib/types";
 import type {
   BudgetStatus,
   CategoryId,
+  FeatureBasis,
   FeatureId,
-  FeatureTier,
   NumericEvidence,
 } from "../types";
 import type { Magnitude } from "./magnitude";
@@ -21,23 +21,34 @@ import type { Magnitude } from "./magnitude";
 /* Features                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/** One feature the user asked for, with the plain-English explanation of it. */
+/** One feature, with the plain-English explanation of it. */
 export interface FeatureFact {
   key: FeatureId;
+  /** The name as a label or heading: "Towbar". */
   label: string;
-  tier: FeatureTier;
+  /** The name as it reads inside a sentence: "a towbar". */
+  phrase: string;
   /** Short, jargon-free description, for the UI's information affordance. */
   explanation: string;
 }
 
-/** The user's selected features for one priority, split by tier and presence. */
+/**
+ * What the car has and hasn't, of whatever this priority was judged on.
+ *
+ * There is no importance grading here, because the user isn't asked for one:
+ * how much the category matters is the priority order, and which things
+ * inside it they care about is the selection. `basis` says which of the two
+ * lists below was measured, so an explanation can tell "you asked for this
+ * and it's missing" apart from "here's how it does on safety kit generally".
+ */
 export interface FeatureEvidence {
-  essentialPresent: FeatureFact[];
-  essentialMissing: FeatureFact[];
-  /** "Good to have" and "luxury extra" together — nice, but not required. */
-  optionalPresent: FeatureFact[];
-  optionalMissing: FeatureFact[];
-  /** How many features the user selected for this priority in total. */
+  /** See `CategoryDetail.basis`. */
+  basis: FeatureBasis;
+  /** Present, of whatever was looked at. */
+  present: FeatureFact[];
+  /** Absent, of whatever was looked at. */
+  missing: FeatureFact[];
+  /** How many features the user singled out. Zero is a valid answer. */
   selectedCount: number;
 }
 
@@ -197,7 +208,8 @@ export interface CostReasoning {
  * not surfaced, however real it is.
  */
 export type TradeoffKind =
-  | "missingEssential"
+  /** The car lacks something the user singled out. Never a disqualification. */
+  | "missingSelected"
   | "priorityDeficit"
   | "measurementDeficit"
   | "cost"

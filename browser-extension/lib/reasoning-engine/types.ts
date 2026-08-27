@@ -1,10 +1,5 @@
 import type { PinnedFinnCar } from "@/lib/types";
-import type {
-  CATEGORIES,
-  FEATURES,
-  PROFILES,
-  TIERS,
-} from "./constants";
+import type { CATEGORIES, FEATURES, PROFILES } from "./constants";
 
 /* -------------------------------------------------------------------------- */
 /* Configuration-derived types                                                */
@@ -12,7 +7,6 @@ import type {
 
 export type CategoryId = keyof typeof CATEGORIES;
 export type FeatureId = keyof typeof FEATURES;
-export type FeatureTier = keyof typeof TIERS;
 export type ProfileId = keyof typeof PROFILES;
 
 /* -------------------------------------------------------------------------- */
@@ -61,10 +55,18 @@ export interface LegacyLensPreferences {
 /* Features                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export interface FeatureWeight {
-  key: FeatureId;
-  tier: FeatureTier;
-}
+/**
+ * The features a user has singled out within one priority.
+ *
+ * Deliberately a plain list of ids. There is no per-feature importance to
+ * store: how much a category matters is the priority order's job, and which
+ * things inside it the user cares about is this list's. Grading individual
+ * features on top of that asked the reader to express the same preference
+ * twice, in two different units.
+ *
+ * An empty list is a valid, meaningful answer — see `CategoryDetail.basis`.
+ */
+export type FeatureSelection = FeatureId[];
 
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
@@ -104,11 +106,11 @@ export interface CategoryDef {
   /**
    * The catalogue of features this category *offers*, most relevant first.
    *
-   * Not the enabled set — see `DEFAULT_CATEGORY_FEATURES`, which takes the
-   * first few of this list, and `LensSettings.categoryFeatures`, which is what
-   * the user actually has switched on.
+   * Not the user's selection — see `DEFAULT_CATEGORY_FEATURES` for the opening
+   * five and `LensSettings.categoryFeatures` for what they actually picked.
+   * It is also the fallback yardstick when they pick nothing.
    */
-  features: FeatureWeight[];
+  features: FeatureId[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -141,11 +143,26 @@ export interface NumericEvidence {
   lowerIsBetter: boolean;
 }
 
+/**
+ * Which yardstick a category's feature score was measured against.
+ *
+ * - `selected` — the user singled features out, and the score is the share of
+ *   *those* the car has.
+ * - `category` — they singled none out, so the car is judged on how much of
+ *   the category's whole catalogue it carries. Picking nothing means "judge
+ *   this category on its own terms", not "skip this category".
+ * - `none` — the category has no feature catalogue at all and is measured
+ *   from vehicle data instead (see `numericOnly`).
+ */
+export type FeatureBasis = "selected" | "category" | "none";
+
 export interface CategoryDetail {
   score: number;
-  matched: FeatureWeight[];
-  missing: FeatureWeight[];
-  /** Score derived from the configured features alone, when any are configured. */
+  matched: FeatureId[];
+  missing: FeatureId[];
+  /** What `featureScore` was measured against. */
+  basis: FeatureBasis;
+  /** Score derived from the features looked at, when there were any. */
   featureScore: number | null;
   /** Score derived from vehicle data alone, when the category has a numeric signal. */
   numericScore: number | null;
@@ -330,8 +347,10 @@ export interface PriorityBreakdown {
   /** score × weight — this priority's actual contribution to the total. */
   weightedContribution: number;
 
-  matched: FeatureWeight[];
-  missing: FeatureWeight[];
+  matched: FeatureId[];
+  missing: FeatureId[];
+  /** See `CategoryDetail.basis`. */
+  basis: FeatureBasis;
   matchedLabels: string[];
   missingLabels: string[];
   numeric: NumericEvidence | null;
@@ -374,15 +393,10 @@ export interface PriorityComparison {
   /** difference × weight — how much this gap moved the overall result. */
   weightedDifference: number;
   numeric: NumericEvidence | null;
-  /**
-   * Features the subject has that the other vehicle does not.
-   *
-   * Carries the tier the user assigned, because "it has one more essential"
-   * and "it has one more luxury extra" are not the same finding.
-   */
-  onlySubjectHas: FeatureWeight[];
+  /** Features the subject has that the other vehicle does not. */
+  onlySubjectHas: FeatureId[];
   /** Features the other vehicle has that the subject does not. */
-  onlyOtherHas: FeatureWeight[];
+  onlyOtherHas: FeatureId[];
 }
 
 export interface HeadToHead {
@@ -453,7 +467,7 @@ export interface ReasoningContext {
   vehicles: PinnedFinnCar[];
   priorities: CategoryId[];
   preferences: LensPreferences;
-  categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+  categoryFeatures: Record<CategoryId, FeatureSelection>;
   scores: VehicleScore[];
   costs: Record<number, CostBreakdown>;
   weights: PriorityWeight[];
@@ -557,6 +571,6 @@ export interface LensSettings {
   priorities: CategoryId[];
   priorityDefinitions: PriorityDefinition[];
   profiles: Profile[];
-  categoryFeatures: Record<CategoryId, FeatureWeight[]>;
+  categoryFeatures: Record<CategoryId, FeatureSelection>;
   defaultProfileId: ProfileId;
 }
