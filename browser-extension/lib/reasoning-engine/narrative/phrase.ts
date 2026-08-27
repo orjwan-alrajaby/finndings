@@ -104,6 +104,19 @@ export function phraseLabel(label: string): string {
     .join(" ");
 }
 
+/**
+ * Capitalises a fragment that has ended up at the start of a sentence.
+ *
+ * Category labels are lowercased for mid-sentence use, and occasionally one
+ * has to open a sentence instead. Leaves anything already capitalised — and
+ * anything starting with a digit or symbol — exactly as it is.
+ */
+export function toSentenceStart(text: string): string {
+  return /^[a-z]/.test(text)
+    ? text.charAt(0).toUpperCase() + text.slice(1)
+    : text;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Sentences                                                                  */
 /* -------------------------------------------------------------------------- */

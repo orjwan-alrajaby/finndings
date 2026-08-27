@@ -203,6 +203,17 @@ export type TradeoffKind =
   | "cost"
   | "budget";
 
+/**
+ * The car a compromise is measured against.
+ *
+ * Always one of the recommendation's realistic alternatives, so "you're
+ * giving this up" names a car the reader could actually take instead.
+ */
+export interface TradeoffRival {
+  vehicleId: number;
+  name: string;
+}
+
 export interface Tradeoff {
   kind: TradeoffKind;
   /** The priority this answers to. Null only for budget, which the user set directly. */
@@ -211,8 +222,20 @@ export interface Tradeoff {
   /** The priority's position in the user's order. Drives how loudly we say it. */
   rank: number | null;
   severity: "high" | "moderate";
-  /** Short label for the UI. */
+  /** Short label for the UI. States the compromise, not a category name. */
   headline: string;
+  /**
+   * What is being given up, as concrete evidence: named equipment or a
+   * measurement with both figures.
+   */
+  evidence: string;
+  /**
+   * Why this reader should care — the priority they ranked, or the budget
+   * they set. Never a generic "worth weighing".
+   */
+  relevance: string;
+  /** The alternative that has it, when one does. */
+  rival: TradeoffRival | null;
   sentences: string[];
 }
 
@@ -220,17 +243,35 @@ export interface Tradeoff {
 /* Verdict                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The answer, stated once.
+ *
+ * The fields are separated because each is said in exactly one place on the
+ * page. The budget override in particular used to appear four times — in the
+ * headline, the verdict prose, the head-to-head summary and the cost panel —
+ * which reads as a system repeating itself rather than a person explaining
+ * something.
+ */
 export interface Verdict {
-  /** One line, safe to use as a hero headline. */
+  /** One line, safe to use as a hero headline. The conclusion, not the score. */
   headline: string;
-  /** The full "why this one" reasoning. */
-  sentences: string[];
+  /** Why, tied to the priorities the user ranked highest. Evidence, not restatement. */
+  reasons: string[];
+  /**
+   * The one place the page says the budget changed the answer.
+   *
+   * Null when the highest-scoring car is also the recommended one, because
+   * then there is nothing to explain.
+   */
+  budgetNote: string | null;
   /** How far clear of the next car it finished, when there is one. */
   margin: {
     name: string;
     difference: number;
     magnitude: Magnitude;
   } | null;
+  /** Said only when the top two are close enough that the ranking misleads. */
+  marginNote: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -244,6 +285,12 @@ export interface AdviceNarrative {
   isRecommendation: boolean;
 
   verdict: Verdict;
+  /**
+   * Every ranked priority, in the user's own order.
+   *
+   * Priorities the data can't speak to are still here, marked `unsupported`,
+   * so the page can say "we don't know" rather than quietly skipping one.
+   */
   priorities: PriorityReasoning[];
   cost: CostReasoning;
   /** Relevance-filtered compromises, most consequential first. */

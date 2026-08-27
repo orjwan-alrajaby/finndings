@@ -11,12 +11,22 @@ const TONE_CLASS: Record<FeatureChipTone, string> = {
     rivalOnly: "bg-finn-cotton text-finn-iron",
 };
 
+/** How much the user said this one mattered, as a colour rather than a word. */
+const TIER_DOT: Record<keyof typeof TIERS, string> = {
+    essential: "bg-finn-accent-blue",
+    good: "bg-[#14B8A6]",
+    luxury: "bg-[#8B5CF6]",
+};
+
 /**
- * A named feature, with the explanation attached to it.
+ * A named feature, carrying both things the reader needs: what it is, and how
+ * much they said it mattered.
  *
- * The tier is shown because "essential" and "luxury extra" are the user's own
- * words for how much they cared, and a missing luxury extra should not look
- * like a missing essential.
+ * The tier is a coloured dot rather than the word "Essential" repeated down
+ * every row — the label is the information, and printing the same three words
+ * fifteen times is what makes a list unreadable. The word is still one hover
+ * away, and a missing luxury extra still can't be mistaken for a missing
+ * essential.
  */
 export function FeatureChip({
     fact,
@@ -25,6 +35,8 @@ export function FeatureChip({
     fact: FeatureFact;
     tone: FeatureChipTone;
 }) {
+    const tier = TIERS[fact.tier];
+
     return (
         <span
             className={[
@@ -32,12 +44,18 @@ export function FeatureChip({
                 TONE_CLASS[tone],
             ].join(" ")}
         >
+            <span
+                className={[
+                    "h-1.5 w-1.5 shrink-0 rounded-full",
+                    TIER_DOT[fact.tier],
+                    tone === "missing" ? "opacity-50" : "",
+                ].join(" ")}
+                title={`You marked this ${tier.inSentence}`}
+                aria-label={`You marked this ${tier.inSentence}`}
+            />
+
             <span className={tone === "missing" ? "line-through" : ""}>
                 {fact.label}
-            </span>
-
-            <span className="text-[9px] font-black uppercase tracking-wide opacity-60">
-                {TIERS[fact.tier].label}
             </span>
 
             {fact.explanation && (

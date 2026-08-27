@@ -70,12 +70,21 @@ export interface FeatureWeight {
 /* Profiles                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A predefined recommendation strategy.
+ *
+ * Profiles are product configuration, not user documents: the label, icon,
+ * copy and priority order are fixed. `enabled` is the only field the user
+ * owns, and whether a profile is *selected by default* is a separate setting
+ * (`LensSettings.defaultProfileId`) rather than a flag here.
+ */
 export interface Profile {
   id: ProfileId;
   label: string;
   icon: string;
   forWhom: string;
   assumes: string;
+  /** Exactly five, in rank order. Fixed for the life of the profile. */
   priorities: CategoryId[];
   enabled: boolean;
 }
@@ -92,6 +101,13 @@ export interface CategoryDef {
   description: string;
   recommendedFor: string[];
   numericOnly?: boolean;
+  /**
+   * The catalogue of features this category *offers*, most relevant first.
+   *
+   * Not the enabled set — see `DEFAULT_CATEGORY_FEATURES`, which takes the
+   * first few of this list, and `LensSettings.categoryFeatures`, which is what
+   * the user actually has switched on.
+   */
   features: FeatureWeight[];
 }
 
@@ -322,10 +338,28 @@ export interface PriorityBreakdown {
   /** See `CategoryDetail.hasEvidence`. */
   hasEvidence: boolean;
 
+  /**
+   * The strongest car in this category **within the comparison set** — the
+   * recommendation and its closest alternatives — not across everything
+   * pinned.
+   *
+   * Scoping it matters: a car that finished thirty points back overall is not
+   * a reason to doubt the recommendation just because it happens to top one
+   * low-ranked category, and naming it as though it were is what turns an
+   * explanation into a leaderboard.
+   */
   leader: ScoreRef | null;
   isLeader: boolean;
   /** Points behind the category leader. 0 when this vehicle leads. */
   gapToLeader: number;
+  /**
+   * The best of the comparison set *other than* this vehicle.
+   *
+   * Carried so that a lead can be described honestly: leading by three grams
+   * of CO₂ is still leading, and calling it a reason to buy the car would be
+   * manufacturing a difference out of noise.
+   */
+  runnerUp: ScoreRef | null;
 
   /** Head-to-head against the vehicle this one is being compared with. */
   versus: PriorityComparison | null;
@@ -457,23 +491,61 @@ export interface Recommendation {
    */
   fallbackReason: "allOverBudget" | "costUnconfirmed" | null;
   budget: BudgetPartition;
-  /** The winner's own evaluation, compared against the runner-up. */
+  /**
+   * The car that scored highest, whoever it is.
+   *
+   * Kept beside `winner` because they differ whenever the budget excluded the
+   * top scorer, and the difference is something the user is owed rather than
+   * something to paper over.
+   */
+  topScorer: PinnedFinnCar;
+  /** True when `topScorer` is not `winner`. */
+  budgetChangedTheAnswer: boolean;
+  /**
+   * The realistic alternatives — the four cars closest to the winner overall.
+   *
+   * This is the entire set the user may challenge the recommendation with.
+   * Everything else pinned stays visible in the ranking but never competes
+   * head-to-head.
+   */
+  alternatives: PinnedFinnCar[];
+  /** The winner's own evaluation, explained on its own merits. */
   evaluation: VehicleEvaluation;
   context: ReasoningContext;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Hot seat                                                                   */
+/* Alternatives and the hot seat                                              */
 /* -------------------------------------------------------------------------- */
 
-export interface HotSeatOption {
+/**
+ * One of the small, fixed set of cars the recommendation may be challenged
+ * with.
+ *
+ * Chosen by overall closeness to the winner, never by "beats it at one
+ * thing" — a car that wins a single low-ranked category while finishing
+ * thirty points behind is not a realistic alternative, and putting it in
+ * front of the reader implies otherwise.
+ */
+export interface AlternativeOption {
   vehicle: PinnedFinnCar;
+  /** Position in the overall ranking of every pinned car. */
   rank: number;
   total: number;
-  isRecommendation: boolean;
+  /** Overall points between this car and the winner. Negative means behind. */
+  differenceToWinner: number;
   isSelected: boolean;
   budgetStatus: BudgetStatus;
   totalMonthly: number;
+  /** Estimated monthly cost minus the winner's. Positive means dearer. */
+  costDifference: number | null;
+  /** Estimated cost minus the budget. Positive means over. Null without one. */
+  budgetDifference: number | null;
+  /**
+   * The single most useful reason to look at this car instead, stated as a
+   * fact. Null when nothing separates it from the winner worth a sentence.
+   */
+  hook: string | null;
 }
 
 /* -------------------------------------------------------------------------- */

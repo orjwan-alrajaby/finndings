@@ -13,8 +13,12 @@ interface AdviceSidebarProps {
 }
 
 /**
- * A read-back of everything the user told us, so the reasoning above can be
- * checked against its inputs — and changed if any of them look wrong.
+ * A read-back of everything the user told us, so the reasoning on the page can
+ * be checked against its inputs — and changed if any of them look wrong.
+ *
+ * Deliberately the inputs only. The weighting those inputs produce is stated
+ * once, under "Behind the recommendation"; repeating it here is how a page
+ * ends up saying the same thing in three places.
  */
 export function AdviceSidebar({
     weights,
@@ -52,17 +56,14 @@ export function AdviceSidebar({
                                 {getCategory(weight.priority)?.label ??
                                     weight.priority}
                             </span>
-
-                            <span className="shrink-0 text-[10px] font-black text-finn-iron">
-                                {weight.weightPercent}%
-                            </span>
                         </div>
                     ))}
                 </div>
 
                 <p className="mt-3 text-[11px] leading-4 text-finn-iron">
-                    Percentages are how much each priority contributes to a
-                    car's overall score, decided by the order you put them in.
+                    The order you set. Higher priorities carry more of the
+                    result — the exact weighting is under "Behind the
+                    recommendation".
                 </p>
             </div>
 

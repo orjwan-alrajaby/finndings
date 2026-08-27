@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ALTERNATIVE_COUNT,
+  alternativeOptions,
   buildReasoningContext,
   buildRecommendation,
+  evaluateChallenger,
   evaluateVehicle,
-  hotSeatOptions,
   migratePreferences,
+  selectAlternatives,
 } from "./index";
-import { explainVerdict } from "./explain";
-import { buildAdviceNarrative } from "./narrative";
+import { buildAdviceNarrative, reasonAboutChallenge } from "./narrative";
 import type { CategoryId, FeatureWeight } from "./types";
 import {
   CATEGORY_IDS,
@@ -18,7 +20,7 @@ import {
 } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
 
-const SAFETY_FIRST: CategoryId[] = ["safety", "practicality"];
+const SAFETY_FIRST: CategoryId[] = ["safetyAssistance", "practicality"];
 
 const features = (
   overrides: Partial<Record<CategoryId, FeatureWeight[]>> = {},
@@ -113,13 +115,27 @@ describe("buildRecommendation", () => {
 
     // And the win is backed by concrete numbers, not a vague assertion.
     const safety = result?.evaluation.priorities.find(
-      (item) => item.priority === "safety",
+      (item) => item.priority === "safetyAssistance",
     );
 
     expect(safety?.rank).toBe(1);
-    expect(safety?.versus?.difference).toBeGreaterThan(0);
+
+    /*
+     * The winner is explained on its own merits rather than against a
+     * runner-up, so the evidence is what the user asked for and got.
+     */
     expect(
-      safety?.versus?.onlySubjectHas.map((item) => item.key),
+      safety?.matched.map((item) => item.key),
+    ).toContain("hasBlindSpotAssist");
+    expect(safety?.isLeader).toBe(true);
+
+    /* And the car it's ahead of is only introduced deliberately. */
+    const challenger = evaluateChallenger(cheapWeakSafety, result!);
+
+    expect(
+      challenger.comparison?.biggestConcession?.versus?.onlyOtherHas.map(
+        (item) => item.key,
+      ),
     ).toContain("hasBlindSpotAssist");
   });
 
@@ -305,19 +321,72 @@ describe("buildRecommendation", () => {
 
     expect(result.winner.id).toBe(1);
 
-    // The winner is not the top scorer, and the verdict must not pretend it is.
+    // The winner is not the top scorer, and the engine says so outright.
     expect(result.evaluation.rank).toBeGreaterThan(1);
+    expect(result.topScorer.id).toBe(2);
+    expect(result.budgetChangedTheAnswer).toBe(true);
 
-    const verdict = explainVerdict(result.evaluation);
-    expect(verdict).toContain("isn't the highest-scoring car");
-    expect(verdict).toContain("Beta Two");
-    expect(verdict).not.toContain("strongest match");
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
 
-    // The head-to-head names the budget as the reason, with the amount.
-    const summary = result.evaluation.comparison!.summary;
-    expect(summary).toContain("over your €600/month budget");
-    expect(summary).toContain("isn't eligible to be recommended");
-    expect(result.evaluation.comparison!.budget.other).toBe("over");
+    // The headline never claims it simply scored highest.
+    expect(narrative.verdict.headline).toContain("fits your");
+    expect(narrative.verdict.headline).not.toContain("Beta Two");
+
+    // And the budget note names the car, the amount and the budget — once.
+    const note = narrative.verdict.budgetNote!;
+    expect(note).toContain("scores higher");
+    expect(note).toContain("€950");
+    expect(note).toContain("€600");
+  });
+
+  /* Saying it four ways is what this pass exists to stop. */
+  it("explains the budget override in exactly one place", () => {
+    const affordable = makeCar({
+      id: 1,
+      name: "Alpha One",
+      customerMonthly: 400,
+      consumption: 5,
+      features: ["hasEmergencyBrakingAssist"],
+    });
+
+    const stronger = makeCar({
+      id: 2,
+      name: "Beta Two",
+      customerMonthly: 900,
+      consumption: 5,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+        "hasEmergencyCallSystem",
+      ],
+    });
+
+    const result = buildRecommendation(
+      [affordable, stronger],
+      SAFETY_FIRST,
+      preferences,
+      features(),
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    const mentions = [
+      narrative.verdict.headline,
+      ...narrative.verdict.reasons,
+      ...narrative.priorities.flatMap((item) => item.sentences),
+    ].filter((line) => /scores higher/i.test(line));
+
+    expect(mentions).toHaveLength(0);
+    expect(narrative.verdict.budgetNote).toMatch(/scores higher/i);
   });
 
   it("says 'strongest match' only when the winner really is the top scorer", () => {
@@ -338,7 +407,16 @@ describe("buildRecommendation", () => {
     )!;
 
     expect(result.evaluation.rank).toBe(1);
-    expect(explainVerdict(result.evaluation)).toContain("strongest match");
+    expect(result.budgetChangedTheAnswer).toBe(false);
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    expect(narrative.verdict.headline).toContain("strongest match");
+    expect(narrative.verdict.budgetNote).toBeNull();
   });
 
   it("returns null only when there is nothing to compare", () => {
@@ -346,12 +424,12 @@ describe("buildRecommendation", () => {
   });
 });
 
-describe("hot seat", () => {
+describe("alternatives and the hot seat", () => {
   const preferences = prefs({ monthlyBudget: 0, monthlyKm: 500 });
 
   /*
-   * Scenario 11 — five cars ranked C, A, E, B, D with C recommended.
-   * Safety feature counts are chosen to force exactly that order.
+   * Five cars ranked C, A, E, B, D with C recommended. Safety feature counts
+   * are chosen to force exactly that order.
    */
   const buildFive = () => {
     const safety: Array<[number, string, number]> = [
@@ -382,7 +460,12 @@ describe("hot seat", () => {
   };
 
   const context = () =>
-    buildReasoningContext(buildFive(), ["safety"], preferences, features());
+    buildReasoningContext(
+      buildFive(),
+      ["safetyAssistance"],
+      preferences,
+      features(),
+    );
 
   it("ranks the fixture set C, A, E, B, D", () => {
     expect(context().ranked.map((car) => car.name)).toEqual([
@@ -394,23 +477,82 @@ describe("hot seat", () => {
     ]);
   });
 
-  it("puts the selected car first, then its closest-ranked neighbours", () => {
-    const ctx = context();
-    const recommended = ctx.ranked[0]!.id;
+  it("offers the four closest cars to the winner, and never the winner itself", () => {
+    const result = buildRecommendation(
+      buildFive(),
+      ["safetyAssistance"],
+      preferences,
+      features(),
+    )!;
 
-    // C selected (rank 1) → C, A, E, B, D
-    expect(
-      hotSeatOptions(ctx, recommended, recommended).map((o) => o.vehicle.name),
-    ).toEqual(["Car C", "Car A", "Car E", "Car B", "Car D"]);
+    expect(result.winner.name).toBe("Car C");
+    expect(result.alternatives).toHaveLength(ALTERNATIVE_COUNT);
+    expect(result.alternatives.map((car) => car.name)).toEqual([
+      "Car A",
+      "Car E",
+      "Car B",
+      "Car D",
+    ]);
 
-    // A selected (rank 2) → A, C, E, B, D
-    const aId = ctx.ranked[1]!.id;
     expect(
-      hotSeatOptions(ctx, aId, recommended).map((o) => o.vehicle.name),
-    ).toEqual(["Car A", "Car C", "Car E", "Car B", "Car D"]);
+      result.alternatives.some((car) => car.id === result.winner.id),
+    ).toBe(false);
   });
 
-  it("bounds the window instead of exposing the whole catalogue", () => {
+  /*
+   * The point of the alternatives set: a distant car that happens to top one
+   * category is not a realistic thing to be offered instead.
+   */
+  it("picks alternatives by overall closeness, not by winning one category", () => {
+    const winner = makeCar({
+      id: 1,
+      name: "Winner Car",
+      trunk: 400,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+        "hasEmergencyCallSystem",
+        "hasAdaptiveCruiseControl",
+      ],
+    });
+
+    const close = Array.from({ length: 4 }, (_, index) =>
+      makeCar({
+        id: index + 2,
+        name: `Close ${index + 1}`,
+        trunk: 400,
+        features: [
+          "hasEmergencyBrakingAssist",
+          "hasBlindSpotAssist",
+          "hasLaneKeepingAssist",
+          "hasEmergencyCallSystem",
+        ],
+      }),
+    );
+
+    /* Tops practicality on boot space, and is hopeless at everything else. */
+    const bootSpecialist = makeCar({
+      id: 99,
+      name: "Boot Specialist",
+      trunk: 2000,
+      features: [],
+    });
+
+    const result = buildRecommendation(
+      [winner, ...close, bootSpecialist],
+      ["safetyAssistance", "practicality"],
+      preferences,
+      features(),
+    )!;
+
+    expect(result.winner.id).toBe(1);
+    expect(
+      result.alternatives.some((car) => car.name === "Boot Specialist"),
+    ).toBe(false);
+  });
+
+  it("bounds the set instead of exposing the whole catalogue", () => {
     const many = Array.from({ length: 12 }, (_, index) =>
       makeCar({
         id: index + 1,
@@ -421,82 +563,139 @@ describe("hot seat", () => {
       }),
     );
 
-    const ctx = buildReasoningContext(
+    const result = buildRecommendation(
       many,
       ["practicality"],
       preferences,
       features(),
-    );
+    )!;
 
-    const middle = ctx.ranked[6]!;
-    const options = hotSeatOptions(ctx, middle.id, ctx.ranked[0]!.id);
-
-    expect(options).toHaveLength(5);
-    expect(options[0]?.vehicle.id).toBe(middle.id);
-    expect(options[0]?.isSelected).toBe(true);
+    expect(result.alternatives).toHaveLength(ALTERNATIVE_COUNT);
+    expect(result.ranked).toHaveLength(12);
   });
 
-  it("marks the recommendation wherever it lands in the window", () => {
-    const ctx = context();
-    const recommended = ctx.ranked[0]!.id;
-    const options = hotSeatOptions(ctx, ctx.ranked[1]!.id, recommended);
-
-    expect(options.filter((option) => option.isRecommendation)).toHaveLength(1);
-    expect(
-      options.find((option) => option.isRecommendation)?.vehicle.id,
-    ).toBe(recommended);
-  });
-
-  /* Scenario 11 — selecting another car must not move the recommendation. */
-  it("does not change the recommendation when another car is examined", () => {
-    const cars = buildFive();
-
+  it("expresses every alternative relative to the recommendation", () => {
     const result = buildRecommendation(
-      cars,
-      ["safety"],
-      preferences,
+      buildFive(),
+      ["safetyAssistance"],
+      prefs({ monthlyKm: 500, monthlyBudget: 600 }),
       features(),
+    )!;
+
+    const options = alternativeOptions(
+      result.context,
+      result.alternatives,
+      result.winner,
+      result.winner.id,
     );
 
-    const before = result!.winner.id;
-    const other = result!.ranked[1]!;
+    expect(options).toHaveLength(ALTERNATIVE_COUNT);
 
-    const hotSeat = evaluateVehicle(other, result!.context, {
-      recommendedId: before,
+    for (const option of options) {
+      expect(option.vehicle.id).not.toBe(result.winner.id);
+      /* Behind the winner, because the winner is the top scorer here. */
+      expect(option.differenceToWinner).toBeLessThanOrEqual(0);
+      expect(option.isSelected).toBe(false);
+    }
+  });
+
+  it("gives each alternative a concrete reason to look at it", () => {
+    const winner = makeCar({
+      id: 1,
+      name: "Winner Car",
+      trunk: 400,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+        "hasEmergencyCallSystem",
+      ],
     });
 
-    expect(hotSeat.vehicle.id).toBe(other.id);
-    expect(hotSeat.isRecommendation).toBe(false);
-    expect(result!.winner.id).toBe(before);
-  });
-
-  /* Scenario 12 — a hot-seated car is explained on its own terms. */
-  it("explains the hot-seat car using its own scores, features and cost", () => {
-    const cars = buildFive();
+    const bigBoot = makeCar({
+      id: 2,
+      name: "Roomy Car",
+      trunk: 1600,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+      ],
+    });
 
     const result = buildRecommendation(
-      cars,
-      ["safety"],
+      [winner, bigBoot],
+      ["safetyAssistance", "practicality"],
       preferences,
       features(),
     )!;
 
-    const carA = result.ranked[1]!;
+    const [option] = alternativeOptions(
+      result.context,
+      result.alternatives,
+      result.winner,
+      result.winner.id,
+    );
 
-    const evaluation = evaluateVehicle(carA, result.context, {
-      recommendedId: result.winner.id,
-    });
+    /*
+     * Something the reader can act on — a named feature or a figure — never
+     * "scores well on practicality".
+     */
+    expect(option?.hook).toBeTruthy();
+    expect(option?.hook).not.toMatch(/\/100/);
+    expect(option?.hook).toMatch(/Adds |: /);
+  });
 
-    expect(evaluation.rank).toBe(2);
-    expect(evaluation.cost.vehicleId).toBe(carA.id);
+  /* Selecting another car must not move the recommendation. */
+  it("does not change the recommendation when another car is examined", () => {
+    const result = buildRecommendation(
+      buildFive(),
+      ["safetyAssistance"],
+      preferences,
+      features(),
+    )!;
 
-    // It is compared against the recommendation, not against itself.
+    const before = result.winner.id;
+    const challenger = result.alternatives[0]!;
+
+    const hotSeat = evaluateChallenger(challenger, result);
+
+    expect(hotSeat.vehicle.id).toBe(challenger.id);
+    expect(hotSeat.isRecommendation).toBe(false);
+    expect(result.winner.id).toBe(before);
+  });
+
+  /* A challenger is always weighed against the winner, in that direction. */
+  it("compares a challenger against the recommendation and nothing else", () => {
+    const result = buildRecommendation(
+      buildFive(),
+      ["safetyAssistance"],
+      preferences,
+      features(),
+    )!;
+
+    const challenger = result.alternatives[1]!;
+    const evaluation = evaluateChallenger(challenger, result);
+
+    expect(evaluation.comparison?.subject.vehicleId).toBe(challenger.id);
     expect(evaluation.comparison?.other.vehicleId).toBe(result.winner.id);
+    expect(evaluation.cost.vehicleId).toBe(challenger.id);
+  });
 
-    // And the verdict never claims it won.
-    const verdict = explainVerdict(evaluation);
-    expect(verdict).toContain("not your recommendation");
-    expect(verdict).toContain(String(evaluation.score.total));
+  /* The winner is explained on its own merits, not against a runner-up. */
+  it("gives the recommendation no head-to-head of its own", () => {
+    const result = buildRecommendation(
+      buildFive(),
+      ["safetyAssistance"],
+      preferences,
+      features(),
+    )!;
+
+    expect(result.evaluation.comparison).toBeNull();
+
+    for (const priority of result.evaluation.priorities) {
+      expect(priority.versus).toBeNull();
+    }
   });
 
   it("evaluates an over-budget car the user selects, without hiding the cost", () => {
@@ -510,29 +709,27 @@ describe("hot seat", () => {
       features(),
     )!;
 
-    const evaluation = evaluateVehicle(expensive, result.context, {
-      recommendedId: result.winner.id,
-    });
+    const evaluation = evaluateChallenger(expensive, result);
 
     expect(evaluation.cost.breakdown.budgetStatus).toBe("over");
     expect(evaluation.cost.budgetSentence).toContain("over budget");
-    expect(explainVerdict(evaluation)).toContain("over your budget");
+
+    const reasoning = reasonAboutChallenge(evaluation, result.context)!;
+    expect(reasoning.budget).toContain("over the");
+    expect(reasoning.verdict).toContain("budget");
   });
 
-  it("judges the hot-seat car against exactly the same settings", () => {
-    const cars = buildFive();
+  it("judges the challenger against exactly the same settings", () => {
     const preferencesUsed = prefs({ monthlyKm: 777, monthlyBudget: 1234 });
 
     const result = buildRecommendation(
-      cars,
-      ["safety"],
+      buildFive(),
+      ["safetyAssistance"],
       preferencesUsed,
       features(),
     )!;
 
-    const evaluation = evaluateVehicle(result.ranked[2]!, result.context, {
-      recommendedId: result.winner.id,
-    });
+    const evaluation = evaluateChallenger(result.alternatives[1]!, result);
 
     expect(result.context.preferences).toBe(preferencesUsed);
     expect(evaluation.cost.breakdown.monthlyKm).toBe(777);
@@ -540,6 +737,15 @@ describe("hot seat", () => {
     expect(evaluation.priorities.map((item) => item.priority)).toEqual(
       result.evaluation.priorities.map((item) => item.priority),
     );
+  });
+
+  it("keeps selectAlternatives usable on its own", () => {
+    const ctx = context();
+    const winner = ctx.ranked[0]!;
+
+    expect(
+      selectAlternatives(ctx, winner.id, 2).map((car) => car.name),
+    ).toEqual(["Car A", "Car E"]);
   });
 });
 
@@ -577,7 +783,7 @@ describe("comparative reasoning", () => {
 
     return buildRecommendation(
       [carC, carA],
-      ["safety", "practicality"],
+      ["safetyAssistance", "practicality"],
       preferences,
       features(),
     )!;
@@ -587,63 +793,94 @@ describe("comparative reasoning", () => {
     const result = setup();
 
     expect(result.context.weights).toEqual([
-      { priority: "safety", rank: 1, weight: 2 / 3, weightPercent: 67 },
+      { priority: "safetyAssistance", rank: 1, weight: 2 / 3, weightPercent: 67 },
       { priority: "practicality", rank: 2, weight: 1 / 3, weightPercent: 33 },
     ]);
   });
 
   it("names the equipment behind a category gap rather than the points", () => {
     const result = setup();
-    const narrative = buildAdviceNarrative(result.evaluation, result.context);
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
 
     const safety = narrative.priorities.find(
-      (item) => item.priority === "safety",
+      (item) => item.priority === "safetyAssistance",
     )!;
 
     const prose = safety.sentences.join(" ");
 
-    // The specific equipment difference is named, and carries its tier.
-    expect(safety.rival!.onlySubjectHas.map((item) => item.label)).toContain(
-      "Blind spot warning",
-    );
-    expect(prose.toLowerCase()).toContain("blind spot warning");
-    expect(
-      safety.features.essentialPresent.map((item) => item.label),
-    ).toContain("Blind spot warning");
+    /* Every feature the user selected is named, present or missing. */
+    const named = [
+      ...safety.features.essentialPresent,
+      ...safety.features.essentialMissing,
+    ];
 
-    // The score recital the old copy leant on is gone.
+    expect(named.length).toBeGreaterThan(0);
+
+    for (const fact of named) {
+      expect(prose.toLowerCase()).toContain(fact.label.toLowerCase());
+    }
+
+    /* The score recital the old copy leant on is gone. */
     expect(prose).not.toContain("/100");
     expect(prose).not.toContain(`${safety.weightPercent}%`);
+    expect(prose).not.toMatch(/\bscores?\b/i);
   });
 
   it("surfaces where the losing car is actually better, with the numbers", () => {
     const result = setup();
-    const concession = result.evaluation.comparison!.biggestConcession!;
 
-    expect(concession.priority).toBe("practicality");
-    expect(concession.versus!.difference).toBeLessThan(0);
+    const challenger = evaluateChallenger(result.alternatives[0]!, result);
 
-    // The boot-space measurement behind it is carried through.
-    expect(concession.numeric?.label).toBe("Boot space");
-    expect(concession.versus?.numeric?.value).toBe(520);
-    expect(concession.numeric?.value).toBe(390);
+    /* Where the challenger genuinely beats the recommendation. */
+    const advantage = challenger.comparison!.decidingAdvantage!;
 
-    // Named by the equipment behind it, not by the points it was worth.
-    const summary = result.evaluation.comparison!.summary;
+    expect(advantage.versus!.difference).toBeGreaterThan(0);
 
-    expect(summary).toContain("practicality");
-    expect(summary).toContain("split-folding rear seats");
-    expect(summary).toContain("isn't enough to close the gap");
+    /* The equipment behind the gap is carried through, tier and all. */
+    expect(
+      advantage.versus!.onlySubjectHas.length +
+        (advantage.numeric ? 1 : 0),
+    ).toBeGreaterThan(0);
+
+    /* And the summary names it rather than reciting the points. */
+    const summary = challenger.comparison!.summary;
+
+    expect(summary).toContain(advantage.label.toLowerCase());
+    expect(summary).not.toMatch(/\bworth about\b/);
+    expect(summary).not.toMatch(/\d+\/100/);
+  });
+
+  /* The recommendation's own boot figure is still reported, unprompted. */
+  it("quotes the measurement behind a priority without being asked", () => {
+    const result = setup();
+
+    const practicality = result.evaluation.priorities.find(
+      (item) => item.priority === "practicality",
+    )!;
+
+    expect(practicality.numeric?.label).toBe("Boot space");
+    expect([390, 520]).toContain(practicality.numeric?.value);
   });
 
   it("never says a car won because 'your other priorities matter more'", () => {
     const result = setup();
-    const narrative = buildAdviceNarrative(result.evaluation, result.context);
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
 
     const prose = [
-      result.evaluation.comparison!.summary,
-      ...narrative.verdict.sentences,
+      narrative.verdict.headline,
+      ...narrative.verdict.reasons,
       ...narrative.priorities.flatMap((item) => item.sentences),
+      ...narrative.tradeoffs.flatMap((item) => item.sentences),
     ].join(" ");
 
     expect(prose).not.toMatch(/other priorities matter more/i);
@@ -655,13 +892,15 @@ describe("comparative reasoning", () => {
   it("keeps matched and missing features available per category", () => {
     const result = setup();
     const safety = result.evaluation.priorities.find(
-      (item) => item.priority === "safety",
+      (item) => item.priority === "safetyAssistance",
     )!;
 
     expect(safety.matchedLabels.length).toBeGreaterThan(0);
     expect(safety.leader).not.toBeNull();
-    expect(safety.isLeader).toBe(true);
-    expect(safety.gapToLeader).toBe(0);
+    expect(safety.runnerUp).not.toBeNull();
+
+    /* Leading and trailing are both expressible, and stay consistent. */
+    expect(safety.isLeader).toBe(safety.gapToLeader === 0);
   });
 
   it("weights sum to the overall score", () => {

@@ -1,5 +1,5 @@
 import "@/assets/tailwind.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ArrowRightIcon,
     Cog6ToothIcon,
@@ -22,6 +22,7 @@ export function StepOneChoosePrioritiesStep({
     priorities,
     setPriorities,
     profiles,
+    defaultProfileId,
     onNext,
     onSettings,
     categoryFeatures,
@@ -29,6 +30,8 @@ export function StepOneChoosePrioritiesStep({
     priorities: CategoryId[];
     setPriorities: (value: CategoryId[]) => void;
     profiles: Profile[];
+    /** The profile that is selected automatically. */
+    defaultProfileId: string;
     onNext: () => void;
     onSettings: () => void;
     categoryFeatures: Record<CategoryId, FeatureWeight[]>;
@@ -42,6 +45,32 @@ export function StepOneChoosePrioritiesStep({
     const [selectionMode, setSelectionMode] =
         useState<SelectionMode>("profile");
 
+    /* Disabled profiles are not offered — that is what disabling one means. */
+    const enabledProfiles = profiles.filter((profile) => profile.enabled);
+
+    /*
+     * "Default profile" means selected, not merely present in the list. It is
+     * a starting point though, so it only claims the selection while the user
+     * hasn't made one of their own: an order matching a profile's shows as
+     * that profile, and anything else shows as no profile at all.
+     */
+    useEffect(() => {
+        const matching = enabledProfiles.find(
+            (profile) =>
+                profile.priorities.length === priorities.length &&
+                profile.priorities.every(
+                    (id, index) => priorities[index] === id,
+                ),
+        );
+
+        setActiveProfileId(matching?.id ?? null);
+    }, [profiles, priorities]);
+
+    const defaultProfile =
+        enabledProfiles.find(
+            (profile) => profile.id === defaultProfileId,
+        ) ?? enabledProfiles[0];
+
     const available = CATEGORY_IDS.filter(
         (id) => !priorities.includes(id),
     );
@@ -53,19 +82,16 @@ export function StepOneChoosePrioritiesStep({
             setPriorities(
                 priorities.filter((category) => category !== id),
             );
-            setActiveProfileId(null);
             return;
         }
 
         if (atLimit) return;
 
         setPriorities([...priorities, id]);
-        setActiveProfileId(null);
     };
 
     const applyProfile = (profile: Profile) => {
-        setActiveProfileId(profile.id);
-        setPriorities(profile.priorities.slice(0, 5));
+        setPriorities([...profile.priorities]);
     };
 
     return (
@@ -80,8 +106,10 @@ export function StepOneChoosePrioritiesStep({
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                    Choose up to five things you care about. We'll ask you
-                    to put them in order next.
+                    Start from a profile or pick your own — either way you
+                    get up to five priorities, and you'll put them in order
+                    next. Whatever you change here is what Lens uses; a
+                    profile is only a starting point.
                 </p>
             </div>
 
@@ -92,8 +120,10 @@ export function StepOneChoosePrioritiesStep({
 
             {selectionMode === "profile" && (
                 <ProfileSelection
-                    profiles={profiles}
+                    profiles={enabledProfiles}
+                    defaultProfileId={defaultProfile?.id ?? null}
                     activeProfileId={activeProfileId}
+                    categoryFeatures={categoryFeatures}
                     onSelect={applyProfile}
                     onSettings={onSettings}
                     onChooseCustom={() => setSelectionMode("custom")}

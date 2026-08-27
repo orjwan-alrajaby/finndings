@@ -10,6 +10,7 @@ import type { PinnedFinnCar } from "@/lib/types";
 
 import {
   DEFAULT_CATEGORY_FEATURES,
+  DEFAULT_DEFAULT_PROFILE_ID,
   DEFAULT_PREFERENCES,
   DEFAULT_PRIORITIES,
   DEFAULT_PROFILES,
@@ -54,6 +55,10 @@ export default function CompareTab({
   const [profiles, setProfiles] =
     useState(DEFAULT_PROFILES);
 
+  /* Which profile is selected automatically when nothing else is. */
+  const [defaultProfileId, setDefaultProfileId] =
+    useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
+
   const [categoryFeatures, setCategoryFeatures] =
     useState<Record<CategoryId, FeatureWeight[]>>(
       DEFAULT_CATEGORY_FEATURES,
@@ -64,6 +69,7 @@ export default function CompareTab({
       setPreferences(settings.preferences);
       setPriorities(settings.priorities);
       setProfiles(settings.profiles);
+      setDefaultProfileId(settings.defaultProfileId);
       setCategoryFeatures(
         settings.categoryFeatures,
       );
@@ -74,10 +80,15 @@ export default function CompareTab({
     nextStep?: CompareStep,
     features = categoryFeatures,
   ) => {
+    /*
+     * Profiles aren't written back from here — they're fixed configuration
+     * owned by the settings page. What the compare flow owns is the user's
+     * own priority order, and saving it is what stops a profile reasserting
+     * itself over a customised order on the next run.
+     */
     await saveLensSettings({
       preferences,
       priorities,
-      profiles,
       categoryFeatures: features,
     });
 
@@ -179,6 +190,9 @@ export default function CompareTab({
                     setPriorities
                   }
                   profiles={profiles}
+                  defaultProfileId={
+                    defaultProfileId
+                  }
                   onNext={() =>
                     setStep("order")
                   }

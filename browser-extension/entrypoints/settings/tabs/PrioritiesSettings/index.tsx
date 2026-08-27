@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-    DEFAULT_CATEGORY_FEATURES,
+    AVAILABLE_CATEGORY_FEATURES,
 } from "@/lib/reasoning-engine/constants";
 import {
     type CategoryId,
@@ -55,7 +55,7 @@ export function PrioritiesSettings({
     return (
         <Section
             title="Priorities"
-            description="Choose the priorities Lens considers when comparing cars. Each priority has its own features that you can enable and rank by importance."
+            description="Each priority looks for a handful of specific features. Turn on the ones you actually want — up to five per priority — and say how much each one matters. Essential features count for most, luxury extras for least."
         >
             <div className="flex flex-col gap-3">
                 {priorityDefinitions.map(
@@ -68,8 +68,9 @@ export function PrioritiesSettings({
                             priority.id
                             ] ?? [];
 
+                        /* The whole catalogue, not just what's switched on. */
                         const availableFeatures =
-                            DEFAULT_CATEGORY_FEATURES[
+                            AVAILABLE_CATEGORY_FEATURES[
                             priority.id
                             ] ?? [];
 

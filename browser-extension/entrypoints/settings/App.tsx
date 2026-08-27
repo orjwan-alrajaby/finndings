@@ -1,5 +1,6 @@
 import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { ArrowLeftIcon, ArrowPathIcon, CheckIcon } from "@heroicons/react/24/outline";
 import {
   DEFAULT_CATEGORY_FEATURES,
@@ -69,13 +70,14 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
   const flashSaved = () => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
 
-  // `priorities` is a legacy fallback field predating the profile system —
-  // kept in sync with the current default profile's order (falling back to
-  // the constant only if that profile is somehow missing) rather than left
-  // frozen at DEFAULT_PRIORITIES forever.
-  const currentSettings = (): LensSettings => ({
+  // Deliberately without `priorities`.
+  //
+  // The user's own priority order is owned by the compare flow. Writing the
+  // default profile's order from here would silently undo a customised order
+  // the next time anything on this page was saved — a profile is a starting
+  // point, not something that reasserts itself.
+  const currentSettings = (): Omit<LensSettings, "priorities"> => ({
     preferences,
-    priorities: profiles.find((p) => p.id === defaultProfileId)?.priorities ?? DEFAULT_PRIORITIES,
     priorityDefinitions,
     categoryFeatures,
     profiles,
@@ -96,26 +98,23 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   };
 
   // ── Profiles ────────────────────────────────────────────────────────────
-
-  const reassignDefaultIfNeeded = (removedOrDisabledId: string) => {
-    if (removedOrDisabledId !== defaultProfileId) return;
-    const replacement = profiles.find((p) => p.id !== removedOrDisabledId && p.enabled);
-    if (replacement) setDefaultProfileId(replacement.id);
-  };
-
-  const handleSaveProfile = (profile: Profile, isNew: boolean) => {
-    setProfiles((cur) => (isNew ? [...cur, profile] : cur.map((p) => (p.id === profile.id ? profile : p))));
-    if (isNew && profiles.length === 0) setDefaultProfileId(profile.id);
-  };
-
-  const handleDeleteProfile = (profile: Profile) => {
-    setProfiles((cur) => cur.filter((p) => p.id !== profile.id));
-    reassignDefaultIfNeeded(profile.id);
-  };
+  //
+  // Profiles are product configuration: they can be switched on and off and
+  // one of them is the default, but their copy and priority order are fixed.
+  // The only thing to guard here is that the default always points at a
+  // profile that is actually available.
 
   const handleToggleProfileEnabled = (id: string, enabled: boolean) => {
-    setProfiles((cur) => cur.map((p) => (p.id === id ? { ...p, enabled } : p)));
-    if (!enabled) reassignDefaultIfNeeded(id);
+    const next = profiles.map((p) => (p.id === id ? { ...p, enabled } : p));
+
+    if (!next.some((p) => p.enabled)) return;
+
+    setProfiles(next);
+
+    if (!enabled && id === defaultProfileId) {
+      const replacement = next.find((p) => p.enabled);
+      if (replacement) setDefaultProfileId(replacement.id);
+    }
   };
 
   // ── Restore defaults ────────────────────────────────────────────────────
@@ -152,6 +151,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   }
 
   return (
+    <Tooltip.Provider delayDuration={250}>
     <main className="min-h-screen bg-finn-snow text-finn-black">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
         <header className="mb-7 flex items-start justify-between gap-4">
@@ -189,8 +189,6 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
               profiles={profiles}
               priorityDefinitions={priorityDefinitions}
               defaultProfileId={defaultProfileId}
-              onSaveProfile={handleSaveProfile}
-              onDeleteProfile={handleDeleteProfile}
               onToggleEnabled={handleToggleProfileEnabled}
               onSetDefault={setDefaultProfileId}
             />
@@ -217,8 +215,9 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         confirmLabel="Restore defaults"
         tone="danger"
         onConfirm={handleRestoreDefaults}
-        description="This resets priorities, features, profiles, the default profile, and driving assumptions to FINN Lens's factory configuration. Any custom priorities, profiles, or edits you've made will be lost. This can't be undone."
+        description="This resets priorities, features, which profiles are enabled, the default profile, and driving assumptions to FINN Lens's factory configuration. Any custom priorities or edits you've made will be lost. This can't be undone."
       />
     </main>
+    </Tooltip.Provider>
   );
 }

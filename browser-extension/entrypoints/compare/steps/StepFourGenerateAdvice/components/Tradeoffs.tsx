@@ -4,88 +4,26 @@ import type { Tradeoff } from "@/lib/reasoning-engine/narrative";
 /**
  * What the reader is accepting in exchange.
  *
- * Deliberately not a disclaimer at the bottom of the page. A recommendation
- * without its compromises is only half an answer, so this sits directly under
- * the reasoning that produced it and is written in the same voice.
+ * This is the other half of the recommendation, not a disclaimer at the
+ * bottom of the page: "why it wins" says what the choice bought, and this
+ * says what it cost. It sits directly under that reasoning and is written in
+ * the same voice.
  *
- * Everything here is already relevance-filtered by the narrative layer: each
- * item traces back to a priority the user ranked or the budget they set.
- * Nothing is listed just because it's true.
+ * Every item is already relevance-filtered by the narrative layer — each one
+ * traces back to a priority the user ranked or the budget they set. Nothing
+ * is listed merely because it is true.
  */
 export function Tradeoffs({
     tradeoffs,
     isRecommendation,
+    subjectName,
 }: {
     tradeoffs: Tradeoff[];
     isRecommendation: boolean;
+    subjectName: string;
 }) {
-    if (!tradeoffs.length) {
-        return (
-            <section className="mt-8 border-t border-finn-cotton pt-6">
-                <Heading isRecommendation={isRecommendation} />
-
-                <p className="mt-2 text-sm leading-6 text-finn-iron">
-                    Nothing you ranked is meaningfully worse on this car than on
-                    the others you pinned, and it's inside the budget you set.
-                    That won't stay true if you change your priority order.
-                </p>
-            </section>
-        );
-    }
-
     return (
-        <section className="mt-8 border-t border-finn-cotton pt-6">
-            <Heading isRecommendation={isRecommendation} />
-
-            <p className="mt-2 text-sm leading-6 text-finn-iron">
-                Only the compromises that answer to something you told us —
-                a priority you ranked, or the budget you set.
-            </p>
-
-            <div className="mt-4 space-y-3">
-                {tradeoffs.map((tradeoff) => (
-                    <article
-                        key={`${tradeoff.kind}-${tradeoff.priority ?? "budget"}`}
-                        className={[
-                            "rounded-[22px] p-5",
-                            tradeoff.severity === "high"
-                                ? "bg-finn-warning/10"
-                                : "bg-finn-snow",
-                        ].join(" ")}
-                    >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <h3 className="text-base font-black text-finn-black">
-                                {tradeoff.headline}
-                            </h3>
-
-                            {tradeoff.priorityLabel && tradeoff.rank && (
-                                <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                                    {tradeoff.priorityLabel} · your #
-                                    {tradeoff.rank}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="mt-2 space-y-2">
-                            {tradeoff.sentences.map((sentence) => (
-                                <p
-                                    key={sentence}
-                                    className="text-sm leading-6 text-finn-iron"
-                                >
-                                    {sentence}
-                                </p>
-                            ))}
-                        </div>
-                    </article>
-                ))}
-            </div>
-        </section>
-    );
-}
-
-function Heading({ isRecommendation }: { isRecommendation: boolean }) {
-    return (
-        <>
+        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-finn-warning">
                 <ScaleIcon className="h-3.5 w-3.5" />
                 The other side of it
@@ -94,8 +32,62 @@ function Heading({ isRecommendation }: { isRecommendation: boolean }) {
             <h2 className="mt-2 text-2xl font-black">
                 {isRecommendation
                     ? "What you're giving up to take this one."
-                    : "What this car would cost you elsewhere."}
+                    : `What ${subjectName} would cost you.`}
             </h2>
-        </>
+
+            {tradeoffs.length === 0 ? (
+                <p className="mt-3 text-sm leading-6 text-finn-iron">
+                    Nothing you ranked comes out meaningfully worse on this car
+                    than on the alternatives closest to it, and it fits the
+                    budget you set. Change your priority order and that may
+                    stop being true.
+                </p>
+            ) : (
+                <>
+                    <p className="mt-2 text-sm leading-6 text-finn-iron">
+                        Only the compromises that answer to something you told
+                        us — a priority you ranked, or the budget you set.
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                        {tradeoffs.map((tradeoff) => (
+                            <article
+                                key={`${tradeoff.kind}-${tradeoff.priority ?? "budget"}`}
+                                className={[
+                                    "rounded-[22px] p-5",
+                                    tradeoff.severity === "high"
+                                        ? "bg-finn-warning/10"
+                                        : "bg-finn-snow",
+                                ].join(" ")}
+                            >
+                                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                    <h3 className="text-base font-black text-finn-black">
+                                        {tradeoff.headline}
+                                    </h3>
+
+                                    {tradeoff.priorityLabel && tradeoff.rank && (
+                                        <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                                            {tradeoff.priorityLabel} · your #
+                                            {tradeoff.rank}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-2 space-y-2">
+                                    {tradeoff.sentences.map((sentence) => (
+                                        <p
+                                            key={sentence}
+                                            className="text-sm leading-6 text-finn-iron"
+                                        >
+                                            {sentence}
+                                        </p>
+                                    ))}
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </>
+            )}
+        </section>
     );
 }

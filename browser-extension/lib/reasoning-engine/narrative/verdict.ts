@@ -9,53 +9,177 @@ import { formatEUR } from "../format";
 import { totalFor } from "../scoring";
 import { classifyTotalGap, isEffectivelyLevel } from "./magnitude";
 import {
+  coverage,
+  inSentence,
+  joinCapped,
   joinList,
   paragraph,
   phraseLabel,
   sentence,
   shortName,
+  toSentenceStart,
 } from "./phrase";
 
 /**
  * The answer to "why this one?".
  *
- * Written from what the car actually leads and doesn't lead across the user's
- * own priority list. It never claims the car is best at everything, and where
- * the result was close it says so — a reader who can see an 82 next to an 81
- * is owed an explanation of the single point, not a confident sentence that
- * pretends the gap is bigger than it is.
+ * Two rules govern this file, and both exist because the old version broke
+ * them:
+ *
+ * - **Say it once.** The budget override, the closeness of the top two, and
+ *   the conclusion itself each get exactly one sentence on the page. They
+ *   used to appear in four places, which reads as a machine looping rather
+ *   than a person explaining.
+ *
+ * - **Reason, don't score.** The reader is told what they asked for and what
+ *   this car does about it. The weighted arithmetic that produced the result
+ *   is still calculated, still checkable, and stays out of the sentence.
  */
+
+/* -------------------------------------------------------------------------- */
+/* Why it won                                                                 */
+/* -------------------------------------------------------------------------- */
 
 /**
- * Priorities this car genuinely leads.
+ * One priority, compressed to the sentence a summary can carry.
  *
- * A tie with the car it's being compared against is not a lead, however the
- * leader lookup happened to break it.
+ * Names the equipment or quotes the figure — never "scores well here", which
+ * tells the reader nothing they can act on.
  */
-function ledPriorities(breakdowns: PriorityBreakdown[]): PriorityBreakdown[] {
-  return breakdowns.filter(
-    (item) =>
-      item.hasEvidence &&
-      item.isLeader &&
-      !(item.versus && item.versus.difference === 0),
+function summarisePriority(
+  reasoning: PriorityReasoning,
+  position: "first" | "next",
+): string | null {
+  if (reasoning.standing === "unsupported") return null;
+
+  const opener =
+    position === "first"
+      ? `You put ${phraseLabel(reasoning.label)} first`
+      : `${toSentenceStart(phraseLabel(reasoning.label))} is your #${reasoning.rank}`;
+
+  const { essentialPresent, essentialMissing } = reasoning.features;
+  const essentials = essentialPresent.length + essentialMissing.length;
+
+  if (essentials > 0) {
+    const missing = joinCapped(
+      essentialMissing.map((fact) => inSentence(fact.label)),
+    );
+
+    if (!essentialMissing.length) {
+      const present = joinCapped(
+        essentialPresent.map((fact) => inSentence(fact.label)),
+      );
+
+      return essentials === 1
+        ? sentence(
+            `${opener}, and this car has ${present} — the one thing you marked`,
+            "essential there",
+          )
+        : sentence(
+            `${opener}, and this car has everything you marked essential there:`,
+            present,
+          );
+    }
+
+    if (!essentialPresent.length) {
+      return sentence(
+        `${opener}, and this car has none of what you marked essential there —`,
+        `it's missing ${missing}`,
+      );
+    }
+
+    /*
+     * `coverage` already reads as a complete object ("two of the four"), so
+     * the sentence names what the shortfall actually is rather than appending
+     * another "of the features".
+     */
+    return sentence(
+      `${opener}, and this car has`,
+      `${coverage(essentialPresent.length, essentials)} features you marked`,
+      `essential there — it doesn't have ${missing}`,
+    );
+  }
+
+  /* No essentials configured: the measurement is the whole answer. */
+  const measured = reasoning.measurements.find((fact) => fact.scored);
+
+  if (measured) {
+    return sentence(
+      `${opener}, and this car's ${inSentence(measured.label)} is ${measured.display}`,
+    );
+  }
+
+  const present = reasoning.features.optionalPresent;
+
+  return present.length
+    ? sentence(
+        `${opener}, and this car has`,
+        joinCapped(present.map((fact) => inSentence(fact.label))),
+      )
+    : null;
+}
+
+/**
+ * The "why", built from the top of the user's own order.
+ *
+ * Capped at two priorities: the detail for every priority is directly below
+ * on the page, and a summary that repeats all five isn't a summary.
+ */
+function describeReasons(priorities: PriorityReasoning[]): string[] {
+  const usable = priorities.filter((item) => item.standing !== "unsupported");
+
+  const [first, second] = usable;
+
+  return paragraph(
+    first ? summarisePriority(first, "first") : null,
+    second ? summarisePriority(second, "next") : null,
   );
 }
 
-/** Priorities where another pinned car is clearly stronger. */
-function trailingPriorities(
-  breakdowns: PriorityBreakdown[],
-): PriorityBreakdown[] {
-  return breakdowns.filter(
-    (item) =>
-      item.hasEvidence &&
-      !item.isLeader &&
-      item.leader != null &&
-      !isEffectivelyLevel(classifyTotalGap(item.gapToLeader)),
+/* -------------------------------------------------------------------------- */
+/* The budget                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The one statement on the page that the budget changed the answer.
+ *
+ * A recommendation that placed below the top scorer is not the highest-scoring
+ * car, and saying so plainly is the difference between a result the reader can
+ * check and one they have to take on faith.
+ */
+function describeBudgetOverride(
+  evaluation: VehicleEvaluation,
+  context: ReasoningContext,
+): string | null {
+  if (!evaluation.isRecommendation || evaluation.rank <= 1) return null;
+
+  const topScorer = context.ranked[0];
+  if (!topScorer) return null;
+
+  const cost = context.costs[topScorer.id];
+  const budget = context.budget.budget;
+
+  if (budget == null) return null;
+
+  const problem =
+    cost?.budgetStatus === "over"
+      ? sentence(
+          `${shortName(topScorer.name)} scores higher overall, but at about`,
+          `${formatEUR(cost.totalMonthly)}/month it's over the ${formatEUR(budget)}`,
+          `budget you set`,
+        )
+      : sentence(
+          `${shortName(topScorer.name)} scores higher overall, but part of its cost`,
+          `couldn't be estimated, so we can't confirm it fits your ${formatEUR(budget)}`,
+          `budget`,
+        );
+
+  return sentence(
+    problem.replace(/\.$/, ""),
+    `— so ${shortName(evaluation.vehicle.name)} is the strongest car you pinned`,
+    `that does fit`,
   );
 }
-
-const labelsOf = (items: PriorityBreakdown[]): string[] =>
-  items.map((item) => phraseLabel(item.label));
 
 /* -------------------------------------------------------------------------- */
 /* The margin                                                                 */
@@ -84,147 +208,34 @@ function marginToNext(
 }
 
 /**
- * When two cars finish a point or two apart, say so and name what tipped it.
+ * Said only when the ranking would otherwise mislead.
  *
- * Anything else invites the reader to look at the ranking, see 82 against 81,
- * and stop trusting the explanation above it.
+ * Two cars a point apart are a coin toss, and a reader who can see 82 beside
+ * 81 deserves to be told that before they read a confident explanation of the
+ * gap.
  */
 function describeMargin(
   margin: Verdict["margin"],
-  evaluation: VehicleEvaluation,
+  priorities: PriorityReasoning[],
 ): string | null {
-  if (!margin) return null;
-  if (!isEffectivelyLevel(margin.magnitude)) return null;
+  if (!margin || !isEffectivelyLevel(margin.magnitude)) return null;
 
-  const decider = evaluation.comparison?.decidingAdvantage;
+  const decider = priorities.find(
+    (item) =>
+      item.standing !== "unsupported" &&
+      (item.standing === "leads" || item.standing === "levelWithLeader"),
+  );
 
-  const gap =
+  return sentence(
+    `${shortName(margin.name)} finishes`,
     margin.difference === 0
-      ? "level on points"
+      ? "level with it on points"
       : `${Math.abs(margin.difference)} point${
           Math.abs(margin.difference) === 1 ? "" : "s"
-        } apart`;
-
-  return sentence(
-    `This one is close: ${shortName(evaluation.vehicle.name)} and`,
-    `${shortName(margin.name)} finish ${gap}.`,
+        } behind`,
     decider
-      ? `What separates them is ${phraseLabel(decider.label)}, your #${decider.rank} priority`
-      : "Treat them as interchangeable on the numbers",
-  );
-}
-
-/**
- * States when the highest-scoring car wasn't allowed to win.
- *
- * Without this, a budget-driven result looks like the arithmetic is wrong.
- */
-function describeBudgetOverride(
-  evaluation: VehicleEvaluation,
-  context: ReasoningContext,
-): string | null {
-  if (!evaluation.isRecommendation || evaluation.rank <= 1) return null;
-
-  const topScorer = context.ranked[0];
-  if (!topScorer) return null;
-
-  const status = context.costs[topScorer.id]?.budgetStatus;
-
-  return sentence(
-    `${shortName(topScorer.name)} scores higher, but`,
-    status === "over"
-      ? `at about ${formatEUR(
-          context.costs[topScorer.id]?.totalMonthly ?? 0,
-        )}/month it's over the ${formatEUR(context.budget.budget ?? 0)} budget you set`
-      : "part of its cost couldn't be estimated, so we can't confirm it fits your budget",
-    `— so it isn't eligible to be recommended, and this one is`,
-  );
-}
-
-/**
- * "It isn't the best at everything", grouped by the car that beats it.
- *
- * Listing the same rival once per category — "Puma does driver assistance
- * better and Puma does safety better" — is the sound of a loop, not a person.
- */
-function describeWhatItDoesntLead(
-  trailing: PriorityBreakdown[],
-  hasComparablePriorities: boolean,
-): string | null {
-  if (!trailing.length) {
-    return hasComparablePriorities
-      ? sentence("It isn't beaten on any priority you ranked")
-      : null;
-  }
-
-  const byLeader = new Map<string, string[]>();
-
-  for (const item of trailing.slice(0, 3)) {
-    const leader = shortName(item.leader?.name ?? "Another car");
-    byLeader.set(leader, [...(byLeader.get(leader) ?? []), phraseLabel(item.label)]);
-  }
-
-  const clauses = [...byLeader.entries()].map(
-    ([leader, labels]) => `${leader} does ${joinList(labels)} better`,
-  );
-
-  return sentence("It isn't the best at everything:", joinList(clauses));
-}
-
-/**
- * The one line that has to be both true and useful.
- *
- * The order of these cases is the order a reader would ask about them: was
- * it even allowed to win, does it lead the thing I care most about, and if
- * not, what is it actually best at?
- */
-function buildHeadline(
-  evaluation: VehicleEvaluation,
-  context: ReasoningContext,
-  name: string,
-  led: PriorityBreakdown[],
-  topLed: PriorityBreakdown[],
-): string {
-  const topPriority = evaluation.priorities[0];
-  const leadsTopPriority = topPriority ? led.includes(topPriority) : false;
-
-  /*
-   * A car that placed below the top scorer only won because the budget
-   * excluded the cars above it. Opening with anything else would make the
-   * ranking underneath look like a mistake.
-   */
-  if (evaluation.rank > 1) {
-    const topScorer = context.ranked[0];
-
-    return sentence(
-      `${name} is the strongest car you pinned that fits your`,
-      `${formatEUR(context.budget.budget ?? 0)}/month budget`,
-      topScorer ? `— ${shortName(topScorer.name)} scores higher but doesn't fit` : "",
-    );
-  }
-
-  if (leadsTopPriority && topPriority) {
-    return sentence(
-      `${name} comes out on top because it's the strongest car you pinned for`,
-      `${phraseLabel(topPriority.label)}, the thing you ranked first`,
-      topLed.length > 1 ? `, and for ${phraseLabel(topLed[1]!.label)} too` : "",
-    );
-  }
-
-  const topLeader = topPriority?.leader ? shortName(topPriority.leader.name) : null;
-
-  if (led.length && topPriority) {
-    return sentence(
-      `${name} doesn't lead ${phraseLabel(topPriority.label)}`,
-      topLeader ? `— ${topLeader} does —` : "—",
-      `but it's close there and it's the strongest car you pinned for`,
-      joinList(labelsOf(topLed)),
-    );
-  }
-
-  return sentence(
-    `${name} doesn't lead any single priority on its own — it wins on the`,
-    `combination across ${joinList(labelsOf(evaluation.priorities.slice(0, 2)))}`,
+      ? `, and ${phraseLabel(decider.label)} is what separates them`
+      : `— close enough that either would be a defensible choice`,
   );
 }
 
@@ -232,65 +243,91 @@ function buildHeadline(
 /* Assembly                                                                   */
 /* -------------------------------------------------------------------------- */
 
+const labelsOf = (items: PriorityBreakdown[]): string[] =>
+  items.map((item) => phraseLabel(item.label));
+
+/**
+ * The verdict for a car the user has put up against the recommendation.
+ *
+ * Framed entirely as "instead of", because that is the only decision on the
+ * table once a recommendation exists.
+ */
+function challengerVerdict(
+  evaluation: VehicleEvaluation,
+  context: ReasoningContext,
+  margin: Verdict["margin"],
+): Verdict {
+  const name = shortName(evaluation.vehicle.name);
+  const winnerName = shortName(evaluation.comparison?.other.name ?? "the recommendation");
+
+  const gains = evaluation.strengths.filter((item) => item.hasEvidence);
+  const losses = evaluation.weaknesses.filter((item) => item.hasEvidence);
+
+  const cost = context.costs[evaluation.vehicle.id];
+  const budget = context.budget.budget;
+
+  return {
+    headline: sentence(
+      `What ${name} would gain you over ${winnerName}, and what it would cost you`,
+    ),
+    reasons: paragraph(
+      gains.length
+        ? sentence(
+            `${name} is ahead on ${joinList(labelsOf(gains.slice(0, 2)))}`,
+          )
+        : sentence(
+            `${name} doesn't beat ${winnerName} on any priority you ranked`,
+          ),
+      losses.length
+        ? sentence(
+            `${winnerName} is ahead on ${joinList(labelsOf(losses.slice(0, 2)))}`,
+          )
+        : null,
+    ),
+    budgetNote:
+      budget != null && cost?.budgetStatus === "over"
+        ? sentence(
+            `At about ${formatEUR(cost.totalMonthly)}/month it's`,
+            `${formatEUR(Math.abs(cost.budgetDifference ?? 0))} over your`,
+            `${formatEUR(budget)} budget, which is why it wasn't recommended`,
+          )
+        : null,
+    margin,
+    marginNote: null,
+  };
+}
+
 export function reasonAboutVerdict(
   evaluation: VehicleEvaluation,
   priorities: PriorityReasoning[],
   context: ReasoningContext,
 ): Verdict {
-  const name = shortName(evaluation.vehicle.name);
-  const led = ledPriorities(evaluation.priorities);
-  const trailing = trailingPriorities(evaluation.priorities);
   const margin = marginToNext(evaluation, context);
 
-  const topLed = led.slice(0, 2);
-  const usable = priorities.filter((item) => item.standing !== "unsupported");
-
   if (!evaluation.isRecommendation) {
-    const better = evaluation.strengths.filter(
-      (item) => (item.versus?.difference ?? 0) > 0,
-    );
-
-    return {
-      headline: sentence(
-        `${name} places #${evaluation.rank} of ${context.ranked.length}`,
-        led.length
-          ? `, and it's the strongest car you pinned for ${joinList(labelsOf(topLed))}`
-          : "",
-      ),
-      sentences: paragraph(
-        better.length
-          ? sentence(
-              `Against ${shortName(
-                evaluation.comparison?.other.name ?? "the recommendation",
-              )} it's ahead on ${joinList(labelsOf(better.slice(0, 2)))}`,
-            )
-          : sentence(
-              `It doesn't beat ${shortName(
-                evaluation.comparison?.other.name ?? "the recommendation",
-              )} on any of the priorities you ranked`,
-            ),
-        trailing.length
-          ? sentence(
-              `Other pinned cars do better on ${joinList(
-                labelsOf(trailing.slice(0, 3)),
-              )}`,
-            )
-          : null,
-      ),
-      margin,
-    };
+    return challengerVerdict(evaluation, context, margin);
   }
 
-  const headline = buildHeadline(evaluation, context, name, led, topLed);
+  const name = shortName(evaluation.vehicle.name);
+  const budget = context.budget.budget;
+
+  /*
+   * The headline is the conclusion and nothing else. Whether the budget
+   * narrowed the field belongs in `budgetNote`, said once, below.
+   */
+  const headline =
+    evaluation.rank > 1 && budget != null
+      ? sentence(
+          `${name} is the strongest match for what you told us that also fits`,
+          `your ${formatEUR(budget)}/month budget`,
+        )
+      : sentence(`${name} is the strongest match for what you told us`);
 
   return {
     headline,
-    sentences: paragraph(
-      headline,
-      describeWhatItDoesntLead(trailing, usable.length > 1),
-      describeMargin(margin, evaluation),
-      describeBudgetOverride(evaluation, context),
-    ),
+    reasons: describeReasons(priorities),
+    budgetNote: describeBudgetOverride(evaluation, context),
     margin,
+    marginNote: describeMargin(margin, priorities),
   };
 }

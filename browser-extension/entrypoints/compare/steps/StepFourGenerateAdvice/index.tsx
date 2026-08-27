@@ -8,18 +8,38 @@ import type {
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 import {
+    alternativeOptions,
     buildAdviceNarrative,
     buildRecommendation,
-    evaluateVehicle,
-    hotSeatOptions,
+    evaluateChallenger,
+    reasonAboutChallenge,
 } from "@/lib/reasoning-engine";
 import { AdviceHero } from "./components/AdviceHero";
-import { AdviceEvidence } from "./components/AdviceEvidence";
 import { AdviceSidebar } from "./components/AdviceSidebar";
+import { BehindTheRecommendation } from "./components/BehindTheRecommendation";
 import { BudgetNotice } from "./components/BudgetNotice";
+import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
-import { HotSeatPicker } from "./components/HotSeatPicker";
+import { HotSeatComparison } from "./components/HotSeatComparison";
+import { Tradeoffs } from "./components/Tradeoffs";
+import { WhyItWins } from "./components/WhyItWins";
 
+/**
+ * The Advice page.
+ *
+ * The order of the sections is the argument, and it follows the order a
+ * reader asks the questions in:
+ *
+ *   1. Which car?                    — the hero
+ *   2. Why that one?                 — why it wins, in their priority order
+ *   3. What am I giving up?          — the tradeoffs
+ *   4. What else could I have had?   — the four closest alternatives
+ *   5. What does it cost, exactly?   — the cost breakdown
+ *   6. Can I check the maths?        — behind the recommendation
+ *
+ * The recommendation is fixed. Putting a car in the hot seat changes what is
+ * *examined* and never what is recommended.
+ */
 export function StepFourGenerateAdvice({
     cars,
     priorities,
@@ -35,14 +55,8 @@ export function StepFourGenerateAdvice({
     onBack: () => void;
     onSettings: () => void;
 }) {
-    const [expanded, setExpanded] = useState(false);
-
-    /*
-     * The car currently under examination. This is deliberately separate from
-     * the recommendation: selecting another car changes what we explain, never
-     * what we recommend.
-     */
-    const [hotSeatId, setHotSeatId] = useState<number | null>(null);
+    /** The challenger under examination. Null means the recommendation itself. */
+    const [challengerId, setChallengerId] = useState<number | null>(null);
 
     const recommendation = useMemo(
         () =>
@@ -55,9 +69,9 @@ export function StepFourGenerateAdvice({
         [cars, priorities, preferences, categoryFeatures],
     );
 
-    /* A new comparison run puts the recommendation back in the hot seat. */
+    /* A new comparison run clears the hot seat. */
     useEffect(() => {
-        setHotSeatId(recommendation?.winner.id ?? null);
+        setChallengerId(null);
     }, [recommendation]);
 
     if (!recommendation) {
@@ -77,35 +91,51 @@ export function StepFourGenerateAdvice({
         );
     }
 
-    const { context, winner, isFallback, fallbackReason } = recommendation;
+    const { context, winner, alternatives, isFallback, fallbackReason } =
+        recommendation;
 
-    const selected =
-        context.ranked.find((car) => car.id === hotSeatId) ?? winner;
+    const winnerNarrative = buildAdviceNarrative(
+        recommendation.evaluation,
+        context,
+        alternatives,
+    );
 
-    /*
-     * The winner's own evaluation is prebuilt on the recommendation, so we
-     * only recompute when the user is examining a different car.
-     */
-    const evaluation =
-        selected.id === winner.id
-            ? recommendation.evaluation
-            : evaluateVehicle(selected, context, {
-                  recommendedId: winner.id,
-              });
+    const challenger =
+        challengerId == null
+            ? null
+            : (alternatives.find((car) => car.id === challengerId) ?? null);
 
     /*
-     * All of the reasoning for the car under examination, derived in one pass
-     * so the hero, the evidence and the tradeoffs can never disagree with
-     * each other about what the data says.
+     * The challenger is evaluated inside the same comparison set as the
+     * winner, so the two readings can never contradict each other about what
+     * the data says.
      */
-    const narrative = buildAdviceNarrative(evaluation, context);
+    const challengerEvaluation = challenger
+        ? evaluateChallenger(challenger, recommendation)
+        : null;
 
-    const winnerNarrative =
-        selected.id === winner.id
-            ? narrative
-            : buildAdviceNarrative(recommendation.evaluation, context);
+    const challengerNarrative = challengerEvaluation
+        ? buildAdviceNarrative(challengerEvaluation, context, [
+              winner,
+              ...alternatives,
+          ])
+        : null;
 
-    const options = hotSeatOptions(context, selected.id, winner.id);
+    const challengeReasoning = challengerEvaluation
+        ? reasonAboutChallenge(challengerEvaluation, context)
+        : null;
+
+    /* Whichever car the cost panel and the ranking are currently describing. */
+    const subject = challengerEvaluation ?? recommendation.evaluation;
+    const subjectNarrative = challengerNarrative ?? winnerNarrative;
+
+    const options = alternativeOptions(
+        context,
+        alternatives,
+        winner,
+        challengerId ?? winner.id,
+    );
+
     const winnerCost = context.costs[winner.id];
 
     return (
@@ -122,8 +152,9 @@ export function StepFourGenerateAdvice({
                         </h1>
 
                         <p className="mt-2 text-sm text-finn-iron">
-                            Based on your priorities, your driving assumptions
-                            and all {cars.length} pinned cars.
+                            Judged on your priorities, your driving assumptions
+                            and your budget, across all {cars.length} cars you
+                            pinned.
                         </p>
                     </header>
 
@@ -147,27 +178,45 @@ export function StepFourGenerateAdvice({
                         />
                     )}
 
-                    <HotSeatPicker
-                        options={options}
-                        onSelect={setHotSeatId}
-                    />
-
                     <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                         <div className="space-y-6">
-                            <AdviceEvidence
-                                evaluation={evaluation}
-                                narrative={narrative}
-                                context={context}
-                                recommendedId={winner.id}
-                                expanded={expanded}
-                                onToggleExpanded={() =>
-                                    setExpanded((value) => !value)
-                                }
+                            <WhyItWins
+                                narrative={winnerNarrative}
+                                subjectName={winner.name}
                             />
 
+                            <Tradeoffs
+                                tradeoffs={winnerNarrative.tradeoffs}
+                                isRecommendation
+                                subjectName={winner.name}
+                            />
+
+                            <ChallengePicker
+                                options={options}
+                                winnerName={winner.name}
+                                selectedId={challengerId}
+                                onSelect={setChallengerId}
+                            />
+
+                            {challengeReasoning && challenger && (
+                                <HotSeatComparison
+                                    reasoning={challengeReasoning}
+                                    challenger={challenger}
+                                />
+                            )}
+
                             <CostAnalysis
-                                analysis={evaluation.cost}
-                                reasoning={narrative.cost}
+                                analysis={subject.cost}
+                                reasoning={subjectNarrative.cost}
+                            />
+
+                            <BehindTheRecommendation
+                                context={context}
+                                recommendedId={winner.id}
+                                selectedId={subject.vehicle.id}
+                                margin={winnerNarrative.verdict.margin}
+                                comparison={subject.comparison}
+                                weights={context.weights}
                             />
                         </div>
 

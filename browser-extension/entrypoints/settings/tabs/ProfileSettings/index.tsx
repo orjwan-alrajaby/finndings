@@ -1,42 +1,39 @@
-import { useState } from "react";
 import type { PriorityDefinition, Profile } from "@/lib/reasoning-engine/types";
 import { Section } from "../../components/primitives";
 import { ProfileCard } from "./components/ProfileCard";
-import { ConfirmDialog } from "../../components/ConfirmDialog";
 
 interface ProfilesSettingsProps {
     profiles: Profile[];
     priorityDefinitions: PriorityDefinition[];
     defaultProfileId: string;
-    onSaveProfile: (profile: Profile, isNew: boolean) => void;
-    onDeleteProfile: (profile: Profile) => void;
     onToggleEnabled: (id: string, enabled: boolean) => void;
     onSetDefault: (id: string) => void;
 }
 
+/**
+ * Profiles are predefined recommendation strategies, not user documents.
+ *
+ * They can be switched on, switched off, and made the default. They cannot be
+ * renamed, reordered or deleted: a "Family First" profile the user has
+ * rewritten to lead on comfort is a lie in the picker, and the honest way to
+ * express that is the custom priority flow instead.
+ *
+ * "Default" here means *automatically selected* — not merely "shipped in the
+ * list". Exactly one profile holds it, and it must be an enabled one.
+ */
 export function ProfilesSettings({
     profiles,
     priorityDefinitions,
     defaultProfileId,
-    onSaveProfile,
-    onDeleteProfile,
     onToggleEnabled,
     onSetDefault,
 }: ProfilesSettingsProps) {
-    const [openId, setOpenId] = useState<string | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
-
     const enabledCount = profiles.filter((profile) => profile.enabled).length;
-
-    const handleSaveProfile = (profile: Profile, isNew: boolean) => {
-        onSaveProfile(profile, isNew);
-        setOpenId(null);
-    };
 
     return (
         <Section
             title="Profiles"
-            description="Profiles are shortcuts for a ranked set of priorities — not a bucket of features. The same priority can appear in several profiles with a different rank in each."
+            description="A profile is a starting philosophy: five priorities in a sensible order. Turn off the ones you'll never use, and pick the one Lens should start you on. If you want a different order, choose your own priorities in the compare flow instead — that always wins over a profile."
         >
             <div className="flex flex-col gap-4">
                 {profiles.map((profile) => (
@@ -44,49 +41,13 @@ export function ProfilesSettings({
                         key={profile.id}
                         profile={profile}
                         priorityDefinitions={priorityDefinitions}
-                        defaultProfileId={defaultProfileId}
+                        isDefault={profile.id === defaultProfileId}
                         enabledCount={enabledCount}
-                        open={openId === profile.id}
-                        onEdit={() =>
-                            setOpenId(
-                                openId === profile.id ? null : profile.id,
-                            )
-                        }
-                        onSave={(updatedProfile) =>
-                            handleSaveProfile(updatedProfile, false)
-                        }
-                        onCancel={() => setOpenId(null)}
-                        onDelete={() => setDeleteTarget(profile)}
                         onToggleEnabled={onToggleEnabled}
                         onSetDefault={onSetDefault}
                     />
                 ))}
             </div>
-
-            <ConfirmDialog
-                open={deleteTarget != null}
-                onOpenChange={(open) => {
-                    if (!open) setDeleteTarget(null);
-                }}
-                title={
-                    deleteTarget
-                        ? `Delete "${deleteTarget.label}"?`
-                        : ""
-                }
-                confirmLabel="Delete profile"
-                onConfirm={() => {
-                    if (deleteTarget) {
-                        onDeleteProfile(deleteTarget);
-                    }
-
-                    setDeleteTarget(null);
-                }}
-                description={
-                    deleteTarget?.id === defaultProfileId
-                        ? "This is currently your default profile. Another enabled profile will automatically become the default."
-                        : "This can't be undone."
-                }
-            />
         </Section>
     );
 }

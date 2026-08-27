@@ -7,18 +7,21 @@ import type {
 import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
 
 /**
- * One priority, answering one question: what does this car actually give me
- * for the thing I said mattered?
+ * One priority, answering one question: what does this car give me for the
+ * thing I said mattered?
  *
- * The prose is composed by the narrative layer from established facts. This
- * component's only job is to lay it out and put the named features and
- * figures within reach of the sentence that mentions them.
+ * The heading carries the user's rank and nothing else. The category score
+ * and its share of the weighting are deliberately absent — "practicality:
+ * 48/100" asks the reader to interpret an abstraction, where "491 L of boot
+ * space against 1,726 L" tells them what they'd actually notice. The
+ * arithmetic is still on the page, under *Behind the recommendation*, where a
+ * number is what the reader came for.
  */
 
 const STANDING_LABEL: Record<PriorityStanding, string> = {
-    leads: "Best of your pinned cars",
+    leads: "Best of the close alternatives",
     levelWithLeader: "Level with the best",
-    closeToLeader: "Just behind the best",
+    closeToLeader: "Close to the best",
     behindLeader: "Another car is stronger",
     unsupported: "Not enough data",
 };
@@ -38,12 +41,8 @@ export function PrioritySection({
 }) {
     const { features } = reasoning;
 
-    const hasChips =
-        features.essentialPresent.length ||
-        features.essentialMissing.length ||
-        features.optionalPresent.length ||
-        features.optionalMissing.length ||
-        (reasoning.rival?.onlyRivalHas.length ?? 0);
+    const present = [...features.essentialPresent, ...features.optionalPresent];
+    const missing = [...features.essentialMissing, ...features.optionalMissing];
 
     return (
         <section className="border-t border-finn-cotton pt-6">
@@ -56,8 +55,7 @@ export function PrioritySection({
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-finn-accent-blue">
-                                Priority #{reasoning.rank} ·{" "}
-                                {reasoning.weightPercent}% of the result
+                                Your priority #{reasoning.rank}
                             </p>
 
                             <h3 className="mt-1 text-lg font-black text-finn-black">
@@ -90,33 +88,20 @@ export function PrioritySection({
                         <MeasurementTable facts={reasoning.measurements} />
                     )}
 
-                    {Boolean(hasChips) && (
+                    {(present.length > 0 || missing.length > 0) && (
                         <div className="mt-3 space-y-2">
+                            <TierKey />
                             <ChipRow
-                                label="You get"
-                                facts={[
-                                    ...features.essentialPresent,
-                                    ...features.optionalPresent,
-                                ]}
+                                label="It has"
+                                facts={present}
                                 tone="present"
                             />
 
                             <ChipRow
-                                label="You don't"
-                                facts={[
-                                    ...features.essentialMissing,
-                                    ...features.optionalMissing,
-                                ]}
+                                label="It doesn't have"
+                                facts={missing}
                                 tone="missing"
                             />
-
-                            {reasoning.rival && (
-                                <ChipRow
-                                    label={`Only ${reasoning.rival.name} has`}
-                                    facts={reasoning.rival.onlyRivalHas}
-                                    tone="rivalOnly"
-                                />
-                            )}
                         </div>
                     )}
                 </div>
@@ -125,6 +110,42 @@ export function PrioritySection({
     );
 }
 
+/**
+ * What the colours on the chips mean, said once per priority rather than
+ * stamped onto every chip.
+ */
+function TierKey() {
+    return (
+        <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                You said
+            </span>
+
+            {(
+                [
+                    ["Essential", "bg-finn-accent-blue"],
+                    ["Good to have", "bg-[#14B8A6]"],
+                    ["Luxury extra", "bg-[#8B5CF6]"],
+                ] as const
+            ).map(([label, dot]) => (
+                <span
+                    key={label}
+                    className="flex items-center gap-1 text-[10px] font-bold text-finn-iron"
+                >
+                    <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                    {label}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * The named features, each carrying its own explanation.
+ *
+ * The `i` is the answer to the reader's actual next question — "what is
+ * adaptive cruise control?" — asked and answered without leaving the page.
+ */
 function ChipRow({
     label,
     facts,
@@ -149,12 +170,7 @@ function ChipRow({
     );
 }
 
-/**
- * The measured figures, side by side with the rival's.
- *
- * Marked when a number feeds the score and when it doesn't, so the reader can
- * tell the evidence apart from the context.
- */
+/** The measured figures, side by side with the rival's where there is one. */
 function MeasurementTable({ facts }: { facts: MeasurementFact[] }) {
     return (
         <dl className="mt-3 grid gap-1.5 sm:grid-cols-2">
@@ -163,14 +179,8 @@ function MeasurementTable({ facts }: { facts: MeasurementFact[] }) {
                     key={fact.label}
                     className="rounded-xl bg-finn-snow px-3 py-2"
                 >
-                    <dt className="flex items-baseline justify-between gap-2 text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                    <dt className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
                         {fact.label}
-
-                        {!fact.scored && (
-                            <span className="font-bold normal-case tracking-normal opacity-70">
-                                context only
-                            </span>
-                        )}
                     </dt>
 
                     <dd className="mt-0.5 text-sm font-black text-finn-black">

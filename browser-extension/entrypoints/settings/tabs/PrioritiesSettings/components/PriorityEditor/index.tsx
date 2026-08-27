@@ -5,19 +5,23 @@ import type {
     PriorityDefinition,
 } from "@/lib/reasoning-engine/types";
 import {
+    MAX_FEATURES_PER_CATEGORY,
+    MIN_FEATURES_PER_CATEGORY,
+} from "@/lib/reasoning-engine/constants";
+import {
     isNumericOnlyPriority,
     validatePriorityDraft,
 } from "../../../../utils/PriorityValidation";
 import { InlineError } from "../../../../components/primitives";
-import { FeatureOption } from "../../../../../../components/FeatureOption";
+import { FeatureOption } from "@/components/FeatureOption";
 import { CalculatedPriorityInfo } from "./components/CalculatedPriorityInfo";
 import { PriorityEditorActions } from "./components/PriorityEditorActions";
 
-const MAX_FEATURES = 5;
-
 interface PriorityEditorProps {
     priority: PriorityDefinition;
+    /** What the user currently has switched on. */
     features: FeatureWeight[];
+    /** Everything this priority offers, most relevant first. */
     availableFeatures: FeatureWeight[];
     onSave: (
         priority: PriorityDefinition,
@@ -27,6 +31,16 @@ interface PriorityEditorProps {
     isOpen: boolean;
 }
 
+/**
+ * Choosing what a priority actually looks at.
+ *
+ * Five is a ceiling, not a quota. A priority starts with the five most
+ * relevant of its catalogue switched on — or all of them, where it offers
+ * fewer than five — and the user is free to swap any of them for something
+ * else in the list. One must always stay on: a priority scoring from an empty
+ * feature list can't tell two cars apart, and would quietly stop meaning
+ * anything while still appearing in their order.
+ */
 export function PriorityEditor({
     priority,
     features,
@@ -34,89 +48,55 @@ export function PriorityEditor({
     onSave,
     onCancel,
 }: PriorityEditorProps) {
-    const numericOnly =
-        isNumericOnlyPriority(priority.id);
+    const numericOnly = isNumericOnlyPriority(priority.id);
 
     const [draftFeatures, setDraftFeatures] =
         useState<FeatureWeight[]>(features);
 
-    const enabledKeys = new Set(
-        draftFeatures.map(
-            (feature) => feature.key,
-        ),
-    );
+    const enabledKeys = new Set(draftFeatures.map((feature) => feature.key));
 
-    const atMax =
-        draftFeatures.length >= MAX_FEATURES;
+    const atMax = draftFeatures.length >= MAX_FEATURES_PER_CATEGORY;
+    const atMin = draftFeatures.length <= MIN_FEATURES_PER_CATEGORY;
 
-    const updateTier = (
-        key: string,
-        tier: FeatureTier,
-    ) => {
+    const updateTier = (key: string, tier: FeatureTier) => {
         setDraftFeatures((current) =>
             current.map((feature) =>
-                feature.key === key
-                    ? { ...feature, tier }
-                    : feature,
+                feature.key === key ? { ...feature, tier } : feature,
             ),
         );
     };
 
-    const toggleFeature = (
-        featureKey: string,
-    ) => {
+    const toggleFeature = (featureKey: string) => {
         setDraftFeatures((current) => {
             const enabled = current.some(
-                (feature) =>
-                    feature.key === featureKey,
+                (feature) => feature.key === featureKey,
             );
 
             if (enabled) {
+                if (current.length <= MIN_FEATURES_PER_CATEGORY) return current;
+
                 return current.filter(
-                    (feature) =>
-                        feature.key !==
-                        featureKey,
+                    (feature) => feature.key !== featureKey,
                 );
             }
 
-            if (current.length >= MAX_FEATURES) {
-                return current;
-            }
+            if (current.length >= MAX_FEATURES_PER_CATEGORY) return current;
 
-            const defaultFeature =
-                availableFeatures.find(
-                    (feature) =>
-                        feature.key ===
-                        featureKey,
-                );
+            const fromCatalogue = availableFeatures.find(
+                (feature) => feature.key === featureKey,
+            );
 
-            if (!defaultFeature) {
-                return current;
-            }
+            if (!fromCatalogue) return current;
 
-            return [
-                ...current,
-                {
-                    ...defaultFeature,
-                    tier:
-                        defaultFeature.tier ??
-                        "good",
-                },
-            ];
+            return [...current, { ...fromCatalogue }];
         });
     };
 
-    const error = validatePriorityDraft(
-        draftFeatures,
-        priority.id,
-    );
+    const error = validatePriorityDraft(draftFeatures, priority.id);
 
     if (numericOnly) {
         return (
-            <CalculatedPriorityInfo
-                priority={priority}
-                onClose={onCancel}
-            />
+            <CalculatedPriorityInfo priority={priority} onClose={onCancel} />
         );
     }
 
@@ -128,84 +108,68 @@ export function PriorityEditor({
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    Enable the features that matter to
-                    you, then set how important each one
-                    is.
+                    Turn on the {MAX_FEATURES_PER_CATEGORY} features you most
+                    want Lens to look for here, then say how much each one
+                    matters. Not sure what something is? Tap the ⓘ.
                 </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-                {availableFeatures.map(
-                    (feature) => {
-                        const enabled =
-                            enabledKeys.has(
-                                feature.key,
-                            );
+                {availableFeatures.map((feature) => {
+                    const enabled = enabledKeys.has(feature.key);
 
-                        const activeFeature =
-                            draftFeatures.find(
-                                (item) =>
-                                    item.key ===
-                                    feature.key,
-                            ) ?? feature;
+                    const activeFeature =
+                        draftFeatures.find(
+                            (item) => item.key === feature.key,
+                        ) ?? feature;
 
-                        return (
-                            <FeatureOption
-                                key={feature.key}
-                                feature={
-                                    activeFeature
-                                }
-                                enabled={enabled}
-                                disabled={
-                                    !enabled &&
-                                    atMax
-                                }
-                                onToggle={() =>
-                                    toggleFeature(
-                                        feature.key,
-                                    )
-                                }
-                                onTierChange={(
-                                    tier,
-                                ) =>
-                                    updateTier(
-                                        feature.key,
-                                        tier,
-                                    )
-                                }
-                            />
-                        );
-                    },
-                )}
+                    return (
+                        <FeatureOption
+                            key={feature.key}
+                            feature={activeFeature}
+                            enabled={enabled}
+                            disabled={
+                                enabled ? atMin : atMax
+                            }
+                            disabledReason={
+                                enabled
+                                    ? "At least one feature has to stay on"
+                                    : `Turn one off first — ${MAX_FEATURES_PER_CATEGORY} is the maximum`
+                            }
+                            onToggle={() => toggleFeature(feature.key)}
+                            onTierChange={(tier) =>
+                                updateTier(feature.key, tier)
+                            }
+                        />
+                    );
+                })}
             </div>
 
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-finn-iron">
-                    {draftFeatures.length}/
-                    {MAX_FEATURES} enabled
+                    {draftFeatures.length}/{MAX_FEATURES_PER_CATEGORY} enabled
                 </span>
 
                 {atMax && (
                     <span className="text-[10px] text-finn-iron">
-                        Maximum reached — turn one off
-                        to enable another.
+                        That's the maximum — turn one off to swap in another.
+                    </span>
+                )}
+
+                {atMin && (
+                    <span className="text-[10px] text-finn-iron">
+                        One has to stay on, or this priority can't tell two
+                        cars apart.
                     </span>
                 )}
             </div>
 
-            <InlineError>
-                {error}
-            </InlineError>
+            <InlineError>{error}</InlineError>
 
             <PriorityEditorActions
                 disabled={Boolean(error)}
                 onCancel={onCancel}
-                onSave={() =>
-                    onSave(
-                        { ...priority },
-                        draftFeatures,
-                    )
-                }
+                onSave={() => onSave({ ...priority }, draftFeatures)}
             />
         </div>
     );

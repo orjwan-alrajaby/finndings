@@ -14,9 +14,12 @@ import {
 import { DrivingAssumptions } from "./DrivingAssumptions";
 import { FeatureCard } from "@/components/FeatureCard";
 import { StepThreeFeatureEditor } from "./StepThreeFeatureEditor";
-import { CATEGORIES } from "@/lib/reasoning-engine/constants";
-
-const MAX_FEATURES_PER_PRIORITY = 5;
+import {
+    AVAILABLE_CATEGORY_FEATURES,
+    CATEGORIES,
+    MAX_FEATURES_PER_CATEGORY,
+    MIN_FEATURES_PER_CATEGORY,
+} from "@/lib/reasoning-engine/constants";
 
 export function StepThreeSetPreferences({
     priorities,
@@ -97,6 +100,13 @@ export function StepThreeSetPreferences({
             );
 
             if (enabled) {
+                /* A priority with nothing enabled can't tell two cars apart. */
+                if (
+                    currentFeatures.length <= MIN_FEATURES_PER_CATEGORY
+                ) {
+                    return current;
+                }
+
                 return {
                     ...current,
                     [categoryId]: currentFeatures.filter(
@@ -106,8 +116,7 @@ export function StepThreeSetPreferences({
             }
 
             if (
-                currentFeatures.length >=
-                MAX_FEATURES_PER_PRIORITY
+                currentFeatures.length >= MAX_FEATURES_PER_CATEGORY
             ) {
                 return current;
             }
@@ -116,10 +125,7 @@ export function StepThreeSetPreferences({
                 ...current,
                 [categoryId]: [
                     ...currentFeatures,
-                    {
-                        ...feature,
-                        tier: feature.tier ?? "good",
-                    },
+                    { ...feature },
                 ],
             };
         });
@@ -142,10 +148,10 @@ export function StepThreeSetPreferences({
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                    Your priorities already have sensible
-                    features selected. Turn features on or off,
-                    then tell Lens how important each one is to
-                    you.
+                    Each priority starts with the features that
+                    usually matter most for it. Swap in whatever
+                    you'd rather Lens looked for, and say how much
+                    each one matters.
                 </p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
@@ -155,12 +161,16 @@ export function StepThreeSetPreferences({
                         <InformationCircleIcon className="h-5 w-5 shrink-0 text-finn-accent-blue" />
 
                         <p className="text-xs leading-5 text-finn-iron">
-                            You can enable up to{" "}
-                            {MAX_FEATURES_PER_PRIORITY} features within
-                            each priority. Use Essential for something
-                            you really need, Good to have for something
-                            that would be useful, and Luxury extra for
-                            something you'd enjoy but don't need.
+                            Up to {MAX_FEATURES_PER_CATEGORY} features per
+                            priority, and at least one. Mark something{" "}
+                            <strong className="font-black">Essential</strong>{" "}
+                            if you wouldn't buy the car without it,{" "}
+                            <strong className="font-black">Good to have</strong>{" "}
+                            if it would genuinely improve the car for you, and{" "}
+                            <strong className="font-black">Luxury extra</strong>{" "}
+                            if you'd enjoy it but don't need it. Essentials
+                            count for most in the result, luxury extras for
+                            least.
                         </p>
                     </div>
                     {priorities.map((categoryId) => {
@@ -194,8 +204,10 @@ export function StepThreeSetPreferences({
                                     <StepThreeFeatureEditor
                                         categoryId={categoryId}
                                         features={features}
-                                        defaultFeatures={
-                                            categoryFeatures[categoryId] ?? []
+                                        availableFeatures={
+                                            AVAILABLE_CATEGORY_FEATURES[
+                                                categoryId
+                                            ] ?? []
                                         }
                                         onToggleFeature={(feature) =>
                                             toggleFeature(

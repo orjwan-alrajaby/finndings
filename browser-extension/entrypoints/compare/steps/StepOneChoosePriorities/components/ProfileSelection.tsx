@@ -7,7 +7,6 @@ import {
 } from "@heroicons/react/24/outline";
 import {
     CATEGORIES,
-    DEFAULT_CATEGORY_FEATURES,
     FEATURES,
     TIERS,
 } from "@/lib/reasoning-engine/constants";
@@ -217,16 +216,18 @@ function ProfilePriority({
     index,
     active,
     expanded,
+    features,
     onToggle,
 }: {
     categoryId: CategoryId;
     index: number;
     active: boolean;
     expanded: boolean;
+    /** What Lens will actually look at — the user's enabled set, not the defaults. */
+    features: FeatureWeight[];
     onToggle: () => void;
 }) {
     const meta = CATEGORIES[categoryId];
-    const features = DEFAULT_CATEGORY_FEATURES[categoryId] ?? [];
 
     const [activeTier, setActiveTier] = useState<FeatureTier | null>(
         null,
@@ -396,10 +397,14 @@ function ProfilePriority({
 function ProfileCard({
     profile,
     active,
+    isDefault,
+    categoryFeatures,
     onSelect,
 }: {
     profile: Profile;
     active: boolean;
+    isDefault: boolean;
+    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
     onSelect: () => void;
 }) {
     const [expandedPriority, setExpandedPriority] = useState<
@@ -449,6 +454,12 @@ function ProfileCard({
                                 {active && (
                                     <CheckBadgeIcon className="h-5 w-5 shrink-0 text-finn-accent-blue" />
                                 )}
+
+                                {isDefault && !active && (
+                                    <span className="rounded-full bg-finn-cotton px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-finn-iron">
+                                        Your default
+                                    </span>
+                                )}
                             </div>
 
                             <p
@@ -480,13 +491,17 @@ function ProfileCard({
 
                     <div className="space-y-1.5">
                         {profile.priorities
-                            .slice(0, 5)
                             .map((categoryId, index) => (
                                 <ProfilePriority
                                     key={categoryId}
                                     categoryId={categoryId}
                                     index={index}
                                     active={active}
+                                    features={
+                                        categoryFeatures[
+                                            categoryId
+                                        ] ?? []
+                                    }
                                     expanded={
                                         expandedPriority ===
                                         categoryId
@@ -506,12 +521,19 @@ function ProfileCard({
 export function ProfileSelection({
     profiles,
     activeProfileId,
+    defaultProfileId,
+    categoryFeatures,
     onSelect,
     onSettings,
     onChooseCustom,
 }: {
+    /** Enabled profiles only — a disabled profile isn't offered. */
     profiles: Profile[];
     activeProfileId: string | null;
+    /** The one Lens starts you on. Marked, so the badge means something. */
+    defaultProfileId: string | null;
+    /** The user's enabled features, so a card shows what Lens will really check. */
+    categoryFeatures: Record<CategoryId, FeatureWeight[]>;
     onSelect: (profile: Profile) => void;
     onSettings: () => void;
     onChooseCustom: () => void;
@@ -525,8 +547,10 @@ export function ProfileSelection({
                     </p>
 
                     <p className="mt-0.5 text-xs text-finn-iron">
-                        Each profile gives you five priorities in a
-                        sensible order. You can change them later.
+                        Each profile is five priorities in a fixed order.
+                        Pick one as a starting point — you can reorder them
+                        in the next step, and anything you change is what
+                        Lens actually uses.
                     </p>
                 </div>
 
@@ -536,7 +560,7 @@ export function ProfileSelection({
                     className="flex shrink-0 items-center gap-1 text-xs font-bold text-finn-accent-blue transition hover:text-finn-highlight-navy"
                 >
                     <PencilSquareIcon className="h-3.5 w-3.5" />
-                    Edit profiles
+                    Manage profiles
                 </button>
             </div>
 
@@ -547,6 +571,8 @@ export function ProfileSelection({
                         key={profile.id}
                         profile={profile}
                         active={activeProfileId === profile.id}
+                        isDefault={profile.id === defaultProfileId}
+                        categoryFeatures={categoryFeatures}
                         onSelect={() => onSelect(profile)}
                     />
                 ))}

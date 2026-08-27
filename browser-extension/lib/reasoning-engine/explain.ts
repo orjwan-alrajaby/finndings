@@ -1,15 +1,7 @@
-import type {
-  HeadToHead,
-  PriorityBreakdown,
-  VehicleEvaluation,
-} from "./types";
+import type { HeadToHead, PriorityBreakdown } from "./types";
 
-import { formatEUR } from "./format";
 import { featureLabel } from "./scoring";
-import {
-  classifyTotalGap,
-  isEffectivelyLevel,
-} from "./narrative/magnitude";
+import { classifyTotalGap, isEffectivelyLevel } from "./narrative/magnitude";
 import {
   inSentence,
   joinCapped,
@@ -19,15 +11,18 @@ import {
 } from "./narrative/phrase";
 
 /**
- * The head-to-head summary and the placement line.
+ * The one-paragraph summary of a pairwise comparison.
  *
- * Per-priority prose lives in `narrative/` — this file covers only the two
- * statements that are about the pair as a whole.
+ * Deliberately narrow. This answers "what separated these two cars on the
+ * priorities?" and nothing else — the budget, the cost and the recommendation
+ * itself are explained once each, elsewhere, by `narrative/verdict.ts` and
+ * `narrative/challenge.ts`. Saying any of it a second time here is how the
+ * page ended up making the same point four ways.
  *
- * The rule both obey: name the thing. A gap is explained by the equipment or
- * the measurement behind it, not by reciting the points it was worth. The
- * weighted arithmetic is still available to the reader, in the contribution
- * table, where a number is what they came for.
+ * The rule every sentence obeys: name the thing. A gap is explained by the
+ * equipment or the measurement behind it, never by reciting the points it was
+ * worth. The weighted arithmetic sits beside this paragraph in the
+ * contribution table, where a number is what the reader came for.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -80,24 +75,14 @@ function whatSeparates(
 /* Head to head                                                               */
 /* -------------------------------------------------------------------------- */
 
-/**
- * The one-paragraph answer to "why did this come out on top?".
- *
- * Every claim traces to a feature list, a measurement or the budget. Where
- * the two cars are a point or two apart, that is stated rather than papered
- * over — a reader looking at 82 next to 81 will notice either way.
- */
 export function explainHeadToHead(head: Omit<HeadToHead, "summary">): string {
   const { subject, other, totalDifference, decidingAdvantage, biggestConcession } =
     head;
-
-  const budget = describeBudgetOutcome(head);
 
   if (totalDifference === 0) {
     return sentence(
       `${shortName(subject.name)} and ${shortName(other.name)} finish level`,
       "under your current priority order",
-      budget ? `. ${budget}` : "",
     );
   }
 
@@ -160,101 +145,5 @@ export function explainHeadToHead(head: Omit<HeadToHead, "summary">): string {
     );
   }
 
-  /*
-   * A car can score highest and still not be the recommendation, because the
-   * budget is a hard constraint. Saying so is the difference between a result
-   * the user can check and one they have to take on faith.
-   */
-  if (budget) sentences.push(budget);
-
   return sentences.join(" ");
-}
-
-/**
- * States when the higher-scoring car of the pair is not budget-eligible.
- *
- * Returns null whenever there is nothing to report — no budget set, or the
- * leader on points is also affordable.
- */
-function describeBudgetOutcome(
-  head: Omit<HeadToHead, "summary">,
-): string | null {
-  const { subject, other, totalDifference, budget } = head;
-
-  if (budget.budget == null) return null;
-
-  const scoreLeaderIsSubject = totalDifference > 0;
-
-  const leader = scoreLeaderIsSubject ? subject : other;
-  const leaderStatus = scoreLeaderIsSubject ? budget.subject : budget.other;
-  const leaderDifference = scoreLeaderIsSubject
-    ? budget.subjectDifference
-    : budget.otherDifference;
-
-  if (leaderStatus === "within") return null;
-
-  const trailer = scoreLeaderIsSubject ? other : subject;
-  const trailerStatus = scoreLeaderIsSubject ? budget.other : budget.subject;
-
-  const problem =
-    leaderStatus === "over"
-      ? `${leader.name} scores higher, but at ${formatEUR(
-          Math.abs(leaderDifference ?? 0),
-        )} over your ${formatEUR(budget.budget)}/month budget it isn't eligible to be recommended`
-      : `${leader.name} scores higher, but part of its cost couldn't be estimated, so we can't confirm it fits your ${formatEUR(
-          budget.budget,
-        )}/month budget`;
-
-  return trailerStatus === "within"
-    ? `${problem} — ${trailer.name} does fit, which is why it comes out on top.`
-    : `${problem}, and neither car is confirmed to fit.`;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Placement                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The status line for a car in the hot seat — states plainly whether it is
- * the recommendation and where it actually placed.
- *
- * Kept deliberately short and factual. The reasoning that follows it is the
- * narrative layer's job; this is the one sentence that has to be unambiguous
- * before any of it is read.
- */
-export function explainVerdict(evaluation: VehicleEvaluation): string {
-  const { vehicle, rank, score, isRecommendation, cost } = evaluation;
-  const status = cost.breakdown.budgetStatus;
-
-  if (isRecommendation) {
-    if (status === "over") {
-      return `${vehicle.name} is your recommendation at ${score.total}/100, but nothing you pinned fits your budget — this one included.`;
-    }
-
-    /*
-     * Rank is by score alone. A recommendation below rank 1 means a
-     * higher-scoring car was ruled out by the budget, and the user is owed
-     * that explanation rather than a bare "strongest match".
-     */
-    if (rank > 1) {
-      const higher = evaluation.comparison?.other.name;
-
-      return higher
-        ? `${vehicle.name} is your recommendation. It isn't the highest-scoring car — ${higher} scores ${evaluation.comparison?.other.total}/100 against its ${score.total}/100 — but ${higher} doesn't fit your budget and ${vehicle.name} does.`
-        : `${vehicle.name} is your recommendation at ${score.total}/100. Higher-scoring cars were ruled out by your budget.`;
-    }
-
-    return `${vehicle.name} is your strongest match at ${score.total}/100 and fits your budget.`;
-  }
-
-  const placement = rank === 2 ? "second overall" : `#${rank} overall`;
-
-  const budgetClause =
-    status === "over"
-      ? " It's also over your budget."
-      : status === "unknown"
-        ? " We also can't confirm it fits your budget, because part of its cost couldn't be estimated."
-        : "";
-
-  return `${vehicle.name} is not your recommendation. It scores ${score.total}/100 and places ${placement}.${budgetClause}`;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRecommendation, evaluateVehicle } from "./index";
+import { buildRecommendation, evaluateChallenger } from "./index";
+import { reasonAboutChallenge } from "./narrative/challenge";
 import { buildAdviceNarrative } from "./narrative";
 import { classifyMonthlyCostGap, classifyScoreGap } from "./narrative/magnitude";
 import { coverage, inSentence, phraseLabel, shortName } from "./narrative/phrase";
@@ -87,14 +88,20 @@ function adviceFor(
     { ...DEFAULT_CATEGORY_FEATURES, ...overrides },
   )!;
 
-  return buildAdviceNarrative(result.evaluation, result.context);
+  return buildAdviceNarrative(
+    result.evaluation,
+    result.context,
+    result.alternatives,
+  );
 }
 
 /** Every sentence the Advice would put in front of the reader. */
 function allProse(narrative: AdviceNarrative): string {
   return [
     narrative.verdict.headline,
-    ...narrative.verdict.sentences,
+    ...narrative.verdict.reasons,
+    ...(narrative.verdict.budgetNote ? [narrative.verdict.budgetNote] : []),
+    ...(narrative.verdict.marginNote ? [narrative.verdict.marginNote] : []),
     ...narrative.priorities.flatMap((item) => item.sentences),
     ...narrative.tradeoffs.flatMap((item) => [item.headline, ...item.sentences]),
     ...narrative.cost.sentences,
@@ -131,11 +138,11 @@ describe("the Advice never asks the reader to infer what it meant", () => {
   ];
 
   const ORDERS: CategoryId[][] = [
-    ["safety", "familyFriendly", "practicality"],
-    ["driverAssistance", "safety", "comfort"],
-    ["environmental", "safety", "practicality"],
+    ["safetyAssistance", "familyFriendly", "practicality"],
+    ["safetyAssistance", "longDistance", "comfort"],
+    ["environmental", "safetyAssistance", "practicality"],
     ["practicality", "familyFriendly", "longDistance"],
-    ["climateSuitability", "comfort", "safety"],
+    ["climateSuitability", "comfort", "safetyAssistance"],
   ];
 
   it.each(ORDERS)("stays concrete for %s-first", (...priorities) => {
@@ -167,8 +174,8 @@ describe("the Advice never asks the reader to infer what it meant", () => {
 
 describe("the reasoning follows the user's priorities, not a template", () => {
   it("explains the same car differently when the priorities change", () => {
-    const safetyFirst = adviceFor(["safety", "practicality"]);
-    const practicalityFirst = adviceFor(["practicality", "safety"]);
+    const safetyFirst = adviceFor(["safetyAssistance", "practicality"]);
+    const practicalityFirst = adviceFor(["practicality", "safetyAssistance"]);
 
     /* Same comparison set, so the winner shouldn't have to change for the
        explanation to. */
@@ -178,7 +185,7 @@ describe("the reasoning follows the user's priorities, not a template", () => {
     expect(safetyProse).not.toEqual(practicalityProse);
 
     /* Each leads with the evidence for the priority the user put first. */
-    expect(safetyFirst.priorities[0]!.priority).toBe("safety");
+    expect(safetyFirst.priorities[0]!.priority).toBe("safetyAssistance");
     expect(practicalityFirst.priorities[0]!.priority).toBe("practicality");
   });
 
@@ -200,7 +207,7 @@ describe("the reasoning follows the user's priorities, not a template", () => {
   });
 
   it("cites CO₂ and the drivetrain for an environment-led reader", () => {
-    const narrative = adviceFor(["environmental", "safety"]);
+    const narrative = adviceFor(["environmental", "safetyAssistance"]);
 
     const environmental = narrative.priorities.find(
       (item) => item.priority === "environmental",
@@ -217,7 +224,7 @@ describe("the reasoning follows the user's priorities, not a template", () => {
 
 describe("tradeoffs are filtered by what the user told us", () => {
   it("does not raise CO₂ with a reader who never ranked the environment", () => {
-    const narrative = adviceFor(["safety", "familyFriendly", "practicality"]);
+    const narrative = adviceFor(["safetyAssistance", "familyFriendly", "practicality"]);
 
     const prose = narrative.tradeoffs
       .flatMap((item) => [item.headline, ...item.sentences])
@@ -228,7 +235,7 @@ describe("tradeoffs are filtered by what the user told us", () => {
   });
 
   it("raises CO₂ evidence once the environment is ranked", () => {
-    const narrative = adviceFor(["environmental", "safety"]);
+    const narrative = adviceFor(["environmental", "safetyAssistance"]);
 
     const prose = [
       ...narrative.priorities.flatMap((item) => item.sentences),
@@ -240,8 +247,8 @@ describe("tradeoffs are filtered by what the user told us", () => {
 
   it("anchors every tradeoff to a ranked priority or to the budget", () => {
     for (const priorities of [
-      ["safety", "practicality"],
-      ["driverAssistance", "comfort"],
+      ["safetyAssistance", "practicality"],
+      ["safetyAssistance", "comfort"],
       ["environmental", "longDistance"],
     ] as CategoryId[][]) {
       const narrative = adviceFor(priorities);
@@ -259,7 +266,7 @@ describe("tradeoffs are filtered by what the user told us", () => {
 
   it("stays short enough to be usable", () => {
     for (const priorities of [
-      ["safety", "driverAssistance", "comfort", "practicality"],
+      ["safetyAssistance", "longDistance", "comfort", "practicality"],
       ["comfort", "climateSuitability", "longDistance"],
     ] as CategoryId[][]) {
       expect(adviceFor(priorities).tradeoffs.length).toBeLessThanOrEqual(4);
@@ -276,7 +283,7 @@ describe("a missing essential is surfaced, not used to disqualify", () => {
    * MG 3 leads on emissions and so wins for an environment-led reader, while
    * lacking two of the safety features that reader marked essential.
    */
-  const narrative = adviceFor(["environmental", "safety"]);
+  const narrative = adviceFor(["environmental", "safetyAssistance"]);
 
   it("still recommends a car that misses one", () => {
     const missing = narrative.priorities.flatMap(
@@ -295,7 +302,11 @@ describe("a missing essential is surfaced, not used to disqualify", () => {
     expect(gap).toBeDefined();
     expect(gap.severity).toBe("high");
     expect(gap.sentences.join(" ")).toMatch(/you marked .+ as essential/i);
-    expect(gap.sentences.join(" ")).toMatch(/doesn't have/i);
+    expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
+
+    /* The car that does have it is named, so the gap is a choice. */
+    expect(gap.rival).not.toBeNull();
+    expect(gap.evidence.toLowerCase()).toContain("blind spot warning");
   });
 
   it("says why it still placed where it did, rather than hiding the gap", () => {
@@ -334,7 +345,7 @@ describe("the language matches the size of the difference", () => {
   it("says so plainly when the data can't answer the question", () => {
     /* A priority the user selected but configured no features for, on cars
        that carry no measurement for it either. */
-    const narrative = adviceFor(["comfort", "safety"], cars, { comfort: [] });
+    const narrative = adviceFor(["comfort", "safetyAssistance"], cars, { comfort: [] });
 
     const comfort = narrative.priorities.find(
       (item) => item.priority === "comfort",
@@ -343,7 +354,7 @@ describe("the language matches the size of the difference", () => {
     expect(comfort.standing).toBe("unsupported");
     expect(comfort.hasEvidence).toBe(false);
     expect(comfort.sentences.join(" ")).toContain(
-      "We don't have enough data",
+      "FINN's data doesn't tell us enough",
     );
 
     /* And it is not dressed up as a finding elsewhere. */
@@ -359,7 +370,7 @@ describe("the language matches the size of the difference", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("financial reasoning is specific", () => {
-  const narrative = adviceFor(["safety", "practicality"]);
+  const narrative = adviceFor(["safetyAssistance", "practicality"]);
 
   it("separates the subscription, the energy estimate and the total", () => {
     const prose = narrative.cost.sentences.join(" ");
@@ -388,7 +399,7 @@ describe("financial reasoning is specific", () => {
     const noPrice = makeCar({ id: 20, name: "Alpha One", consumption: null });
     const priced = makeCar({ id: 21, name: "Beta Two", consumption: 5 });
 
-    const narrative = adviceFor(["safety"], [noPrice, priced]);
+    const narrative = adviceFor(["safetyAssistance"], [noPrice, priced]);
 
     if (!narrative.cost.subject.complete) {
       expect(narrative.cost.unknowns.length).toBeGreaterThan(0);
@@ -426,15 +437,13 @@ describe("the ranking and the explanation agree", () => {
       features: ["hasEmergencyBrakingAssist", "hasBlindSpotAssist"],
     });
 
-    const narrative = adviceFor(["safety", "practicality"], [first, second]);
+    const narrative = adviceFor(["safetyAssistance", "practicality"], [first, second]);
 
     expect(narrative.verdict.margin).not.toBeNull();
 
     if (narrative.verdict.margin!.magnitude === "negligible" ||
         narrative.verdict.margin!.magnitude === "tie") {
-      expect(narrative.verdict.sentences.join(" ")).toMatch(
-        /close|level/i,
-      );
+      expect(narrative.verdict.marginNote).toMatch(/close|level|behind/i);
     }
   });
 });
@@ -445,7 +454,11 @@ describe("the ranking and the explanation agree", () => {
 
 describe("feature terminology is explained in the product", () => {
   it("carries a plain-English explanation for every feature it can name", () => {
-    const narrative = adviceFor(["safety", "driverAssistance", "practicality"]);
+    const narrative = adviceFor([
+      "safetyAssistance",
+      "climateSuitability",
+      "practicality",
+    ]);
 
     const named = narrative.priorities.flatMap((item) => [
       ...item.features.essentialPresent,
@@ -518,22 +531,266 @@ describe("a car in the hot seat is explained on its own terms", () => {
   it("never claims a car won when it didn't", () => {
     const result = buildRecommendation(
       cars,
-      ["safety", "practicality"],
+      ["safetyAssistance", "practicality"],
       preferences,
       DEFAULT_CATEGORY_FEATURES,
     )!;
 
-    const other = result.context.ranked.find(
-      (car) => car.id !== result.winner.id,
-    )!;
+    const challenger = result.alternatives[0]!;
 
     const narrative = buildAdviceNarrative(
-      evaluateVehicle(other, result.context, { recommendedId: result.winner.id }),
+      evaluateChallenger(challenger, result),
       result.context,
+      [result.winner, ...result.alternatives],
     );
 
     expect(narrative.isRecommendation).toBe(false);
-    expect(narrative.verdict.headline).toContain("places #");
+
+    /* Framed as a swap, never as a second winner. */
+    expect(narrative.verdict.headline).toMatch(/would gain you over/i);
     expect(narrative.verdict.headline).not.toMatch(/comes out on top/i);
+    expect(narrative.verdict.headline).not.toMatch(/strongest match/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* The recommendation stays the focus                                         */
+/* -------------------------------------------------------------------------- */
+
+describe("the recommendation is explained on its own merits", () => {
+  const ORDER: CategoryId[] = [
+    "safetyAssistance",
+    "practicality",
+    "familyFriendly",
+    "climateSuitability",
+    "comfort",
+  ];
+
+  /*
+   * The failure this guards against: "Compass does safety better, Karoq does
+   * practicality better, Puma does comfort better" — five comparisons under
+   * five headings, which destroys the hierarchy of the recommendation.
+   */
+  it("never parades another car under a priority heading", () => {
+    const result = buildRecommendation(
+      cars,
+      ORDER,
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    const others = result.context.vehicles.filter(
+      (car) => car.id !== result.winner.id,
+    );
+
+    for (const reasoning of narrative.priorities) {
+      const prose = reasoning.sentences.join(" ");
+
+      for (const other of others) {
+        expect(prose).not.toContain(other.name);
+        expect(prose).not.toContain(shortName(other.name));
+      }
+    }
+  });
+
+  /* Where another car IS better belongs here — once, with the evidence. */
+  it("moves that comparison into what you're giving up", () => {
+    const result = buildRecommendation(
+      cars,
+      ORDER,
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    for (const tradeoff of narrative.tradeoffs) {
+      /* Every compromise states the thing and why this reader cares. */
+      expect(tradeoff.evidence.length).toBeGreaterThan(0);
+      expect(tradeoff.relevance.length).toBeGreaterThan(0);
+
+      /* And traces back to a ranked priority or the budget the user set. */
+      const answersToSomething =
+        tradeoff.priority != null ||
+        tradeoff.kind === "budget" ||
+        tradeoff.kind === "cost";
+
+      expect(answersToSomething).toBe(true);
+    }
+  });
+
+  it("orders compromises by the user's own ranking, not an internal severity", () => {
+    const result = buildRecommendation(
+      cars,
+      ORDER,
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    const ranks = narrative.tradeoffs
+      .map((tradeoff) => tradeoff.rank)
+      .filter((rank): rank is number => rank != null);
+
+    expect([...ranks]).toEqual([...ranks].sort((a, b) => a - b));
+  });
+
+  /*
+   * Nothing sits above #1, so "it's stronger on the priorities you ranked
+   * above this one" is simply false there — and a reader checking the page
+   * against itself is exactly who notices.
+   */
+  it("never claims a strength above the user's first priority", () => {
+    const result = buildRecommendation(
+      cars,
+      ORDER,
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    for (const tradeoff of narrative.tradeoffs) {
+      if (tradeoff.rank !== 1) continue;
+
+      expect(tradeoff.sentences.join(" ")).not.toMatch(
+        /priorities you ranked above/i,
+      );
+    }
+  });
+
+  /*
+   * The user didn't say the environment matters, so a car's emissions are a
+   * fact about it and not a compromise they are making.
+   */
+  it("stays silent about a weakness the user never ranked", () => {
+    const result = buildRecommendation(
+      cars,
+      ["safetyAssistance", "comfort"],
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const narrative = buildAdviceNarrative(
+      result.evaluation,
+      result.context,
+      result.alternatives,
+    );
+
+    const prose = narrative.tradeoffs
+      .flatMap((tradeoff) => tradeoff.sentences)
+      .join(" ");
+
+    expect(prose).not.toMatch(/co₂|emissions/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Challenging the recommendation                                             */
+/* -------------------------------------------------------------------------- */
+
+describe("a challenger is always weighed against the recommendation", () => {
+  const setup = () =>
+    buildRecommendation(
+      cars,
+      ["safetyAssistance", "practicality", "comfort"],
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+  it("frames every line as gain-or-lose against the winner", () => {
+    const result = setup();
+    const challenger = result.alternatives[0]!;
+
+    const reasoning = reasonAboutChallenge(
+      evaluateChallenger(challenger, result),
+      result.context,
+    )!;
+
+    expect(reasoning.winnerName).toBe(shortName(result.winner.name));
+    expect(reasoning.challengerName).toBe(shortName(challenger.name));
+
+    for (const line of [...reasoning.gains, ...reasoning.losses]) {
+      /* Both cars are named, so the direction is never ambiguous. */
+      expect(
+        line.evidence.includes(reasoning.challengerName) ||
+          line.evidence.includes(reasoning.winnerName),
+      ).toBe(true);
+
+      expect(line.relevance).toMatch(/you ranked/i);
+    }
+  });
+
+  /* A feature can sit in two categories; saying it twice is padding. */
+  it("never makes the same point twice", () => {
+    const result = setup();
+
+    for (const challenger of result.alternatives) {
+      const reasoning = reasonAboutChallenge(
+        evaluateChallenger(challenger, result),
+        result.context,
+      )!;
+
+      const claims = [...reasoning.gains, ...reasoning.losses].map(
+        (line) => line.evidence,
+      );
+
+      expect(new Set(claims).size).toBe(claims.length);
+    }
+  });
+
+  /* "Then why wasn't this one recommended?" is the reader's next question. */
+  it("always answers why the recommendation still stands", () => {
+    const result = setup();
+
+    for (const challenger of result.alternatives) {
+      const reasoning = reasonAboutChallenge(
+        evaluateChallenger(challenger, result),
+        result.context,
+      )!;
+
+      expect(reasoning.verdict.length).toBeGreaterThan(0);
+      expect(reasoning.verdict).not.toMatch(/\d+\/100/);
+    }
+  });
+
+  it("keeps the car names intact in its prose", () => {
+    const result = setup();
+
+    for (const challenger of result.alternatives) {
+      const reasoning = reasonAboutChallenge(
+        evaluateChallenger(challenger, result),
+        result.context,
+      )!;
+
+      const prose = [
+        reasoning.verdict,
+        reasoning.cost ?? "",
+        reasoning.budget ?? "",
+      ].join(" ");
+
+      /* A lowercased sentence turns "CX-60" into "cx-60". */
+      expect(prose).not.toMatch(/\bcx-60\b/);
+      expect(prose).not.toMatch(/\bcompass has\b/);
+    }
   });
 });

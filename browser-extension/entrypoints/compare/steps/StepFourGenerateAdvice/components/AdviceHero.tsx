@@ -28,8 +28,12 @@ function determineSubtitle(
 }
 
 /**
- * The recommendation itself. Always the recommended car, never the hot-seat
- * selection — the two are separate concepts and the hero owns the first one.
+ * The recommendation itself. Always the recommended car, never the car in the
+ * hot seat — the two are separate concepts and the hero owns the first one.
+ *
+ * The headline is the conclusion. The two notes beneath it are the only place
+ * on the page that the budget override and the closeness of the top two are
+ * stated; everything below adds evidence rather than repeating the verdict.
  */
 export function AdviceHero({
     evaluation,
@@ -40,15 +44,16 @@ export function AdviceHero({
     onBack,
 }: AdviceHeroProps) {
     const winner = evaluation.vehicle;
+    const { headline, budgetNote, marginNote } = narrative.verdict;
 
-    /*
-     * The headline is the reason, not the score. The score is still on the
-     * card to the right for anyone who wants it — it just isn't the argument.
-     */
-    const headline = narrative.verdict.headline;
-
-    /* The most consequential thing the reader is accepting in exchange. */
-    const tradeoff = narrative.tradeoffs[0];
+    const budgetLabel =
+        cost.budget == null
+            ? null
+            : cost.budgetStatus === "over"
+              ? `${formatEUR(Math.abs(cost.budgetDifference ?? 0))} over your ${formatEUR(cost.budget)} budget`
+              : cost.budgetStatus === "unknown"
+                ? `budget ${formatEUR(cost.budget)} · can't confirm it fits`
+                : `${formatEUR(Math.abs(cost.budgetDifference ?? 0))} under your ${formatEUR(cost.budget)} budget`;
 
     return (
         <section className="overflow-hidden rounded-[30px] bg-finn-highlight-navy text-white shadow-xl">
@@ -57,8 +62,8 @@ export function AdviceHero({
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold ring-1 ring-white/10">
                         <SparklesIcon className="h-4 w-4 text-finn-accent-blue" />
                         {isFallback
-                            ? "Strongest match — over budget"
-                            : "Strongest match"}
+                            ? "Closest match — nothing you pinned fits your budget"
+                            : "Your recommendation"}
                     </div>
 
                     <h2 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">
@@ -81,20 +86,24 @@ export function AdviceHero({
                         {headline}
                     </p>
 
-                    {tradeoff && (
-                        <div className="mt-3 max-w-2xl rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">
-                                What you're accepting in exchange
-                            </p>
+                    {(budgetNote || marginNote) && (
+                        <div className="mt-4 max-w-2xl space-y-2 border-l-2 border-white/20 pl-4">
+                            {budgetNote && (
+                                <p className="text-sm leading-6 text-white/75">
+                                    {budgetNote}
+                                </p>
+                            )}
 
-                            <p className="mt-1.5 text-sm leading-6 text-white/85">
-                                {tradeoff.sentences[0]}
-                            </p>
+                            {marginNote && (
+                                <p className="text-sm leading-6 text-white/75">
+                                    {marginNote}
+                                </p>
+                            )}
                         </div>
                     )}
 
                     <div className="mt-6 flex flex-wrap gap-2">
-                        {priorities.slice(0, 3).map((priority, index) => (
+                        {priorities.map((priority, index) => (
                             <span
                                 key={priority}
                                 className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold ring-1 ring-white/10"
@@ -135,35 +144,33 @@ export function AdviceHero({
                     <div className="absolute inset-0 bg-linear-to-t from-finn-highlight-navy via-finn-highlight-navy/20 to-transparent" />
 
                     <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-white/10 p-4 backdrop-blur-md ring-1 ring-white/15">
-                        <div className="flex items-end justify-between gap-4">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                                    {cost.complete
-                                        ? "Estimated monthly"
-                                        : "Estimated monthly (partial)"}
-                                </p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                            {cost.complete
+                                ? "Estimated total per month"
+                                : "Estimated per month (partial)"}
+                        </p>
 
-                                <p className="mt-1 text-2xl font-black">
-                                    {formatEUR(cost.totalMonthly)}
-                                </p>
+                        <p className="mt-1 text-3xl font-black">
+                            {formatEUR(cost.totalMonthly)}
+                        </p>
 
-                                {cost.budget != null && (
-                                    <p className="mt-0.5 text-[10px] font-bold text-white/60">
-                                        budget {formatEUR(cost.budget)}
-                                    </p>
-                                )}
-                            </div>
+                        {budgetLabel && (
+                            <p
+                                className={[
+                                    "mt-1 text-[11px] font-bold",
+                                    cost.budgetStatus === "over"
+                                        ? "text-finn-warning"
+                                        : "text-white/70",
+                                ].join(" ")}
+                            >
+                                {budgetLabel}
+                            </p>
+                        )}
 
-                            <div className="text-right">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                                    Match
-                                </p>
-
-                                <p className="mt-1 text-2xl font-black">
-                                    {evaluation.score.total}/100
-                                </p>
-                            </div>
-                        </div>
+                        <p className="mt-2 text-[11px] leading-4 text-white/55">
+                            Subscription plus estimated energy and extra
+                            mileage. The full breakdown is further down.
+                        </p>
                     </div>
                 </div>
             </div>

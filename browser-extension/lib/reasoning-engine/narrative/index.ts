@@ -23,22 +23,33 @@ import { reasonAboutVerdict } from "./verdict";
 export function buildAdviceNarrative(
   evaluation: VehicleEvaluation,
   context: ReasoningContext,
+  alternatives: PinnedFinnCar[] = [],
 ): AdviceNarrative {
   const rivalVehicle: PinnedFinnCar | null =
     context.vehicles.find(
       (item) => item.id === evaluation.comparison?.other.vehicleId,
     ) ?? null;
 
-  const priorities: PriorityReasoning[] = evaluation.priorities.map((breakdown) =>
-    reasonAboutPriority(
-      breakdown,
-      evaluation.vehicle,
-      rivalVehicle,
-      evaluation.isRecommendation,
-    ),
+  /*
+   * The cars a compromise or a cost comparison may be drawn from: the
+   * recommendation's realistic alternatives, minus the subject itself when
+   * the subject is one of them. Falling back to everything pinned keeps the
+   * function usable on its own, but the Advice always passes the real set.
+   */
+  const competitors = (alternatives.length ? alternatives : context.vehicles).filter(
+    (item) => item.id !== evaluation.vehicle.id,
   );
 
-  const cost = reasonAboutCost(evaluation.vehicle, rivalVehicle, context);
+  const priorities: PriorityReasoning[] = evaluation.priorities.map((breakdown) =>
+    reasonAboutPriority(breakdown, evaluation.vehicle, rivalVehicle),
+  );
+
+  const cost = reasonAboutCost(
+    evaluation.vehicle,
+    rivalVehicle,
+    context,
+    competitors,
+  );
 
   return {
     vehicle: evaluation.vehicle,
@@ -48,12 +59,24 @@ export function buildAdviceNarrative(
     verdict: reasonAboutVerdict(evaluation, priorities, context),
     priorities,
     cost,
-    tradeoffs: reasonAboutTradeoffs(evaluation, priorities, cost, context),
+    tradeoffs: reasonAboutTradeoffs(
+      evaluation,
+      priorities,
+      cost,
+      context,
+      competitors,
+    ),
     unsupported: priorities.filter((item) => item.standing === "unsupported"),
   };
 }
 
 export * from "./types";
+export {
+  challengeSentences,
+  reasonAboutChallenge,
+  type ChallengeLine,
+  type ChallengeReasoning,
+} from "./challenge";
 export {
   classifyMeasurementGap,
   classifyMonthlyCostGap,

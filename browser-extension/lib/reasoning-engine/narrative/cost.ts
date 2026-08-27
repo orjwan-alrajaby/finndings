@@ -40,7 +40,12 @@ function position(
 }
 
 /**
- * The cheapest pinned car we can fully cost.
+ * The cheapest realistic alternative we can fully cost.
+ *
+ * Drawn from the recommendation's alternatives rather than everything pinned,
+ * so "you could pay less" always names a car the reader could actually take
+ * instead — not the cheapest thing in the list regardless of whether it
+ * matches anything they asked for.
  *
  * Restricted to complete estimates on purpose: a car with an unknown energy
  * cost must never be presented as the cheap option just because part of its
@@ -48,18 +53,19 @@ function position(
  */
 function cheapestComparable(
   context: ReasoningContext,
+  candidates: PinnedFinnCar[],
   excludeIds: number[],
 ): CostPosition | null {
-  const candidates = context.vehicles
+  const positions = candidates
     .map((vehicle) => position(vehicle, context.costs[vehicle.id]))
     .filter(
       (item): item is CostPosition =>
         item != null && item.complete && !excludeIds.includes(item.vehicleId),
     );
 
-  if (!candidates.length) return null;
+  if (!positions.length) return null;
 
-  return candidates.reduce((cheapest, item) =>
+  return positions.reduce((cheapest, item) =>
     item.total < cheapest.total ? item : cheapest,
   );
 }
@@ -125,7 +131,7 @@ function describeAgainst(
   if (difference > 0) {
     return sentence(
       role === "cheapest"
-        ? `${shortName(other.name)} is the cheapest car you pinned that we can fully cost:`
+        ? `${shortName(other.name)} is the cheapest of the close alternatives:`
         : `${shortName(other.name)} costs less:`,
       `${formatEUR(other.total)}/month, about ${amount} less than this one`,
     );
@@ -137,7 +143,7 @@ function describeAgainst(
    */
   return role === "cheapest"
     ? sentence(
-        "Nothing else you pinned that we can fully cost comes in lower —",
+        "None of the close alternatives we can fully cost comes in lower —",
         `the nearest is ${shortName(other.name)} at ${formatEUR(other.total)}/month`,
       )
     : sentence(
@@ -145,37 +151,11 @@ function describeAgainst(
       );
 }
 
-function describeBudget(
-  subject: CostPosition,
-  budget: number | null,
-  difference: number | null,
-): string | null {
-  if (budget == null || difference == null) return null;
-
-  if (subject.budgetStatus === "over") {
-    return sentence(
-      `You set a ${formatEUR(budget)}/month budget, and this comes to about`,
-      `${formatEUR(Math.abs(difference))} over it`,
-    );
-  }
-
-  if (subject.budgetStatus === "unknown") {
-    return sentence(
-      `You set a ${formatEUR(budget)}/month budget. What we could calculate fits inside it,`,
-      "but part of the estimate is missing, so we can't confirm that it does",
-    );
-  }
-
-  return sentence(
-    `You set a ${formatEUR(budget)}/month budget, so this leaves about`,
-    `${formatEUR(Math.abs(difference))} of room`,
-  );
-}
-
 export function reasonAboutCost(
   vehicle: PinnedFinnCar,
   rivalVehicle: PinnedFinnCar | null,
   context: ReasoningContext,
+  alternatives: PinnedFinnCar[] = context.vehicles,
 ): CostReasoning {
   const breakdown = context.costs[vehicle.id];
 
@@ -196,7 +176,7 @@ export function reasonAboutCost(
     ? position(rivalVehicle, context.costs[rivalVehicle.id])
     : null;
 
-  const cheapest = cheapestComparable(context, [
+  const cheapest = cheapestComparable(context, alternatives, [
     vehicle.id,
     ...(rival ? [rival.vehicleId] : []),
   ]);
@@ -224,7 +204,6 @@ export function reasonAboutCost(
       : null,
     rival ? describeAgainst(subject, rival, "rival") : null,
     cheapest ? describeAgainst(subject, cheapest, "cheapest") : null,
-    describeBudget(subject, context.budget.budget, breakdown?.budgetDifference ?? null),
   );
 
   return {

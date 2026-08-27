@@ -10,19 +10,29 @@ import type {
 /* Tiers                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * How much the user said a feature matters.
+ *
+ * The weights are deliberately far apart: a car that has everything the user
+ * called essential should beat one that has five luxuries and none of them.
+ */
 export const TIERS = {
   essential: {
     label: "Essential",
+    /** How the tier reads in a sentence: "you marked it essential". */
+    inSentence: "essential",
     weight: 5,
     activeClass: "bg-finn-accent-blue text-white",
   },
   good: {
     label: "Good to have",
+    inSentence: "good to have",
     weight: 3,
     activeClass: "bg-[#14B8A6] text-white",
   },
   luxury: {
     label: "Luxury extra",
+    inSentence: "a luxury extra",
     weight: 1,
     activeClass: "bg-[#8B5CF6] text-white",
   },
@@ -39,262 +49,272 @@ const tier = (tier: FeatureTier, key: FeatureId): FeatureWeight => ({
 /* Features                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Every feature FINN's data exposes, with a plain-English explanation.
+ *
+ * The explanations exist so a reader never has to leave Lens to look up a
+ * term. Each one says what the system actually does — no marketing, no
+ * "provides useful everyday assistance", and no claim the data can't support.
+ */
 export const FEATURES = {
   hadLedLights: {
     label: "LED headlights",
     explanation:
-      "Bright, efficient headlights that improve visibility at night.",
+      "Headlights that use LEDs instead of halogen bulbs. They throw a brighter, whiter beam and use less power.",
   },
   hasFogLights: {
     label: "Fog lights",
     explanation:
-      "Helps improve visibility in fog and other low-visibility conditions.",
+      "Extra low, wide-beam lamps at the front. They light the road edge in fog, heavy rain and snow, where normal headlights reflect back at you.",
   },
   hasMatrixLedHeadlights: {
     label: "Matrix LED headlights",
     explanation:
-      "Automatically adjusts individual LED sections to improve visibility without dazzling other drivers.",
+      "Headlights split into segments that switch off individually. You can leave main beam on and the car blanks out just the part aimed at oncoming traffic.",
   },
   hasSunroof: {
     label: "Sunroof",
     explanation:
-      "A roof panel that lets in extra light and, when opened, fresh air.",
+      "A glass panel in the roof. Depending on the car it either slides open or is fixed and only lets light in.",
   },
   hasTowbar: {
     label: "Towbar",
     explanation:
-      "Allows the car to tow a trailer or use compatible towing accessories.",
+      "A fitted tow hitch at the rear, for pulling a trailer or caravan or carrying a bike rack.",
   },
   hasPrivacyGlass: {
     label: "Privacy glass",
     explanation:
-      "Tinted rear glass that reduces glare and gives passengers more privacy.",
+      "Darkened rear side and tailgate windows. They make it harder to see into the back of the car and cut sun glare for rear passengers.",
   },
   hasRoofRails: {
     label: "Roof rails",
     explanation:
-      "Provides mounting points for roof boxes, bikes and other cargo carriers.",
+      "Rails along the roof that crossbars bolt to, so you can fit a roof box, bike carrier or ski rack.",
   },
   hasElectricallyFoldingMirrors: {
     label: "Electrically folding mirrors",
     explanation:
-      "Lets the side mirrors fold in automatically, useful in tight spaces.",
+      "The door mirrors fold flat at the touch of a button, or automatically when you lock the car — useful in narrow garages and tight street parking.",
   },
   hasRainSlashLightSensors: {
     label: "Rain & light sensors",
     explanation:
-      "Automatically turns on lights and adjusts wipers when conditions require it.",
+      "Sensors that start the wipers when the windscreen gets wet and switch the headlights on when it gets dark, without you touching either stalk.",
   },
   hasHeadlightCleaningSystem: {
-    label: "Headlight cleaning system",
+    label: "Headlight washers",
     explanation:
-      "Cleans the headlights to help maintain visibility when they're dirty.",
+      "Small jets that spray the headlight lenses clean. Road salt and winter grime dim a headlight quickly.",
   },
   hasCorneringLights: {
     label: "Cornering lights",
     explanation:
-      "Adds light to the side of the road when turning at low speeds.",
+      "An extra lamp that lights up the inside of a bend when you turn the wheel or indicate at low speed.",
   },
 
   hasHeatedSeats: {
     label: "Heated seats",
-    explanation: "Warms the seat quickly on cold days.",
+    explanation:
+      "Heating elements in the seat cushion and backrest. They warm you directly, so you feel warm before the cabin does.",
   },
   hasSeatCooling: {
-    label: "Seat cooling",
+    label: "Ventilated seats",
     explanation:
-      "Circulates air through the seats to make hot-weather driving more comfortable.",
+      "Fans that draw air through perforations in the seat. They keep your back from sticking to the upholstery in hot weather.",
   },
   hasAirConditioning: {
     label: "Air conditioning",
-    explanation: "Cools and dehumidifies the cabin.",
+    explanation:
+      "Cools the cabin and pulls moisture out of the air, which is also what clears a fogged-up windscreen quickly.",
   },
   hasThreeZoneAutomaticClimateControls: {
     label: "3-zone climate control",
     explanation:
-      "Automatically maintains separate temperature settings for different areas of the cabin.",
+      "Driver, front passenger and the rear seats each get their own temperature setting, held automatically.",
   },
   hasLeatherSeats: {
     label: "Leather seats",
     explanation:
-      "Leather upholstery that adds a more premium feel and is easy to wipe clean.",
+      "Leather upholstery rather than cloth. It wipes clean and doesn't soak up spills, but gets colder in winter and hotter in summer.",
   },
   hasElectricFrontSeatAdjustment: {
-    label: "Electric front seat adjustment",
+    label: "Electric front seats",
     explanation:
-      "Lets you adjust the front seats electrically for easier, more precise positioning.",
+      "The front seats move on motors instead of levers, so you can fine-tune the position — and often store it — rather than working it out by hand.",
   },
   hasAmbientInteriorLightning: {
     label: "Ambient interior lighting",
     explanation:
-      "Soft interior lighting that adds atmosphere to the cabin.",
+      "Coloured strip lighting in the doors and dashboard, usually adjustable. It's decorative — it isn't bright enough to read by.",
   },
   hasLumbarSupport: {
     label: "Lumbar support",
     explanation:
-      "Adjustable lower-back support that can improve comfort on longer drives.",
+      "An adjustable pad in the seat backrest that pushes into the curve of your lower back. It's what stops the ache on a long drive.",
   },
   hasHeatedSteeringWheel: {
     label: "Heated steering wheel",
-    explanation: "Warms the steering wheel on cold days.",
+    explanation:
+      "The rim of the wheel warms up, so you can drive without gloves on a cold morning.",
   },
   hasHeadUpDisplay: {
     label: "Head-up display",
     explanation:
-      "Projects key driving information into your line of sight.",
+      "Projects your speed and navigation directions onto the windscreen in front of you, so you read them without looking down at the dials.",
   },
 
   hasAppleCarPlaySlashAndroidAuto: {
     label: "Apple CarPlay / Android Auto",
     explanation:
-      "Connects your phone to the car's display for apps, calls, music and navigation.",
+      "Puts your phone's maps, music and messages on the car's own screen, so you use apps you already know instead of the car's built-in ones.",
   },
   hasWirelessChargingStation: {
     label: "Wireless phone charging",
-    explanation: "Charges compatible phones without a cable.",
+    explanation:
+      "A pad you rest a compatible phone on to charge it without plugging in a cable.",
   },
   hasPremiumSoundSystem: {
     label: "Premium sound system",
     explanation:
-      "Higher-quality audio hardware designed for a richer listening experience.",
+      "The manufacturer's upgraded audio system — typically more speakers and a separate amplifier than the standard fit.",
   },
   hasIntegratedNavigationSystem: {
     label: "Built-in navigation",
     explanation:
-      "Built-in navigation that works without relying entirely on your phone.",
+      "Maps stored in the car itself, so directions keep working where there's no phone signal.",
   },
 
   hasAdaptiveCruiseControl: {
     label: "Adaptive cruise control",
     explanation:
-      "Maintains your speed while automatically adjusting distance from traffic ahead.",
+      "Holds a set speed and automatically slows to keep a gap from the car in front, then picks the speed back up. Ordinary cruise control can't slow down for traffic.",
   },
   hasCruiseControl: {
     label: "Cruise control",
     explanation:
-      "Maintains a set speed without keeping your foot on the accelerator.",
+      "Holds a speed you set so you can take your foot off the accelerator. It does not react to traffic ahead — you brake yourself.",
   },
   hasIsofix: {
     label: "ISOFIX child seat anchors",
     explanation:
-      "Standard mounting points make compatible child seats easier and more secure to install.",
+      "Metal anchor points built into the seat frame. A compatible child seat clicks straight onto them instead of being strapped in with the seatbelt.",
   },
   hasLaneKeepingAssist: {
     label: "Lane keeping assist",
     explanation:
-      "Helps keep the car within its lane if it detects that you're drifting.",
+      "Watches the lane markings and nudges the steering back if you start drifting out of your lane without indicating.",
   },
   hasParkingAssistant: {
     label: "Parking assistant",
     explanation:
-      "Assists with steering while parking; you remain responsible for controlling the car.",
+      "Finds a space and steers the car into it while you control the brake and accelerator.",
   },
   hasParkingSensors: {
     label: "Parking sensors",
     explanation:
-      "Warns you when you're getting close to objects while parking.",
+      "Sensors in the bumpers that beep faster as you get closer to an obstacle you can't see.",
   },
   hasAuxiliaryHeater: {
     label: "Auxiliary heater",
     explanation:
-      "Provides additional heating to warm the cabin more quickly in cold weather.",
+      "A heater that runs with the engine off, so the cabin is warm and the windows clear before you get in.",
   },
   hasBlindSpotAssist: {
     label: "Blind spot warning",
     explanation:
-      "Warns you when another vehicle is travelling beside you in a hard-to-see area.",
+      "Lights up a warning in the door mirror when another vehicle is alongside you, in the area you can't see in the mirrors.",
   },
   hasRearCrosswalkWarning: {
-    label: "Rear crosswalk warning",
+    label: "Rear cross-traffic alert",
     explanation:
-      "Warns about approaching traffic when reversing out of a parking space.",
+      "Warns you about cars crossing behind you as you reverse out of a parking space between two vehicles.",
   },
   hasThreeSixtyDegreesCamera: {
     label: "360° camera",
     explanation:
-      "Uses cameras around the car to provide a top-down view when manoeuvring.",
+      "Cameras around the car stitched into a bird's-eye view of the whole car and everything touching it.",
   },
   hasOneEightyDegreesReversingCamera: {
     label: "Reversing camera",
     explanation:
-      "Shows the area behind the car while reversing.",
+      "A camera that shows what's directly behind the car on the screen when you select reverse.",
   },
 
   hasHillStartAssist: {
     label: "Hill start assist",
     explanation:
-      "Prevents the car from rolling backwards when moving off on an incline.",
+      "Holds the brakes for a moment after you lift off on a slope, so the car doesn't roll back while you move to the accelerator.",
   },
   hasTirePressureMonitoringSystem: {
     label: "Tyre pressure monitoring",
     explanation:
-      "Monitors tyre pressure and warns you when it becomes too low.",
+      "Warns you on the dashboard when a tyre loses pressure, rather than you noticing it looks flat.",
   },
   hasTrafficSignRecognition: {
     label: "Traffic sign recognition",
     explanation:
-      "Detects common road signs and displays relevant information to the driver.",
+      "A camera reads speed limit and no-overtaking signs and shows the current limit on the dashboard.",
   },
   hasEmergencyBrakingAssist: {
     label: "Automatic emergency braking",
     explanation:
-      "Can automatically brake when a collision appears imminent and the driver doesn't react.",
+      "Brakes the car by itself if it detects a collision coming and you haven't reacted. It can avoid the impact entirely at low speed and reduce it at higher speed.",
   },
   hasEmergencyCallSystem: {
     label: "Emergency call system (eCall)",
     explanation:
-      "Can automatically contact emergency services after a serious crash.",
+      "Calls the emergency services automatically after a serious crash and sends them your location, even if nobody in the car can speak. There's also a manual button.",
   },
   hasDriverAssistance: {
-    label: "General driver assistance package",
+    label: "Driver assistance package",
     explanation:
-      "A general package of systems designed to support the driver and reduce workload.",
+      "FINN lists this car as carrying a driver assistance package, but not which individual systems are in it.",
   },
 
   hasKeylessEntryAndStart: {
     label: "Keyless entry & start",
     explanation:
-      "Lets you unlock and start the car without taking the key out of your pocket.",
+      "The car unlocks when you touch the handle with the key in your pocket, and starts on a button — you never take the key out.",
   },
   hasElectricTailgate: {
     label: "Electric tailgate",
     explanation:
-      "Opens and closes the boot electrically, often at the push of a button.",
+      "The boot lid opens and closes on a motor at the press of a button, useful when both your hands are full.",
   },
   hasSplitFoldingRearSeats: {
     label: "Split-folding rear seats",
     explanation:
-      "Allows the rear seats to fold in sections for more flexible passenger and cargo space.",
+      "The rear bench folds down in sections, so you can carry something long and still seat a passenger in the back.",
   },
   hasBackUSBPorts: {
     label: "Rear USB ports",
     explanation:
-      "Provides USB charging ports for passengers in the rear.",
+      "USB sockets for the back seats, so rear passengers can charge without a cable running from the front.",
   },
   hasFrontUSBPorts: {
     label: "Front USB ports",
-    explanation:
-      "Provides USB charging ports for front passengers.",
+    explanation: "USB sockets in the front of the cabin for charging.",
   },
   hasStartSlashStopSystem: {
     label: "Start/stop system",
     explanation:
-      "Automatically switches the engine off when stopped and restarts it when needed.",
+      "Switches the engine off when you stop in traffic and restarts it when you pull away, to cut fuel use and idling emissions.",
   },
   hasElectricParkingBrake: {
     label: "Electric parking brake",
     explanation:
-      "Applies the parking brake electronically instead of using a traditional lever or pedal.",
+      "A switch replaces the handbrake lever. It usually holds the car automatically at a standstill and releases as you drive off.",
   },
   hasAlloyWheels: {
     label: "Alloy wheels",
     explanation:
-      "Lightweight metal wheels that typically improve appearance and can reduce unsprung weight.",
+      "Cast metal wheels instead of steel wheels with plastic covers. Mostly a cosmetic difference.",
   },
   hasSpareWheel: {
     label: "Spare wheel",
     explanation:
-      "Provides a spare wheel for use after a puncture.",
+      "An actual spare wheel in the boot, rather than only a tyre repair kit — so a serious puncture doesn't need a tow.",
   },
 } as const;
 
@@ -304,18 +324,34 @@ type FeatureId = keyof typeof FEATURES;
 /* Categories                                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * `features` is the **catalogue** — every feature the user may enable for the
+ * category, ordered most relevant first. It is not what is enabled.
+ *
+ * The enabled set defaults to the first `MAX_FEATURES_PER_CATEGORY` of this
+ * list (all of it, when the catalogue is shorter than that) and the user is
+ * free to change both which features are on and what tier each one sits at.
+ * See `DEFAULT_CATEGORY_FEATURES` below.
+ */
 export const CATEGORIES = {
-  safety: {
-    label: "Safety",
+  /**
+   * Safety and driver assistance are one priority.
+   *
+   * They were two, and splitting them made the user rank the same systems
+   * twice: automatic emergency braking is a safety feature and an assistance
+   * feature, and no reader has a coherent opinion about which of the two they
+   * care about more.
+   */
+  safetyAssistance: {
+    label: "Safety & Driver Assistance",
     icon: "🛡️",
     color: "#2563EB",
-    question: "How well does this car protect the people inside it?",
+    question: "What does the car do to keep you out of an accident?",
     description:
-      "Systems that intervene automatically to prevent or reduce the severity of an accident.",
+      "Systems that intervene when something goes wrong — automatic braking, blind spot and lane warnings, the emergency call — plus the assistance that reduces the work of driving.",
     recommendedFor: [
       "Families",
-      "Safety-conscious drivers",
-      "Parents",
+      "New drivers",
       "Long-distance commuters",
       "Drivers who travel in poor weather often",
     ],
@@ -325,34 +361,18 @@ export const CATEGORIES = {
       tier("essential", "hasBlindSpotAssist"),
       tier("essential", "hasLaneKeepingAssist"),
       tier("essential", "hasEmergencyCallSystem"),
+      tier("good", "hasAdaptiveCruiseControl"),
+      /* Available, off by default. */
+      tier("good", "hasParkingSensors"),
+      tier("good", "hasOneEightyDegreesReversingCamera"),
+      tier("good", "hasTrafficSignRecognition"),
+      tier("good", "hasRearCrosswalkWarning"),
       tier("good", "hasTirePressureMonitoringSystem"),
-      tier("good", "hasTrafficSignRecognition"),
-    ],
-  },
-
-  driverAssistance: {
-    label: "Driver Assistance",
-    icon: "🧭",
-    color: "#7C3AED",
-    question: "How much does the car help you while you're driving it?",
-    description:
-      "Technology that reduces mental effort behind the wheel — cruise control, parking help, and navigation.",
-    recommendedFor: [
-      "New drivers",
-      "City commuters",
-      "Drivers who spend lots of time in traffic",
-      "People who dislike parking",
-    ],
-    numericOnly: false,
-    features: [
-      tier("essential", "hasEmergencyBrakingAssist"),
-      tier("essential", "hasAdaptiveCruiseControl"),
-      tier("essential", "hasLaneKeepingAssist"),
-      tier("essential", "hasParkingAssistant"),
-      tier("good", "hasTrafficSignRecognition"),
+      tier("good", "hasParkingAssistant"),
+      tier("good", "hasHillStartAssist"),
       tier("good", "hasCruiseControl"),
-      tier("good", "hasBlindSpotAssist"),
       tier("luxury", "hasThreeSixtyDegreesCamera"),
+      tier("luxury", "hasMatrixLedHeadlights"),
     ],
   },
 
@@ -361,7 +381,8 @@ export const CATEGORIES = {
     icon: "👨‍👩‍👧",
     color: "#EA580C",
     question: "Will this work for transporting your family, week after week?",
-    description: "Child seat compatibility and rear-seat practicality.",
+    description:
+      "Child seat anchors, a rear bench that folds, and the things that make loading children and their equipment less of a fight.",
     recommendedFor: [
       "Parents",
       "Large families",
@@ -372,9 +393,15 @@ export const CATEGORIES = {
     features: [
       tier("essential", "hasIsofix"),
       tier("essential", "hasSplitFoldingRearSeats"),
-      tier("good", "hasElectricTailgate"),
       tier("good", "hasParkingSensors"),
-      tier("good", "hasThreeSixtyDegreesCamera"),
+      tier("good", "hasElectricTailgate"),
+      tier("good", "hasBackUSBPorts"),
+      /* Available, off by default. */
+      tier("good", "hasOneEightyDegreesReversingCamera"),
+      tier("good", "hasThreeZoneAutomaticClimateControls"),
+      tier("good", "hasRearCrosswalkWarning"),
+      tier("luxury", "hasThreeSixtyDegreesCamera"),
+      tier("luxury", "hasPrivacyGlass"),
     ],
   },
 
@@ -384,7 +411,7 @@ export const CATEGORIES = {
     color: "#0891B2",
     question: "Will everything you carry day-to-day actually fit?",
     description:
-      "Boot space plus small daily conveniences — roof rails, towbar, USB ports, parking sensors.",
+      "Boot space, plus the fittings that decide what you can get in and out of it — folding seats, roof rails, a towbar, a powered tailgate.",
     recommendedFor: [
       "Daily commuters",
       "Active lifestyles",
@@ -393,9 +420,16 @@ export const CATEGORIES = {
     numericOnly: false,
     features: [
       tier("essential", "hasSplitFoldingRearSeats"),
-      tier("good", "hasTowbar"),
-      tier("good", "hasRoofRails"),
       tier("good", "hasElectricTailgate"),
+      tier("good", "hasRoofRails"),
+      tier("good", "hasTowbar"),
+      tier("good", "hasParkingSensors"),
+      /* Available, off by default. */
+      tier("good", "hasSpareWheel"),
+      tier("good", "hasKeylessEntryAndStart"),
+      tier("good", "hasElectricallyFoldingMirrors"),
+      tier("good", "hasFrontUSBPorts"),
+      tier("good", "hasBackUSBPorts"),
     ],
   },
 
@@ -403,9 +437,9 @@ export const CATEGORIES = {
     label: "Long Distance Travel",
     icon: "🛣️",
     color: "#D97706",
-    question: "How enjoyable will this be after three hours on the motorway?",
+    question: "How does this feel after three hours on the motorway?",
     description:
-      "Cruise assistance, seat comfort, and — for electric cars — enough range not to think about it.",
+      "What keeps a long drive tolerable: cruise assistance that holds a gap for you, a seat you can set up properly, and navigation that doesn't drop out.",
     recommendedFor: [
       "Road trippers",
       "Business travellers",
@@ -414,9 +448,18 @@ export const CATEGORIES = {
     numericOnly: false,
     features: [
       tier("essential", "hasAdaptiveCruiseControl"),
+      tier("good", "hasLumbarSupport"),
       tier("good", "hasIntegratedNavigationSystem"),
       tier("good", "hasHeatedSeats"),
-      tier("good", "hasLumbarSupport"),
+      tier("good", "hasElectricFrontSeatAdjustment"),
+      /* Available, off by default. */
+      tier("good", "hasCruiseControl"),
+      tier("good", "hasAppleCarPlaySlashAndroidAuto"),
+      tier("good", "hasRainSlashLightSensors"),
+      tier("luxury", "hasHeadUpDisplay"),
+      tier("luxury", "hasSeatCooling"),
+      tier("luxury", "hasMatrixLedHeadlights"),
+      tier("luxury", "hasPremiumSoundSystem"),
     ],
   },
 
@@ -424,8 +467,9 @@ export const CATEGORIES = {
     label: "Climate Suitability",
     icon: "❄️",
     color: "#0284C7",
-    question: "How will this hold up through winter mornings & summer heat?",
-    description: "Heated seats, heated steering wheel, and climate control.",
+    question: "How will this hold up through winter mornings and summer heat?",
+    description:
+      "Heating and cooling for the people rather than the cabin — warm seats and wheel on a frozen morning, air conditioning in August.",
     recommendedFor: [
       "Drivers in extreme climates",
       "Mountain regions",
@@ -439,6 +483,13 @@ export const CATEGORIES = {
       tier("good", "hasHeatedSteeringWheel"),
       tier("good", "hasRainSlashLightSensors"),
       tier("luxury", "hasAuxiliaryHeater"),
+      /* Available, off by default. */
+      tier("good", "hasThreeZoneAutomaticClimateControls"),
+      tier("good", "hasSeatCooling"),
+      tier("good", "hasFogLights"),
+      tier("good", "hasCorneringLights"),
+      tier("good", "hasHeadlightCleaningSystem"),
+      tier("good", "hasElectricallyFoldingMirrors"),
     ],
   },
 
@@ -446,9 +497,9 @@ export const CATEGORIES = {
     label: "Environmental Impact",
     icon: "🌿",
     color: "#16A34A",
-    question: "How much does this car affect the environment?",
+    question: "How much does this car emit, and what does it run on?",
     description:
-      "CO₂ emissions and fuel type — the dominant signal — plus a couple of efficiency features.",
+      "CO₂ per kilometre and the drivetrain it comes from. Measured from the vehicle data rather than from a feature list.",
     recommendedFor: [
       "Eco-conscious drivers",
       "City drivers",
@@ -462,9 +513,9 @@ export const CATEGORIES = {
     label: "Comfort",
     icon: "🛋️",
     color: "#DB2777",
-    question: "How enjoyable is it just to sit in and drive, every single day?",
+    question: "How pleasant is it to sit in, every single day?",
     description:
-      "Leather, warmth, ambient lighting, and other small everyday luxuries.",
+      "Warmth, upholstery and the small everyday conveniences you notice on the drive to work and nowhere else.",
     recommendedFor: [
       "Daily drivers who spend hours in the car",
       "Anyone who wants driving to feel like a treat",
@@ -476,10 +527,16 @@ export const CATEGORIES = {
       tier("good", "hasHeatedSteeringWheel"),
       tier("good", "hasLumbarSupport"),
       tier("good", "hasLeatherSeats"),
+      /* Available, off by default. */
       tier("good", "hasSeatCooling"),
+      tier("good", "hasElectricFrontSeatAdjustment"),
+      tier("good", "hasKeylessEntryAndStart"),
+      tier("good", "hasAppleCarPlaySlashAndroidAuto"),
       tier("luxury", "hasPremiumSoundSystem"),
       tier("luxury", "hasAmbientInteriorLightning"),
       tier("luxury", "hasWirelessChargingStation"),
+      tier("luxury", "hasHeadUpDisplay"),
+      tier("luxury", "hasSunroof"),
     ],
   },
 } satisfies Record<
@@ -493,23 +550,53 @@ export const CATEGORIES = {
 type CategoryId = keyof typeof CATEGORIES;
 
 /* -------------------------------------------------------------------------- */
+/* Feature selection rules                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The most features one priority may have switched on at once.
+ *
+ * A cap, not a quota. A category whose catalogue is shorter than this simply
+ * starts with all of it enabled.
+ */
+export const MAX_FEATURES_PER_CATEGORY = 5;
+
+/**
+ * The fewest.
+ *
+ * A feature-based priority with nothing enabled has no way to tell two cars
+ * apart, so the UI never lets the user empty one.
+ */
+export const MIN_FEATURES_PER_CATEGORY = 1;
+
+/* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Profiles are fixed starting philosophies, not user documents.
+ *
+ * They can be enabled, disabled and chosen. They cannot be renamed, reordered
+ * or deleted — a "Family First" profile the user has rewritten to lead on
+ * comfort is a lie in the picker, and the way to express that is the custom
+ * priority flow instead.
+ *
+ * Every profile carries exactly five priorities.
+ */
 export const PROFILES = {
   nervous: {
     label: "Nervous Driver",
     icon: "🛡️",
     forWhom:
-      "Drivers who want maximum reassurance behind the wheel — safety and assistance systems doing the heavy lifting.",
+      "Drivers who want the car watching the road with them — braking, lane and blind spot warnings doing the heavy lifting.",
     assumes:
-      "Weighs safety and driver assistance far above everything else.",
+      "Safety and assistance systems outrank everything else, with visibility in bad weather close behind.",
     priorities: [
-      "safety",
-      "driverAssistance",
+      "safetyAssistance",
+      "climateSuitability",
       "practicality",
       "familyFriendly",
-      "climateSuitability",
+      "longDistance",
     ],
   },
 
@@ -517,14 +604,15 @@ export const PROFILES = {
     label: "City Commuter",
     icon: "🧭",
     forWhom:
-      "People who spend lots of time in traffic and dislike parking.",
+      "People doing the same short, busy journey twice a day, mostly in traffic.",
     assumes:
-      "Prioritizes tech that reduces daily friction on short, repetitive journeys.",
+      "Assistance that reduces daily friction leads, and emissions matter because most of the driving is urban.",
     priorities: [
-      "driverAssistance",
-      "safety",
+      "safetyAssistance",
       "practicality",
-      "longDistance",
+      "comfort",
+      "environmental",
+      "climateSuitability",
     ],
   },
 
@@ -532,14 +620,14 @@ export const PROFILES = {
     label: "Family First",
     icon: "👨‍👩‍👧",
     forWhom:
-      "Parents who need to safely and comfortably transport children on a regular basis.",
+      "Parents moving children, car seats and everything that comes with them, week after week.",
     assumes:
-      "Safety and family practicality dominate everything else.",
+      "Fitting the family in comes first, with safety immediately behind it.",
     priorities: [
-      "safety",
       "familyFriendly",
+      "safetyAssistance",
       "practicality",
-      "driverAssistance",
+      "climateSuitability",
       "longDistance",
     ],
   },
@@ -548,15 +636,15 @@ export const PROFILES = {
     label: "Road Tripper",
     icon: "🛣️",
     forWhom:
-      "Anyone who regularly spends hours behind the wheel on longer journeys.",
+      "Anyone who regularly spends hours at a stretch behind the wheel.",
     assumes:
-      "Comfort and long-distance capability matter as much as safety.",
+      "How the car feels after three hours matters as much as what it does in an emergency.",
     priorities: [
       "longDistance",
-      "driverAssistance",
-      "safety",
       "comfort",
+      "safetyAssistance",
       "practicality",
+      "climateSuitability",
     ],
   },
 
@@ -564,14 +652,15 @@ export const PROFILES = {
     label: "Eco-Conscious",
     icon: "🌿",
     forWhom:
-      "Drivers who want their car choice to reflect their environmental values.",
+      "Drivers who want emissions to be the first thing the choice answers to.",
     assumes:
-      "Environmental impact leads, with safety close behind.",
+      "CO₂ and drivetrain lead, with safety immediately behind them.",
     priorities: [
       "environmental",
-      "safety",
-      "driverAssistance",
+      "safetyAssistance",
       "practicality",
+      "longDistance",
+      "comfort",
     ],
   },
 
@@ -579,20 +668,23 @@ export const PROFILES = {
     label: "Balanced",
     icon: "⚖️",
     forWhom:
-      "Anyone without a strong single priority who wants a well-rounded pick.",
+      "Anyone without one dominant requirement who wants a sensible all-rounder.",
     assumes:
-      "No category dominates — spreads weight evenly across the essentials.",
+      "No category runs away with it — the weight is spread across the everyday essentials.",
     priorities: [
-      "safety",
-      "driverAssistance",
+      "safetyAssistance",
       "practicality",
-      "longDistance",
+      "familyFriendly",
       "climateSuitability",
+      "comfort",
     ],
   },
 } as const;
 
 export type ProfileId = keyof typeof PROFILES;
+
+/** How many priorities every profile carries. */
+export const PROFILE_PRIORITY_COUNT = 5;
 
 /* -------------------------------------------------------------------------- */
 /* Derived defaults                                                           */
@@ -604,8 +696,30 @@ export const NUMERIC_ONLY_CATEGORIES = CATEGORY_IDS.filter(
   (id) => CATEGORIES[id].numericOnly
 );
 
+/**
+ * Every feature a category *offers*, in relevance order.
+ *
+ * This is the list the settings UI draws from. It is not what is enabled.
+ */
+export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
+  CATEGORY_IDS.map((id) => [id, CATEGORIES[id].features as FeatureWeight[]])
+) as Record<CategoryId, FeatureWeight[]>;
+
+/**
+ * What a category starts with switched on.
+ *
+ * The first five of the catalogue when there are more than five, and all of
+ * them when there aren't. The order in `CATEGORIES` is therefore load-bearing:
+ * it is the answer to "which five are the sensible five?".
+ */
 export const DEFAULT_CATEGORY_FEATURES = Object.fromEntries(
-  CATEGORY_IDS.map((id) => [id, CATEGORIES[id].features])
+  CATEGORY_IDS.map((id) => [
+    id,
+    (CATEGORIES[id].features as FeatureWeight[]).slice(
+      0,
+      MAX_FEATURES_PER_CATEGORY
+    ),
+  ])
 ) as Record<CategoryId, FeatureWeight[]>;
 
 export const DEFAULT_PRIORITY_DEFINITIONS: PriorityDefinition[] =
@@ -627,15 +741,21 @@ export const DEFAULT_PROFILES: Profile[] = (
   enabled: true,
 }));
 
-export const DEFAULT_PRIORITIES: CategoryId[] = [
-  "safety",
-  "driverAssistance",
-  "practicality",
-  "comfort",
-];
-
-/** Which profile is pre-selected for a brand-new comparison, out of the box. */
+/**
+ * Which profile is automatically selected out of the box.
+ *
+ * "Default" means selected, not merely present. Nothing else in the product
+ * is allowed to use the word for "shipped in the list".
+ */
 export const DEFAULT_DEFAULT_PROFILE_ID: ProfileId = "balanced";
+
+/**
+ * The starting priority order: the default profile's own, so that opening
+ * Lens and pressing nothing gives exactly what the default profile promises.
+ */
+export const DEFAULT_PRIORITIES: CategoryId[] = [
+  ...PROFILES[DEFAULT_DEFAULT_PROFILE_ID].priorities,
+];
 
 /* -------------------------------------------------------------------------- */
 /* Preferences                                                                */

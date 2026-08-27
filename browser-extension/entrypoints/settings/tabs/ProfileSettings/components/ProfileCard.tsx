@@ -1,18 +1,15 @@
 import type { PriorityDefinition, Profile } from "@/lib/reasoning-engine/types";
-import { ProfileEditor } from "./ProfileEditor";
-import { PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { DefaultBadge, SetDefaultButton, Toggle } from "@/entrypoints/settings/components/primitives";
+import {
+    DefaultBadge,
+    SetDefaultButton,
+    Toggle,
+} from "@/entrypoints/settings/components/primitives";
 
 interface ProfileCardProps {
     profile: Profile;
     priorityDefinitions: PriorityDefinition[];
-    defaultProfileId: string;
+    isDefault: boolean;
     enabledCount: number;
-    open: boolean;
-    onEdit: () => void;
-    onSave: (profile: Profile) => void;
-    onCancel: () => void;
-    onDelete: () => void;
     onToggleEnabled: (id: string, enabled: boolean) => void;
     onSetDefault: (id: string) => void;
 }
@@ -20,18 +17,13 @@ interface ProfileCardProps {
 export function ProfileCard({
     profile,
     priorityDefinitions,
-    defaultProfileId,
+    isDefault,
     enabledCount,
-    open,
-    onEdit,
-    onSave,
-    onCancel,
-    onDelete,
     onToggleEnabled,
     onSetDefault,
 }: ProfileCardProps) {
+    /* Lens always needs one strategy to start from. */
     const isLastEnabled = profile.enabled && enabledCount <= 1;
-    const isDefault = profile.id === defaultProfileId;
 
     return (
         <div className="rounded-[22px] bg-finn-snow drop-shadow-sm">
@@ -49,67 +41,48 @@ export function ProfileCard({
                         {isDefault && <DefaultBadge />}
                     </div>
 
-                    <p className="mt-0.5 text-xs text-finn-iron">
+                    <p className="mt-0.5 text-xs leading-5 text-finn-iron">
                         {profile.forWhom}
                     </p>
 
-                    {profile?.priorities?.length > 0 && <PriorityList
+                    <p className="mt-1 text-xs leading-5 text-finn-black">
+                        {profile.assumes}
+                    </p>
+
+                    <PriorityList
                         profile={profile}
                         priorityDefinitions={priorityDefinitions}
-                    />}
-
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                        {!isDefault && profile.enabled && (
-                            <SetDefaultButton onClick={() => onSetDefault(profile.id)} />
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex flex-shrink-0 flex-col items-end gap-2">
-                    <div className="flex items-center gap-1">
-                        <button
-                            type="button"
-                            onClick={onEdit}
-                            className="rounded-full p-2 text-finn-iron hover:text-finn-black"
-                            aria-label="Edit"
-                        >
-                            <PencilSquareIcon className="h-4 w-4" />
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={onDelete}
-                            disabled={isLastEnabled}
-                            className="rounded-full p-2 text-finn-iron transition-colors hover:text-finn-error disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={`Delete ${profile.label}`}
-                        >
-                            <TrashIcon className="h-4 w-4" />
-                        </button>
-                    </div>
-
-                    <Toggle
-                        checked={profile.enabled}
-                        disabled={isLastEnabled}
-                        onChange={(next) => onToggleEnabled(profile.id, next)}
-                        label={`${profile.enabled ? "Disable" : "Enable"} ${profile.label}`}
                     />
+
+                    {!isDefault && profile.enabled && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <SetDefaultButton
+                                onClick={() => onSetDefault(profile.id)}
+                            />
+                        </div>
+                    )}
                 </div>
+
+                <Toggle
+                    checked={profile.enabled}
+                    disabled={isLastEnabled}
+                    onChange={(next) => onToggleEnabled(profile.id, next)}
+                    label={`${profile.enabled ? "Disable" : "Enable"} ${profile.label}`}
+                />
             </div>
 
             {isLastEnabled && (
                 <p className="mx-4 mb-3 rounded-xl bg-finn-cotton px-3 py-2 text-[10px] leading-4 text-finn-iron">
-                    This is the only enabled profile, so it can't be disabled
-                    or deleted — FINN Lens always needs one to fall back on.
+                    This is the only profile still switched on, so it can't be
+                    switched off — Lens always needs one to start you from.
                 </p>
             )}
 
-            {open && (
-                <ProfileEditor
-                    profile={profile}
-                    priorityDefinitions={priorityDefinitions}
-                    onCancel={onCancel}
-                    onSave={onSave}
-                />
+            {isDefault && (
+                <p className="mx-4 mb-3 rounded-xl bg-finn-pale-blue px-3 py-2 text-[10px] leading-4 text-finn-highlight-navy">
+                    This profile is selected automatically when you start a new
+                    comparison. Anything you change afterwards is kept.
+                </p>
             )}
         </div>
     );
@@ -120,12 +93,10 @@ interface PriorityListProps {
     priorityDefinitions: PriorityDefinition[];
 }
 
-function PriorityList({
-    profile,
-    priorityDefinitions,
-}: PriorityListProps) {
+/** The profile's fixed order, shown so the label is never taken on trust. */
+function PriorityList({ profile, priorityDefinitions }: PriorityListProps) {
     return (
-        <div className="mt-4 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
             {profile.priorities.map((id, index) => {
                 const definition = priorityDefinitions.find(
                     (priority) => priority.id === id,
@@ -134,13 +105,15 @@ function PriorityList({
                 return (
                     <span
                         key={id}
-                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold shadow-xs ${definition && definition.enabled
-                            ? "border-finn-iron/20 bg-white text-finn-black"
-                            : "border-finn-warning/20 bg-finn-warning/10 text-finn-warning"
-                            }`}
+                        className={[
+                            "rounded-full border px-2.5 py-1 text-[10px] font-bold shadow-xs",
+                            definition?.enabled
+                                ? "border-finn-iron/20 bg-white text-finn-black"
+                                : "border-finn-warning/20 bg-finn-warning/10 text-finn-warning",
+                        ].join(" ")}
                     >
-                        {index + 1} ·{" "}
-                        {definition?.label ?? "Unknown priority"}
+                        {index + 1} · {definition?.label ?? "Unknown priority"}
+                        {definition && !definition.enabled && " (off)"}
                     </span>
                 );
             })}

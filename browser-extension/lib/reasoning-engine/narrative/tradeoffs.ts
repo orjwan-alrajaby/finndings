@@ -1,3 +1,4 @@
+import type { PinnedFinnCar } from "@/lib/types";
 import type {
   CategoryId,
   ReasoningContext,
@@ -6,23 +7,20 @@ import type {
 import type {
   CostPosition,
   CostReasoning,
+  FeatureFact,
   PriorityReasoning,
   Tradeoff,
 } from "./types";
 
 import { formatEUR } from "../format";
-import { scoreFor } from "../scoring";
-import {
-  classifyMonthlyCostGap,
-  classifyScoreGap,
-  isNoticeable,
-} from "./magnitude";
+import { featureFact } from "./facts";
+import { classifyMonthlyCostGap, isNoticeable } from "./magnitude";
 import {
   inSentence,
   joinCapped,
   joinList,
-  phraseLabel,
   paragraph,
+  phraseLabel,
   sentence,
   shortName,
 } from "./phrase";
@@ -30,19 +28,54 @@ import {
 /**
  * What the reader is giving up.
  *
- * The filter that matters is relevance, not completeness. A weakness is only
- * surfaced when it answers to something the user actually told us: a priority
- * they ranked, or the budget they set. High CO₂ is a fact about every car
- * here; it is only a *tradeoff* for someone who said the environment matters.
+ * This is not a disclaimer and not a footnote. A recommendation presented
+ * without its compromises is half an answer, so this reasoning is built to
+ * the same standard as the reasoning that produced the recommendation: every
+ * item names the thing being given up, quotes the figures behind it, names
+ * the car that has it, and says why *this* reader should care.
  *
- * The other half of the job is restraint — a recommendation followed by nine
- * caveats is not honest, it's unusable. Only the compromises with weight get
- * through.
+ * Two filters keep it honest:
+ *
+ * - **Relevance.** A compromise is only surfaced when it answers to something
+ *   the user told us — a priority they ranked, or the budget they set. High
+ *   CO₂ is a fact about a car; it is only a tradeoff for someone who said the
+ *   environment matters. Manufacturing importance is its own dishonesty.
+ *
+ * - **Restraint.** Only the alternatives the recommendation is actually
+ *   competing with can source a compromise, and only the most consequential
+ *   few are shown. A recommendation followed by nine caveats is unusable.
  */
 
 /** How loudly to say it, from where the user put the priority. */
 const severityFor = (rank: number): Tradeoff["severity"] =>
   rank <= 2 ? "high" : "moderate";
+
+/**
+ * Equipment the alternative has for this priority and the subject doesn't.
+ *
+ * Restricted to the user's own enabled features, so a compromise can never be
+ * built out of equipment nobody asked about.
+ */
+function featureGap(
+  subject: PinnedFinnCar,
+  other: PinnedFinnCar,
+  priority: CategoryId,
+  context: ReasoningContext,
+): FeatureFact[] {
+  const configured = context.categoryFeatures[priority] ?? [];
+
+  return configured
+    .filter(
+      (feature) =>
+        Boolean(other.features?.[feature.key]) &&
+        !subject.features?.[feature.key],
+    )
+    .map(featureFact);
+}
+
+/** Why the reader should care, said in their own ranking. */
+const relevanceFor = (label: string, rank: number): string =>
+  `You ranked ${phraseLabel(label)} #${rank}.`;
 
 /* -------------------------------------------------------------------------- */
 /* Essentials the car doesn't have                                            */
@@ -52,136 +85,180 @@ const severityFor = (rank: number): Tradeoff["severity"] =>
  * A missing essential is surfaced, never used to disqualify.
  *
  * The product's position is that the user decides. Lens's job is to make sure
- * they decide knowing this, so the sentence says the gap plainly and then
- * says why the car still placed where it did.
+ * they decide knowing this, so the sentence states the gap plainly and then
+ * accounts for why the car still placed where it did.
  */
 function missingEssentials(
   reasoning: PriorityReasoning,
-  rank: number,
-  isRecommendation: boolean,
+  evaluation: VehicleEvaluation,
+  priorities: PriorityReasoning[],
+  alternatives: PinnedFinnCar[],
+  context: ReasoningContext,
 ): Tradeoff | null {
   const missing = reasoning.features.essentialMissing;
   if (!missing.length) return null;
 
   const labels = joinCapped(missing.map((fact) => inSentence(fact.label)));
 
-  const rivalHas = reasoning.rival?.onlyRivalHas.filter((fact) =>
-    missing.some((item) => item.key === fact.key),
+  /* Which alternative would give the reader the missing piece back. */
+  const rescuer = alternatives.find((candidate) =>
+    missing.some((fact) => candidate.features?.[fact.key]),
   );
 
-  const placement = isRecommendation
-    ? sentence(
-        "It still comes out on top, because it's stronger on the priorities you",
-        "ranked above this one — but this is a real compromise, not a rounding error",
-      )
-    : null;
+  const rescued = rescuer
+    ? missing.filter((fact) => rescuer.features?.[fact.key])
+    : [];
+
+  const evidence = sentence(
+    `This car doesn't have ${labels}`,
+    rescuer
+      ? `— ${shortName(rescuer.name)} has ${joinCapped(
+          rescued.map((fact) => inSentence(fact.label)),
+        )}`
+      : "",
+  );
+
+  const relevance = sentence(
+    `You marked ${labels} as essential under`,
+    `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority`,
+  );
+
+  const placement = whyItStillWon(reasoning, evaluation, priorities, context);
 
   return {
     kind: "missingEssential",
     priority: reasoning.priority,
     priorityLabel: reasoning.label,
-    rank,
+    rank: reasoning.rank,
     severity: "high",
-    headline: `Missing: ${missing.map((fact) => fact.label).join(", ")}`,
-    sentences: paragraph(
-      sentence(
-        `You marked ${labels} as essential under ${phraseLabel(reasoning.label)},`,
-        "and this car",
-        missing.length === 1
-          ? "doesn't have it"
-          : missing.length === 2
-            ? "doesn't have either"
-            : "doesn't have any of them",
-      ),
-      rivalHas?.length && reasoning.rival
-        ? sentence(
-            `${shortName(reasoning.rival.name)} does have`,
-            `${joinCapped(rivalHas.map((fact) => inSentence(fact.label)))}, if that's the`,
-            "part you're not willing to give up",
-          )
-        : null,
-      placement,
-    ),
+    headline: `No ${missing.map((fact) => inSentence(fact.label)).join(", no ")}`,
+    evidence,
+    relevance,
+    rival: rescuer ? { vehicleId: rescuer.id, name: rescuer.name } : null,
+    sentences: paragraph(evidence, relevance, placement),
   };
 }
 
+/**
+ * Why the car still won despite a gap the user called essential.
+ *
+ * Only stated when it is actually true. "It's stronger on the priorities you
+ * ranked above this one" is a lie under the #1 priority, where there is
+ * nothing above it, and a lie again when the budget is what decided the
+ * result — which is precisely the case a reader is most likely to check.
+ */
+function whyItStillWon(
+  reasoning: PriorityReasoning,
+  evaluation: VehicleEvaluation,
+  priorities: PriorityReasoning[],
+  context: ReasoningContext,
+): string | null {
+  if (!evaluation.isRecommendation) return null;
+
+  /* The budget narrowed the field; that is the honest account. */
+  if (evaluation.rank > 1 && context.budget.budget != null) {
+    return sentence(
+      "It's still the recommendation because it's the strongest car you pinned",
+      "that fits your budget — not because this gap doesn't matter",
+    );
+  }
+
+  const stronger = priorities.filter(
+    (item) =>
+      item.rank < reasoning.rank &&
+      item.standing !== "unsupported" &&
+      (item.standing === "leads" || item.standing === "levelWithLeader"),
+  );
+
+  if (!stronger.length) return null;
+
+  return sentence(
+    `It still comes out on top because nothing close beats it on`,
+    `${joinList(stronger.slice(0, 2).map((item) => phraseLabel(item.label)))},`,
+    "which you ranked higher — but this is a real compromise, not a rounding error",
+  );
+}
+
 /* -------------------------------------------------------------------------- */
-/* Priorities another car does better                                         */
+/* Priorities an alternative does better                                      */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Somewhere the user cares about, that another pinned car genuinely wins.
+ * Somewhere the user cares about that a realistic alternative genuinely wins.
  *
- * Only raised at "clear" or better — a four-point spread is not a compromise
- * and calling it one would be manufacturing drama out of noise.
+ * Raised only at "clear" or better. A four-point spread is not a compromise,
+ * and dressing one up as a compromise is manufacturing drama out of noise.
  */
 function priorityDeficit(
   reasoning: PriorityReasoning,
-  rank: number,
+  evaluation: VehicleEvaluation,
+  context: ReasoningContext,
 ): Tradeoff | null {
-  const behind = reasoning.leader ?? null;
+  const behind = reasoning.leader;
 
-  if (!behind || !isNoticeable(behind.magnitude)) {
-    const rival = reasoning.rival;
+  if (!behind || !isNoticeable(behind.magnitude)) return null;
 
-    if (!rival || rival.subjectAhead || !isNoticeable(rival.magnitude)) {
-      return null;
-    }
+  const rival = context.vehicles.find(
+    (item) => item.id === behind.vehicleId,
+  );
 
-    const measurement = reasoning.measurements.find(
-      (fact) => fact.scored && fact.rival && !fact.rival.subjectAhead,
-    );
+  if (!rival) return null;
 
-    return {
-      kind: measurement ? "measurementDeficit" : "priorityDeficit",
-      priority: reasoning.priority,
-      priorityLabel: reasoning.label,
-      rank,
-      severity: severityFor(rank),
-      headline: `${shortName(rival.name)} is better on ${reasoning.label}`,
-      sentences: paragraph(
-        measurement && measurement.rival
-          ? sentence(
-              `${shortName(rival.name)} has the stronger ${phraseLabel(reasoning.label)}`,
-              `result here: ${measurement.rival.display} against this car's`,
-              `${measurement.display} for ${inSentence(measurement.label)}`,
-            )
-          : sentence(
-              `${shortName(rival.name)} does ${phraseLabel(reasoning.label)} better than this car`,
-            ),
-        rival.onlyRivalHas.length
-          ? sentence(
-              `It has ${joinCapped(
-                rival.onlyRivalHas.map((fact) => inSentence(fact.label)),
-              )}, which this one doesn't`,
-            )
-          : null,
-        sentence(
-          `You ranked ${phraseLabel(reasoning.label)} #${rank}, so this is worth`,
-          "weighing before you decide",
-        ),
-      ),
-    };
-  }
+  /*
+   * The measurement is the better evidence when there is one: "1,726 L
+   * against 491 L" tells the reader what they're giving up, where a score
+   * only tells them that they're giving something up.
+   */
+  const measured = reasoning.measurements.find((fact) => fact.scored);
+
+  const gained = featureGap(
+    evaluation.vehicle,
+    rival,
+    reasoning.priority,
+    context,
+  );
+
+  const evidence =
+    measured && behind.numeric
+      ? sentence(
+          `${shortName(rival.name)} has the better ${inSentence(measured.label)}:`,
+          `${behind.numeric.display} against this car's ${measured.display}`,
+        )
+      : gained.length
+        ? sentence(
+            `${shortName(rival.name)} has`,
+            `${joinCapped(gained.map((fact) => inSentence(fact.label)))}, which this car doesn't`,
+          )
+        : null;
+
+  /* No concrete difference to point at means no claim worth making. */
+  if (!evidence) return null;
+
+  const relevance = sentence(
+    relevanceFor(reasoning.label, reasoning.rank).replace(/\.$/, ""),
+    reasoning.rank === 1
+      ? ", so this is the most significant thing you'd be giving up"
+      : `, so this is one of the main compromises in choosing ${shortName(
+          evaluation.vehicle.name,
+        )}`,
+  );
 
   return {
-    kind: "priorityDeficit",
+    kind: measured ? "measurementDeficit" : "priorityDeficit",
     priority: reasoning.priority,
     priorityLabel: reasoning.label,
-    rank,
-    severity: severityFor(rank),
-    headline: `${shortName(behind.name)} leads ${reasoning.label}`,
-    sentences: paragraph(
-      sentence(
-        `${shortName(behind.name)} is the strongest car you pinned for`,
-        `${phraseLabel(reasoning.label)}`,
-        behind.numeric ? `, at ${behind.numeric.display}` : "",
-      ),
-      sentence(
-        `You ranked ${phraseLabel(reasoning.label)} #${rank}, so if that's the part`,
-        `you'd feel day to day, ${shortName(behind.name)} is the car to look at`,
-      ),
-    ),
+    rank: reasoning.rank,
+    severity: severityFor(reasoning.rank),
+    headline:
+      measured && behind.numeric
+        ? `${measured.label}: ${measured.display} vs ${behind.numeric.display}`
+        : `${shortName(rival.name)} has ${inSentence(
+            gained[0]?.label ?? reasoning.label,
+          )}`,
+    evidence,
+    relevance,
+    rival: { vehicleId: rival.id, name: rival.name },
+    sentences: paragraph(evidence, relevance),
   };
 }
 
@@ -190,34 +267,52 @@ function priorityDeficit(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Names what the extra monthly cost is actually buying, in the user's own
- * priorities — or admits that nothing in them explains it.
+ * Names what the extra monthly cost is buying, in the user's own priorities —
+ * or admits that nothing in them explains it.
+ *
+ * "You're paying €152 more than the Dolphin Surf" invites exactly one
+ * question, and this is where it gets answered.
  */
 function whatTheExtraBuys(
-  subjectId: number,
+  evaluation: VehicleEvaluation,
+  priorities: PriorityReasoning[],
   otherId: number,
   context: ReasoningContext,
 ): string[] {
-  const wins = context.weights
-    .filter(({ priority }) =>
-      isNoticeable(
-        classifyScoreGap(
-          scoreFor(context.scores, subjectId, priority as CategoryId) -
-            scoreFor(context.scores, otherId, priority as CategoryId),
-        ),
-      ) &&
-      scoreFor(context.scores, subjectId, priority as CategoryId) >
-        scoreFor(context.scores, otherId, priority as CategoryId),
-    )
-    .slice(0, 2);
+  const other = context.vehicles.find((item) => item.id === otherId);
+  if (!other) return [];
 
-  return wins.map(({ priority }) => priority as string);
+  const wins: string[] = [];
+
+  for (const reasoning of priorities) {
+    if (reasoning.standing === "unsupported") continue;
+
+    const gained = context.categoryFeatures[reasoning.priority]?.filter(
+      (feature) =>
+        Boolean(evaluation.vehicle.features?.[feature.key]) &&
+        !other.features?.[feature.key],
+    );
+
+    if (gained?.length) {
+      wins.push(
+        `${joinCapped(
+          gained.map((feature) => inSentence(featureFact(feature).label)),
+          2,
+        )} under ${phraseLabel(reasoning.label)}`,
+      );
+    }
+
+    if (wins.length === 2) break;
+  }
+
+  return wins;
 }
 
 function costTradeoff(
   cost: CostReasoning,
-  context: ReasoningContext,
+  evaluation: VehicleEvaluation,
   priorities: PriorityReasoning[],
+  context: ReasoningContext,
 ): Tradeoff | null {
   const alternative: CostPosition | null = cost.cheapest ?? cost.rival;
 
@@ -226,21 +321,32 @@ function costTradeoff(
   const difference = cost.subject.total - alternative.total;
   if (difference <= 0) return null;
 
-  const magnitude = classifyMonthlyCostGap(difference, alternative.total);
-  if (!isNoticeable(magnitude)) return null;
+  if (!isNoticeable(classifyMonthlyCostGap(difference, alternative.total))) {
+    return null;
+  }
 
   const buys = whatTheExtraBuys(
-    cost.subject.vehicleId,
+    evaluation,
+    priorities,
     alternative.vehicleId,
     context,
   );
 
-  const labels = buys
-    .map(
-      (id) =>
-        priorities.find((item) => item.priority === id)?.label ?? id,
-    )
-    .map(phraseLabel);
+  const evidence = sentence(
+    `At your mileage this is estimated at ${formatEUR(cost.subject.total)}/month,`,
+    `about ${formatEUR(difference)} more than ${shortName(alternative.name)} at`,
+    formatEUR(alternative.total),
+  );
+
+  const relevance = buys.length
+    ? sentence(
+        `That extra ${formatEUR(difference)} a month is buying you`,
+        `${buys.join("; and ")} — which is what put this car ahead of it`,
+      )
+    : sentence(
+        `Nothing you ranked separates the two by much, so that extra`,
+        `${formatEUR(difference)} a month isn't buying you anything you told us you wanted`,
+      );
 
   return {
     kind: "cost",
@@ -249,22 +355,10 @@ function costTradeoff(
     rank: null,
     severity: "high",
     headline: `${formatEUR(difference)}/month more than ${shortName(alternative.name)}`,
-    sentences: paragraph(
-      sentence(
-        `At your mileage this is estimated at ${formatEUR(cost.subject.total)}/month,`,
-        `about ${formatEUR(difference)} more than ${shortName(alternative.name)} at`,
-        `${formatEUR(alternative.total)}`,
-      ),
-      labels.length
-        ? sentence(
-            `That extra ${formatEUR(difference)} a month is buying you a stronger`,
-            `${joinList(labels)} result — which is what pushed this car above it`,
-          )
-        : sentence(
-            `Nothing in your priorities separates the two by much, so the extra`,
-            `${formatEUR(difference)} a month isn't buying you anything you told us you wanted`,
-          ),
-    ),
+    evidence,
+    relevance,
+    rival: { vehicleId: alternative.vehicleId, name: alternative.name },
+    sentences: paragraph(evidence, relevance),
   };
 }
 
@@ -274,25 +368,40 @@ function budgetTradeoff(cost: CostReasoning): Tradeoff | null {
 
   const over = cost.subject.budgetStatus === "over";
 
+  const evidence = over
+    ? sentence(
+        `You set ${formatEUR(cost.budget)}/month. This is estimated at`,
+        `${formatEUR(cost.subject.total)}/month, about`,
+        `${formatEUR(Math.abs(cost.budgetDifference ?? 0))} over`,
+      )
+    : sentence(
+        `You set ${formatEUR(cost.budget)}/month, and part of this car's cost`,
+        "couldn't be estimated from FINN's data",
+      );
+
+  const relevance = over
+    ? sentence(
+        "Your budget is the one constraint Lens treats as a hard limit rather",
+        "than a preference, so nothing else here outweighs it",
+      )
+    : sentence(
+        "We won't call a car affordable on the strength of numbers we don't have,",
+        "so it can't be confirmed to fit",
+      );
+
   return {
     kind: "budget",
     priority: null,
     priorityLabel: null,
     rank: null,
     severity: "high",
-    headline: over ? "Over your budget" : "We can't confirm it fits your budget",
-    sentences: paragraph(
-      over
-        ? sentence(
-            `You set ${formatEUR(cost.budget)}/month. This is estimated at`,
-            `${formatEUR(cost.subject.total)}/month, about`,
-            `${formatEUR(Math.abs(cost.budgetDifference ?? 0))} over`,
-          )
-        : sentence(
-            `You set ${formatEUR(cost.budget)}/month. Part of this car's cost couldn't be`,
-            "estimated, so we can't tell you whether it fits",
-          ),
-    ),
+    headline: over
+      ? `${formatEUR(Math.abs(cost.budgetDifference ?? 0))}/month over your budget`
+      : "We can't confirm it fits your budget",
+    evidence,
+    relevance,
+    rival: null,
+    sentences: paragraph(evidence, relevance),
   };
 }
 
@@ -308,6 +417,7 @@ export function reasonAboutTradeoffs(
   priorities: PriorityReasoning[],
   cost: CostReasoning,
   context: ReasoningContext,
+  alternatives: PinnedFinnCar[] = [],
 ): Tradeoff[] {
   const fromPriorities: Tradeoff[] = [];
 
@@ -316,8 +426,10 @@ export function reasonAboutTradeoffs(
 
     const essential = missingEssentials(
       reasoning,
-      reasoning.rank,
-      evaluation.isRecommendation,
+      evaluation,
+      priorities,
+      alternatives,
+      context,
     );
 
     if (essential) {
@@ -325,19 +437,25 @@ export function reasonAboutTradeoffs(
       continue;
     }
 
-    const deficit = priorityDeficit(reasoning, reasoning.rank);
+    const deficit = priorityDeficit(reasoning, evaluation, context);
     if (deficit) fromPriorities.push(deficit);
   }
 
-  const money = [budgetTradeoff(cost), costTradeoff(cost, context, priorities)].filter(
-    (item): item is Tradeoff => item != null,
-  );
+  const money = [
+    budgetTradeoff(cost),
+    costTradeoff(cost, evaluation, priorities, context),
+  ].filter((item): item is Tradeoff => item != null);
 
-  const ordered = [...money, ...fromPriorities].sort((a, b) => {
-    if (a.severity !== b.severity) return a.severity === "high" ? -1 : 1;
-
-    return (a.rank ?? 0) - (b.rank ?? 0);
-  });
+  /*
+   * Money first — the budget is a constraint the user set outright — and then
+   * strictly in their own priority order. Sorting by an internal severity
+   * ahead of that would print a #5 compromise above a #3 one, which reads as
+   * the page disagreeing with the ranking it just showed them.
+   */
+  const ordered = [
+    ...money,
+    ...[...fromPriorities].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0)),
+  ];
 
   return ordered.slice(0, MAX_TRADEOFFS);
 }
