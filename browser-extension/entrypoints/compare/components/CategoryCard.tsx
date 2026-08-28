@@ -4,7 +4,11 @@ import {
     ArrowRightIcon,
     ChevronDownIcon,
 } from "@heroicons/react/24/outline";
-import { CATEGORIES, FEATURES } from "@/lib/reasoning-engine/constants";
+import {
+    CATEGORIES,
+    FEATURE_IMPORTANCE,
+    FEATURES,
+} from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
     FeatureSelection,
@@ -245,16 +249,27 @@ function CategoryReadonlyDetails({
                 <div>
                     <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
                         {features.length > 0
-                            ? "Features you picked out"
+                            ? "Getting extra influence"
                             : "Judged on the equipment overall"}
                     </p>
 
                     {features.length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
+                            {/*
+                              * Coloured by the level the user gave it, so the
+                              * scale they met in the picker still reads the
+                              * same way here.
+                              */}
                             {features.map((preference) => (
                                 <span
                                     key={preference.key}
-                                    className="rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-bold text-finn-highlight-navy"
+                                    title={`You marked this ${FEATURE_IMPORTANCE[preference.importance].inSentence}`}
+                                    className={[
+                                        "rounded-full px-2.5 py-1 text-[11px] font-bold",
+                                        FEATURE_IMPORTANCE[
+                                            preference.importance
+                                        ].chipClass,
+                                    ].join(" ")}
                                 >
                                     {FEATURES[preference.key].label}
                                 </span>
@@ -262,9 +277,9 @@ function CategoryReadonlyDetails({
                         </div>
                     ) : (
                         <p className="text-[11px] leading-5 text-finn-iron">
-                            You haven't singled out particular features here,
-                            so cars are compared across all{" "}
-                            {meta.features.length} systems this priority covers.
+                            You haven't singled anything out here, so cars are
+                            judged on this category as a whole — all{" "}
+                            {meta.features.length} systems it covers.
                         </p>
                     )}
                 </div>

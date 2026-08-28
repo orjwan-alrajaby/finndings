@@ -46,10 +46,10 @@ export function Tradeoffs({
                 <>
                     <p className="mt-2 text-sm leading-6 text-finn-iron">
                         Only the compromises that answer to something you told
-                        us — a priority you ranked, a feature you picked out,
-                        or the budget you set. A feature you picked and this
-                        car lacks didn't count against its score; it's here so
-                        you can weigh it yourself.
+                        us — a priority you ranked, a feature you gave extra
+                        influence, or the budget you set. A feature you picked
+                        and this car lacks was never a requirement; it's here
+                        so you can weigh it yourself.
                     </p>
 
                     <div className="mt-4 space-y-3">

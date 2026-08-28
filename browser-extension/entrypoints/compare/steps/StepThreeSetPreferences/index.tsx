@@ -127,15 +127,16 @@ export function StepThreeSetPreferences({
                 </p>
 
                 <h2 className="mt-2 text-3xl font-black tracking-tight text-finn-black sm:text-4xl">
-                    Anything specific you want?
+                    What should influence your decision?
                 </h2>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                    You've said which categories matter and in what
-                    order. This step is optional: if there are
-                    particular features you want inside a category,
-                    name them and say how much they matter. Skip it
-                    and cars are compared on each category as a whole.
+                    You've said which categories matter and in what order.
+                    This step is optional and finer: inside a category, are
+                    there particular features you want us to pay extra
+                    attention to? We always judge a car on the whole
+                    category — the features you pick just get extra
+                    influence on top.
                 </p>
             </div>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-7">
@@ -146,12 +147,12 @@ export function StepThreeSetPreferences({
 
                         <p className="text-xs leading-5 text-finn-iron">
                             Your order already tells us how much each priority
-                            matters. This is the finer question: within a
-                            priority, are there particular features you
-                            especially want, and how badly? Pick up to{" "}
-                            {MAX_FEATURES_PER_CATEGORY}, or none at all — a
-                            car missing one isn't ruled out, it just shows up
-                            as a tradeoff in your advice.
+                            matters. Here you can name up to{" "}
+                            {MAX_FEATURES_PER_CATEGORY} features inside a
+                            priority that should have extra influence, and say
+                            how much. Nothing you pick becomes a requirement:
+                            a car missing one isn't ruled out, it just shows
+                            up as a tradeoff in your advice.
                         </p>
                     </div>
                     {priorities.map((categoryId, index) => {

@@ -68,7 +68,7 @@ export interface FeatureEvidence {
   coverage: FeatureSplit;
   /** The features the user picked out. Both lists empty when they picked none. */
   picked: FeatureSplit;
-  /** Picks the car lacks that the user marked a high priority. */
+  /** Picks the car lacks that the user gave the most influence. */
   highMisses: FeatureFact[];
   /** How many features the user picked out. Zero is a valid answer. */
   selectedCount: number;

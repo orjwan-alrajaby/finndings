@@ -31,7 +31,7 @@ export function CalculatedPriorityDetails({
                 <p className="mt-1 text-xs leading-5 text-finn-iron">
                     Unlike the other priorities, this one is
                     derived directly from vehicle data. There are
-                    no features to enable or rank.
+                    no features to single out for extra influence.
                 </p>
             </div>
         </div>

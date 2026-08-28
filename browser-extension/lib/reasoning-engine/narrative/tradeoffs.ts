@@ -137,8 +137,8 @@ function missingSelected(
   const relevance = high.length
     ? sentence(
         high.length === missing.length && missing.length === 1
-          ? `You marked it a high priority under`
-          : `You marked ${joinCapped(high.map((fact) => fact.phrase), 5)} a high priority under`,
+          ? `You marked it extremely important under`
+          : `You marked ${joinCapped(high.map((fact) => fact.phrase), 5)} extremely important under`,
         `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
         "so this is the compromise here most worth weighing",
       )
@@ -156,8 +156,9 @@ function missingSelected(
     priorityLabel: reasoning.label,
     rank: reasoning.rank,
     /*
-     * Loud when the reader ranked the priority highly *or* marked the pick a
-     * high priority. Either on its own is enough to earn the top of the list.
+     * Loud when the reader ranked the priority highly *or* gave the pick the
+     * most influence. Either on its own is enough to earn the top of the
+     * list.
      */
     severity:
       missing.some((fact) => fact.importance === "high")

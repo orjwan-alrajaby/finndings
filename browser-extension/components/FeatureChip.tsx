@@ -14,11 +14,11 @@ const TONE_CLASS: Record<FeatureChipTone, string> = {
 /**
  * A named feature, with its explanation attached.
  *
- * Importance is shown only where the user actually set one — that is, only on
- * features they picked out — and only for high, which is the level that
- * changes how the reader should weigh a gap. Labelling every chip "medium"
- * would be noise, since medium is simply what a pick is until they say
- * otherwise.
+ * The influence level is shown only where the user actually set one — that
+ * is, only on features they picked out — and only for the top level, which is
+ * the one that changes how the reader should read a gap. Labelling every chip
+ * "very important" would be noise, since that is simply what a pick is until
+ * they say otherwise.
  */
 export function FeatureChip({
     fact,
@@ -43,9 +43,9 @@ export function FeatureChip({
             {flagged && (
                 <span
                     className="text-[9px] font-black uppercase tracking-wide opacity-70"
-                    title={`You marked this ${FEATURE_IMPORTANCE.high.inSentence}`}
+                    title={`You said this should have the most influence on your decision`}
                 >
-                    High
+                    {FEATURE_IMPORTANCE.high.label}
                 </span>
             )}
 

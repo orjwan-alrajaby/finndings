@@ -29,9 +29,9 @@ export function CalculatedPriorityInfo({
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    This priority does not use manually
-                    selected features, so there is nothing
-                    to enable or prioritize here.
+                    This priority has no feature list, so
+                    there is nothing here to single out for
+                    extra influence.
                 </p>
             </div>
 

@@ -17,9 +17,11 @@ import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
  * arithmetic is still on the page, under *Behind the recommendation*, where a
  * number is what the reader came for.
  *
- * Features carry no importance marking either. The reader was never asked to
- * grade one, so there is nothing to show beyond whether they asked for it and
- * whether the car has it.
+ * The feature rows keep the two halves of the model apart on purpose. What
+ * the reader singled out for extra influence comes first, present and missing
+ * both; what the category covers anyway comes second, under a label that says
+ * it still counted. A reader who picked five safety features has to be able
+ * to see here that Lens looked at more than five.
  */
 
 const STANDING_LABEL: Record<PriorityStanding, string> = {
@@ -49,10 +51,10 @@ export function PrioritySection({
      * Two questions, shown separately.
      *
      * The reader's own picks come first and carry both halves, present and
-     * missing, because a gap in something they asked for is the point. The
+     * missing, because a gap in something they singled out is the point. The
      * category coverage below it shows only what the car has — fifteen
      * struck-through chips of equipment nobody asked about is a dump, not
-     * evidence.
+     * evidence — but it is labelled as counting, because it did.
      */
     const picked = features.picked;
     const hasPicks = picked.present.length + picked.missing.length > 0;
@@ -105,13 +107,13 @@ export function PrioritySection({
                         {hasPicks && (
                             <>
                                 <ChipRow
-                                    label="You picked out, and it has"
+                                    label="You gave extra influence, and it has"
                                     facts={picked.present}
                                     tone="present"
                                 />
 
                                 <ChipRow
-                                    label="You picked out, but it doesn't have"
+                                    label="You gave extra influence, but it doesn't have"
                                     facts={picked.missing}
                                     tone="missing"
                                 />
@@ -121,7 +123,7 @@ export function PrioritySection({
                         <ChipRow
                             label={
                                 hasPicks
-                                    ? "Everything else it has here"
+                                    ? "Also counted here, and it has"
                                     : "It has"
                             }
                             facts={

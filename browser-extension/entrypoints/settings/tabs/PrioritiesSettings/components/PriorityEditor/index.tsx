@@ -8,14 +8,13 @@ import type {
 import {
     DEFAULT_FEATURE_IMPORTANCE,
     MAX_FEATURES_PER_CATEGORY,
-    SUGGESTED_CATEGORY_FEATURES,
 } from "@/lib/reasoning-engine/constants";
 import {
     isNumericOnlyPriority,
     validatePriorityDraft,
 } from "../../../../utils/PriorityValidation";
 import { InlineError } from "../../../../components/primitives";
-import { FeatureOption } from "@/components/FeatureOption";
+import { FeatureInfluencePicker } from "@/components/FeatureInfluencePicker";
 import { CalculatedPriorityInfo } from "./components/CalculatedPriorityInfo";
 import { PriorityEditorActions } from "./components/PriorityEditorActions";
 
@@ -34,11 +33,13 @@ interface PriorityEditorProps {
 }
 
 /**
- * Choosing what a priority pays particular attention to.
+ * Choosing what a priority pays extra attention to, as a saved default.
  *
- * Five is a ceiling on how many things the user can single out, not a quota
- * to fill. Picking none is a real answer — the category is then judged on its
- * whole catalogue — so nothing here blocks an empty selection.
+ * The same two questions step 3 asks, drawn by the same component, so the
+ * model is explained identically in both places. Five is a ceiling on how
+ * many things the user can single out, not a quota to fill. Picking none is a
+ * real answer — the category is then judged on its whole catalogue — so
+ * nothing here blocks an empty selection.
  */
 export function PriorityEditor({
     priority,
@@ -51,19 +52,6 @@ export function PriorityEditor({
 
     const [draftFeatures, setDraftFeatures] =
         useState<FeatureSelection>(features);
-
-    const importanceOf = new Map(
-        draftFeatures.map((preference) => [
-            preference.key,
-            preference.importance,
-        ]),
-    );
-
-    const suggested = new Set(
-        SUGGESTED_CATEGORY_FEATURES[priority.id] ?? [],
-    );
-
-    const atMax = draftFeatures.length >= MAX_FEATURES_PER_CATEGORY;
 
     const toggleFeature = (feature: FeatureId) => {
         setDraftFeatures((current) => {
@@ -101,63 +89,14 @@ export function PriorityEditor({
 
     return (
         <div className="space-y-4 border-t border-white p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <div className="min-w-0">
-                    <p className="text-sm font-black text-finn-highlight-navy">
-                        Pick up to {MAX_FEATURES_PER_CATEGORY} features that
-                        matter most to you
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-finn-iron">
-                        Optional. Pick none and Lens compares cars on the
-                        category as a whole. Pick something and you can say how
-                        much it matters. Not sure what something is? Tap the ⓘ.
-                    </p>
-                </div>
-
-                <span
-                    className={[
-                        "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
-                        draftFeatures.length
-                            ? "bg-finn-pale-blue text-finn-accent-blue"
-                            : "bg-finn-cotton text-finn-iron",
-                    ].join(" ")}
-                >
-                    {draftFeatures.length} / {MAX_FEATURES_PER_CATEGORY}{" "}
-                    selected
-                </span>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2">
-                {availableFeatures.map((feature) => (
-                    <FeatureOption
-                        key={feature}
-                        feature={feature}
-                        importance={importanceOf.get(feature) ?? null}
-                        disabled={!importanceOf.has(feature) && atMax}
-                        disabledReason={`You've picked ${MAX_FEATURES_PER_CATEGORY} already — unpick one to swap`}
-                        suggested={suggested.has(feature)}
-                        onToggle={() => toggleFeature(feature)}
-                        onImportanceChange={(importance) =>
-                            updateImportance(feature, importance)
-                        }
-                    />
-                ))}
-            </div>
-
-            {atMax && (
-                <p className="text-[11px] leading-4 text-finn-iron">
-                    That's {MAX_FEATURES_PER_CATEGORY} — unpick one to choose
-                    something else.
-                </p>
-            )}
-
-            {draftFeatures.length === 0 && (
-                <p className="rounded-2xl bg-white px-3.5 py-3 text-[11px] leading-5 text-finn-iron">
-                    Nothing picked out, so cars will be compared across all{" "}
-                    {availableFeatures.length} systems this priority covers.
-                </p>
-            )}
+            <FeatureInfluencePicker
+                categoryId={priority.id}
+                categoryLabel={priority.label}
+                features={draftFeatures}
+                availableFeatures={availableFeatures}
+                onToggleFeature={toggleFeature}
+                onImportanceChange={updateImportance}
+            />
 
             <InlineError>{error}</InlineError>
 

@@ -56,16 +56,19 @@ export interface LegacyLensPreferences {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How much one picked-out feature matters to the user.
+ * How much extra influence one picked-out feature should have.
+ *
+ * The keys are internal and unchanged; what the user reads is "important",
+ * "very important" and "extremely important" — see FEATURE_IMPORTANCE.
  *
  * Deliberately not "essential". A feature nobody would buy the car without is
- * a hard requirement, and Lens has none — a car missing a high-priority
- * feature stays in the running and the gap is reported as a tradeoff. These
- * words describe strength of preference, nothing more.
+ * a hard requirement, and Lens has none — a car missing even an
+ * extremely-important pick stays in the running, and the gap is reported as a
+ * tradeoff. These words describe strength of preference, nothing more.
  */
 export type FeatureImportance = "high" | "medium" | "low";
 
-/** One feature the user picked out, and how strongly they want it. */
+/** One feature the user picked out, and how much it should influence. */
 export interface FeaturePreference {
   key: FeatureId;
   importance: FeatureImportance;

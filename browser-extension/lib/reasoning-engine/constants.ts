@@ -12,45 +12,84 @@ import type {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How much weight a picked-out feature carries.
+ * How much extra influence a picked-out feature carries.
  *
  * Read the numbers like this: every feature in a category's catalogue counts
  * once, because it is relevant equipment. A feature the user picked out
- * counts again for how much they said it matters — once more for low, twice
- * for medium, three times for high. Hence 2, 3 and 4 against a base of 1.
+ * counts again for how much they said it should influence the result — once
+ * more for the lowest level, twice for the middle, three times for the
+ * highest. Hence 2, 3 and 4 against a base of 1.
  *
  * The ratios matter, not the absolute figures. What they have to achieve is
- * narrow: a high-priority pick should visibly outweigh a low-priority one,
- * and the whole catalogue must stay the denominator so that no single feature
- * can push a category to 0 or 100. Anything much steeper (the old system's
- * 5-to-1) starts letting five picks drown out the ten to fifteen other things
- * the category is actually made of.
+ * narrow: an extremely-important pick should visibly outweigh a merely
+ * important one, and the whole catalogue must stay the denominator so that no
+ * single feature can push a category to 0 or 100. Anything much steeper (the
+ * old system's 5-to-1) starts letting five picks drown out the ten to fifteen
+ * other things the category is actually made of.
  *
- * There is deliberately no "essential". Nothing here gates a car out.
+ * The three labels all say "important" because all three mean the same kind
+ * of thing — the user telling us to pay extra attention — and differ only in
+ * degree. "High / medium / low" read as a grading scheme the reader had to
+ * decode; these read as the sentence they are actually saying. There is
+ * deliberately no "essential" and no "required": nothing here gates a car
+ * out.
+ *
+ * The colour fields live here rather than in the components so that the
+ * scale looks the same everywhere it is shown — the picker in step 3, the
+ * priority editor in settings, and the chips in the advice. Three distinct
+ * hues, not three tints of one, because tints of one colour say "more of the
+ * same" where these have to say "a different level". Never red: a level on
+ * this scale is never an error or a warning.
  */
 export const FEATURE_IMPORTANCE = {
   high: {
-    label: "High",
-    /** For "you marked it as a high priority". */
-    inSentence: "a high priority",
-    hint: "Matters a lot to me",
+    label: "Extremely important",
+    /** For "you marked it extremely important". */
+    inSentence: "extremely important",
+    hint: "Give this the most influence of the three",
     weight: 4,
-    activeClass: "bg-finn-accent-blue text-white",
+    /* Deep violet: the furthest from the page's ordinary blue. */
+    activeClass:
+      "bg-finn-influence-red text-white ring-1 ring-finn-influence-red",
+    idleClass:
+      "text-finn-influence-red hover:bg-finn-influence-red-pale",
+    dotClass: "bg-finn-influence-red",
+    selectedCardClass:
+      "bg-finn-influence-red-pale ring-2 ring-finn-influence-red",
+    accentTextClass: "text-finn-influence-red",
+    chipClass:
+      "bg-finn-influence-red-pale text-finn-influence-red",
   },
   medium: {
-    label: "Medium",
-    inSentence: "a medium priority",
-    hint: "I'd like to have it",
+    label: "Very important",
+    inSentence: "very important",
+    hint: "Give this more influence than an ordinary pick",
     weight: 3,
-    activeClass: "bg-finn-accent-blue/70 text-white",
+    /* Amber/gold: the middle step, warm rather than louder blue. */
+    activeClass:
+      "bg-finn-influence-orange text-white ring-1 ring-finn-influence-orange",
+    idleClass: "text-finn-influence-orange hover:bg-finn-influence-orange-pale",
+    dotClass: "bg-finn-influence-orange",
+    selectedCardClass:
+      "bg-finn-influence-orange-pale ring-2 ring-finn-influence-orange",
+    accentTextClass: "text-finn-influence-orange",
+    chipClass: "bg-finn-influence-orange-pale text-finn-influence-orange",
   },
   low: {
-    label: "Low",
-    inSentence: "a low priority",
-    hint: "A bonus, not a need",
+    label: "Important",
+    inSentence: "important",
+    hint: "Worth extra influence, but the least of the three",
     weight: 2,
-    /* The quietest of the three, so visual weight tracks stated weight. */
-    activeClass: "bg-finn-iron text-white",
+    /* Green/teal: the calmest of the three, so visual weight tracks stated
+       weight without any level looking like a failure. */
+    activeClass:
+      "bg-finn-influence-emerald text-white ring-1 ring-finn-influence-emerald",
+    idleClass: "text-finn-influence-emerald hover:bg-finn-influence-emerald-pale",
+    dotClass: "bg-finn-influence-emerald",
+    selectedCardClass:
+      "bg-finn-influence-emerald-pale ring-2 ring-finn-influence-emerald",
+    accentTextClass: "text-finn-influence-emerald",
+    chipClass: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
   },
 } as const satisfies Record<
   FeatureImportance,
@@ -60,6 +99,11 @@ export const FEATURE_IMPORTANCE = {
     hint: string;
     weight: number;
     activeClass: string;
+    idleClass: string;
+    dotClass: string;
+    selectedCardClass: string;
+    accentTextClass: string;
+    chipClass: string;
   }
 >;
 
@@ -70,14 +114,24 @@ export const BASE_FEATURE_WEIGHT = 1;
  * What a feature gets when the user picks it without touching the importance
  * control.
  *
- * Neutral on purpose: picking something already says it matters, and
- * defaulting either high or low would put words in their mouth. Leaving every
- * pick at medium reproduces plain equal weighting, so the importance layer is
+ * The middle rung on purpose: picking something already says it matters, and
+ * defaulting to either end would put words in their mouth. Leaving every pick
+ * in the middle reproduces plain equal weighting, so the importance layer is
  * refinement the user opts into rather than a form they must fill in.
  */
 export const DEFAULT_FEATURE_IMPORTANCE: FeatureImportance = "medium";
 
+/** The levels strongest-first, for anything reasoning about weight. */
 export const IMPORTANCE_LEVELS = ["high", "medium", "low"] as const;
+
+/**
+ * The levels as the user meets them, gentlest first.
+ *
+ * The control reads left to right as a rising scale, which is the whole point
+ * of it — reversing the internal order here keeps that reading in one place
+ * instead of in every component that draws the control.
+ */
+export const IMPORTANCE_SCALE = ["low", "medium", "high"] as const;
 
 /* -------------------------------------------------------------------------- */
 /* Features                                                                   */

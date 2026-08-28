@@ -5,27 +5,43 @@ import {
     InformationCircleIcon,
     PencilSquareIcon,
 } from "@heroicons/react/24/outline";
-import { CATEGORIES, FEATURES } from "@/lib/reasoning-engine/constants";
+import {
+    CATEGORIES,
+    FEATURE_IMPORTANCE,
+    FEATURES,
+} from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
     FeatureId,
+    FeatureImportance,
     FeatureSelection,
     Profile,
 } from "@/lib/reasoning-engine/types";
 
 export function FeatureChip({
     feature,
+    importance,
     size = "sm",
 }: {
     feature: FeatureId;
+    /** The level the user gave it, where one was set. Colours the chip. */
+    importance?: FeatureImportance;
     size?: "sm" | "md";
 }) {
     const { label, explanation } = FEATURES[feature];
 
     return (
         <div
+            title={
+                importance
+                    ? `You marked this ${FEATURE_IMPORTANCE[importance].inSentence}`
+                    : undefined
+            }
             className={[
-                "group inline-flex max-w-full items-center gap-1 rounded-full bg-finn-pale-blue font-bold text-finn-highlight-navy",
+                "group inline-flex max-w-full items-center gap-1 rounded-full font-bold",
+                importance
+                    ? FEATURE_IMPORTANCE[importance].chipClass
+                    : "bg-finn-pale-blue text-finn-highlight-navy",
                 size === "sm"
                     ? "px-2 py-1 text-[10px]"
                     : "px-2.5 py-1.5 text-[11px]",
@@ -192,7 +208,7 @@ function ProfilePriority({
                         ) : features.length > 0 ? (
                             <>
                                 <p className="mt-3 text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                                    Features you picked out
+                                    Getting extra influence
                                 </p>
 
                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -200,16 +216,16 @@ function ProfilePriority({
                                         <FeatureChip
                                             key={preference.key}
                                             feature={preference.key}
+                                            importance={preference.importance}
                                         />
                                     ))}
                                 </div>
                             </>
                         ) : (
                             <p className="mt-3 text-[11px] leading-5 text-finn-iron">
-                                You haven't picked out particular features
-                                here, so cars are compared across all{" "}
-                                {meta.features.length} systems this priority
-                                covers.
+                                You haven't singled anything out here, so
+                                cars are judged on this category as a whole —
+                                all {meta.features.length} systems it covers.
                             </p>
                         )}
                     </div>

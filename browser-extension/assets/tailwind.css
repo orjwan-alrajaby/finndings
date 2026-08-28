@@ -18,6 +18,20 @@
   --color-finn-error: #e71d3f;
   --color-finn-pale-blue: #eaf4ff;
 
+  /* -- Influence scale --
+     How much a feature the user picked out should count. Three separate
+     hues rather than three tints of the accent blue, so "important" and
+     "extremely important" are told apart at a glance instead of read as
+     the same colour twice. None of them is red: nothing on this scale is
+     an error, a warning, or a rule the car broke. Every solid shade below
+     clears 4.5:1 against white text. */
+  --color-finn-influence-emerald: #009966;
+  --color-finn-influence-emerald-pale: #ecfdf5;
+  --color-finn-influence-orange: #f54900;
+  --color-finn-influence-orange-pale: #fff7ed;
+  --color-finn-influence-red: #c70036;
+  --color-finn-influence-red-pale: #fff1f2;
+
   /* -- Breakpoints --
      Redeclaring these overrides Tailwind's defaults and generates
      2xs:, xs:, sm:, md:, lg:, xl:, 2xl:, 3xl:, 4xl:, 5xl: variants. */

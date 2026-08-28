@@ -45,25 +45,39 @@ export function FeatureCard({
                             {label}
                         </p>
 
+                        {/*
+                          * Both states say what Lens will do, because both
+                          * are real answers. Picking nothing is judged on the
+                          * whole category; picking five adds weight to those
+                          * five and still judges the whole category. Neither
+                          * line may imply the rest stopped counting.
+                          */}
                         <p
                             className={[
-                                "mt-0.5 text-[11px]",
-                                open
-                                    ? "text-finn-black"
-                                    : "text-finn-iron",
+                                "mt-0.5 text-[11px] font-bold",
+                                open ? "text-finn-black" : "text-finn-iron",
                             ].join(" ")}
                         >
-                            {/*
-                              * No features picked out is a real setting, not
-                              * an empty one — the card must not read like an
-                              * unfinished form.
-                              */}
                             {featureCount > 0
-                                ? `${featureCount} ${featureCount === 1
-                                    ? "feature"
-                                    : "features"
-                                } picked out`
-                                : "Judged on the category overall"}
+                                ? `${featureCount} ${
+                                      featureCount === 1
+                                          ? "feature"
+                                          : "features"
+                                  } selected`
+                                : "No specific features selected"}
+                        </p>
+
+                        <p
+                            className={[
+                                "mt-0.5 text-[11px] leading-4",
+                                open ? "text-finn-black/70" : "text-finn-iron",
+                            ].join(" ")}
+                        >
+                            {featureCount > 0
+                                ? `${
+                                      featureCount === 1 ? "It" : "They"
+                                  }'ll have extra influence on your recommendation.`
+                                : "We'll judge this priority on the category as a whole."}
                         </p>
                     </div>
                 </div>
