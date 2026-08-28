@@ -1,9 +1,9 @@
-import { CheckIcon } from "@heroicons/react/24/solid";
 import { InfoTip } from "@/components/InfoTip";
 import {
     FEATURE_IMPORTANCE,
     FEATURES,
     IMPORTANCE_SCALE,
+    STANDARD_INFLUENCE,
 } from "@/lib/reasoning-engine/constants";
 import type {
     FeatureId,
@@ -18,210 +18,163 @@ export interface FeatureElsewhere {
 
 interface FeatureOptionProps {
     feature: FeatureId;
-    /** The influence the user gave it. This card only exists once picked. */
-    importance: FeatureImportance;
-    /**
-     * A one-line explanation of what just happened, shown under this row
-     * only. The picker puts it on the user's first pick and nowhere else.
-     */
-    hint?: string;
+    /** The level the reader gave it, or null — which means standard. */
+    importance: FeatureImportance | null;
+    /** True when the cap is reached and this one isn't in it. */
+    disabled: boolean;
     /** Other priorities where this same feature is already picked out. */
     alsoPickedIn?: FeatureElsewhere[];
-    onToggle: () => void;
-    onImportanceChange: (importance: FeatureImportance) => void;
+    /** Raise it to a level, or put it back to standard with null. */
+    onSet: (importance: FeatureImportance | null) => void;
 }
 
 /**
- * One feature the reader singled out, and how much it should count.
+ * One feature, and how much it counts, as a card.
  *
- * Only picked features get a card, and only on the right-hand column. The
- * catalogue on the left is a list of names; the rich treatment — colour, the
- * influence control, the notices — belongs to the handful the reader actually
- * spoke about, which is what keeps a fifteen-feature category from arriving
- * as fifteen identical boxes.
+ * Every feature in the priority gets one, and every one of them shows the
+ * same four-step control — standard, somewhat, moderately, highly. That is
+ * the point of the shape: a reader can see that all fifteen are on the scale
+ * and that ten of them are sitting on *standard*, which is a far better
+ * answer to "what happens to the ones I didn't pick" than any sentence
+ * underneath a list of checkboxes.
  *
- * The card is coloured by the level it carries, so "which of these did I say
- * matters most" is answered without reading a word.
+ * One tap does both jobs — picking a feature and saying how much it counts —
+ * because "not picked" is just the first segment. Nothing appears, nothing
+ * moves, and there is no default to correct afterwards.
  */
 export function FeatureOption({
     feature,
     importance,
-    hint,
+    disabled,
     alsoPickedIn,
-    onToggle,
-    onImportanceChange,
+    onSet,
 }: FeatureOptionProps) {
     const { label, explanation } = FEATURES[feature];
-    const level = FEATURE_IMPORTANCE[importance];
+    const level = importance ? FEATURE_IMPORTANCE[importance] : null;
 
     return (
-        <div className={["rounded-2xl p-3 transition", level.selectedCardClass].join(" ")}>
-            <div className="flex items-start gap-2.5">
-                <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={true}
-                    aria-label={`${label} — remove from your picks`}
-                    onClick={onToggle}
-                    className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 text-left"
-                >
+        /*
+         * A container query, not a breakpoint. On a wide panel the name and
+         * the control share a line; in the narrow settings editor the control
+         * drops below. A viewport breakpoint can't tell those apart — the
+         * settings page is a wide window with a narrow panel in it.
+         */
+        <div
+            className={[
+                "@container rounded-xl p-2 transition",
+                level
+                    ? level.selectedCardClass
+                    : disabled
+                        ? "bg-white/50"
+                        : "bg-white shadow-sm",
+            ].join(" ")}
+        >
+            <div className="flex flex-col items-start gap-1.5 @sm:flex-row @sm:items-center @sm:gap-2">
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
                     <span
+                        aria-hidden
                         className={[
-                            "mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-transparent text-white transition",
-                            level.dotClass,
+                            "h-2.5 w-2.5 shrink-0 rounded-full transition",
+                            level ? level.dotClass : STANDARD_INFLUENCE.dotClass,
                         ].join(" ")}
-                    >
-                        <CheckIcon className="h-3.5 w-3.5" />
+                    />
+
+                    <span className="min-w-0 flex-1 text-xs font-bold leading-4 text-finn-black">
+                        {label}
+
+                        {alsoPickedIn && alsoPickedIn.length > 0 && (
+                            <span aria-hidden className="ml-1 opacity-70">
+                                {alsoPickedIn.map((item) => item.icon).join("")}
+                            </span>
+                        )}
                     </span>
 
-                    <span className="min-w-0">
-                        <span className="block text-sm font-bold leading-5 text-finn-black">
-                            {label}
+                    {explanation && (
+                        <span className="shrink-0">
+                            <InfoTip subject={label}>{explanation}</InfoTip>
                         </span>
+                    )}
+                </span>
 
-                        <span
-                            className={[
-                                "mt-0.5 block text-[10px] font-black uppercase tracking-wide",
-                                level.accentTextClass,
-                            ].join(" ")}
-                        >
-                            {level.badgeLabel}
-                        </span>
-                    </span>
-                </button>
+                <div
+                    role="radiogroup"
+                    aria-label={`How much ${label} should influence your decision`}
+                    className="flex shrink-0 gap-0.5 rounded-lg bg-finn-snow p-0.5 @sm:ml-auto"
+                >
+                    {/*
+                      * Standard first, because that is where every feature
+                      * starts and where most of them stay. Reading the row
+                      * left to right is reading the scale.
+                      */}
+                    <Segment
+                        label={STANDARD_INFLUENCE.label}
+                        hint={STANDARD_INFLUENCE.hint}
+                        active={importance == null}
+                        activeClass={STANDARD_INFLUENCE.activeClass}
+                        /* Never blocked: dropping back to standard is how
+                           the reader frees a slot at the cap. */
+                        disabled={false}
+                        onClick={() => onSet(null)}
+                    />
 
-                {explanation && (
-                    <span className="mt-0.5 shrink-0">
-                        <InfoTip subject={label}>{explanation}</InfoTip>
-                    </span>
-                )}
-            </div>
+                    {IMPORTANCE_SCALE.map((option) => {
+                        const meta = FEATURE_IMPORTANCE[option];
 
-            <ImportancePicker
-                label={label}
-                value={importance}
-                onChange={onImportanceChange}
-            />
-
-            {alsoPickedIn && alsoPickedIn.length > 0 && (
-                <DuplicateNotice label={label} elsewhere={alsoPickedIn} />
-            )}
-
-            {hint && (
-                <p className="mt-2 text-[11px] leading-4 text-finn-black/70">
-                    {hint}
-                </p>
-            )}
-        </div>
-    );
-}
-
-/**
- * The same feature, already spoken for under another priority.
- *
- * Not an error, and not undone for them: a feature that sits in two
- * catalogues genuinely counts in both, so picking it twice does something
- * real. What it also does is spend two of ten picks on one signal, and that
- * is the part a reader can't see from inside one category. So the note states
- * both halves and leaves the choice where it belongs.
- */
-function DuplicateNotice({
-    label,
-    elsewhere,
-}: {
-    label: string;
-    elsewhere: FeatureElsewhere[];
-}) {
-    const names = elsewhere.map((item) => item.label);
-
-    const joined =
-        names.length === 1
-            ? names[0]
-            : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-
-    return (
-        <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-white/70 px-2.5 py-2 text-[11px] leading-4 text-finn-iron">
-            <span aria-hidden className="shrink-0">
-                {elsewhere.map((item) => item.icon).join(" ")}
-            </span>
-
-            <span>
-                You've also given {label.toLowerCase()} extra influence under{" "}
-                <strong className="font-black text-finn-black">{joined}</strong>
-                . It counts in both — or spend this pick on something else.
-            </span>
-        </p>
-    );
-}
-
-/**
- * How much this one should count, on the three levels the engine understands.
- *
- * The labels are adverbs answering the question above them, so the control
- * reads as one sentence: how much should this influence your decision —
- * somewhat, moderately, highly. The question is written out once, on the
- * first picked row; asking it again under every row after that is the same
- * sentence three times in one column. The radiogroup carries it as a label
- * either way, so a screen reader hears the question on every control.
- *
- * Nothing here is a requirement. A car missing a highly-weighted pick is
- * still eligible to win, and the Advice says so.
- */
-function ImportancePicker({
-    label,
-    value,
-    onChange,
-}: {
-    label: string;
-    value: FeatureImportance;
-    onChange: (importance: FeatureImportance) => void;
-}) {
-    return (
-        <div className="mt-2.5 rounded-xl bg-white/80 p-2">
-            <p className="px-0.5 pb-1.5 text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                How much should this influence your decision?
-            </p>
-            <div
-                role="radiogroup"
-                aria-label={`How much ${label} should influence your decision`}
-                className="flex gap-1"
-            >
-                {IMPORTANCE_SCALE.map((option) => {
-                    const meta = FEATURE_IMPORTANCE[option];
-                    const active = value === option;
-
-                    return (
-                        <button
-                            key={option}
-                            type="button"
-                            role="radio"
-                            aria-checked={active}
-                            title={meta.hint}
-                            onClick={() => onChange(option)}
-                            className={[
-                                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5 text-[11px] font-black leading-3 transition",
-                                active
-                                    ? meta.activeClass
-                                    : `bg-white ${meta.idleClass}`,
-                            ].join(" ")}
-                        >
-                            {/*
-                              * The dot carries the colour so the label never
-                              * has to. Colour is the fast read; the words are
-                              * the real one, and they stay on every state.
-                              */}
-                            <span
-                                className={[
-                                    "h-2 w-2 shrink-0 rounded-full",
-                                    active ? "bg-white" : meta.dotClass,
-                                ].join(" ")}
+                        return (
+                            <Segment
+                                key={option}
+                                label={meta.label}
+                                hint={
+                                    disabled
+                                        ? "You've raised five already — put one back to standard to swap"
+                                        : meta.hint
+                                }
+                                active={importance === option}
+                                activeClass={meta.activeClass}
+                                disabled={disabled}
+                                onClick={() => onSet(option)}
                             />
-
-                            <span>{meta.label}</span>
-                        </button>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
+    );
+}
+
+function Segment({
+    label,
+    hint,
+    active,
+    activeClass,
+    disabled,
+    onClick,
+}: {
+    label: string;
+    hint: string;
+    active: boolean;
+    activeClass: string;
+    disabled: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={disabled && !active}
+            title={hint}
+            onClick={onClick}
+            className={[
+                "rounded-md px-2 py-1 text-[10px] font-black transition",
+                active
+                    ? `${activeClass} shadow-sm`
+                    : disabled
+                        ? "cursor-not-allowed text-finn-iron/40"
+                        : "text-finn-iron hover:bg-white hover:text-finn-black",
+            ].join(" ")}
+        >
+            {label}
+        </button>
     );
 }

@@ -211,7 +211,7 @@ export function StepThreeSetPreferences({
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
                     {phase === "preferences"
-                        ? "Optional. Open a priority to name features that should count for more — skip it and cars are judged on each category as a whole."
+                        ? "Optional. Inside a priority every feature counts the same — open one to raise the few that matter most to you, so they count for more."
                         : "These decide what each car costs you to run, and which cars fit your budget. The values below already work — change them only where they're wrong for you."}
                 </p>
             </div>

@@ -56,7 +56,7 @@ export function PrioritiesSettings({
     return (
         <Section
             title="Priorities"
-            description="Your priority order says how much each category matters. This is the finer question: within a category, are there particular features Lens should pay extra attention to? Pick up to five, or none — cars are judged on the whole category either way, and a car missing one you picked isn't ruled out. It just shows up as a tradeoff in your advice."
+            description="Your priority order says how much each category matters overall. This is the finer question: inside a category, every feature counts the same by default — you can raise up to five so they count for more. Cars are judged on the whole category either way, and a car missing one you raised isn't ruled out; it just gives up some ground and the gap is named in your advice."
         >
             <div className="flex flex-col gap-3">
                 {priorityDefinitions.map(

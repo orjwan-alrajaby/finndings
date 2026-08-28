@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { PlusSmallIcon } from "@heroicons/react/24/outline";
 import {
     FEATURE_IMPORTANCE,
     FEATURES,
     IMPORTANCE_SCALE,
     MAX_FEATURES_PER_CATEGORY,
+    STANDARD_INFLUENCE,
 } from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
@@ -12,7 +11,6 @@ import type {
     FeatureImportance,
     FeatureSelection,
 } from "@/lib/reasoning-engine/types";
-import { InfoTip } from "@/components/InfoTip";
 import {
     FeatureOption,
     type FeatureElsewhere,
@@ -42,19 +40,20 @@ interface FeatureInfluencePickerProps {
 }
 
 /**
- * The two questions this step asks, as two columns.
+ * The whole priority as one list, with the same four-step scale on every
+ * card.
  *
- * Left is the category — everything Lens looks at here, all of it counting.
- * Right is the five slots the reader can speak into. Moving a feature across
- * is the whole interaction, and it is a literal picture of what the engine
- * does with it: the catalogue stays whole on the left, and the thing they
- * moved is now somewhere it can be given a voice.
+ * One tap does both jobs. Everywhere else in this app's history, picking a
+ * feature and saying how much it counts were two moves — tick then grade,
+ * move then grade, tap then tap again — and each needed something to appear,
+ * move, or be learned. Here every feature is already on the scale, sitting on
+ * *standard*, and the reader raises the few they care about.
  *
- * A single mixed list could never show that. There, a picked feature and an
- * unpicked one sit in the same column looking like two states of one
- * checkbox, and "I ticked five things" is the only story available. Two
- * columns say the rest of it: the left column doesn't empty as you pick, it
- * just gets shorter, and it is still labelled as counting.
+ * Naming the resting state is what makes this work. "Nothing selected" is an
+ * absence, and an absence is what a reader mistakes for "doesn't count" —
+ * which is the single misreading this whole screen exists to prevent. Ten
+ * cards visibly resting on "Standard" say what no sentence under a list of
+ * checkboxes could.
  *
  * Shared by step 3 and the settings priority editor so the two never drift
  * into explaining the same model two different ways.
@@ -68,326 +67,276 @@ export function FeatureInfluencePicker({
     onToggleFeature,
     onImportanceChange,
 }: FeatureInfluencePickerProps) {
-    /*
-     * Whether the user has moved an influence level yet, which is the moment
-     * the second half of the model becomes worth explaining. Local because it
-     * is about this reader's progress through the control, not about their
-     * preferences — nothing here belongs in saved state.
-     */
-    const [hasGraded, setHasGraded] = useState(false);
-
     const importanceOf = new Map(
         features.map((preference) => [preference.key, preference.importance]),
     );
 
     const atMax = features.length >= MAX_FEATURES_PER_CATEGORY;
 
-    /*
-     * Picks strongest first, so the right column reads as the ranking the
-     * reader just built. Ties keep catalogue order, which is stable — a card
-     * only ever moves because they moved it.
+    /**
+     * Move a feature along the scale, in either direction.
+     *
+     * Raising something that was standard adds it to the selection; putting
+     * it back to standard removes it. The reader is doing one thing — saying
+     * how much it counts — and never has to think about which of those two
+     * operations they are performing.
      */
-    const picked = availableFeatures
-        .filter((feature) => importanceOf.has(feature))
-        .sort(
-            (a, b) =>
-                FEATURE_IMPORTANCE[importanceOf.get(b)!].weight -
-                FEATURE_IMPORTANCE[importanceOf.get(a)!].weight,
-        );
+    const set = (
+        feature: FeatureId,
+        importance: FeatureImportance | null,
+    ) => {
+        const current = importanceOf.get(feature) ?? null;
 
-    const unpicked = availableFeatures.filter(
-        (feature) => !importanceOf.has(feature),
-    );
+        if (importance == null) {
+            if (current != null) onToggleFeature(feature);
+            return;
+        }
 
-    /*
-     * The teaching line rides on the first thing the user ever picks here,
-     * and only while it is the only thing they have picked. One sentence, in
-     * the place where the question just came up, and gone before it can
-     * become wallpaper.
-     */
-    const firstPick =
-        features.length === 1 ? (features[0]?.key ?? null) : null;
+        if (current == null) onToggleFeature(feature);
 
-    const hintFor = (feature: FeatureId): string | undefined => {
-        if (feature !== firstPick) return undefined;
-
-        return hasGraded
-            ? "The more influence you give it, the more it counts towards the recommendation."
-            : "We'll give this feature extra influence when comparing your cars.";
+        onImportanceChange(feature, importance);
     };
 
+    /* Picks that are already carrying influence somewhere else too. */
+    const duplicates = features
+        .map((preference) => ({
+            key: preference.key,
+            elsewhere: pickedElsewhere?.[preference.key] ?? [],
+        }))
+        .filter((item) => item.elsewhere.length > 0);
+
     return (
-        <div className="space-y-3.5">
+        <div className="space-y-3">
             <div>
                 <p className="text-sm font-black text-finn-highlight-navy">
                     What should influence your decision?
                 </p>
 
-                <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    Pick up to {MAX_FEATURES_PER_CATEGORY} features you care
-                    about most. We'll still judge the car on{" "}
-                    {categoryLabel.toLowerCase()} as a whole, but your picks
-                    get extra influence in the recommendation. Tap the ⓘ if a
-                    name means nothing to you.
-                </p>
-
                 {/*
-                  * Kept visually distinct rather than folded into the
-                  * paragraph above: "not requirements" is the sentence most
-                  * likely to be skimmed past, and the one that decides
-                  * whether the reader understands the model at all.
+                  * What "influence" actually does, in the order the reader
+                  * needs it: what happens by default, what changes when they
+                  * raise something, and what it does not do. The mechanism
+                  * stated plainly is what stops "extra influence" reading as
+                  * a filter — a phrase people otherwise fill in with
+                  * "only show me cars that have these".
                   */}
-                <p className="mt-2 inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-bold leading-4 text-finn-highlight-navy ring-1 ring-finn-highlight-navy/15">
-                    Think of these as your strongest signals — not
-                    requirements.
+                <p className="mt-1 text-xs leading-5 text-finn-iron">
+                    Every feature below counts when we compare these cars on{" "}
+                    {categoryLabel.toLowerCase()} — that's{" "}
+                    <strong className="font-black text-finn-black">
+                        standard
+                    </strong>
+                    . Raise up to {MAX_FEATURES_PER_CATEGORY} of them and
+                    those count for more: a car that has them gains ground
+                    here, and a car that's missing one gives a little up.
                 </p>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-                <section className="rounded-2xl bg-white/70 p-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                            Everything in {categoryLabel}
-                        </p>
+                <p className="mt-1.5 text-xs leading-5 text-finn-iron">
+                    How much this priority counts against your others is still
+                    your order from step 2. And nothing here is a requirement
+                    — a car can miss one of your picks and still come out as
+                    the recommendation, with the gap named in your advice. Tap
+                    the ⓘ if a name means nothing to you.
+                </p>
 
-                        <span className="text-[10px] font-bold text-finn-iron">
-                            all {availableFeatures.length} count
-                        </span>
-                    </div>
-
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     {/*
-                      * Scrolls rather than truncating. A reader looking for
-                      * one feature they have in mind should not have to find
-                      * a "show more" first, and the column staying a fixed
-                      * height is what keeps the two sides side by side.
+                      * Kept visually distinct rather than folded into the
+                      * paragraph above: "not requirements" is the sentence
+                      * most likely to be skimmed past, and the one that
+                      * decides whether the reader understands the model.
                       */}
-                    <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto pr-1">
-                        {unpicked.map((feature) => (
-                            <CatalogueRow
-                                key={feature}
-                                feature={feature}
-                                disabled={atMax}
-                                alsoPickedIn={pickedElsewhere?.[feature]}
-                                onAdd={() => onToggleFeature(feature)}
-                            />
-                        ))}
-
-                        {unpicked.length === 0 && (
-                            <li className="px-1 py-2 text-[11px] leading-4 text-finn-iron">
-                                Everything here is in your picks. They all
-                                still count either way.
-                            </li>
-                        )}
-                    </ul>
-                </section>
-
-                <section className="rounded-2xl bg-white/70 p-3">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                            Getting extra influence
-                        </p>
-
-                        <span
-                            className={[
-                                "rounded-full px-2 py-0.5 text-[10px] font-black",
-                                features.length
-                                    ? "bg-finn-pale-blue text-finn-accent-blue"
-                                    : "bg-finn-cotton text-finn-iron",
-                            ].join(" ")}
-                        >
-                            {features.length} / {MAX_FEATURES_PER_CATEGORY}{" "}
-                            features selected
-                        </span>
-                    </div>
-
-                    <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                        {atMax
-                            ? "These are the features we'll give extra influence."
-                            : `Choose the ${MAX_FEATURES_PER_CATEGORY} things that matter most to you.`}
+                    <p className="inline-flex rounded-full bg-white px-3 py-1.5 text-[11px] font-bold leading-4 text-finn-highlight-navy ring-1 ring-finn-highlight-navy/15">
+                        Think of these as your strongest signals — not
+                        requirements.
                     </p>
 
-                    {picked.length > 0 ? (
-                        <div className="mt-2.5 space-y-2">
-                            <InfluenceLegend />
-
-                            {picked.map((feature) => (
-                                <FeatureOption
-                                    key={feature}
-                                    feature={feature}
-                                    importance={importanceOf.get(feature)!}
-                                    hint={hintFor(feature)}
-                                    alsoPickedIn={pickedElsewhere?.[feature]}
-                                    onToggle={() => onToggleFeature(feature)}
-                                    onImportanceChange={(importance) => {
-                                        setHasGraded(true);
-                                        onImportanceChange(
-                                            feature,
-                                            importance,
-                                        );
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <NothingPickedHint
-                            label={categoryLabel}
-                            rank={rank}
-                            catalogueSize={availableFeatures.length}
-                        />
-                    )}
-                </section>
+                    <span
+                        className={[
+                            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
+                            features.length
+                                ? "bg-finn-pale-blue text-finn-accent-blue"
+                                : "bg-finn-cotton text-finn-iron",
+                        ].join(" ")}
+                    >
+                        {features.length} / {MAX_FEATURES_PER_CATEGORY}{" "}
+                        influential features
+                    </span>
+                </div>
             </div>
+
+            <InfluenceLegend />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4">
+                {availableFeatures.map((feature) => (
+                    <FeatureOption
+                        key={feature}
+                        feature={feature}
+                        importance={importanceOf.get(feature) ?? null}
+                        disabled={!importanceOf.has(feature) && atMax}
+                        alsoPickedIn={pickedElsewhere?.[feature]}
+                        onSet={(importance) => set(feature, importance)}
+                    />
+                ))}
+            </div>
+
+            {/*
+              * The standing answer to what the empty rows mean. It sits under
+              * the list rather than above it because that is where the reader
+              * is when the question occurs to them.
+              */}
+            <p className="text-[11px] leading-4 text-finn-iron">
+                {features.length === 0
+                    ? "Everything is on standard right now, so every feature above counts the same. Raise the few that matter most to you."
+                    : "Raising a feature doesn't switch the others off — everything above still counts, those ones just count for more. Put one back to standard to free a slot."}
+            </p>
+
+            {duplicates.map((item) => (
+                <DuplicateNotice
+                    key={item.key}
+                    label={FEATURES[item.key].label}
+                    elsewhere={item.elsewhere}
+                />
+            ))}
+
+            {features.length === 0 ? (
+                <NothingPickedHint
+                    label={categoryLabel}
+                    rank={rank}
+                    catalogueSize={availableFeatures.length}
+                />
+            ) : atMax ? (
+                <p className="text-[11px] leading-4 text-finn-iron">
+                    That's your {MAX_FEATURES_PER_CATEGORY} strongest signals.
+                    Put one back to standard to raise another.
+                </p>
+            ) : null}
         </div>
     );
 }
 
 /**
- * One feature on the catalogue side, waiting to be moved across.
+ * The four rungs, named, before the reader meets them on a card.
  *
- * The row is not a checkbox: an unpicked feature is not "off", it is simply
- * one of the many things this priority is judged on, and the only question it
- * has an answer to is whether the reader wants to lean on it.
- *
- * The tap target and the explanation are separate elements — a tooltip
- * trigger nested inside a button is neither valid nor operable.
- */
-function CatalogueRow({
-    feature,
-    disabled,
-    alsoPickedIn,
-    onAdd,
-}: {
-    feature: FeatureId;
-    disabled: boolean;
-    alsoPickedIn?: FeatureElsewhere[];
-    onAdd: () => void;
-}) {
-    const { label, explanation } = FEATURES[feature];
-
-    const elsewhereNames = alsoPickedIn?.map((item) => item.label).join(", ");
-
-    return (
-        <li
-            className={[
-                "flex items-center gap-1 rounded-xl px-1.5 py-1 transition",
-                disabled ? "opacity-60" : "hover:bg-finn-pale-blue",
-            ].join(" ")}
-        >
-            <button
-                type="button"
-                onClick={onAdd}
-                disabled={disabled}
-                title={
-                    disabled
-                        ? `You've picked ${MAX_FEATURES_PER_CATEGORY} already — release one to swap`
-                        : elsewhereNames
-                          ? `Already getting extra influence under ${elsewhereNames}`
-                          : `Give ${label} extra influence`
-                }
-                className={[
-                    "flex min-w-0 flex-1 items-center gap-1.5 text-left text-[11px] font-bold leading-4 transition",
-                    disabled
-                        ? "cursor-not-allowed text-finn-iron"
-                        : "cursor-pointer text-finn-black hover:text-finn-accent-blue",
-                ].join(" ")}
-            >
-                <span
-                    className={[
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-                        disabled
-                            ? "bg-finn-cotton text-finn-iron"
-                            : "bg-finn-pale-blue text-finn-accent-blue",
-                    ].join(" ")}
-                >
-                    <PlusSmallIcon className="h-3 w-3" />
-                </span>
-
-                <span className="min-w-0 truncate">{label}</span>
-
-                {/*
-                  * The other priority's own icon, which is how it is labelled
-                  * everywhere else in Lens. It says "you have met this
-                  * elsewhere" at row size; the full sentence appears on the
-                  * card if they pick it anyway.
-                  */}
-                {alsoPickedIn && alsoPickedIn.length > 0 && (
-                    <span aria-hidden className="shrink-0 opacity-70">
-                        {alsoPickedIn.map((item) => item.icon).join("")}
-                    </span>
-                )}
-
-                {elsewhereNames && (
-                    <span className="sr-only">
-                        already getting extra influence under {elsewhereNames}
-                    </span>
-                )}
-            </button>
-
-            {explanation && (
-                <InfoTip subject={label}>{explanation}</InfoTip>
-            )}
-        </li>
-    );
-}
-
-/**
- * What the three colours mean, said once per priority.
- *
- * It appears with the first pick, which is the first time an influence
- * control is on screen — before that there is nothing to decode. The words
- * carry the meaning and the swatches carry the hierarchy; neither is doing
- * the job alone.
+ * Standard is in the legend for the same reason it is in the control: it is
+ * the rung fourteen of the fifteen features are on, and leaving it unnamed is
+ * what turns "I didn't pick it" into "it doesn't count".
  */
 function InfluenceLegend() {
     return (
-        <div className="px-0.5">
-            <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                How much should this feature influence your decision?
-            </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-0.5">
+            <span className="inline-flex items-center gap-1.5">
+                <span
+                    className={[
+                        "h-2 w-2 rounded-full",
+                        STANDARD_INFLUENCE.dotClass,
+                    ].join(" ")}
+                />
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                {IMPORTANCE_SCALE.map((level) => {
-                    const meta = FEATURE_IMPORTANCE[level];
+                <span className="text-[11px] font-bold text-finn-iron">
+                    {STANDARD_INFLUENCE.label}
+                </span>
+            </span>
 
-                    return (
+            {IMPORTANCE_SCALE.map((level) => {
+                const meta = FEATURE_IMPORTANCE[level];
+
+                return (
+                    <span
+                        key={level}
+                        className="inline-flex items-center gap-1.5"
+                    >
                         <span
-                            key={level}
-                            className="inline-flex items-center gap-1.5"
+                            className={[
+                                "h-2 w-2 rounded-full",
+                                meta.dotClass,
+                            ].join(" ")}
+                        />
+
+                        <span
+                            className={[
+                                "text-[11px] font-bold",
+                                meta.accentTextClass,
+                            ].join(" ")}
                         >
-                            <span
-                                className={[
-                                    "h-2 w-2 rounded-full",
-                                    meta.dotClass,
-                                ].join(" ")}
-                            />
-
-                            <span
-                                className={[
-                                    "text-[11px] font-bold",
-                                    meta.accentTextClass,
-                                ].join(" ")}
-                            >
-                                {meta.label}
-                            </span>
+                            {meta.label}
                         </span>
-                    );
-                })}
-            </div>
+                    </span>
+                );
+            })}
 
-            <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                More influence as you go up. None of them rules a car out.
+            <span className="text-[11px] leading-4 text-finn-iron">
+                Everything starts with standard influence on this category. More influence as you go up from standard to highly,
+                and none of them rules a car out.
+            </span>
+
+            {/*
+              * The one place the scale is quantified. "Twice as much" is the
+              * arithmetic in words the reader can check against what they see
+              * in the advice — where "more influence" on its own leaves them
+              * to guess whether it means a nudge or a veto, and the guess
+              * that costs us is the veto.
+              */}
+            <p className="basis-full text-[11px] leading-4 text-finn-iron">
+                Next to a standard feature,{" "}
+                <span className={FEATURE_IMPORTANCE.low.accentTextClass}>
+                    {FEATURE_IMPORTANCE.low.label.toLowerCase()}
+                </span>{" "}
+                counts about twice as much,{" "}
+                <span className={FEATURE_IMPORTANCE.medium.accentTextClass}>
+                    {FEATURE_IMPORTANCE.medium.label.toLowerCase()}
+                </span>{" "}
+                three times, and{" "}
+                <span className={FEATURE_IMPORTANCE.high.accentTextClass}>
+                    {FEATURE_IMPORTANCE.high.label.toLowerCase()}
+                </span>{" "}
+                four times — within this priority only.
             </p>
         </div>
     );
 }
 
 /**
- * What happens when the user picks nothing.
+ * The same feature, already spoken for under another priority.
+ *
+ * Not an error, and not undone for them: a feature that sits in two
+ * catalogues genuinely counts in both, so picking it twice does something
+ * real. What it also does is spend two of ten picks on one signal, and that
+ * is the part a reader can't see from inside one category.
+ */
+function DuplicateNotice({
+    label,
+    elsewhere,
+}: {
+    label: string;
+    elsewhere: FeatureElsewhere[];
+}) {
+    const names = elsewhere.map((item) => item.label);
+
+    const joined =
+        names.length === 1
+            ? names[0]
+            : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+    return (
+        <p className="text-[11px] leading-4 text-finn-iron">
+            <span aria-hidden className="mr-1">
+                {elsewhere.map((item) => item.icon).join("")}
+            </span>
+            You've also given {label.toLowerCase()} extra influence under{" "}
+            <strong className="font-black text-finn-black">{joined}</strong>. It
+            counts in both — or spend this pick on something else.
+        </p>
+    );
+}
+
+/**
+ * What happens when the reader marks nothing.
  *
  * Deliberately not a warning. "I want the safest car, I just don't have
  * opinions about which systems it has" is a complete preference, and the only
- * thing the reader needs to know is what Lens does with it — the whole
- * catalogue, the same denominator a car with five picks is judged against.
+ * thing they need to know is what Lens does with it — the whole catalogue,
+ * the same denominator a car with five picks is judged against.
  */
 function NothingPickedHint({
     label,
@@ -399,16 +348,15 @@ function NothingPickedHint({
     catalogueSize: number;
 }) {
     return (
-        <div className="mt-2.5 rounded-xl bg-finn-snow px-3 py-3">
+        <div className="rounded-xl bg-white/70 px-3 py-2.5">
             <p className="text-[11px] font-black text-finn-black">
                 No specific features selected
             </p>
 
-            <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
                 {rank === 1 ? `${label} is your top priority. ` : ""}
-                We'll judge this priority based on the category as a whole —
-                all {catalogueSize} systems it covers. Move a few across if
-                you want some of them to count for more.
+                We'll judge it on the category as a whole — all{" "}
+                {catalogueSize} systems it covers, each counting the same.
             </p>
         </div>
     );

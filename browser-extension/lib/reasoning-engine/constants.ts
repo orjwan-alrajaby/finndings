@@ -127,6 +127,31 @@ export const FEATURE_IMPORTANCE = {
 export const BASE_FEATURE_WEIGHT = 1;
 
 /**
+ * The rung below the three, and the one every feature starts on.
+ *
+ * Not a fourth importance: there is no such stored value, and a feature
+ * sitting here is simply one the reader hasn't singled out — weight 1, like
+ * the rest of the catalogue. It exists because the interface needs a *name*
+ * for that. "Nothing selected" is an absence, and an absence is what a reader
+ * mistakes for "doesn't count"; "Standard" is a state they can see themselves
+ * choosing, sitting in the same control as the levels above it, which makes
+ * the whole model legible in one glance: everything counts as standard, and
+ * you may raise five of them.
+ *
+ * Grey on purpose. It is the resting state, not a low grade.
+ */
+export const STANDARD_INFLUENCE = {
+  label: "Standard",
+  hint: "Counts like everything else in this category",
+  /** Stated for the reader of this file; the scorer uses BASE_FEATURE_WEIGHT. */
+  weight: BASE_FEATURE_WEIGHT,
+  activeClass: "bg-finn-iron/20 text-finn-black",
+  idleClass: "text-finn-iron hover:bg-white hover:text-finn-black",
+  dotClass: "bg-finn-iron/30",
+  accentTextClass: "text-finn-iron",
+} as const;
+
+/**
  * What a feature gets when the user picks it without touching the importance
  * control.
  *
