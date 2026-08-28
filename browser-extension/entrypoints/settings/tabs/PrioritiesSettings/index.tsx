@@ -9,6 +9,7 @@ import {
 } from "@/lib/reasoning-engine/types";
 import { Section } from "../../components/primitives";
 import { PriorityEditor } from "./components/PriorityEditor";
+import { buildPickedElsewhere } from "@/components/FeatureInfluencePicker";
 import { PriorityCard } from "./components/PriorityCard";
 
 interface PrioritiesSettingsProps {
@@ -97,6 +98,21 @@ export function PrioritiesSettings({
                                         availableFeatures={
                                             availableFeatures
                                         }
+                                        pickedElsewhere={buildPickedElsewhere(
+                                            priority.id,
+                                            categoryFeatures,
+                                            Object.fromEntries(
+                                                priorityDefinitions.map(
+                                                    (item) => [
+                                                        item.id,
+                                                        {
+                                                            label: item.label,
+                                                            icon: item.icon,
+                                                        },
+                                                    ],
+                                                ),
+                                            ),
+                                        )}
                                         onCancel={() =>
                                             setOpenId(
                                                 null,

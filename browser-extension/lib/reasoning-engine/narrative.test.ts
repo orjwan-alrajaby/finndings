@@ -308,7 +308,7 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
     expect(gap).toBeDefined();
     /* Named in the reader's own terms, at the importance they gave it. */
     expect(gap.sentences.join(" ")).toMatch(
-      /you (picked (it|them) out|marked .+ extremely important)/i,
+      /you (picked (it|them) out|said .+ should count highly)/i,
     );
     expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
 

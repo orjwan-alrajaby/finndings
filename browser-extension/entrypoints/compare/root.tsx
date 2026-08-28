@@ -49,8 +49,25 @@ export default function CompareTab({
   const [priorities, setPriorities] =
     useState<CategoryId[]>(DEFAULT_PRIORITIES);
 
+  /*
+   * The saved settings, and this run's copy of them.
+   *
+   * Step 3 edits the copy and never the original. What a reader does on the
+   * way to one recommendation is a question about these cars today — "what if
+   * I only had 800 a month", "what if I stopped caring about the boot" — and
+   * answering it must not quietly rewrite what they'll be asked next time.
+   * Making any of it permanent is a deliberate act, and it lives in Settings.
+   */
   const [preferences, setPreferences] =
     useState<LensPreferences>(DEFAULT_PREFERENCES);
+
+  const [sessionPreferences, setSessionPreferences] =
+    useState<LensPreferences>(DEFAULT_PREFERENCES);
+
+  /** Step 3's feature picks for this run only. Empty until it is visited. */
+  const [sessionFeatures, setSessionFeatures] = useState<
+    Partial<Record<CategoryId, FeatureSelection>>
+  >({});
 
   const [profiles, setProfiles] =
     useState(DEFAULT_PROFILES);
@@ -67,6 +84,7 @@ export default function CompareTab({
   useEffect(() => {
     loadLensSettings().then((settings) => {
       setPreferences(settings.preferences);
+      setSessionPreferences(settings.preferences);
       setPriorities(settings.priorities);
       setProfiles(settings.profiles);
       setDefaultProfileId(settings.defaultProfileId);
@@ -224,12 +242,16 @@ export default function CompareTab({
               {step === "preferences" && (
                 <StepThreeSetPreferences
                   priorities={priorities}
-                  preferences={preferences}
+                  preferences={sessionPreferences}
                   setPreferences={
-                    setPreferences
+                    setSessionPreferences
                   }
+                  savedPreferences={preferences}
                   categoryFeatures={
                     categoryFeatures
+                  }
+                  sessionFeatures={
+                    sessionFeatures
                   }
                   onBack={() =>
                     setStep("order")
@@ -237,13 +259,15 @@ export default function CompareTab({
                   onAdvice={(
                     nextCategoryFeatures,
                   ) => {
-                    const merged = {
-                      ...categoryFeatures,
-                      ...nextCategoryFeatures,
-                    };
+                    /*
+                     * Held, not saved. The advice is generated from these;
+                     * the stored configuration is untouched.
+                     */
+                    setSessionFeatures(
+                      nextCategoryFeatures,
+                    );
 
-                    setCategoryFeatures(merged);
-                    void saveAnd("advice", merged);
+                    setStep("advice");
                   }}
                 />
               )}
@@ -252,10 +276,11 @@ export default function CompareTab({
                 <StepFourGenerateAdvice
                   cars={cars}
                   priorities={priorities}
-                  preferences={preferences}
-                  categoryFeatures={
-                    categoryFeatures
-                  }
+                  preferences={sessionPreferences}
+                  categoryFeatures={{
+                    ...categoryFeatures,
+                    ...sessionFeatures,
+                  }}
                   onBack={() =>
                     setStep("preferences")
                   }

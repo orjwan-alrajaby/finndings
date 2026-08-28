@@ -6,7 +6,10 @@ import type {
 } from "@/lib/reasoning-engine/types";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { CalculatedPriorityDetails } from "./CalculatedPriorityDetails";
-import { FeatureInfluencePicker } from "@/components/FeatureInfluencePicker";
+import {
+    FeatureInfluencePicker,
+    type PickedElsewhere,
+} from "@/components/FeatureInfluencePicker";
 
 interface StepThreeFeatureEditorProps {
     categoryId: CategoryId;
@@ -16,6 +19,8 @@ interface StepThreeFeatureEditorProps {
     availableFeatures: FeatureId[];
     /** Where this priority sits in the user's order, for the empty-state hint. */
     rank: number;
+    /** The same features already picked out under the user's other priorities. */
+    pickedElsewhere: PickedElsewhere;
     onToggleFeature: (feature: FeatureId) => void;
     onImportanceChange: (
         feature: FeatureId,
@@ -36,6 +41,7 @@ export function StepThreeFeatureEditor({
     features,
     availableFeatures,
     rank,
+    pickedElsewhere,
     onToggleFeature,
     onImportanceChange,
 }: StepThreeFeatureEditorProps) {
@@ -52,11 +58,11 @@ export function StepThreeFeatureEditor({
     return (
         <div className="border-t border-white p-4">
             <FeatureInfluencePicker
-                categoryId={categoryId}
                 categoryLabel={category.label}
                 features={features}
                 availableFeatures={availableFeatures}
                 rank={rank}
+                pickedElsewhere={pickedElsewhere}
                 onToggleFeature={onToggleFeature}
                 onImportanceChange={onImportanceChange}
             />

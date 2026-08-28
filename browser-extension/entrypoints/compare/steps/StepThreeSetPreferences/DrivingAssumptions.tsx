@@ -6,12 +6,28 @@ import type {
 
 type NumericField = Exclude<keyof LensPreferences, "contractType">;
 
+/**
+ * What the reader's driving costs, as its own half of step 3.
+ *
+ * Every field here arrives with a working value, so this is a panel to
+ * correct rather than a form to fill in — which is why the defaults are
+ * offered as a button and not merely as placeholder text. The budget is the
+ * one that changes what the reader sees rather than what a car costs, so it
+ * says so, and it is called out again when it is still sitting on the
+ * placeholder Lens ships with.
+ */
 export function DrivingAssumptions({
     preferences,
     setPreferences,
+    onUseSaved,
+    isSaved,
 }: {
     preferences: LensPreferences;
     setPreferences: (value: LensPreferences) => void;
+    /** Puts every field back to the reader's saved settings. */
+    onUseSaved?: () => void;
+    /** True when nothing has been changed away from those. */
+    isSaved?: boolean;
 }) {
     const update = (key: NumericField, value: number) => {
         setPreferences({
@@ -21,27 +37,47 @@ export function DrivingAssumptions({
     };
 
     return (
-        <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6 col-span-3 h-fit">
-            <div>
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-finn-accent-blue">
-                    Your driving
-                </p>
+        <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-finn-accent-blue">
+                        Your driving
+                    </p>
 
-                <h3 className="mt-1 text-xl font-black text-finn-black">
-                    Driving assumptions
-                </h3>
+                    <h3 className="mt-1 text-xl font-black text-finn-black">
+                        Driving assumptions
+                    </h3>
 
-                <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    These values help Lens estimate what each car costs you.
-                    The defaults are based on the German market, but you can
-                    change them to reflect your situation.
-                </p>
+                    <p className="mt-1 max-w-xl text-xs leading-5 text-finn-iron">
+                        Lens uses these to estimate what each car costs you.
+                        Change anything here and it applies to this comparison
+                        only — your saved values stay as they are.
+                    </p>
+                </div>
+
+                {onUseSaved && (
+                    <button
+                        type="button"
+                        onClick={onUseSaved}
+                        disabled={isSaved}
+                        className={[
+                            "shrink-0 rounded-full px-4 py-2 text-xs font-black transition",
+                            isSaved
+                                ? "cursor-default bg-finn-cotton text-finn-iron"
+                                : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
+                        ].join(" ")}
+                    >
+                        {isSaved
+                            ? "Using your saved values"
+                            : "Use my saved values"}
+                    </button>
+                )}
             </div>
 
-            <div className="mt-5 flex flex-col gap-3">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <AssumptionInput
                     label="Monthly budget"
-                    hint="The most you want to spend per month in total, including running costs."
+                    hint="The most you want to spend per month in total, including running costs. This one decides which cars are eligible at all."
                     unit="€/month"
                     value={preferences.monthlyBudget}
                     step={50}
@@ -81,12 +117,14 @@ export function DrivingAssumptions({
                     onChange={(value) => update("electricityPrice", value)}
                 />
 
-                <ContractTypeToggle
-                    value={preferences.contractType}
-                    onChange={(contractType) =>
-                        setPreferences({ ...preferences, contractType })
-                    }
-                />
+                <div className="sm:col-span-2">
+                    <ContractTypeToggle
+                        value={preferences.contractType}
+                        onChange={(contractType) =>
+                            setPreferences({ ...preferences, contractType })
+                        }
+                    />
+                </div>
             </div>
 
             <p className="mt-4 text-[11px] leading-5 text-finn-iron">

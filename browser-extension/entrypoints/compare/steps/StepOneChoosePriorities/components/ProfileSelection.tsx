@@ -34,7 +34,7 @@ export function FeatureChip({
         <div
             title={
                 importance
-                    ? `You marked this ${FEATURE_IMPORTANCE[importance].inSentence}`
+                    ? `You said this should count ${FEATURE_IMPORTANCE[importance].inSentence}`
                     : undefined
             }
             className={[

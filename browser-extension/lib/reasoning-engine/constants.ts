@@ -27,28 +27,41 @@ import type {
  * old system's 5-to-1) starts letting five picks drown out the ten to fifteen
  * other things the category is actually made of.
  *
- * The three labels all say "important" because all three mean the same kind
- * of thing — the user telling us to pay extra attention — and differ only in
- * degree. "High / medium / low" read as a grading scheme the reader had to
- * decode; these read as the sentence they are actually saying. There is
- * deliberately no "essential" and no "required": nothing here gates a car
- * out.
+ * The three labels are adverbs because the question above them is "how much
+ * should this influence your decision?" and an adverb is what answers it —
+ * "somewhat", "moderately", "highly" finish the reader's own sentence, where
+ * "high / medium / low" was a grading scheme they had to decode first. There
+ * is deliberately no "essential" and no "required": nothing here gates a car
+ * out, so no label may sound like it does.
  *
  * The colour fields live here rather than in the components so that the
  * scale looks the same everywhere it is shown — the picker in step 3, the
  * priority editor in settings, and the chips in the advice. Three distinct
  * hues, not three tints of one, because tints of one colour say "more of the
- * same" where these have to say "a different level". Never red: a level on
- * this scale is never an error or a warning.
+ * same" where these have to say "a different level".
+ *
+ * The scale currently runs emerald → orange → rose. Worth knowing what that
+ * costs: a warm ramp ending in red is the colour language of severity, and
+ * the top level here is the opposite of a warning — it is the reader saying
+ * a feature matters most, on a scale where no level rules a car out. See
+ * assets/tailwind.css for the contrast figures.
  */
 export const FEATURE_IMPORTANCE = {
+  /*
+   * The keys are high/medium/low and stay that way. They are written into
+   * saved settings, so renaming them to match the labels would strand every
+   * preference a reader has already stored behind a migration — and the
+   * labels are free to change again without touching any of that.
+   */
   high: {
-    label: "Extremely important",
-    /** For "you marked it extremely important". */
-    inSentence: "extremely important",
-    hint: "Give this the most influence of the three",
+    label: "Highly",
+    /** Completes "you said it should count ___". */
+    inSentence: "highly",
+    /** Names the level where the control isn't on screen to give it context. */
+    badgeLabel: "Counts highly",
+    hint: "As much as anything else in this priority",
     weight: 4,
-    /* Deep violet: the furthest from the page's ordinary blue. */
+    /* Rose: the loudest of the three. */
     activeClass:
       "bg-finn-influence-red text-white ring-1 ring-finn-influence-red",
     idleClass:
@@ -61,11 +74,12 @@ export const FEATURE_IMPORTANCE = {
       "bg-finn-influence-red-pale text-finn-influence-red",
   },
   medium: {
-    label: "Very important",
-    inSentence: "very important",
-    hint: "Give this more influence than an ordinary pick",
+    label: "Moderately",
+    inSentence: "moderately",
+    badgeLabel: "Counts moderately",
+    hint: "Clearly more than the rest of the category",
     weight: 3,
-    /* Amber/gold: the middle step, warm rather than louder blue. */
+    /* Orange: the middle step, warm rather than louder blue. */
     activeClass:
       "bg-finn-influence-orange text-white ring-1 ring-finn-influence-orange",
     idleClass: "text-finn-influence-orange hover:bg-finn-influence-orange-pale",
@@ -76,12 +90,13 @@ export const FEATURE_IMPORTANCE = {
     chipClass: "bg-finn-influence-orange-pale text-finn-influence-orange",
   },
   low: {
-    label: "Important",
-    inSentence: "important",
-    hint: "Worth extra influence, but the least of the three",
+    label: "Somewhat",
+    inSentence: "somewhat",
+    badgeLabel: "Counts somewhat",
+    hint: "A little more than the rest of the category",
     weight: 2,
-    /* Green/teal: the calmest of the three, so visual weight tracks stated
-       weight without any level looking like a failure. */
+    /* Emerald: the calmest of the three, so visual weight tracks stated
+       weight. */
     activeClass:
       "bg-finn-influence-emerald text-white ring-1 ring-finn-influence-emerald",
     idleClass: "text-finn-influence-emerald hover:bg-finn-influence-emerald-pale",
@@ -96,6 +111,7 @@ export const FEATURE_IMPORTANCE = {
   {
     label: string;
     inSentence: string;
+    badgeLabel: string;
     hint: string;
     weight: number;
     activeClass: string;
@@ -673,16 +689,6 @@ type CategoryId = keyof typeof CATEGORIES;
  */
 export const MAX_FEATURES_PER_CATEGORY = 5;
 
-/**
- * How many of a catalogue's leading entries are flagged as commonly picked.
- *
- * A hint about where to start, shown as a label beside the feature. It is
- * explicitly not a selection: nothing is picked on the user's behalf, because
- * picking something now means "I care about this" and Lens has no business
- * asserting that for them.
- */
-export const SUGGESTED_FEATURE_COUNT = 5;
-
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -836,17 +842,6 @@ export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
 export const DEFAULT_CATEGORY_FEATURES = Object.fromEntries(
   CATEGORY_IDS.map((id) => [id, [] as FeatureSelection])
 ) as Record<CategoryId, FeatureSelection>;
-
-/**
- * The leading catalogue entries for each category, flagged in the picker as
- * a starting point. Suggestions, never selections.
- */
-export const SUGGESTED_CATEGORY_FEATURES = Object.fromEntries(
-  CATEGORY_IDS.map((id) => [
-    id,
-    (CATEGORIES[id].features as FeatureId[]).slice(0, SUGGESTED_FEATURE_COUNT),
-  ])
-) as Record<CategoryId, FeatureId[]>;
 
 export const DEFAULT_PRIORITY_DEFINITIONS: PriorityDefinition[] =
   CATEGORY_IDS.map((id) => ({

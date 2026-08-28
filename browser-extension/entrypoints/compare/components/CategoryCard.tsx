@@ -263,7 +263,7 @@ function CategoryReadonlyDetails({
                             {features.map((preference) => (
                                 <span
                                     key={preference.key}
-                                    title={`You marked this ${FEATURE_IMPORTANCE[preference.importance].inSentence}`}
+                                    title={`You said this should count ${FEATURE_IMPORTANCE[preference.importance].inSentence}`}
                                     className={[
                                         "rounded-full px-2.5 py-1 text-[11px] font-bold",
                                         FEATURE_IMPORTANCE[

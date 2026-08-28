@@ -137,8 +137,8 @@ function missingSelected(
   const relevance = high.length
     ? sentence(
         high.length === missing.length && missing.length === 1
-          ? `You marked it extremely important under`
-          : `You marked ${joinCapped(high.map((fact) => fact.phrase), 5)} extremely important under`,
+          ? `You said it should count highly under`
+          : `You said ${joinCapped(high.map((fact) => fact.phrase), 5)} should count highly under`,
         `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
         "so this is the compromise here most worth weighing",
       )

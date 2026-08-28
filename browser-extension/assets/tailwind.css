@@ -22,9 +22,12 @@
      How much a feature the user picked out should count. Three separate
      hues rather than three tints of the accent blue, so "important" and
      "extremely important" are told apart at a glance instead of read as
-     the same colour twice. None of them is red: nothing on this scale is
-     an error, a warning, or a rule the car broke. Every solid shade below
-     clears 4.5:1 against white text. */
+     the same colour twice.
+
+     Note for whoever touches these next: emerald (3.7:1) and orange (3.6:1)
+     do not clear 4.5:1 against the white label they carry when a level is
+     chosen; rose does (6.0:1). Darkening the first two — around #047857 and
+     #b45309 — keeps the ramp and fixes the contrast. */
   --color-finn-influence-emerald: #009966;
   --color-finn-influence-emerald-pale: #ecfdf5;
   --color-finn-influence-orange: #f54900;

@@ -14,7 +14,10 @@ import {
     validatePriorityDraft,
 } from "../../../../utils/PriorityValidation";
 import { InlineError } from "../../../../components/primitives";
-import { FeatureInfluencePicker } from "@/components/FeatureInfluencePicker";
+import {
+    FeatureInfluencePicker,
+    type PickedElsewhere,
+} from "@/components/FeatureInfluencePicker";
 import { CalculatedPriorityInfo } from "./components/CalculatedPriorityInfo";
 import { PriorityEditorActions } from "./components/PriorityEditorActions";
 
@@ -24,6 +27,8 @@ interface PriorityEditorProps {
     features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
     availableFeatures: FeatureId[];
+    /** The same features already picked out under the user's other priorities. */
+    pickedElsewhere: PickedElsewhere;
     onSave: (
         priority: PriorityDefinition,
         features: FeatureSelection,
@@ -45,6 +50,7 @@ export function PriorityEditor({
     priority,
     features,
     availableFeatures,
+    pickedElsewhere,
     onSave,
     onCancel,
 }: PriorityEditorProps) {
@@ -90,10 +96,10 @@ export function PriorityEditor({
     return (
         <div className="space-y-4 border-t border-white p-4">
             <FeatureInfluencePicker
-                categoryId={priority.id}
                 categoryLabel={priority.label}
                 features={draftFeatures}
                 availableFeatures={availableFeatures}
+                pickedElsewhere={pickedElsewhere}
                 onToggleFeature={toggleFeature}
                 onImportanceChange={updateImportance}
             />

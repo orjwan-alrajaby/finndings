@@ -74,7 +74,7 @@ const joinSelection = (facts: FeatureFact[]): string =>
  * Leads the section, because it is the part the reader wrote themselves.
  *
  * The influence level is mentioned only where it changes what the sentence
- * means — missing something the reader called extremely important is worth
+ * means — missing something the reader said should count highly is worth
  * flagging, where the middle level counts silently. Appending "which you
  * marked very important" to every clause would be the mail-merge voice this
  * layer exists to avoid.
@@ -99,7 +99,7 @@ function describeSelection(
 
     return sentence(
       `You picked out ${only.phrase} here`,
-      only.importance === "high" ? "as extremely important" : "",
+      only.importance === "high" ? "and said it should count highly" : "",
       `, and this car doesn't have it`,
     );
   }
@@ -138,7 +138,7 @@ function describeSelection(
     `This car has ${coverage(present.length, total)} —`,
     `it doesn't have ${joinSelection(missing)}`,
     highMisses.length && highMisses.length < missing.length
-      ? `, and you marked ${joinSelection(highMisses)} extremely important`
+      ? `, and you said ${joinSelection(highMisses)} should count highly`
       : "",
     rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
   );

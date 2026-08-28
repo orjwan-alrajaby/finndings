@@ -695,7 +695,7 @@ describe("zero, one, three and five picks over a realistic set", () => {
    * The winner is decided by breadth across the category, so expressing an
    * interest refines the result without overturning it. CX-60 carries the
    * most safety equipment by a distance and stays top throughout — including
-   * when the reader marks a feature it lacks extremely important.
+   * when the reader says a feature it lacks should count highly.
    */
   it("keeps the broadly strongest car on top however the picks fall", () => {
     for (const selection of [NONE, ONE_COMMON, ONE_RARE, THREE, FIVE]) {

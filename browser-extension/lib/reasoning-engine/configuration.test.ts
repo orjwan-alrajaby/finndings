@@ -15,7 +15,6 @@ import {
   NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
   PROFILES,
-  SUGGESTED_CATEGORY_FEATURES,
 } from "./constants";
 
 import { validatePriorityDraft } from "@/entrypoints/settings/utils/PriorityValidation";
@@ -77,29 +76,6 @@ describe("feature selection", () => {
   it("picks nothing for the user", () => {
     for (const id of CATEGORY_IDS) {
       expect(DEFAULT_CATEGORY_FEATURES[id]).toEqual([]);
-    }
-  });
-
-  /* Suggestions are a starting point, and stay clearly separate from picks. */
-  it("suggests a handful without selecting them", () => {
-    for (const id of featureCategories) {
-      const suggested = SUGGESTED_CATEGORY_FEATURES[id];
-
-      expect(suggested.length).toBeGreaterThan(0);
-      expect(suggested.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
-
-      /* Drawn from the front of the catalogue, which is relevance-ordered. */
-      expect(suggested).toEqual(
-        AVAILABLE_CATEGORY_FEATURES[id].slice(0, suggested.length),
-      );
-    }
-  });
-
-  it("offers more than it suggests, so there is something to explore", () => {
-    for (const id of featureCategories) {
-      expect(
-        AVAILABLE_CATEGORY_FEATURES[id].length,
-      ).toBeGreaterThan(SUGGESTED_CATEGORY_FEATURES[id].length);
     }
   });
 
