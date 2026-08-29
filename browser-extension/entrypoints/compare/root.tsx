@@ -1,5 +1,5 @@
 import "@/assets/tailwind.css";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   Cog6ToothIcon,
   SparklesIcon,
@@ -8,114 +8,36 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
 
-import {
-  DEFAULT_CATEGORY_FEATURES,
-  DEFAULT_DEFAULT_PROFILE_ID,
-  DEFAULT_PREFERENCES,
-  DEFAULT_PRIORITIES,
-  DEFAULT_PROFILES,
-} from "@/lib/reasoning-engine/constants";
-
-import {
-  loadLensSettings,
-  saveLensSettings,
-} from "@/lib/reasoning-engine";
-
-import type {
-  CategoryId,
-  FeatureSelection,
-  LensPreferences,
-} from "@/lib/reasoning-engine/types";
-
 import { Stepper } from "./components/Stepper";
 import { StepOneChoosePrioritiesStep } from "./steps/StepOneChoosePriorities";
 import { StepTwoOrderPrioritiesStep } from "./steps/StepTwoOrderPriorities";
-import type { CompareStep } from "./types";
 import { StepThreeSetPreferences } from "./steps/StepThreeSetPreferences";
 import { StepFourGenerateAdvice } from "./steps/StepFourGenerateAdvice";
+import { useCompareStore } from "./store";
 
+/**
+ * The compare flow.
+ *
+ * Every answer the reader gives lives in the compare store rather than in
+ * the step that asks for it, so the four steps are a view onto one set of
+ * answers instead of a form that has to be filled in front to back. That is
+ * what lets the stepper walk backwards and forwards freely: a step that is
+ * re-entered redraws what the reader left there, down to which card was
+ * open and which car was in the hot seat.
+ */
 export default function CompareTab({
   cars,
-  onAdvice,
   onSettings,
 }: {
   cars: PinnedFinnCar[];
-  onAdvice: () => void;
   onSettings: () => void;
 }) {
-  const [step, setStep] =
-    useState<CompareStep>("priorities");
-
-  const [priorities, setPriorities] =
-    useState<CategoryId[]>(DEFAULT_PRIORITIES);
-
-  /*
-   * The saved settings, and this run's copy of them.
-   *
-   * Step 3 edits the copy and never the original. What a reader does on the
-   * way to one recommendation is a question about these cars today — "what if
-   * I only had 800 a month", "what if I stopped caring about the boot" — and
-   * answering it must not quietly rewrite what they'll be asked next time.
-   * Making any of it permanent is a deliberate act, and it lives in Settings.
-   */
-  const [preferences, setPreferences] =
-    useState<LensPreferences>(DEFAULT_PREFERENCES);
-
-  const [sessionPreferences, setSessionPreferences] =
-    useState<LensPreferences>(DEFAULT_PREFERENCES);
-
-  /** Step 3's feature picks for this run only. Empty until it is visited. */
-  const [sessionFeatures, setSessionFeatures] = useState<
-    Partial<Record<CategoryId, FeatureSelection>>
-  >({});
-
-  const [profiles, setProfiles] =
-    useState(DEFAULT_PROFILES);
-
-  /* Which profile is selected automatically when nothing else is. */
-  const [defaultProfileId, setDefaultProfileId] =
-    useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
-
-  const [categoryFeatures, setCategoryFeatures] =
-    useState<Record<CategoryId, FeatureSelection>>(
-      DEFAULT_CATEGORY_FEATURES,
-    );
+  const step = useCompareStore((state) => state.step);
+  const loadSettings = useCompareStore((state) => state.loadSettings);
 
   useEffect(() => {
-    loadLensSettings().then((settings) => {
-      setPreferences(settings.preferences);
-      setSessionPreferences(settings.preferences);
-      setPriorities(settings.priorities);
-      setProfiles(settings.profiles);
-      setDefaultProfileId(settings.defaultProfileId);
-      setCategoryFeatures(
-        settings.categoryFeatures,
-      );
-    });
-  }, []);
-
-  const saveAnd = async (
-    nextStep?: CompareStep,
-    features = categoryFeatures,
-  ) => {
-    /*
-     * Profiles aren't written back from here — they're fixed configuration
-     * owned by the settings page. What the compare flow owns is the user's
-     * own priority order, and saving it is what stops a profile reasserting
-     * itself over a customised order on the next run.
-     */
-    await saveLensSettings({
-      preferences,
-      priorities,
-      categoryFeatures: features,
-    });
-
-    if (nextStep) {
-      setStep(nextStep);
-    } else {
-      onAdvice();
-    }
-  };
+    void loadSettings();
+  }, [loadSettings]);
 
   if (cars.length === 0) {
     return (
@@ -164,15 +86,6 @@ export default function CompareTab({
     );
   }
 
-  const completedStepsByStep: Record<CompareStep, CompareStep[]> = {
-    priorities: [],
-    order: ["priorities"],
-    preferences: ["priorities", "order"],
-    advice: ["priorities", "order", "preferences"],
-  };
-
-  const completedSteps = completedStepsByStep[step];
-
   return (
     <Tooltip.Provider delayDuration={350}>
       <main className="min-h-screen bg-finn-snow text-finn-black">
@@ -180,13 +93,7 @@ export default function CompareTab({
           <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-finn-cotton/70 bg-finn-snow/90 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-10">
             <div />
 
-            <Stepper
-              current={step}
-              onGoTo={setStep}
-              completed={
-                new Set(completedSteps)
-              }
-            />
+            <Stepper />
 
             <button
               type="button"
@@ -202,88 +109,16 @@ export default function CompareTab({
           <div className="px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
             <div className="mx-auto flex max-w-6xl items-center justify-center">
               {step === "priorities" && (
-                <StepOneChoosePrioritiesStep
-                  priorities={priorities}
-                  setPriorities={
-                    setPriorities
-                  }
-                  profiles={profiles}
-                  defaultProfileId={
-                    defaultProfileId
-                  }
-                  onNext={() =>
-                    setStep("order")
-                  }
-                  onSettings={onSettings}
-                  categoryFeatures={
-                    categoryFeatures
-                  }
-                />
+                <StepOneChoosePrioritiesStep onSettings={onSettings} />
               )}
 
-              {step === "order" && (
-                <StepTwoOrderPrioritiesStep
-                  priorities={priorities}
-                  setPriorities={
-                    setPriorities
-                  }
-                  categoryFeatures={
-                    categoryFeatures
-                  }
-                  onBack={() =>
-                    setStep("priorities")
-                  }
-                  onNext={() =>
-                    saveAnd("preferences")
-                  }
-                />
-              )}
+              {step === "order" && <StepTwoOrderPrioritiesStep />}
 
-              {step === "preferences" && (
-                <StepThreeSetPreferences
-                  priorities={priorities}
-                  preferences={sessionPreferences}
-                  setPreferences={
-                    setSessionPreferences
-                  }
-                  savedPreferences={preferences}
-                  categoryFeatures={
-                    categoryFeatures
-                  }
-                  sessionFeatures={
-                    sessionFeatures
-                  }
-                  onBack={() =>
-                    setStep("order")
-                  }
-                  onAdvice={(
-                    nextCategoryFeatures,
-                  ) => {
-                    /*
-                     * Held, not saved. The advice is generated from these;
-                     * the stored configuration is untouched.
-                     */
-                    setSessionFeatures(
-                      nextCategoryFeatures,
-                    );
-
-                    setStep("advice");
-                  }}
-                />
-              )}
+              {step === "preferences" && <StepThreeSetPreferences />}
 
               {step === "advice" && (
                 <StepFourGenerateAdvice
                   cars={cars}
-                  priorities={priorities}
-                  preferences={sessionPreferences}
-                  categoryFeatures={{
-                    ...categoryFeatures,
-                    ...sessionFeatures,
-                  }}
-                  onBack={() =>
-                    setStep("preferences")
-                  }
                   onSettings={onSettings}
                 />
               )}

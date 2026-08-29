@@ -4,8 +4,6 @@ import type { PinnedFinnCar } from "@/lib/types";
 import CompareTab from "./root";
 import { openBrowserTab } from "../popup/utils";
 
-type Page = "compare" | "advice" | "settings";
-
 async function getPinnedCars(): Promise<PinnedFinnCar[]> {
   const stored = await browser.storage.local.get("pinnedCars");
   const value = stored.pinnedCars as
@@ -16,7 +14,6 @@ async function getPinnedCars(): Promise<PinnedFinnCar[]> {
 }
 
 export default function ReviewOrCompare() {
-  const [page, setPage] = useState<Page>("compare");
   const [cars, setCars] = useState<PinnedFinnCar[]>([]);
 
   const refreshCars = async () => {
@@ -47,7 +44,6 @@ export default function ReviewOrCompare() {
     <main className="min-h-screen bg-finn-snow">
       <CompareTab
         cars={cars}
-        onAdvice={() => setPage("advice")}
         onSettings={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
       />
     </main>

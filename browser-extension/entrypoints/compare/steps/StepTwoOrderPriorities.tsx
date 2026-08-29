@@ -4,53 +4,33 @@ import {
     ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { useState } from "react";
-import {
-    type CategoryId,
-    type FeatureSelection,
-} from "@/lib/reasoning-engine/types";
+import { type CategoryId } from "@/lib/reasoning-engine/types";
 import { CategoryCard } from "../components/CategoryCard";
+import { useCompareStore } from "../store";
 
-export function StepTwoOrderPrioritiesStep({
-    priorities,
-    setPriorities,
-    categoryFeatures,
-    onBack,
-    onNext,
-}: {
-    priorities: CategoryId[];
-    setPriorities: (value: CategoryId[]) => void;
-    categoryFeatures: Record<CategoryId, FeatureSelection>;
-    onBack: () => void;
-    onNext: () => void;
-}) {
-    const [activeCategory, setActiveCategory] =
-        useState<CategoryId | null>(null);
+export function StepTwoOrderPrioritiesStep() {
+    const priorities = useCompareStore((state) => state.priorities);
+    const features = useCompareStore((state) => state.features);
+    const movePriority = useCompareStore((state) => state.movePriority);
+    const back = useCompareStore((state) => state.back);
+    const next = useCompareStore((state) => state.next);
 
+    const activeCategory = useCompareStore(
+        (state) => state.expandedOrderCategory,
+    );
+    const setActiveCategory = useCompareStore(
+        (state) => state.setExpandedOrderCategory,
+    );
+
+    /*
+     * A drag lives and dies inside one gesture, so it stays local — there is
+     * nothing to come back to.
+     */
     const [draggedCategory, setDraggedCategory] =
         useState<CategoryId | null>(null);
 
     const [dragOverCategory, setDragOverCategory] =
         useState<CategoryId | null>(null);
-
-    const movePriorityByDrag = (targetCategory: CategoryId) => {
-        if (!draggedCategory || draggedCategory === targetCategory) {
-            return;
-        }
-
-        const fromIndex = priorities.indexOf(draggedCategory);
-        const toIndex = priorities.indexOf(targetCategory);
-
-        if (fromIndex === -1 || toIndex === -1) return;
-
-        const next = [...priorities];
-        const [moved] = next.splice(fromIndex, 1);
-
-        if (!moved) return;
-
-        next.splice(toIndex, 0, moved);
-
-        setPriorities(next);
-    };
 
     return (
         <div className="space-y-7 w-full">
@@ -87,11 +67,15 @@ export function StepTwoOrderPrioritiesStep({
                             rank={index}
                             onExpand={() => setActiveCategory(catId)}
                             expanded={activeCategory === catId}
-                            categoryFeatures={categoryFeatures}
+                            categoryFeatures={features}
                             draggable
                             onDragStart={() => setDraggedCategory(catId)}
                             onDragOver={() => setDragOverCategory(catId)}
-                            onDrop={() => movePriorityByDrag(catId)}
+                            onDrop={() => {
+                                if (draggedCategory) {
+                                    movePriority(draggedCategory, catId);
+                                }
+                            }}
                             isDragOver={dragOverCategory === catId}
                         />
                     ))}
@@ -101,7 +85,7 @@ export function StepTwoOrderPrioritiesStep({
             <div className="flex gap-3 border-t border-finn-cotton pt-5">
                 <button
                     type="button"
-                    onClick={onBack}
+                    onClick={back}
                     className="flex h-13 items-center gap-2 rounded-full border-2 border-finn-cotton px-6 text-sm font-bold text-finn-black transition hover:bg-white"
                 >
                     <ArrowLeftIcon className="h-4 w-4" />
@@ -110,7 +94,7 @@ export function StepTwoOrderPrioritiesStep({
 
                 <button
                     type="button"
-                    onClick={onNext}
+                    onClick={next}
                     className="flex h-13 flex-1 items-center justify-center gap-2 rounded-full bg-finn-accent-blue text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy"
                 >
                     See my advice

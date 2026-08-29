@@ -4,46 +4,50 @@ import {
     ArrowRightIcon,
     Cog6ToothIcon,
 } from "@heroicons/react/24/outline";
-import {
-    type CategoryId,
-    type FeatureSelection,
-    type Profile,
-} from "@/lib/reasoning-engine/types";
+import { type Profile } from "@/lib/reasoning-engine/types";
 import {
     CATEGORY_IDS,
 } from "@/lib/reasoning-engine/constants";
 
+import { MAX_PRIORITIES, MIN_PRIORITIES, useCompareStore } from "../../store";
 import { SelectionModeSwitch } from "./components/SelectionModeSwitch";
 import { ProfileSelection } from "./components/ProfileSelection";
 import { CustomPrioritySelection } from "./components/CustomPrioritySelection";
-import type { SelectionMode } from "./types";
 
 export function StepOneChoosePrioritiesStep({
-    priorities,
-    setPriorities,
-    profiles,
-    defaultProfileId,
-    onNext,
     onSettings,
-    categoryFeatures,
 }: {
-    priorities: CategoryId[];
-    setPriorities: (value: CategoryId[]) => void;
-    profiles: Profile[];
-    /** The profile that is selected automatically. */
-    defaultProfileId: string;
-    onNext: () => void;
     onSettings: () => void;
-    categoryFeatures: Record<CategoryId, FeatureSelection>;
 }) {
-    const [expandedCat, setExpandedCat] =
-        useState<CategoryId | null>(null);
+    const priorities = useCompareStore((state) => state.priorities);
+    const profiles = useCompareStore((state) => state.profiles);
+    const defaultProfileId = useCompareStore(
+        (state) => state.defaultProfileId,
+    );
+    /*
+     * This run's picks rather than the saved ones, so a reader who comes
+     * back here after editing in step 3 sees what is actually in play.
+     */
+    const features = useCompareStore((state) => state.features);
+
+    const selectionMode = useCompareStore((state) => state.selectionMode);
+    const setSelectionMode = useCompareStore(
+        (state) => state.setSelectionMode,
+    );
+
+    const expandedCategory = useCompareStore(
+        (state) => state.expandedCategory,
+    );
+    const setExpandedCategory = useCompareStore(
+        (state) => state.setExpandedCategory,
+    );
+
+    const setPriorities = useCompareStore((state) => state.setPriorities);
+    const togglePriority = useCompareStore((state) => state.togglePriority);
+    const next = useCompareStore((state) => state.next);
 
     const [activeProfileId, setActiveProfileId] =
         useState<string | null>(null);
-
-    const [selectionMode, setSelectionMode] =
-        useState<SelectionMode>("profile");
 
     /* Disabled profiles are not offered — that is what disabling one means. */
     const enabledProfiles = profiles.filter((profile) => profile.enabled);
@@ -75,20 +79,7 @@ export function StepOneChoosePrioritiesStep({
         (id) => !priorities.includes(id),
     );
 
-    const atLimit = priorities.length >= 5;
-
-    const togglePriority = (id: CategoryId) => {
-        if (priorities.includes(id)) {
-            setPriorities(
-                priorities.filter((category) => category !== id),
-            );
-            return;
-        }
-
-        if (atLimit) return;
-
-        setPriorities([...priorities, id]);
-    };
+    const atLimit = priorities.length >= MAX_PRIORITIES;
 
     const applyProfile = (profile: Profile) => {
         setPriorities([...profile.priorities]);
@@ -123,7 +114,7 @@ export function StepOneChoosePrioritiesStep({
                     profiles={enabledProfiles}
                     defaultProfileId={defaultProfile?.id ?? null}
                     activeProfileId={activeProfileId}
-                    categoryFeatures={categoryFeatures}
+                    categoryFeatures={features}
                     onSelect={applyProfile}
                     onSettings={onSettings}
                     onChooseCustom={() => setSelectionMode("custom")}
@@ -135,12 +126,12 @@ export function StepOneChoosePrioritiesStep({
                     priorities={priorities}
                     available={available}
                     atLimit={atLimit}
-                    expandedCat={expandedCat}
-                    categoryFeatures={categoryFeatures}
+                    expandedCat={expandedCategory}
+                    categoryFeatures={features}
                     onTogglePriority={togglePriority}
                     onExpandCategory={(categoryId) =>
-                        setExpandedCat((current) =>
-                            current === categoryId
+                        setExpandedCategory(
+                            expandedCategory === categoryId
                                 ? null
                                 : categoryId,
                         )
@@ -163,8 +154,8 @@ export function StepOneChoosePrioritiesStep({
 
                 <button
                     type="button"
-                    disabled={priorities.length < 3}
-                    onClick={onNext}
+                    disabled={priorities.length < MIN_PRIORITIES}
+                    onClick={next}
                     className="flex h-13 flex-1 items-center justify-center gap-2 rounded-full bg-finn-accent-blue text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-not-allowed disabled:bg-finn-cotton disabled:text-finn-iron"
                 >
                     Order my priorities

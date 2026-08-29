@@ -1,9 +1,7 @@
 import "@/assets/tailwind.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import type {
     CategoryId,
-    FeatureId,
-    FeatureImportance,
     FeatureSelection,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
@@ -19,10 +17,13 @@ import { buildPickedElsewhere } from "@/components/FeatureInfluencePicker";
 import {
     AVAILABLE_CATEGORY_FEATURES,
     CATEGORIES,
-    DEFAULT_FEATURE_IMPORTANCE,
     DEFAULT_PREFERENCES,
-    MAX_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
+import {
+    featuresChanged as haveFeaturesChanged,
+    type PreferencesPhase,
+    useCompareStore,
+} from "../../store";
 
 /**
  * The two questions this step asks, asked one at a time.
@@ -37,44 +38,48 @@ import {
  * unfinished form: preferences fall back to what the reader has saved, and
  * the assumptions have working values from the moment the extension is
  * installed.
+ *
+ * Every answer given here is held in the compare store, so leaving the step
+ * — forwards to the advice or backwards to the priority order — keeps it,
+ * down to which half was open and which priority was expanded.
  */
-type Phase = "preferences" | "driving";
+export function StepThreeSetPreferences() {
+    const priorities = useCompareStore((state) => state.priorities);
+    const preferences = useCompareStore((state) => state.preferences);
+    const savedPreferences = useCompareStore(
+        (state) => state.savedPreferences,
+    );
+    const savedCategoryFeatures = useCompareStore(
+        (state) => state.savedCategoryFeatures,
+    );
+    const features = useCompareStore((state) => state.features);
 
-export function StepThreeSetPreferences({
-    priorities,
-    preferences,
-    setPreferences,
-    savedPreferences,
-    categoryFeatures,
-    sessionFeatures,
-    onBack,
-    onAdvice,
-}: {
-    priorities: CategoryId[];
-    /** This run's values. Editing them never touches what is stored. */
-    preferences: LensPreferences;
-    setPreferences: (value: LensPreferences) => void;
-    /** What the reader has saved, which is what "my saved values" restores. */
-    savedPreferences: LensPreferences;
-    /** The saved picks, and the starting point for a run that has none. */
-    categoryFeatures: Record<CategoryId, FeatureSelection>;
-    /** Picks already made in this run, if the reader has been here before. */
-    sessionFeatures?: Partial<Record<CategoryId, FeatureSelection>>;
-    onBack: () => void;
-    onAdvice: (
-        categoryFeatures: Partial<Record<CategoryId, FeatureSelection>>,
-    ) => void;
-}) {
-    const [phase, setPhase] = useState<Phase>("preferences");
+    const setPreferences = useCompareStore((state) => state.setPreferences);
+    const useSavedPreferences = useCompareStore(
+        (state) => state.useSavedPreferences,
+    );
+    const toggleFeature = useCompareStore((state) => state.toggleFeature);
+    const setFeatureImportance = useCompareStore(
+        (state) => state.setFeatureImportance,
+    );
+    const resetFeaturesToSaved = useCompareStore(
+        (state) => state.resetFeaturesToSaved,
+    );
 
-    const [localFeatures, setLocalFeatures] = useState<
-        Partial<Record<CategoryId, FeatureSelection>>
-    >({});
+    const phase = useCompareStore((state) => state.phase);
+    const setPhase = useCompareStore((state) => state.setPhase);
 
-    const [expandedPriority, setExpandedPriority] =
-        useState<CategoryId | null>(
-            priorities[0] ?? null,
-        );
+    const expandedPriority = useCompareStore(
+        (state) => state.expandedPriority,
+    );
+    const setExpandedPriority = useCompareStore(
+        (state) => state.setExpandedPriority,
+    );
+
+    const back = useCompareStore((state) => state.back);
+    const next = useCompareStore((state) => state.next);
+
+    const featuresChanged = useCompareStore(haveFeaturesChanged);
 
     /* A new half of the step starts at the top of it, not halfway down. */
     useEffect(() => {
@@ -82,119 +87,31 @@ export function StepThreeSetPreferences({
     }, [phase]);
 
     /*
-     * categoryFeatures is the saved/default configuration.
-     * localFeatures is the temporary configuration for
-     * this recommendation.
+     * What "picked elsewhere" means is picked in another priority the reader
+     * is being asked about — picks kept for a category they since dropped
+     * are not somewhere they can see or reach.
      */
-    useEffect(() => {
-        setLocalFeatures((current) => {
-            const next: Partial<Record<CategoryId, FeatureSelection>> = {};
-
-            for (const categoryId of priorities) {
-                next[categoryId] =
-                    current[categoryId] ??
-                    sessionFeatures?.[categoryId] ??
-                    [...(categoryFeatures[categoryId] ?? [])];
-            }
-
-            return next;
-        });
-    }, [priorities, categoryFeatures, sessionFeatures]);
-
-    /**
-     * Pick a feature out, or put it back.
-     *
-     * Unpicking the last one is allowed: an empty selection means "compare
-     * these cars on the category as a whole", which is a preference rather
-     * than a hole in the form.
-     */
-    const toggleFeature = (categoryId: CategoryId, feature: FeatureId) => {
-        setLocalFeatures((current) => {
-            const currentFeatures = current[categoryId] ?? [];
-
-            if (currentFeatures.some((item) => item.key === feature)) {
-                return {
-                    ...current,
-                    [categoryId]: currentFeatures.filter(
-                        (item) => item.key !== feature,
-                    ),
-                };
-            }
-
-            if (currentFeatures.length >= MAX_FEATURES_PER_CATEGORY) {
-                return current;
-            }
-
-            return {
-                ...current,
-                [categoryId]: [
-                    ...currentFeatures,
-                    { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE },
-                ],
-            };
-        });
-    };
-
-    const updateImportance = (
-        categoryId: CategoryId,
-        feature: FeatureId,
-        importance: FeatureImportance,
-    ) => {
-        setLocalFeatures((current) => ({
-            ...current,
-            [categoryId]: (current[categoryId] ?? []).map((item) =>
-                item.key === feature ? { ...item, importance } : item,
-            ),
-        }));
-    };
+    const pickedInPriorities = useMemo(
+        () =>
+            Object.fromEntries(
+                priorities.map((categoryId) => [
+                    categoryId,
+                    features[categoryId] ?? [],
+                ]),
+            ) as Partial<Record<CategoryId, FeatureSelection>>,
+        [priorities, features],
+    );
 
     const pickedCount = priorities.reduce(
-        (total, categoryId) =>
-            total + (localFeatures[categoryId]?.length ?? 0),
+        (total, categoryId) => total + (features[categoryId]?.length ?? 0),
         0,
     );
 
     const savedCount = priorities.reduce(
         (total, categoryId) =>
-            total + (categoryFeatures[categoryId]?.length ?? 0),
+            total + (savedCategoryFeatures[categoryId]?.length ?? 0),
         0,
     );
-
-    /* Whether this run has been edited away from what the reader has saved. */
-    const featuresChanged = priorities.some((categoryId) => {
-        const local = localFeatures[categoryId] ?? [];
-        const saved = categoryFeatures[categoryId] ?? [];
-
-        return (
-            local.length !== saved.length ||
-            local.some(
-                (item, index) =>
-                    saved[index]?.key !== item.key ||
-                    saved[index]?.importance !== item.importance,
-            )
-        );
-    });
-
-    /*
-     * Put this run's picks back to the saved ones — the same offer the
-     * driving half makes, and for the same reason: a reader who has fiddled
-     * their way somewhere they don't like needs one move back to a known
-     * state, not an undo history.
-     *
-     * It reverts in place rather than advancing. Watching the picks change is
-     * the point; a button that both discarded their edits and moved the page
-     * would be two surprises at once.
-     */
-    const resetToSaved = () => {
-        setLocalFeatures(
-            Object.fromEntries(
-                priorities.map((categoryId) => [
-                    categoryId,
-                    [...(categoryFeatures[categoryId] ?? [])],
-                ]),
-            ),
-        );
-    };
 
     return (
         <div className="flex w-full flex-col gap-6">
@@ -237,11 +154,7 @@ export function StepThreeSetPreferences({
                     </p>
 
                     {priorities.map((categoryId, index) => {
-                        const features =
-                            localFeatures[categoryId] ??
-                            categoryFeatures[categoryId] ??
-                            [];
-
+                        const categoryFeatures = features[categoryId] ?? [];
                         const category = CATEGORIES[categoryId];
                         const open = expandedPriority === categoryId;
 
@@ -250,20 +163,18 @@ export function StepThreeSetPreferences({
                                 key={categoryId}
                                 icon={category.icon}
                                 label={category.label}
-                                featureCount={features.length}
+                                featureCount={categoryFeatures.length}
                                 open={open}
                                 onToggle={() =>
-                                    setExpandedPriority((current) =>
-                                        current === categoryId
-                                            ? null
-                                            : categoryId,
+                                    setExpandedPriority(
+                                        open ? null : categoryId,
                                     )
                                 }
                             >
                                 {open && (
                                     <StepThreeFeatureEditor
                                         categoryId={categoryId}
-                                        features={features}
+                                        features={categoryFeatures}
                                         availableFeatures={
                                             AVAILABLE_CATEGORY_FEATURES[
                                                 categoryId
@@ -272,7 +183,7 @@ export function StepThreeSetPreferences({
                                         rank={index + 1}
                                         pickedElsewhere={buildPickedElsewhere(
                                             categoryId,
-                                            localFeatures,
+                                            pickedInPriorities,
                                             CATEGORIES,
                                         )}
                                         onToggleFeature={(feature) =>
@@ -282,7 +193,7 @@ export function StepThreeSetPreferences({
                                             feature,
                                             importance,
                                         ) =>
-                                            updateImportance(
+                                            setFeatureImportance(
                                                 categoryId,
                                                 feature,
                                                 importance,
@@ -298,7 +209,7 @@ export function StepThreeSetPreferences({
                 <DrivingAssumptions
                     preferences={preferences}
                     setPreferences={setPreferences}
-                    onUseSaved={() => setPreferences({ ...savedPreferences })}
+                    onUseSaved={useSavedPreferences}
                     isSaved={sameAssumptions(preferences, savedPreferences)}
                 />
             )}
@@ -316,7 +227,7 @@ export function StepThreeSetPreferences({
                     type="button"
                     onClick={() =>
                         phase === "preferences"
-                            ? onBack()
+                            ? back()
                             : setPhase("preferences")
                     }
                     className="flex h-13 w-13 shrink-0 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
@@ -343,7 +254,7 @@ export function StepThreeSetPreferences({
                         {featuresChanged && (
                             <button
                                 type="button"
-                                onClick={resetToSaved}
+                                onClick={resetFeaturesToSaved}
                                 className="h-13 rounded-full px-4 text-xs font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline"
                             >
                                 {savedCount > 0
@@ -355,7 +266,7 @@ export function StepThreeSetPreferences({
                 ) : (
                     <button
                         type="button"
-                        onClick={() => onAdvice(localFeatures)}
+                        onClick={next}
                         className="flex h-13 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-finn-accent-blue text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy"
                     >
                         Show my recommendation
@@ -379,11 +290,11 @@ function PhaseTabs({
     pickedCount,
     onGoTo,
 }: {
-    phase: Phase;
+    phase: PreferencesPhase;
     pickedCount: number;
-    onGoTo: (phase: Phase) => void;
+    onGoTo: (phase: PreferencesPhase) => void;
 }) {
-    const tabs: [Phase, string, string][] = [
+    const tabs: [PreferencesPhase, string, string][] = [
         [
             "preferences",
             "Your preferences",

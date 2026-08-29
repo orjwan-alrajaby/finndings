@@ -1,12 +1,7 @@
 import "@/assets/tailwind.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
-import type {
-    CategoryId,
-    FeatureSelection,
-    LensPreferences,
-} from "@/lib/reasoning-engine/types";
 import {
     alternativeOptions,
     buildAdviceNarrative,
@@ -23,6 +18,7 @@ import { CostAnalysis } from "./components/CostAnalysis";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
+import { useCompareStore } from "../../store";
 
 /**
  * The Advice page.
@@ -39,24 +35,36 @@ import { WhyItWins } from "./components/WhyItWins";
  *
  * The recommendation is fixed. Putting a car in the hot seat changes what is
  * *examined* and never what is recommended.
+ *
+ * The step is a reading of the answers held in the compare store, so
+ * stepping back to change one and returning re-reads them — and the hot seat
+ * is left where the reader had it, unless what it was comparing against has
+ * changed underneath it.
  */
 export function StepFourGenerateAdvice({
     cars,
-    priorities,
-    preferences,
-    categoryFeatures,
-    onBack,
     onSettings,
 }: {
     cars: PinnedFinnCar[];
-    priorities: CategoryId[];
-    preferences: LensPreferences;
-    categoryFeatures: Record<CategoryId, FeatureSelection>;
-    onBack: () => void;
     onSettings: () => void;
 }) {
-    /** The challenger under examination. Null means the recommendation itself. */
-    const [challengerId, setChallengerId] = useState<number | null>(null);
+    const priorities = useCompareStore((state) => state.priorities);
+    const preferences = useCompareStore((state) => state.preferences);
+    const categoryFeatures = useCompareStore((state) => state.features);
+
+    /**
+     * The challenger under examination. Null means the recommendation
+     * itself. It lives in the store so that leaving the step and coming
+     * back returns the reader to the comparison they were reading; changing
+     * an answer anywhere in the flow clears it, because the comparison it
+     * described no longer holds.
+     */
+    const challengerId = useCompareStore((state) => state.challengerId);
+    const setChallengerId = useCompareStore(
+        (state) => state.setChallengerId,
+    );
+
+    const onBack = useCompareStore((state) => state.back);
 
     const recommendation = useMemo(
         () =>
@@ -69,10 +77,19 @@ export function StepFourGenerateAdvice({
         [cars, priorities, preferences, categoryFeatures],
     );
 
-    /* A new comparison run clears the hot seat. */
+    /*
+     * The pinned set can change under the page — a car unpinned in another
+     * tab. If the hot seat was holding that car, empty it.
+     */
     useEffect(() => {
-        setChallengerId(null);
-    }, [recommendation]);
+        const stillOffered = recommendation?.alternatives.some(
+            (car) => car.id === challengerId,
+        );
+
+        if (challengerId != null && !stillOffered) {
+            setChallengerId(null);
+        }
+    }, [recommendation, challengerId, setChallengerId]);
 
     if (!recommendation) {
         return (
