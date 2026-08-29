@@ -6,7 +6,11 @@ import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, panelStyles } from "./dom";
 import { analysisBody } from "./sections";
-import { detailsPageRoot, resolveCurrentCar } from "./currentCar";
+import {
+  CONFIGURATIONS_SELECTOR,
+  detailsPageRoot,
+  resolveCurrentCar,
+} from "./currentCar";
 
 /**
  * The panel itself: a drawer over finn.com, and the states it can be in.
@@ -89,6 +93,15 @@ const openSettings = () => {
   void browser.runtime.sendMessage({ type: "OPEN_SETTINGS_PAGE" });
 };
 
+/** Gets out of the way and puts FINN's own configuration list on screen. */
+const showConfigurations = () => {
+  const grid = document.querySelector(CONFIGURATIONS_SELECTOR);
+
+  closePanel();
+
+  grid?.scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
 /* -------------------------------------------------------------------------- */
 /* Content                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -154,12 +167,30 @@ async function render(into: HTMLElement, retry: () => void): Promise<void> {
 
   const current = await resolveCurrentCar(root);
 
+  /*
+   * A model page with nothing selected isn't showing a car — it is asking the
+   * reader to pick one, and the panel says the same thing rather than
+   * analysing whichever configuration happens to be drawn first.
+   */
+  if (current.status === "chooseConfiguration") {
+    empty(into);
+    into.append(
+      message(
+        "Pick a configuration first",
+        `FINN has this model in ${current.count} configurations, and they differ in exactly the things Lens weighs — equipment, range, price. Choose one and Lens can tell you how that car fits you.`,
+        { label: "Show me the configurations", onClick: showConfigurations },
+      ),
+    );
+
+    return;
+  }
+
   if (current.status === "unidentified") {
     empty(into);
     into.append(
       message(
         "We can't tell which car this is",
-        "This page is showing more than one configuration and nothing says which one is selected. Pick a configuration on the page and open Lens again — analysing the wrong trim would be worse than not analysing one.",
+        "Nothing on this page says which configuration it's showing. Open a car from FINN's list and Lens will pick it up — analysing the wrong trim would be worse than not analysing one.",
         { label: "Try again", onClick: retry },
       ),
     );

@@ -60,14 +60,56 @@ export async function loadCarsFromFinnApi({
       throw new Error("Couldn't determine car name.");
     }
 
-    const [brand, ...modelParts] = title.split(" ");
+    const { brand, model } = splitBrandAndModel(title, window.location.pathname);
 
     return finnFetch<FinnCarsResponse>(
-      `/api/cars?brands=${encodeURIComponent(brand ?? "")}&hide_related=true&limit=50&models=${encodeURIComponent(
-        modelParts.join(" ")
+      `/api/cars?brands=${encodeURIComponent(brand)}&hide_related=true&limit=50&models=${encodeURIComponent(
+        model
       )}&pricing_type=downpayment&view=available_cars`
     );
   }
 
   throw new Error("Couldn't determine which FINN API endpoint to call.");
+}
+/** Lowercased, with everything that isn't a letter or digit removed. */
+const normalise = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Splits "BYD Dolphin Surf" into a brand and a model.
+ *
+ * The heading alone can't be split reliably: taking the first word gives
+ * "Alfa" and "Romeo Tonale", and counting words in the URL slug instead gives
+ * "Mercedes-Benz A-Klasse" as the brand, because that brand is two slug words
+ * and one heading word. What does work is matching — a detail page lives at
+ * `/de-DE/models/{brand}/{model}`, so the leading words of the heading whose
+ * letters and digits equal the brand slug's are the brand, however either side
+ * spells it.
+ *
+ * Falls back to the first word when the path doesn't say, which is what this
+ * did before and is right for the great majority of brands.
+ */
+export function splitBrandAndModel(
+  title: string,
+  pathname: string
+): { brand: string; model: string } {
+  const words = title.split(/\s+/).filter(Boolean);
+  const slug = /\/models\/([^/]+)\//.exec(pathname)?.[1];
+
+  if (slug) {
+    const target = normalise(slug);
+
+    for (let count = 1; count < words.length; count++) {
+      if (normalise(words.slice(0, count).join("")) === target) {
+        return {
+          brand: words.slice(0, count).join(" "),
+          model: words.slice(count).join(" "),
+        };
+      }
+    }
+  }
+
+  const [first, ...rest] = words;
+
+  return { brand: first ?? "", model: rest.join(" ") };
 }

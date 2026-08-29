@@ -8,10 +8,7 @@ import {
   getPinnedCars,
   mergeLoadedCars,
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
-import {
-  buildCarUrl,
-  extractConfigId,
-} from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
+import { buildCarUrl } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
 
 /**
  * Which car the reader is actually looking at, and what we know about it.
@@ -26,47 +23,68 @@ import {
 
 export type CurrentCar =
   | { status: "ready"; car: PinnedFinnCar; configId: number; isPinned: boolean }
+  /** A model page where the reader hasn't chosen a configuration yet. */
+  | { status: "chooseConfiguration"; count: number }
   | { status: "unidentified" }
   | { status: "unavailable"; reason: string };
 
+/** Where FINN lists the configurations a model is available in. */
+export const CONFIGURATIONS_SELECTOR = '[data-testid="group-comparison"]';
+
 /**
- * The config id of the car on screen.
+ * The configuration cards on a model page.
  *
- * Two signals, both of which the extension already relies on elsewhere:
- *
- * 1. `selected_config` in the URL. FINN uses it to address one configuration
- *    of a model, and `buildCarUrl` writes the same parameter when pinning, so
- *    it is the closest thing to a canonical identifier the page offers.
- *
- * 2. A single `id="product-XXXXX"` element inside the details root. The pin
- *    injector treats these as the page's configuration cards; where the page
- *    shows exactly one there is no ambiguity about which car it is.
- *
- * Where the page shows several configurations and the URL doesn't say which is
- * selected, this deliberately gives up. An analysis of the wrong trim is worse
- * than no analysis.
+ * Each carries its own `id="product-XXXXX"`, which is where the pin button
+ * gets the id of the car it pins. They are scoped to FINN's comparison grid
+ * rather than looked for anywhere in the page, so nothing else that happens to
+ * use that id shape can be mistaken for a car.
  */
-export function resolveCurrentConfigId(root: HTMLElement): number | null {
-  const fromUrl = new URLSearchParams(window.location.search).get(
-    "selected_config",
-  );
+export function configurationCards(root: HTMLElement): number[] {
+  const grid = root.querySelector(CONFIGURATIONS_SELECTOR) ?? root;
 
-  const parsed = fromUrl ? extractConfigId(fromUrl) : null;
-  if (parsed != null) return parsed;
+  const ids = Array.from(grid.querySelectorAll<HTMLElement>('[id^="product-"]'))
+    .map((element) => /^product-(\d+)$/.exec(element.id)?.[1])
+    .map((digits) => (digits == null ? null : Number(digits)))
+    .filter((id): id is number => id != null && Number.isSafeInteger(id));
 
-  const configCards = Array.from(
-    root.querySelectorAll<HTMLElement>('[id^="product-"]'),
-  ).filter((element) => /^product-\d+$/.test(element.id));
+  return [...new Set(ids)];
+}
 
-  const ids = new Set(
-    configCards
-      .map((element) => extractConfigId(element.id))
-      .filter((id): id is number => id != null),
-  );
+/**
+ * The config id of the car on screen, if one is on screen at all.
+ *
+ * `selected_config` in the URL is the answer whenever there is one. It is how
+ * FINN addresses a configuration — every "similar car" on a detail page links
+ * with it, and `buildCarUrl` writes the same parameter when pinning — so it is
+ * as close to canonical as the page gets.
+ *
+ * Without it, a model page is not showing a car. `/models/byd/dolphin-surf`
+ * heads its sidebar "Wähle ein Auto", prices the model "ab 209 €" rather than
+ * at any one configuration's price, and lists three of them to choose between.
+ * The one case that still resolves is a model with a single configuration,
+ * where there is nothing to choose.
+ */
+export function resolveCurrentConfigId(
+  root: HTMLElement,
+  search: string = window.location.search,
+): number | null {
+  /*
+   * Read whole, not through `extractConfigId` — that helper matches the first
+   * five digits it finds, which is right for the ids it was written against
+   * and would quietly truncate anything longer.
+   */
+  const fromUrl = new URLSearchParams(search).get("selected_config")?.trim();
 
-  const [only] = [...ids];
+  if (fromUrl && /^\d+$/.test(fromUrl)) {
+    const parsed = Number(fromUrl);
 
-  return ids.size === 1 && only != null ? only : null;
+    if (Number.isSafeInteger(parsed)) return parsed;
+  }
+
+  const cards = configurationCards(root);
+  const [only] = cards;
+
+  return cards.length === 1 && only != null ? only : null;
 }
 
 /** The details page root, or null when this isn't one. */
@@ -89,7 +107,13 @@ export async function resolveCurrentCar(
 ): Promise<CurrentCar> {
   const configId = resolveCurrentConfigId(root);
 
-  if (configId == null) return { status: "unidentified" };
+  if (configId == null) {
+    const count = configurationCards(root).length;
+
+    return count > 1
+      ? { status: "chooseConfiguration", count }
+      : { status: "unidentified" };
+  }
 
   try {
     const pinned = (await getPinnedCars())[configId];

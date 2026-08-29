@@ -2,10 +2,12 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
- * Standalone config for the reasoning-engine unit tests.
+ * Standalone config for the unit tests.
  *
- * These tests exercise pure calculation and reasoning code, so they don't
+ * These exercise pure calculation, reasoning and parsing code, so they don't
  * need the WXT/browser environment — only the "@" alias WXT normally provides.
+ * Content-script modules are in scope on the same terms: a test may import one
+ * only if it reaches no browser API at module level.
  */
 export default defineConfig({
   resolve: {
@@ -15,6 +17,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts"],
+    include: ["lib/**/*.test.ts", "entrypoints/**/*.test.ts"],
   },
 });
