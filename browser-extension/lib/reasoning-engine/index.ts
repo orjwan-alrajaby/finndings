@@ -1051,6 +1051,41 @@ export function migratePreferences(
   };
 }
 
+/**
+ * Whether the reader has ever configured Lens, as opposed to being carried by
+ * its defaults.
+ *
+ * `loadLensSettings` can't answer this: it is built to always return something
+ * usable, falling back to the default profile so that nothing downstream has
+ * to handle an unconfigured state. That is right for the Compare flow, which
+ * walks the reader through configuring it anyway, and wrong for the in-page
+ * analysis, which would otherwise present a stranger's defaults as "how this
+ * car fits you".
+ *
+ * Only the three keys that shape an analysis count. Enabling a profile or
+ * choosing a default one changes which questions get asked, not what the
+ * answer is measured against.
+ */
+export async function hasSavedLensSettings(): Promise<boolean> {
+  const stored = await browser.storage.local.get([
+    "finnLensPreferences",
+    "finnLensPriorities",
+    "finnLensCategoryFeatures",
+  ]);
+
+  const priorities = stored.finnLensPriorities as unknown[] | undefined;
+
+  const features = stored.finnLensCategoryFeatures as
+    | Record<string, unknown[]>
+    | undefined;
+
+  return Boolean(
+    stored.finnLensPreferences ||
+      priorities?.length ||
+      Object.values(features ?? {}).some((picks) => picks?.length),
+  );
+}
+
 export async function loadLensSettings(): Promise<LensSettings> {
   const stored = (await browser.storage.local.get([
     ...STORAGE_KEYS,

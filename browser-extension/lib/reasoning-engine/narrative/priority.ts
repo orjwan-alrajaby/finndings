@@ -181,8 +181,8 @@ function describeCoverage(
   }
 
   return sentence(
-    `You didn't pick out particular ${phraseLabel(label)} features, so cars`,
-    `are compared across the category as a whole and ${figure}`,
+    `You didn't pick out particular ${phraseLabel(label)} features, so this`,
+    `priority is judged across the category as a whole and ${figure}`,
   );
 }
 
@@ -204,6 +204,10 @@ function measurementPhrase(fact: MeasurementFact): string {
       return `${fact.display} of boot space`;
     case "Consumption":
       return `a combined ${fact.display}`;
+    case "Electric range":
+      return `an electric range of ${fact.display}`;
+    case "CO\u2082 emissions":
+      return `CO\u2082 emissions of ${fact.display}`;
     default:
       return `${inSentence(fact.label)} of ${fact.display}`;
   }
@@ -302,6 +306,14 @@ function describeStanding(
   if (standing !== "leads") return null;
 
   const runnerUp = breakdown.runnerUp;
+
+  /*
+   * Nothing to have a standing against. One car on its own leads every
+   * category it is evaluated in, and "none of the closest alternatives does
+   * better here" would be an invented comparison — see `buildFitAnalysis`,
+   * which evaluates a single car the reader is looking at on finn.com.
+   */
+  if (!runnerUp) return null;
 
   /*
    * Nobody having any of the equipment is not a lead. Saying "none of the

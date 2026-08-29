@@ -4,6 +4,7 @@ import { injectPinBtnIntoCarListItem } from "./injectors/inject-pin-button/injec
 import { HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR, DETAILS_PAGE_SELECTOR } from "./constants";
 import { mapFinnConfigToAll } from "./manipulateApiData";
 import { getPinnedCars } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
+import { mountLauncher, unmountLauncher } from "./lens-panel/launcher";
 
 export default defineContentScript({
   matches: ["https://www.finn.com/*"],
@@ -32,44 +33,27 @@ export default defineContentScript({
       };
     });
 
+    /*
+     * Every car FINN's own page loads, kept.
+     *
+     * The interceptor forwards each /api/cars response and this is the only
+     * place that accumulates them, so the in-page analysis usually needs no
+     * request of its own: the car the reader is looking at was fetched by the
+     * page that is showing it.
+     */
     window.addEventListener("message", async (event) => {
       if (event.source !== window) return;
       if (event.data?.source !== "finn-lens") return;
       if (event.data?.type !== "FINN_CARS_RESPONSE") return;
 
-      browser.runtime.onMessage.addListener(async (message) => {
-        if (message.type !== "GET_PAGE_STATS") return;
+      const batchLoaded = event.data.payload.results;
+      const formatted = mapFinnConfigToAll(batchLoaded);
 
-        const pinnedCars = await getPinnedCars();
+      allLoadedSoFar = {
+        cars: { ...allLoadedSoFar.cars, ...formatted },
+        total: allLoadedSoFar.total + batchLoaded.length,
+      };
 
-      await browser.storage.local.set({
-        loadedCarsFromFinnApi: allLoadedSoFar,
-      });
-        
-        return {
-          detectedCount: document.querySelectorAll(
-            '[data-finn-lens-processed="true"]'
-          ).length,
-          pinnedCount: Object.keys(pinnedCars ?? {}).length,
-          pinnedCars,
-        };
-      });
-
-      window.addEventListener("message", async (event) => {
-        if (event.source !== window) return;
-        if (event.data?.source !== "finn-lens") return;
-        if (event.data?.type !== "FINN_CARS_RESPONSE") return;
-
-        const batchLoaded = event.data.payload.results;
-        const formatted = mapFinnConfigToAll(batchLoaded);
-
-        allLoadedSoFar = {
-          cars: { ...allLoadedSoFar.cars, ...formatted },
-          total: allLoadedSoFar.total + batchLoaded.length,
-        };
-
-        await browser.storage.local.set({ loadedCarsFromFinnApi: allLoadedSoFar });
-      });
       await browser.storage.local.set({
         loadedCarsFromFinnApi: allLoadedSoFar,
       });
@@ -100,6 +84,7 @@ export default defineContentScript({
 
       if (document.querySelector(DETAILS_PAGE_SELECTOR)) {
         injectPinBtnIntoDetailsPage();
+        void mountLauncher();
       }
     };
 
@@ -145,6 +130,13 @@ export default defineContentScript({
       if (navDebounceTimer !== null) {
         clearTimeout(navDebounceTimer);
       }
+
+      /*
+       * Taken down before the new page is read rather than after. FINN moves
+       * between cars without reloading, and a panel still describing the car
+       * the reader has just left is worse than no panel at all.
+       */
+      unmountLauncher();
 
       navDebounceTimer = setTimeout(() => {
         navDebounceTimer = null;

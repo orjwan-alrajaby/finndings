@@ -46,7 +46,7 @@ import {
  * Names the equipment or quotes the figure — never "scores well here", which
  * tells the reader nothing they can act on.
  */
-function summarisePriority(
+export function summarisePriority(
   reasoning: PriorityReasoning,
   position: "first" | "next",
 ): string | null {
@@ -107,8 +107,8 @@ function summarisePriority(
 
   if (basis === "category" && total > 0) {
     return sentence(
-      `${opener}. You didn't pick out particular features there, so cars are`,
-      `compared across the category — this one has ${cover.present.length} of`,
+      `${opener}. You didn't pick out particular features there, so it's`,
+      `judged across the category — this one has ${cover.present.length} of`,
       `the ${total} systems it covers`,
     );
   }

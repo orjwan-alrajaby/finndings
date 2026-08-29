@@ -12,7 +12,11 @@ export default defineConfig({
     ],
     web_accessible_resources: [
       {
-        resources: ["network-interceptor.js"],
+        /*
+         * The panel's stylesheet is fetched by the content script and put
+         * inside a shadow root, so it has to be reachable as a resource.
+         */
+        resources: ["network-interceptor.js", "content-scripts/content.css"],
         matches: ["https://www.finn.com/*"]
       }
     ]

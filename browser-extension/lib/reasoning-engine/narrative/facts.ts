@@ -149,6 +149,70 @@ function supportingMeasurements(
 }
 
 /**
+ * The figure a priority is *about*, reported when the engine couldn't score
+ * one.
+ *
+ * A relative score needs a population to be relative to. Where there isn't
+ * one — a single car being looked at on finn.com, or a set where only one car
+ * carries the figure — the measurement drops out of the score, and staying
+ * silent about it would leave "Long Distance" explained without ever
+ * mentioning the range. So it is reported as a plain fact and never scored,
+ * which is exactly what it is.
+ *
+ * Deduplicated by label against the scored measurement upstream, so a
+ * comparison that did score the figure is completely unaffected.
+ */
+function headlineMeasurements(
+  priority: string,
+  vehicle: PinnedFinnCar,
+): { label: string; value: number; unit: string; lowerIsBetter: boolean }[] {
+  const range =
+    vehicle.electric?.range != null && vehicle.electric.range !== "Unknown"
+      ? finite(vehicle.electric.range)
+      : null;
+
+  const consumption = finite(vehicle.consumption?.combined);
+  const trunk = finite(vehicle.capacity?.trunk);
+  const co2 = finite(vehicle.co2?.value);
+
+  const consumptionUnit =
+    vehicle.fuelType === "Electric" ? "kWh/100km" : "L/100km";
+
+  switch (priority) {
+    case "practicality":
+      return trunk == null
+        ? []
+        : [{ label: "Boot space", value: trunk, unit: "L", lowerIsBetter: false }];
+
+    case "longDistance":
+      if (range != null) {
+        return [
+          { label: "Electric range", value: range, unit: "km", lowerIsBetter: false },
+        ];
+      }
+
+      return consumption == null
+        ? []
+        : [
+            {
+              label: "Consumption",
+              value: consumption,
+              unit: consumptionUnit,
+              lowerIsBetter: true,
+            },
+          ];
+
+    case "environmental":
+      return co2 == null || co2 <= 0
+        ? []
+        : [{ label: "CO\u2082 emissions", value: co2, unit: "g/km", lowerIsBetter: true }];
+
+    default:
+      return [];
+  }
+}
+
+/**
  * The measured evidence for one priority: the number the engine scored, plus
  * any supporting figures, each set beside the rival's own value.
  */
@@ -186,14 +250,21 @@ export function measurementFacts(
     });
   }
 
-  for (const supporting of supportingMeasurements(breakdown.priority, vehicle)) {
+  const unscored = [
+    ...supportingMeasurements(breakdown.priority, vehicle),
+    ...(scored ? [] : headlineMeasurements(breakdown.priority, vehicle)),
+  ];
+
+  for (const supporting of unscored) {
     /* Never report the same figure twice under two labels. */
     if (scored && scored.label === supporting.label) continue;
+    if (facts.some((fact) => fact.label === supporting.label)) continue;
 
     const rivalValue = rival
-      ? supportingMeasurements(breakdown.priority, rival).find(
-          (item) => item.label === supporting.label,
-        )?.value ?? null
+      ? [
+          ...supportingMeasurements(breakdown.priority, rival),
+          ...(scored ? [] : headlineMeasurements(breakdown.priority, rival)),
+        ].find((item) => item.label === supporting.label)?.value ?? null
       : null;
 
     const display = supporting.unit

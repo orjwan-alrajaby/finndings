@@ -1,0 +1,335 @@
+import { describe, expect, it } from "vitest";
+
+import { buildFitAnalysis, classifyFit, describeFit, hasEquipmentData } from "./fit";
+import { buildRecommendation } from "./index";
+import { AVAILABLE_CATEGORY_FEATURES } from "./constants";
+import { makeCar, prefs } from "./test-fixtures";
+import type { CategoryId, FeatureSelection } from "./types";
+
+/**
+ * The single-car analysis shown on finn.com.
+ *
+ * What these tests are really protecting is a boundary: the engine is
+ * comparative almost everywhere, and this path evaluates a car with nothing to
+ * compare it to. Every assertion below is either "the arithmetic is still the
+ * engine's" or "it does not invent a car that isn't there".
+ */
+
+const SAFETY = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
+const PRACTICALITY = AVAILABLE_CATEGORY_FEATURES.practicality;
+
+const picks = (
+  entries: Partial<Record<CategoryId, FeatureSelection>>,
+): Record<CategoryId, FeatureSelection> =>
+  entries as Record<CategoryId, FeatureSelection>;
+
+describe("classifyFit", () => {
+  it("bands the engine's score without producing one of its own", () => {
+    expect(classifyFit(90).level).toBe("strong");
+    expect(classifyFit(65).level).toBe("strong");
+    expect(classifyFit(64).level).toBe("good");
+    expect(classifyFit(45).level).toBe("good");
+    expect(classifyFit(44).level).toBe("partial");
+    expect(classifyFit(25).level).toBe("partial");
+    expect(classifyFit(24).level).toBe("limited");
+    expect(classifyFit(0).level).toBe("limited");
+  });
+
+  it("says it doesn't know rather than guessing, with no evidence", () => {
+    expect(classifyFit(0, false).level).toBe("unknown");
+    expect(classifyFit(90, false).level).toBe("unknown");
+  });
+
+  it("never labels a car, only the fit", () => {
+    for (const score of [0, 30, 50, 80, 100]) {
+      expect(classifyFit(score).label).toMatch(/match|Not enough data/);
+    }
+  });
+});
+
+describe("hasEquipmentData", () => {
+  it("is false for a car FINN supplied no equipment list for", () => {
+    expect(hasEquipmentData(makeCar({ id: 1, features: [] }))).toBe(false);
+  });
+
+  it("is true as soon as anything is known", () => {
+    expect(
+      hasEquipmentData(makeCar({ id: 1, features: ["hasIsofix"] })),
+    ).toBe(true);
+  });
+});
+
+describe("buildFitAnalysis", () => {
+  const priorities: CategoryId[] = ["safetyAssistance", "practicality"];
+
+  it("judges the car on the reader's priorities, in their order", () => {
+    const car = makeCar({ id: 1, features: SAFETY.slice(0, 8) });
+
+    const analysis = buildFitAnalysis(car, priorities, prefs());
+
+    expect(analysis.priorities.map((item) => item.priority)).toEqual(priorities);
+    expect(analysis.priorities[0]?.rank).toBe(1);
+    expect(analysis.priorities[0]?.weightPercent).toBeGreaterThan(
+      analysis.priorities[1]?.weightPercent ?? 0,
+    );
+  });
+
+  it("scores the catalogue the car actually carries", () => {
+    const car = makeCar({ id: 1, features: SAFETY.slice(0, 8) });
+
+    const analysis = buildFitAnalysis(car, priorities, prefs());
+    const safety = analysis.priorities[0];
+
+    expect(safety?.covered).toBe(8);
+    expect(safety?.catalogueSize).toBe(SAFETY.length);
+  });
+
+  it("never claims a standing against cars that aren't there", () => {
+    const car = makeCar({ id: 1, features: SAFETY.slice(0, 8) });
+
+    const analysis = buildFitAnalysis(car, priorities, prefs());
+    const prose = analysis.priorities.flatMap((item) => item.sentences).join(" ");
+
+    expect(prose).not.toMatch(/alternative/i);
+    expect(prose).not.toMatch(/none of the close/i);
+    expect(prose).not.toMatch(/against/i);
+  });
+
+  it("reports the figure a priority is about even though nothing scored it", () => {
+    const car = makeCar({ id: 1, trunk: 520, features: PRACTICALITY });
+
+    const analysis = buildFitAnalysis(car, ["practicality"], prefs());
+    const boot = analysis.priorities[0]?.measurements.find(
+      (fact) => fact.label === "Boot space",
+    );
+
+    expect(boot?.value).toBe(520);
+    expect(boot?.scored).toBe(false);
+    expect(boot?.rival).toBeNull();
+  });
+
+  it("reports an electric car's range under long distance", () => {
+    const car = makeCar({
+      id: 1,
+      fuelType: "Electric",
+      range: 450,
+      consumption: 16,
+    });
+
+    const analysis = buildFitAnalysis(car, ["longDistance"], prefs());
+    const range = analysis.priorities[0]?.measurements.find(
+      (fact) => fact.label === "Electric range",
+    );
+
+    expect(range?.value).toBe(450);
+    expect(range?.scored).toBe(false);
+  });
+
+  it("splits the reader's own picks into what the car has and hasn't", () => {
+    const [first, second, third] = SAFETY as [string, string, string];
+
+    const car = makeCar({ id: 1, features: [first, second] as never });
+
+    const analysis = buildFitAnalysis(
+      car,
+      ["safetyAssistance"],
+      prefs(),
+      picks({
+        safetyAssistance: [
+          { key: first as never, importance: "high" },
+          { key: second as never, importance: "medium" },
+          { key: third as never, importance: "high" },
+        ],
+      }),
+    );
+
+    expect(analysis.picked.present.map((item) => item.key)).toEqual([
+      first,
+      second,
+    ]);
+    expect(analysis.picked.absent.map((item) => item.key)).toEqual([third]);
+    expect(analysis.picked.unknown).toHaveLength(0);
+  });
+
+  it("surfaces a missing pick as a tradeoff and never as a disqualification", () => {
+    const [first, second] = SAFETY as [string, string];
+
+    const car = makeCar({ id: 1, features: [first] as never });
+
+    const analysis = buildFitAnalysis(
+      car,
+      ["safetyAssistance"],
+      prefs(),
+      picks({
+        safetyAssistance: [
+          { key: first as never, importance: "high" },
+          { key: second as never, importance: "high" },
+        ],
+      }),
+    );
+
+    const missing = analysis.tradeoffs.find(
+      (item) => item.kind === "missingSelected",
+    );
+
+    expect(missing).toBeDefined();
+    expect(missing?.rival).toBeNull();
+    expect(missing?.sentences.join(" ")).toContain("doesn't have");
+    expect(analysis.overall.level).not.toBe("unknown");
+  });
+
+  it("names the budget as a tradeoff when the car is over it", () => {
+    const car = makeCar({ id: 1, customerMonthly: 900, features: SAFETY });
+
+    const analysis = buildFitAnalysis(
+      car,
+      ["safetyAssistance"],
+      prefs({ monthlyBudget: 400 }),
+    );
+
+    expect(
+      analysis.tradeoffs.some((item) => item.kind === "budget"),
+    ).toBe(true);
+  });
+
+  it("costs the car on the reader's own driving assumptions", () => {
+    const car = makeCar({
+      id: 1,
+      customerMonthly: 500,
+      consumption: 6,
+      features: SAFETY,
+    });
+
+    const analysis = buildFitAnalysis(
+      car,
+      ["safetyAssistance"],
+      prefs({ monthlyKm: 1000, petrolPrice: 2 }),
+    );
+
+    /* 1,000 km at 6 L/100 km and €2/L is €120 of fuel on top of the €500. */
+    expect(analysis.cost.breakdown.energy.amount).toBeCloseTo(120, 5);
+    expect(analysis.cost.breakdown.subscription.amount).toBe(500);
+    expect(analysis.costReasoning.rival).toBeNull();
+    expect(analysis.costReasoning.cheapest).toBeNull();
+  });
+
+  it("keeps what FINN charges apart from what Lens estimates", () => {
+    const car = makeCar({ id: 1, features: SAFETY });
+
+    const analysis = buildFitAnalysis(car, ["safetyAssistance"], prefs());
+
+    const subscription = analysis.cost.lines.find(
+      (line) => line.id === "subscription",
+    );
+
+    expect(subscription?.source).toBe("finn");
+    expect(
+      analysis.cost.lines.find((line) => line.id === "energy")?.source,
+    ).toBe("estimate");
+  });
+
+  it("reads unknown, not missing, when FINN supplied no equipment list", () => {
+    const car = makeCar({ id: 1, features: [] });
+
+    const analysis = buildFitAnalysis(
+      car,
+      ["safetyAssistance"],
+      prefs(),
+      picks({
+        safetyAssistance: [{ key: SAFETY[0] as never, importance: "high" }],
+      }),
+    );
+
+    expect(analysis.equipmentKnown).toBe(false);
+    expect(analysis.overall.level).toBe("unknown");
+    expect(analysis.priorities[0]?.band.level).toBe("unknown");
+    expect(analysis.picked.unknown).toHaveLength(1);
+    expect(analysis.picked.absent).toHaveLength(0);
+    expect(analysis.strengths).toEqual([]);
+  });
+
+  it("still costs a car whose equipment is unknown", () => {
+    const car = makeCar({ id: 1, customerMonthly: 450, features: [] });
+
+    const analysis = buildFitAnalysis(car, ["safetyAssistance"], prefs());
+
+    expect(analysis.cost.breakdown.subscription.amount).toBe(450);
+  });
+
+  it("gives reasons drawn from priorities the car actually serves", () => {
+    const car = makeCar({ id: 1, features: SAFETY });
+
+    const analysis = buildFitAnalysis(car, ["safetyAssistance"], prefs());
+
+    expect(analysis.strengths.length).toBeGreaterThan(0);
+    expect(analysis.strengths[0]).toMatch(/safety & driver assistance/i);
+  });
+
+  it("offers no reasons rather than consolation when nothing fits", () => {
+    const car = makeCar({ id: 1, features: ["hasSpareWheel"] });
+
+    const analysis = buildFitAnalysis(car, ["safetyAssistance"], prefs());
+
+    expect(analysis.overall.level).toBe("limited");
+    expect(analysis.strengths).toEqual([]);
+  });
+
+  it("produces the same category scores as the comparison engine does", () => {
+    /*
+     * The guarantee worth having: for the half of the score that doesn't need
+     * a population — equipment — one car alone is judged exactly as it is
+     * inside a full comparison.
+     */
+    const subject = makeCar({ id: 1, features: SAFETY.slice(0, 9) });
+    const other = makeCar({ id: 2, features: SAFETY.slice(0, 3) });
+
+    const alone = buildFitAnalysis(subject, ["safetyAssistance"], prefs());
+
+    const compared = buildRecommendation(
+      [subject, other],
+      ["safetyAssistance"],
+      prefs(),
+    );
+
+    expect(compared?.winner.id).toBe(subject.id);
+    expect(compared?.score.byCategory.safetyAssistance).toBe(
+      alone.priorities[0] &&
+        Math.round(
+          (alone.priorities[0].covered / alone.priorities[0].catalogueSize) * 100,
+        ),
+    );
+  });
+});
+
+describe("describeFit", () => {
+  it("frames the answer as fit, never as vehicle quality", () => {
+    const car = makeCar({ id: 1, features: SAFETY });
+
+    const line = describeFit(
+      buildFitAnalysis(car, ["safetyAssistance", "practicality"], prefs()),
+    );
+
+    expect(line).toMatch(/you set/);
+    expect(line).not.toMatch(/excellent|great car|best car/i);
+  });
+
+  it("says plainly when nothing is served", () => {
+    const car = makeCar({ id: 1, features: ["hasSpareWheel"] });
+
+    const line = describeFit(
+      buildFitAnalysis(car, ["safetyAssistance"], prefs()),
+    );
+
+    expect(line).toMatch(/doesn't strongly serve/);
+  });
+
+  it("says the equipment list is missing rather than judging the car", () => {
+    const car = makeCar({ id: 1, features: [] });
+
+    const line = describeFit(
+      buildFitAnalysis(car, ["safetyAssistance"], prefs()),
+    );
+
+    expect(line).toMatch(/hasn't supplied an equipment list/);
+  });
+});
