@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   describeEnvironmentalMethod,
+  ENVIRONMENTAL_METHOD,
+  ENVIRONMENTAL_METHOD_NOTES,
   environmentalImpact,
   environmentalPhrases,
 } from "./environmental";
@@ -224,5 +226,52 @@ describe("the priority as a whole", () => {
 
     expect(analysis.priorities[0]?.band.level).not.toBe("unknown");
     expect(analysis.priorities[0]?.impact).not.toBeNull();
+  });
+});
+
+describe("the method as shown before there is a car", () => {
+  it("covers the same four signals the scoring uses", () => {
+    const scored = environmentalImpact(electric())?.components.map((c) => c.id);
+
+    expect(ENVIRONMENTAL_METHOD.map((step) => step.id)).toEqual(scored);
+  });
+
+  it("quotes the ceilings the arithmetic actually applies", () => {
+    /*
+     * The explanation is built from the scoring constants so it can't drift.
+     * This checks the figures a reader is told are the figures being used: a
+     * car at the stated ceiling must score zero, and one at half of it fifty.
+     */
+    const stated = (id: string) =>
+      Number(
+        /(\d+(?:\.\d+)?)/.exec(
+          ENVIRONMENTAL_METHOD.find((step) => step.id === id)?.scale ?? "",
+        )?.[1],
+      );
+
+    const co2Ceiling = stated("emissions");
+
+    expect(
+      environmentalImpact(petrol({ co2: co2Ceiling }))?.components.find(
+        (c) => c.id === "emissions",
+      )?.score,
+    ).toBe(0);
+
+    expect(
+      environmentalImpact(petrol({ co2: co2Ceiling / 2 }))?.components.find(
+        (c) => c.id === "emissions",
+      )?.score,
+    ).toBe(50);
+  });
+
+  it("says the four count equally, which is what the score does", () => {
+    expect(ENVIRONMENTAL_METHOD_NOTES.join(" ")).toMatch(/count equally/i);
+
+    /* All four at full marks is full marks; nothing is weighted up. */
+    const perfect = environmentalImpact(
+      electric({ consumption: 0.01, co2: 0, co2Class: "A" }),
+    );
+
+    expect(perfect?.score).toBe(100);
   });
 });

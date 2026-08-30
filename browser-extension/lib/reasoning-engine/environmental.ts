@@ -320,3 +320,57 @@ export function environmentalPhrases(impact: EnvironmentalImpact): string[] {
     }
   });
 }
+
+/* -------------------------------------------------------------------------- */
+/* The method, without a car                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** One signal, described where there is no particular car to describe. */
+export interface EnvironmentalMethodStep {
+  id: EnvironmentalSignal;
+  label: string;
+  /** What it reads off the car. */
+  reads: string;
+  /** How that figure becomes a mark out of a hundred. */
+  scale: string;
+}
+
+/**
+ * How this priority works, for the places that explain it before there is a
+ * car to explain — the settings page and the compare flow's step 3.
+ *
+ * Built from the same constants the scoring uses, so the explanation cannot
+ * drift from the arithmetic: change a ceiling and this changes with it.
+ */
+export const ENVIRONMENTAL_METHOD: EnvironmentalMethodStep[] = [
+  {
+    id: "emissions",
+    label: "CO\u2082 emissions",
+    reads: "The tailpipe figure FINN publishes, in grams per kilometre.",
+    scale: `Scored against a ${CO2_CEILING_G_PER_KM} g/km ceiling: a car emitting nothing at the tailpipe scores full marks, one at ${CO2_CEILING_G_PER_KM} or above scores none.`,
+  },
+  {
+    id: "co2Class",
+    label: "CO\u2082 class",
+    reads: "The EU efficiency label, A through G.",
+    scale: "A scores full marks and G none, in even steps — the same grade you can see on FINN's own page.",
+  },
+  {
+    id: "energy",
+    label: "Energy use",
+    reads: "What the car consumes over 100 km.",
+    scale: `Against ${FUEL_CEILING_L_PER_100KM} L/100 km for a combustion car and ${ELECTRIC_CEILING_KWH_PER_100KM} kWh/100 km for an electric one. Litres and kilowatt-hours aren't the same quantity, so they can't share a scale.`,
+  },
+  {
+    id: "powertrain",
+    label: "Fuel type",
+    reads: "What the car runs on.",
+    scale: "Electric scores highest, then plug-in hybrid. Diesel and petrol score alike: where one emits less per kilometre, that is already the CO\u2082 figure above.",
+  },
+];
+
+/** What the four steps don't say on their own. */
+export const ENVIRONMENTAL_METHOD_NOTES: string[] = [
+  "The four count equally, and the result is their average. Where FINN hasn't supplied one of them, it's named and left out rather than counted as zero.",
+  "Two things no figure can say for itself: a plug-in hybrid's official CO\u2082 figure assumes you charge it, and an electric car's zero is a figure about the tailpipe rather than about the electricity you charge it with. Lens says both where they apply.",
+];

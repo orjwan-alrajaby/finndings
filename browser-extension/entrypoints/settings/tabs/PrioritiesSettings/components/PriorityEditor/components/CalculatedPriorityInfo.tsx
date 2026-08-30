@@ -1,4 +1,5 @@
 import type { PriorityDefinition } from "@/lib/reasoning-engine/types";
+import { EnvironmentalMethod } from "@/components/EnvironmentalMethod";
 
 interface CalculatedPriorityInfoProps {
     priority: PriorityDefinition;
@@ -17,10 +18,23 @@ export function CalculatedPriorityInfo({
                     calculated
                 </p>
 
-                <p className="mt-2 text-xs leading-5 text-finn-black">
-                    This priority is calculated automatically from the
-                    vehicle's emissions and efficiency data.
-                </p>
+                {priority.id === "environmental" ? (
+                    <>
+                        <p className="mt-2 mb-3 text-xs leading-5 text-finn-black">
+                            Not from equipment, like every other priority —
+                            from what the car emits and uses. Four figures,
+                            each read against a fixed scale rather than
+                            against the other cars:
+                        </p>
+
+                        <EnvironmentalMethod />
+                    </>
+                ) : (
+                    <p className="mt-2 text-xs leading-5 text-finn-black">
+                        This priority is calculated automatically from the
+                        vehicle's own data rather than from a feature list.
+                    </p>
+                )}
             </div>
 
             <div className="rounded-2xl bg-white p-4">
@@ -29,9 +43,10 @@ export function CalculatedPriorityInfo({
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    This priority has no feature list, so
-                    there is nothing here to single out for
-                    extra influence.
+                    Because it's judged on figures rather than equipment,
+                    there's no feature list here to single one out of. Where
+                    this priority sits in your order is what decides how much
+                    it counts.
                 </p>
             </div>
 
