@@ -280,10 +280,24 @@ describe("tradeoffs are filtered by what the user told us", () => {
 
 describe("a feature the user picked out is surfaced, not used to disqualify", () => {
   /*
-   * MG 3 leads on emissions and so wins for an environment-led reader, while
-   * lacking two of the safety features that reader picked out.
+   * An electric car runs away with the environment priority — nothing burning
+   * fuel comes close on an absolute emissions scale — and so wins for an
+   * environment-led reader while lacking two of the safety features that
+   * reader picked out.
    */
-  const narrative = adviceFor(["environmental", "safetyAssistance"], cars, {
+  const cleanButBasic = makeCar({
+    id: 4,
+    name: "BYD Dolphin",
+    fuelType: "Electric",
+    range: 400,
+    consumption: 15.1,
+    customerMonthly: 289,
+    co2: 0,
+    co2Class: "A",
+    features: ["hasEmergencyBrakingAssist", "hasIsofix", "hasAirConditioning"],
+  });
+
+  const narrative = adviceFor(["environmental", "safetyAssistance"], [...cars, cleanButBasic], {
     safetyAssistance: [
       { key: "hasEmergencyBrakingAssist", importance: "high" },
       { key: "hasBlindSpotAssist", importance: "high" },
@@ -399,10 +413,21 @@ describe("the language matches the size of the difference", () => {
   });
 
   it("says so plainly when the data genuinely can't answer the question", () => {
-    /* No CO₂ figures at all, and no feature catalogue to fall back on. */
+    /*
+     * Nothing to judge emissions on: no CO₂ figure, no class, no consumption
+     * and a powertrain we don't recognise. Note that a figure of zero is not
+     * this case — that is an electric car, and it is scored.
+     */
+    const dataless = {
+      co2: Number.NaN,
+      co2Class: "",
+      consumption: null,
+      fuelType: "Unknown" as never,
+    };
+
     const blank = [
-      makeCar({ id: 60, name: "Alpha One", co2: 0 }),
-      makeCar({ id: 61, name: "Beta Two", co2: 0 }),
+      makeCar({ id: 60, name: "Alpha One", ...dataless }),
+      makeCar({ id: 61, name: "Beta Two", ...dataless }),
     ];
 
     const narrative = adviceFor(["environmental", "safetyAssistance"], blank);

@@ -6,6 +6,7 @@ import type {
   LensPreferences,
   PriorityBreakdown,
 } from "./types";
+import type { EnvironmentalImpact } from "./environmental";
 import type {
   CostReasoning,
   FeatureFact,
@@ -181,6 +182,14 @@ export interface FitPriority {
   measurements: MeasurementFact[];
   traits: TraitFact[];
 
+  /**
+   * The working, where a priority is scored on figures rather than on
+   * equipment. Only environmental impact has one, and it is the only priority
+   * whose result a reader can't check against a list of features — so the
+   * panel shows what went into it.
+   */
+  impact: EnvironmentalImpact | null;
+
   /** The engine's explanation, already written. */
   sentences: string[];
 
@@ -324,7 +333,8 @@ function toFitPriority(
      */
     band: classifyFit(
       breakdown.score,
-      equipmentKnown && breakdown.hasEvidence,
+      breakdown.hasEvidence &&
+        (equipmentKnown || breakdown.environmental != null),
     ),
 
     covered: breakdown.matched.length,
@@ -339,16 +349,19 @@ function toFitPriority(
 
     measurements: reasoning.measurements,
     traits: reasoning.traits,
+    impact: breakdown.environmental,
 
     /*
      * The engine's own sentences, except where they rest on equipment we
-     * don't have. The measurements below them are still true.
+     * don't have. A priority scored on figures keeps them either way — an
+     * emissions result doesn't depend on the equipment list at all.
      */
-    sentences: equipmentKnown ? reasoning.sentences : [],
+    sentences:
+      equipmentKnown || breakdown.environmental ? reasoning.sentences : [],
 
     hasEvidence: equipmentKnown
       ? breakdown.hasEvidence
-      : reasoning.measurements.length > 0,
+      : breakdown.environmental != null || reasoning.measurements.length > 0,
   };
 }
 

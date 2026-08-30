@@ -282,6 +282,7 @@ function priorityBreakdown(
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
+    environmental: detail.environmental ?? null,
     hasEvidence: detail.hasEvidence,
     leader,
     isLeader: leader ? leader.score <= score : true,

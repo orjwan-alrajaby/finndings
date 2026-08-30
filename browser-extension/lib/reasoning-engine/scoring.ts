@@ -23,6 +23,10 @@ import {
 } from "./constants";
 
 import { formatNumber } from "./format";
+import {
+  environmentalImpact,
+  type EnvironmentalImpact,
+} from "./environmental";
 
 /* -------------------------------------------------------------------------- */
 /* Runtime category registry                                                  */
@@ -122,7 +126,10 @@ function relativeScore(
 
 interface NumericResult {
   score: number;
-  evidence: NumericEvidence;
+  /** Null where the score rests on several figures rather than one. */
+  evidence: NumericEvidence | null;
+  /** The full working, where a category has more than one figure behind it. */
+  impact?: EnvironmentalImpact;
 }
 
 function evidence(
@@ -210,18 +217,26 @@ function numericScore(
       };
     }
 
+    /*
+     * The one category not scored by comparison. See `environmentalImpact`:
+     * emissions have absolute reference points where boot space doesn't, and
+     * scoring them relatively made a single car unanswerable and an electric
+     * one unreadable.
+     */
     case "environmental": {
-      const values = vehicles
-        .map((item) => Number(item.co2.value))
-        .filter((value) => Number.isFinite(value) && value > 0);
+      const impact = environmentalImpact(vehicle);
 
-      const co2 = Number(vehicle.co2.value);
+      if (!impact) return null;
 
-      if (!Number.isFinite(co2) || values.length < 2) return null;
+      const co2 = Number(vehicle.co2?.value);
 
       return {
-        score: relativeScore(co2, values, true),
-        evidence: evidence("CO₂ emissions", co2, "g/km", true),
+        score: impact.score,
+        /* The headline figure, for prose that wants to quote one number. */
+        evidence: Number.isFinite(co2)
+          ? evidence("CO₂ emissions", co2, "g/km", true)
+          : null,
+        impact,
       };
     }
 
@@ -352,6 +367,7 @@ export function categoryDetail(
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,
+    environmental: numeric?.impact ?? null,
     hasEvidence: featureScore != null || numeric != null,
   };
 }

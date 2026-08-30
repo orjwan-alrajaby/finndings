@@ -23,6 +23,8 @@ export interface CarOverrides {
   trunk?: number | string;
   seats?: string;
   co2?: number;
+  /** The EU efficiency class. Empty means FINN supplied none. */
+  co2Class?: string;
   range?: number | null;
   features?: FeatureId[];
 }
@@ -39,6 +41,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     trunk = 400,
     seats = "5",
     co2 = 120,
+    co2Class = "C",
     range = null,
     features = [],
   } = overrides;
@@ -90,7 +93,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
       unit: fuelType === "Electric" ? "kWh/100Km" : "L/100Km",
     },
 
-    co2: { value: co2, class: "C", unit: "g/km" },
+    co2: { value: co2, class: co2Class, unit: "g/km" },
 
     electric:
       fuelType === "Electric"

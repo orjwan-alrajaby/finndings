@@ -6,6 +6,7 @@ import type {
 } from "@/lib/reasoning-engine/fit";
 import type { CostLine } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
+import type { EnvironmentalImpact } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
 import { describeFit } from "@/lib/reasoning-engine/fit";
@@ -323,7 +324,9 @@ function priorityRow(priority: FitPriority): HTMLElement {
         )
       : null,
 
-    priority.measurements.length
+    priority.impact ? impactBreakdown(priority.impact) : null,
+
+    priority.measurements.length && !priority.impact
       ? el(
           "dl",
           { class: "mt-3 flex flex-wrap gap-x-4 gap-y-1" },
@@ -402,8 +405,82 @@ function priorityRow(priority: FitPriority): HTMLElement {
   return el("li", { class: "rounded-xl" }, [button, body]);
 }
 
+/**
+ * The four figures behind an emissions result, and what each one did to it.
+ *
+ * Every other priority can be checked against a list of features the car has
+ * or hasn't. This one is arithmetic on figures, so the arithmetic is shown:
+ * the reader sees the number FINN supplied, the scale it was read against, and
+ * the mark it earned. A result nobody can audit is an opinion.
+ */
+function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
+  return el("div", { class: "mt-3 rounded-xl bg-finn-snow p-3" }, [
+    el("p", {
+      class: "text-[11px] font-black uppercase tracking-[0.1em] text-finn-iron",
+      text: "How this is judged",
+    }),
+
+    el(
+      "ul",
+      { class: "mt-2 flex flex-col gap-2" },
+      impact.components.map((component) =>
+        el("li", {}, [
+          el("div", { class: "flex items-baseline justify-between gap-3" }, [
+            el("span", {
+              class: "text-[12px] font-bold text-finn-black",
+              text: component.label,
+            }),
+            el("span", { class: "flex shrink-0 items-baseline gap-2" }, [
+              el("span", {
+                class: "text-[12px] font-bold tabular-nums text-finn-black",
+                text: component.display,
+              }),
+              el("span", {
+                class: "text-[10px] tabular-nums text-finn-iron",
+                text: `${component.score}/100`,
+              }),
+            ]),
+          ]),
+
+          el("p", {
+            class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+            text: component.basis,
+          }),
+        ]),
+      ),
+    ),
+
+    el("p", {
+      class: "mt-2.5 border-t border-finn-cotton pt-2 text-[11px] leading-4 text-finn-iron",
+      text:
+        impact.components.length === 1
+          ? "That is the only one of the four FINN supplied, so it is the score."
+          : `The four count equally: this car averages ${impact.score} of 100.`,
+    }),
+
+    impact.missing.length
+      ? el("p", {
+          class: "mt-1 text-[11px] leading-4 text-finn-iron",
+          text: `FINN didn't supply ${impact.missing.join(" or ")}, so those are left out rather than counted as zero.`,
+        })
+      : null,
+
+    /*
+     * The caveat is deliberately not repeated here — the prose above this box
+     * already carries it, and saying it twice on one screen reads as the
+     * panel not trusting the reader to have read it once.
+     */
+  ]);
+}
+
 /** The count behind the band, which is the part a reader can check. */
 function coverageLine(priority: FitPriority): string {
+  if (priority.impact) {
+    const counted = priority.impact.components.length;
+
+    return `Judged on ${counted} emissions figure${counted === 1 ? "" : "s"}, not on equipment`;
+  }
+
   if (priority.band.level === "unknown") return "Equipment not listed by FINN";
 
   const picks = priority.picked.length;

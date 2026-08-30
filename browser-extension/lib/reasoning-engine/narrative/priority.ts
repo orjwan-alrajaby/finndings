@@ -26,6 +26,11 @@ import {
 } from "./magnitude";
 
 import {
+  describeEnvironmentalMethod,
+  environmentalPhrases,
+} from "../environmental";
+
+import {
   coverage,
   inSentence,
   joinCapped,
@@ -278,6 +283,32 @@ const article = (word: string): string =>
   /^[aeiou]/i.test(word) ? "an" : "a";
 
 /* -------------------------------------------------------------------------- */
+/* Emissions                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The one priority judged on figures rather than on equipment, explained.
+ *
+ * Everywhere else the reader can check a result against a list of features the
+ * car does or doesn't have. Here there is no list, so the working has to be
+ * shown instead: the figures that were read, and then how they were judged.
+ * Without that, "Partial match" on emissions is a number the reader has no way
+ * to argue with.
+ */
+function describeEmissions(breakdown: PriorityBreakdown): string[] {
+  const impact = breakdown.environmental;
+
+  if (!impact) return [];
+
+  const phrases = environmentalPhrases(impact);
+
+  return paragraph(
+    phrases.length ? sentence(`It ${joinList(phrases)}`) : null,
+    ...describeEnvironmentalMethod(impact),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Standing                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -446,11 +477,23 @@ export function reasonAboutPriority(
             breakdown.label,
             features.selectedCount > 0,
           ),
-          describeScoredMeasurement(
-            measurements.find((fact) => fact.scored) ?? null,
-          ),
-          describeSupportingMeasurements(measurements),
-          describeDrivetrain(traits),
+
+          /*
+           * Emissions replace the generic measurement lines rather than
+           * joining them: all four of its figures are named below, and the
+           * drivetrain sentence would say a third time what the fuel type
+           * already says.
+           */
+          ...(breakdown.environmental
+            ? describeEmissions(breakdown)
+            : paragraph(
+                describeScoredMeasurement(
+                  measurements.find((fact) => fact.scored) ?? null,
+                ),
+                describeSupportingMeasurements(measurements),
+                describeDrivetrain(traits),
+              )),
+
           describeStanding(
             standing,
             breakdown,
