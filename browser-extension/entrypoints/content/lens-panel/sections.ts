@@ -5,10 +5,11 @@ import type {
   FitPriority,
 } from "@/lib/reasoning-engine/fit";
 import type { CostLine } from "@/lib/reasoning-engine/types";
+import type { FinnCar } from "@/lib/types";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
 import { describeFit } from "@/lib/reasoning-engine/fit";
-import { formatEUR, formatKm } from "@/lib/reasoning-engine";
+import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
 import { el, fragment } from "./dom";
 
@@ -105,28 +106,146 @@ function prose(text: string, tone = "text-finn-black"): HTMLElement {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Configurations                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What distinguishes one configuration of a model from another.
+ *
+ * FINN sells a Dolphin Surf as a Boost with 88 PS and as a Comfort with 156
+ * PS, and the whole analysis changes between them. The same two lines are used
+ * to label a configuration in the chooser and to head the analysis of one, so
+ * that a reader who picks the second row and then reads two screens of prose
+ * never has to wonder which car it is about.
+ */
+export function configurationName(car: FinnCar): string {
+  const named = [car.trim, car.equipmentLine].filter(Boolean).join(" ");
+
+  return named || car.engine || `Configuration ${car.id}`;
+}
+
+/** The figures a reader tells configurations apart by. */
+export function configurationDetail(car: FinnCar): string {
+  const range =
+    car.electric?.range != null && car.electric.range !== "Unknown"
+      ? `${formatNumber(Number(car.electric.range))} km range`
+      : null;
+
+  const price = car.pricing?.customerMonthly?.price;
+
+  return [
+    car.power?.inHp ? `${car.power.inHp} PS` : null,
+    car.fuelType,
+    range,
+    price ? `from ${formatEUR(price)}/mo` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * The configurations this model comes in, as a choice.
+ *
+ * Shown whenever there is more than one, selected or not. When the URL already
+ * names one this is how the reader flips to a sibling without leaving the
+ * panel; when it doesn't, this is the question the panel opens with. Each row
+ * carries its own band, so the choice is informed before it is made — which is
+ * the one thing FINN's own configuration grid can't tell them.
+ */
+export function configurationsSection({
+  cars,
+  bandOf,
+  selectedId,
+  onSelect,
+}: {
+  cars: FinnCar[];
+  bandOf: (id: number) => { level: FitLevel; label: string } | null;
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}): HTMLElement | null {
+  if (cars.length < 2) return null;
+
+  const rows = cars.map((car) => {
+    const selected = car.id === selectedId;
+    const band = bandOf(car.id);
+
+    return el(
+      "button",
+      {
+        class: [
+          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+          "transition-colors",
+          selected
+            ? "bg-finn-pale-blue ring-1 ring-finn-accent-blue"
+            : "bg-finn-snow hover:bg-finn-cotton",
+        ].join(" "),
+        attrs: {
+          type: "button",
+          ...(selected ? { "aria-current": "true" } : {}),
+        },
+        on: { click: () => onSelect(car.id) },
+      },
+      [
+        el("span", { class: "min-w-0 flex-1" }, [
+          el("span", {
+            class: "block truncate text-[13px] font-bold text-finn-black",
+            text: configurationName(car),
+          }),
+          el("span", {
+            class: "block truncate text-[11px] leading-4 text-finn-iron",
+            text: configurationDetail(car),
+          }),
+        ]),
+
+        band ? bandChip(band.level, band.label) : null,
+      ],
+    );
+  });
+
+  const list = el("div", { class: "flex flex-col gap-1.5" }, rows);
+
+  /*
+   * Before a choice is made the panel's opening lines have already asked the
+   * question, so the list is just the list. Afterwards it needs a name and a
+   * reason to still be there.
+   */
+  if (selectedId == null) {
+    return el("div", { class: "px-5 pb-4 pt-2" }, [list]);
+  }
+
+  return section(
+    "Configuration",
+    prose("Switch to compare how each one fits you.", "mt-2 text-finn-iron"),
+    el("div", { class: "mt-2.5" }, [list]),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* 1. Overall fit                                                             */
 /* -------------------------------------------------------------------------- */
 
 export function fitHeader(analysis: FitAnalysis): HTMLElement {
   const { vehicle } = analysis;
 
-  const subtitle = [vehicle.trim, vehicle.equipmentLine, vehicle.engine]
-    .filter(Boolean)
-    .join(" · ");
-
-  return el("header", { class: "px-5 pb-4 pt-1" }, [
+  return el("header", { class: "px-5 pb-4 pt-4" }, [
     el("p", {
       class: "text-lg font-black leading-6 text-finn-black",
       text: vehicle.name,
     }),
 
-    subtitle
-      ? el("p", {
-          class: "mt-0.5 text-xs leading-4 text-finn-iron",
-          text: subtitle,
-        })
-      : null,
+    /*
+     * The configuration, said in the same words the chooser used. Everything
+     * below this line is about this one car and no other.
+     */
+    el("p", {
+      class: "mt-0.5 text-[13px] font-bold leading-5 text-finn-accent-blue",
+      text: configurationName(vehicle),
+    }),
+
+    el("p", {
+      class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+      text: configurationDetail(vehicle),
+    }),
 
     el("div", { class: "mt-3 flex items-center gap-2" }, [
       bandChip(analysis.overall.level, analysis.overall.label),
@@ -551,9 +670,21 @@ export function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
 /* Assembly                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export function analysisBody(analysis: FitAnalysis): DocumentFragment {
+/**
+ * The whole analysis of one configuration.
+ *
+ * `configurations` is slotted directly under the header rather than at the
+ * end: on a model page it is the control that decides what everything below
+ * it is about, and a switcher a reader has to scroll past six sections to
+ * find is a switcher they won't know is there.
+ */
+export function analysisBody(
+  analysis: FitAnalysis,
+  configurations: Node | null = null,
+): DocumentFragment {
   return fragment([
     fitHeader(analysis),
+    configurations,
     strengthsSection(analysis),
     prioritiesSection(analysis),
     featuresSection(analysis),

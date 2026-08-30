@@ -5,12 +5,8 @@ import {
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, panelStyles } from "./dom";
-import { analysisBody } from "./sections";
-import {
-  CONFIGURATIONS_SELECTOR,
-  detailsPageRoot,
-  resolveCurrentCar,
-} from "./currentCar";
+import { analysisBody, configurationsSection } from "./sections";
+import { detailsPageRoot, resolvePageCars } from "./currentCar";
 
 /**
  * The panel itself: a drawer over finn.com, and the states it can be in.
@@ -93,15 +89,6 @@ const openSettings = () => {
   void browser.runtime.sendMessage({ type: "OPEN_SETTINGS_PAGE" });
 };
 
-/** Gets out of the way and puts FINN's own configuration list on screen. */
-const showConfigurations = () => {
-  const grid = document.querySelector(CONFIGURATIONS_SELECTOR);
-
-  closePanel();
-
-  grid?.scrollIntoView({ behavior: "smooth", block: "center" });
-};
-
 /* -------------------------------------------------------------------------- */
 /* Content                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -115,7 +102,22 @@ const showConfigurations = () => {
  * that deserve two different sentences — we can't tell which car this is, and
  * we know which car this is but couldn't load it.
  */
-async function render(into: HTMLElement, retry: () => void): Promise<void> {
+/**
+ * What the reader has chosen inside the panel, kept across re-renders.
+ *
+ * A re-render is not a fresh start — settings changing in the options tab
+ * redraws the analysis, and redrawing it for a different car than the one the
+ * reader was reading would be its own small betrayal.
+ */
+interface Session {
+  chosenId: number | null;
+}
+
+async function render(
+  into: HTMLElement,
+  retry: () => void,
+  session: Session,
+): Promise<void> {
   empty(into);
   into.append(loadingState());
 
@@ -165,32 +167,14 @@ async function render(into: HTMLElement, retry: () => void): Promise<void> {
     return;
   }
 
-  const current = await resolveCurrentCar(root);
+  const page = await resolvePageCars(root);
 
-  /*
-   * A model page with nothing selected isn't showing a car — it is asking the
-   * reader to pick one, and the panel says the same thing rather than
-   * analysing whichever configuration happens to be drawn first.
-   */
-  if (current.status === "chooseConfiguration") {
-    empty(into);
-    into.append(
-      message(
-        "Pick a configuration first",
-        `FINN has this model in ${current.count} configurations, and they differ in exactly the things Lens weighs — equipment, range, price. Choose one and Lens can tell you how that car fits you.`,
-        { label: "Show me the configurations", onClick: showConfigurations },
-      ),
-    );
-
-    return;
-  }
-
-  if (current.status === "unidentified") {
+  if (page.status === "unidentified") {
     empty(into);
     into.append(
       message(
         "We can't tell which car this is",
-        "Nothing on this page says which configuration it's showing. Open a car from FINN's list and Lens will pick it up — analysing the wrong trim would be worse than not analysing one.",
+        "Nothing on this page says which car it's showing. Open one from FINN's list and Lens will pick it up — analysing the wrong car would be worse than not analysing one.",
         { label: "Try again", onClick: retry },
       ),
     );
@@ -198,10 +182,10 @@ async function render(into: HTMLElement, retry: () => void): Promise<void> {
     return;
   }
 
-  if (current.status === "unavailable") {
+  if (page.status === "unavailable") {
     empty(into);
     into.append(
-      message("We couldn't load this car", current.reason, {
+      message("We couldn't load this car", page.reason, {
         label: "Try again",
         onClick: retry,
       }),
@@ -212,16 +196,80 @@ async function render(into: HTMLElement, retry: () => void): Promise<void> {
 
   const settings = await loadLensSettings();
 
-  const analysis: FitAnalysis = buildFitAnalysis(
-    current.car,
-    settings.priorities,
-    settings.preferences,
-    settings.categoryFeatures,
+  /*
+   * Every configuration is analysed, not only the one on screen. They are
+   * already loaded, each analysis is arithmetic over one car, and having them
+   * all is what lets the chooser show what each one would mean for this reader
+   * before they commit to reading about it.
+   */
+  const analyses = new Map<number, FitAnalysis>(
+    page.cars.map((car) => [
+      car.id,
+      buildFitAnalysis(
+        car,
+        settings.priorities,
+        settings.preferences,
+        settings.categoryFeatures,
+      ),
+    ]),
   );
 
-  empty(into);
-  into.append(analysisBody(analysis));
-  into.scrollTop = 0;
+  const [first] = page.cars;
+
+  /*
+   * With one configuration there is nothing to choose, so it is the subject.
+   * With several, the URL decides — and where it says nothing, so does the
+   * panel, until the reader picks.
+   */
+  const chosen =
+    session.chosenId != null &&
+    page.cars.some((car) => car.id === session.chosenId)
+      ? session.chosenId
+      : null;
+
+  let subjectId: number | null =
+    chosen ?? page.selectedId ?? (page.cars.length === 1 && first ? first.id : null);
+
+  const paint = () => {
+    const chooser = configurationsSection({
+      cars: page.cars,
+      bandOf: (id) => analyses.get(id)?.overall ?? null,
+      selectedId: subjectId,
+      onSelect: (id) => {
+        subjectId = id;
+        session.chosenId = id;
+        paint();
+      },
+    });
+
+    const analysis = subjectId == null ? null : analyses.get(subjectId);
+
+    empty(into);
+
+    into.append(
+      analysis
+        ? analysisBody(analysis, chooser)
+        : fragment([chooseLead(page.cars.length), chooser]),
+    );
+
+    into.scrollTop = 0;
+  };
+
+  paint();
+}
+
+/** What the panel opens with when the reader hasn't chosen a car yet. */
+function chooseLead(count: number): HTMLElement {
+  return el("div", { class: "px-5 pb-1 pt-4" }, [
+    el("p", {
+      class: "text-base font-black leading-6 text-finn-black",
+      text: "Which one are you looking at?",
+    }),
+    el("p", {
+      class: "mt-1.5 text-[13px] leading-5 text-finn-iron",
+      text: `This page is showing a model, not a car — FINN sells it in ${count} configurations, and they don't fit you equally. Pick one and Lens will explain it.`,
+    }),
+  ]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -356,7 +404,9 @@ async function build(): Promise<Panel> {
 
   window.addEventListener("keydown", onKeyDown, true);
 
-  const retry = () => void render(scroller, retry);
+  const session: Session = { chosenId: null };
+
+  const retry = () => void render(scroller, retry, session);
 
   /*
    * Settings changed in the options tab reach an open panel, which is what
@@ -378,7 +428,7 @@ async function build(): Promise<Panel> {
     host.remove();
   };
 
-  void render(scroller, retry);
+  void render(scroller, retry, session);
 
   document.body.append(host);
   closeButton.focus();

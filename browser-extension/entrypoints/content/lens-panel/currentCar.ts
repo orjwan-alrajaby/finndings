@@ -21,10 +21,24 @@ import { buildCarUrl } from "../injectors/inject-pin-button/injectPinCarButtonIn
  * reliable signal to the least, and it returns `null` rather than a guess.
  */
 
-export type CurrentCar =
-  | { status: "ready"; car: PinnedFinnCar; configId: number; isPinned: boolean }
-  /** A model page where the reader hasn't chosen a configuration yet. */
-  | { status: "chooseConfiguration"; count: number }
+/**
+ * Every configuration this page offers, and which of them is on screen.
+ *
+ * The page is read as a set rather than as one car because that is what it is:
+ * a model page lists the configurations FINN sells the model in, and
+ * `selected_config` picks one out. Loading them all costs nothing extra — the
+ * one API call that answers "what is config 34889?" answers it for every
+ * sibling too — and it is what lets the panel offer the choice instead of
+ * refusing to answer until the reader makes it somewhere else.
+ */
+export type PageCars =
+  | {
+      status: "ready";
+      /** In the order FINN lists them. */
+      cars: PinnedFinnCar[];
+      /** The one named by the URL, when it names one. */
+      selectedId: number | null;
+    }
   | { status: "unidentified" }
   | { status: "unavailable"; reason: string };
 
@@ -93,78 +107,78 @@ export function detailsPageRoot(): HTMLElement | null {
 }
 
 /**
- * The car on screen, ready for the reasoning engine.
+ * Every configuration on this page, ready for the reasoning engine.
  *
  * Storage is consulted before the network in both directions — the pinned
- * record first, because it is the same car with a real pinned date on it, then
- * the cache the interceptor fills as the reader browses. Most opens of this
- * panel therefore cost nothing: FINN has already fetched the car and we
- * already kept it. Only a cold cache reaches the API, through the same helper
- * the pin button uses.
+ * record first, because that is the same car with a real pinned date on it,
+ * then the cache the interceptor fills as the reader browses. Most opens of
+ * this panel therefore cost nothing: FINN has already fetched these cars and
+ * we already kept them. Only a gap in the cache reaches the API, through the
+ * same helper the pin button uses, and that one call returns every
+ * configuration of the model at once.
  */
-export async function resolveCurrentCar(
+export async function resolvePageCars(
   root: HTMLElement,
-): Promise<CurrentCar> {
-  const configId = resolveCurrentConfigId(root);
+): Promise<PageCars> {
+  const selectedId = resolveCurrentConfigId(root);
+  const listed = configurationCards(root);
 
-  if (configId == null) {
-    const count = configurationCards(root).length;
+  /*
+   * The URL wins on order as well as on selection: a configuration it names
+   * that FINN hasn't listed on the page is still the car the reader opened.
+   */
+  const wanted = [...new Set(selectedId != null ? [selectedId, ...listed] : listed)];
 
-    return count > 1
-      ? { status: "chooseConfiguration", count }
-      : { status: "unidentified" };
-  }
+  if (!wanted.length) return { status: "unidentified" };
 
   try {
-    const pinned = (await getPinnedCars())[configId];
+    const pinned = await getPinnedCars();
+    let loaded = await getLoadedCars();
 
-    if (pinned) {
-      return { status: "ready", car: pinned, configId, isPinned: true };
+    const missing = wanted.filter((id) => !pinned[id] && !loaded[id]);
+
+    if (missing.length) {
+      const response = await loadCarsFromFinnApi({
+        isHomePage: false,
+        isListingsPage: false,
+        isDetailsPage: root,
+        anchorElementIsAListItem: false,
+        /* The branch that asks FINN for every configuration of this model. */
+        anchorElementIsAConfigCardItem: true,
+        anchorElement: root,
+        carConfigId: missing[0] as number,
+      });
+
+      const mapped = mapFinnConfigToAll(response.results);
+
+      await mergeLoadedCars(mapped);
+
+      loaded = { ...loaded, ...mapped };
     }
 
-    const cached = (await getLoadedCars())[configId];
+    const cars = wanted
+      .map((id) => pinned[id] ?? (loaded[id] ? asEvaluatable(loaded[id]) : null))
+      .filter((car): car is PinnedFinnCar => car != null);
 
-    if (cached) {
-      return {
-        status: "ready",
-        car: asEvaluatable(cached),
-        configId,
-        isPinned: false,
-      };
-    }
-
-    const response = await loadCarsFromFinnApi({
-      isHomePage: false,
-      isListingsPage: false,
-      isDetailsPage: root,
-      anchorElementIsAListItem: false,
-      /* The branch that asks FINN for every configuration of this model. */
-      anchorElementIsAConfigCardItem: true,
-      anchorElement: root,
-      carConfigId: configId,
-    });
-
-    const mapped = mapFinnConfigToAll(response.results);
-
-    await mergeLoadedCars(mapped);
-
-    const car = mapped[configId];
-
-    if (!car) {
+    if (!cars.length) {
       return {
         status: "unavailable",
-        reason: "FINN's data for this car didn't come back with the configuration on screen.",
+        reason:
+          "FINN's data came back without the configurations this page is showing.",
       };
     }
 
     return {
       status: "ready",
-      car: asEvaluatable(car),
-      configId,
-      isPinned: false,
+      cars,
+      /* Only claim a selection we actually have a car for. */
+      selectedId:
+        selectedId != null && cars.some((car) => car.id === selectedId)
+          ? selectedId
+          : null,
     };
   } catch (error) {
-    console.error("[FinnLens] couldn't load the car on screen", error);
+    console.error("[FinnLens] couldn't load this model's configurations", error);
 
     return {
       status: "unavailable",
