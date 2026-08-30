@@ -7,6 +7,10 @@ import type {
 import type { CostLine } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
 import type { EnvironmentalImpact } from "@/lib/reasoning-engine/environmental";
+import {
+  ENVIRONMENTAL_METHOD,
+  ENVIRONMENTAL_METHOD_NOTES,
+} from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
 import { describeFit } from "@/lib/reasoning-engine/fit";
@@ -461,25 +465,36 @@ function prioritySection(priority: FitPriority): HTMLElement {
 }
 
 /**
- * The four figures behind an emissions result, and what each one did to it.
+ * The four figures behind an emissions result, and why there are four.
  *
  * Every other priority can be checked against a list of features the car has
- * or hasn't. This one is arithmetic on figures, so the arithmetic is shown:
- * the reader sees the number FINN supplied, the scale it was read against, and
- * the mark it earned. A result nobody can audit is an opinion.
+ * or hasn't. This one is figures, so what has to be shown is not the sum but
+ * the reasoning: what each figure is, what it earned, and what it can't see
+ * on its own. A reader who knows that the tailpipe number reads zero for every
+ * electric car understands immediately why energy use is in the set — and that
+ * is worth more than watching the average being taken.
  */
 function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
+  const methodFor = (id: string) =>
+    ENVIRONMENTAL_METHOD.find((step) => step.id === id);
+
   return el("div", { class: "mt-3 rounded-xl bg-finn-snow p-3" }, [
     el("p", {
       class: "text-[11px] font-black uppercase tracking-[0.1em] text-finn-iron",
       text: "How this is judged",
     }),
 
+    /*
+     * No lead sentence here: the prose immediately above already says why
+     * there are four, and this box's job is the four themselves.
+     */
     el(
       "ul",
-      { class: "mt-2 flex flex-col gap-2" },
-      impact.components.map((component) =>
-        el("li", {}, [
+      { class: "mt-2 flex flex-col gap-2.5" },
+      impact.components.map((component) => {
+        const method = methodFor(component.id);
+
+        return el("li", {}, [
           el("div", { class: "flex items-baseline justify-between gap-3" }, [
             el("span", {
               class: "text-[12px] font-bold text-finn-black",
@@ -497,43 +512,35 @@ function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
             ]),
           ]),
 
-          /*
-           * The arithmetic, with this car's own numbers in it. Being told
-           * the rule and being able to check it were applied are different
-           * things, and only the second is an explanation.
-           */
-          el("p", {
-            class: "mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy",
-            text: component.working,
-          }),
+          method
+            ? el("p", {
+                class: "mt-0.5 text-[11px] leading-4 text-finn-black",
+                text: method.matters,
+              })
+            : null,
 
-          el("p", {
-            class: "mt-1 text-[11px] leading-4 text-finn-iron",
-            text: component.basis,
-          }),
-        ]),
-      ),
+          method
+            ? el("p", {
+                class: "mt-1 border-l-2 border-finn-cotton pl-2 text-[11px] leading-4 text-finn-iron",
+                text: method.relates,
+              })
+            : null,
+        ]);
+      }),
     ),
 
-    el("div", { class: "mt-2.5 border-t border-finn-cotton pt-2" }, [
-      el("p", {
-        class: "text-[11px] leading-4 text-finn-iron",
-        text:
-          impact.components.length === 1
-            ? "That is the only one of the four FINN supplied, so it is the score."
-            : "Added up and divided by however many FINN supplied:",
-      }),
-
-      el("p", {
-        class: "mt-1 font-mono text-[11px] font-bold leading-4 tabular-nums text-finn-black",
-        text: impact.working,
-      }),
-    ]),
+    el("p", {
+      class: "mt-2.5 border-t border-finn-cotton pt-2 text-[11px] leading-4 text-finn-iron",
+      text:
+        impact.components.length === 1
+          ? "That is the only one of the four FINN supplied, so it is the result on its own."
+          : (ENVIRONMENTAL_METHOD_NOTES[0] as string),
+    }),
 
     impact.missing.length
       ? el("p", {
           class: "mt-1 text-[11px] leading-4 text-finn-iron",
-          text: `FINN didn't supply ${impact.missing.join(" or ")}, so those are left out rather than counted as zero.`,
+          text: `FINN didn't supply ${impact.missing.join(" or ")} for this car.`,
         })
       : null,
 

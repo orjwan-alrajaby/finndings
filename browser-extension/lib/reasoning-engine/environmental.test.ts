@@ -162,16 +162,13 @@ describe("environmentalImpact", () => {
 });
 
 describe("the explanation", () => {
-  it("names the four figures and says they count equally", () => {
+  it("says why there are four figures rather than one", () => {
     const lines = describeEnvironmentalMethod(
       environmentalImpact(electric()) as never,
     ).join(" ");
 
     expect(lines).toMatch(/count equally/i);
-    expect(lines).toMatch(/co₂ emissions/i);
-    expect(lines).toMatch(/co₂ class/i);
-    expect(lines).toMatch(/energy use/i);
-    expect(lines).toMatch(/fuel type/i);
+    expect(lines).toMatch(/blind to something the others catch/i);
   });
 
   it("says which figures were missing when some were", () => {
@@ -236,32 +233,22 @@ describe("the method as shown before there is a car", () => {
     expect(ENVIRONMENTAL_METHOD.map((step) => step.id)).toEqual(scored);
   });
 
-  it("quotes the ceilings the arithmetic actually applies", () => {
+  it("says, for each signal, what it can't see on its own", () => {
     /*
-     * The explanation is built from the scoring constants so it can't drift.
-     * This checks the figures a reader is told are the figures being used: a
-     * car at the stated ceiling must score zero, and one at half of it fifty.
+     * The set only makes sense if each figure's blind spot is named. Without
+     * that the four read as four attempts at the same measurement.
      */
-    const stated = (id: string) =>
-      Number(
-        /(\d+(?:\.\d+)?)/.exec(
-          ENVIRONMENTAL_METHOD.find((step) => step.id === id)?.scale ?? "",
-        )?.[1],
-      );
+    for (const step of ENVIRONMENTAL_METHOD) {
+      expect(step.matters.length).toBeGreaterThan(20);
+      expect(step.relates.length).toBeGreaterThan(20);
+    }
 
-    const co2Ceiling = stated("emissions");
+    const emissions = ENVIRONMENTAL_METHOD.find((s) => s.id === "emissions");
+    const energy = ENVIRONMENTAL_METHOD.find((s) => s.id === "energy");
 
-    expect(
-      environmentalImpact(petrol({ co2: co2Ceiling }))?.components.find(
-        (c) => c.id === "emissions",
-      )?.score,
-    ).toBe(0);
-
-    expect(
-      environmentalImpact(petrol({ co2: co2Ceiling / 2 }))?.components.find(
-        (c) => c.id === "emissions",
-      )?.score,
-    ).toBe(50);
+    /* The tailpipe figure's blind spot, and the signal that covers it. */
+    expect(emissions?.relates).toMatch(/electric/i);
+    expect(energy?.matters).toMatch(/electric/i);
   });
 
   it("says the four count equally, which is what the score does", () => {

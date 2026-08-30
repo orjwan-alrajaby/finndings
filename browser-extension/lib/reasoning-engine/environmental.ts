@@ -1,7 +1,6 @@
 import type { FinnCar } from "@/lib/types";
 
 import { formatNumber } from "./format";
-import { inSentence } from "./narrative/phrase";
 
 /**
  * What a car costs the environment, judged on its own.
@@ -110,22 +109,11 @@ export interface EnvironmentalComponent {
   display: string;
   /** 0–100. */
   score: number;
-  /** How that figure became that score, in one line. */
-  basis: string;
-  /**
-   * The same thing as arithmetic, with this car's own numbers in it.
-   *
-   * A reader who is told a scale still has to trust that it was applied. A
-   * reader shown "100 × (1 − 0 ÷ 250) = 100" can check it.
-   */
-  working: string;
 }
 
 export interface EnvironmentalImpact {
   /** The mean of whatever could be worked out. 0–100. */
   score: number;
-  /** How the components became that mean, as arithmetic. */
-  working: string;
   components: EnvironmentalComponent[];
   /** Signals FINN supplied nothing for, named in plain English. */
   missing: string[];
@@ -143,13 +131,6 @@ const clamp = (value: number): number =>
 /** Distance below a ceiling, as a percentage of it. */
 const againstCeiling = (value: number, ceiling: number): number =>
   clamp(100 * (1 - value / ceiling));
-
-/** The ceiling rule as the reader would work it out on paper. */
-const ceilingWorking = (value: number, ceiling: number): string =>
-  `100 × (1 − ${formatNumber(value)} ÷ ${ceiling}) = ${againstCeiling(
-    value,
-    ceiling,
-  )}`;
 
 const isMeasured = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -184,8 +165,6 @@ export function environmentalImpact(
       label: "CO₂ emissions",
       display: `${formatNumber(co2)} g/km`,
       score: againstCeiling(co2, CO2_CEILING_G_PER_KM),
-      basis: `Scored against a ${CO2_CEILING_G_PER_KM} g/km ceiling, so a car emitting nothing at the tailpipe scores full marks.`,
-      working: ceilingWorking(co2, CO2_CEILING_G_PER_KM),
     });
   } else {
     missing.push("its CO₂ figure");
@@ -200,10 +179,6 @@ export function environmentalImpact(
       label: "CO₂ class",
       display: letter,
       score: CO2_CLASS_SCORE[letter] as number,
-      basis: "The EU efficiency class FINN publishes for this car, A through G.",
-      working: `Class ${letter} is step ${
-        CO2_CLASS_LETTERS.indexOf(letter) + 1
-      } of ${CO2_CLASS_LETTERS.length}, counting down evenly from A = 100 to G = 0`,
     });
   } else {
     missing.push("its CO₂ class");
@@ -224,10 +199,6 @@ export function environmentalImpact(
       label: "Energy use",
       display: `${formatNumber(consumption)} ${unit}`,
       score: againstCeiling(consumption, ceiling),
-      basis: `Scored against a ${ceiling} ${unit} ceiling — the scale for ${
-        isElectric ? "an electric car" : "a combustion car"
-      }, since litres and kilowatt-hours aren't the same quantity.`,
-      working: ceilingWorking(consumption, ceiling),
     });
   } else {
     missing.push("what it consumes");
@@ -242,9 +213,6 @@ export function environmentalImpact(
       label: "Fuel type",
       display: vehicle.fuelType,
       score: powertrain,
-      basis:
-        "What the car burns, which the figures above can't say on their own.",
-      working: `${vehicle.fuelType} is fixed at ${powertrain}`,
     });
   } else {
     missing.push("what it runs on");
@@ -259,9 +227,6 @@ export function environmentalImpact(
 
   return {
     score,
-    working: `(${components
-      .map((item) => item.score)
-      .join(" + ")}) ÷ ${components.length} = ${score}`,
     components,
     missing,
     caveat: caveatFor(vehicle),
@@ -303,20 +268,15 @@ function caveatFor(vehicle: FinnCar): string | null {
 export function describeEnvironmentalMethod(
   impact: EnvironmentalImpact,
 ): string[] {
-  /* `inSentence` leaves acronyms alone, so CO₂ stays CO₂ mid-sentence. */
-  const named = impact.components.map((item) => inSentence(item.label));
-
   const lines = [
-    `This priority isn't scored on equipment — it's scored on what the car emits and uses. Four figures count equally: ${named.join(
-      ", ",
-    )}.`,
+    "This priority isn't judged on equipment — it's judged on what the car emits and what it uses. Four figures count equally, and they're four rather than one because each is blind to something the others catch.",
   ];
 
   if (impact.missing.length) {
     lines.push(
       `FINN didn't supply ${impact.missing.join(
         " or ",
-      )} for this car, so the score is the average of what's left rather than of all four.`,
+      )} for this car, so the result is the average of what's left rather than of all four.`,
     );
   }
 
@@ -357,62 +317,77 @@ export function environmentalPhrases(impact: EnvironmentalImpact): string[] {
 /* The method, without a car                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** One signal, described where there is no particular car to describe. */
+/** One signal: what it is, why it counts, and what it can't see. */
 export interface EnvironmentalMethodStep {
   id: EnvironmentalSignal;
   label: string;
   /** What it reads off the car. */
   reads: string;
-  /** How that figure becomes a mark out of a hundred. */
-  scale: string;
-  /** The rule itself, so the reader can apply it to a car of their own. */
-  formula: string;
+  /** Why it counts towards the result at all. */
+  matters: string;
+  /** What it is blind to, and which of the others covers that. */
+  relates: string;
 }
 
 /**
- * How this priority works, for the places that explain it before there is a
- * car to explain — the settings page and the compare flow's step 3.
+ * How this priority works, and why it is made of four things rather than one.
  *
- * Built from the same constants the scoring uses, so the explanation cannot
- * drift from the arithmetic: change a ceiling and this changes with it.
+ * The four are not four attempts at the same measurement. Each is blind to
+ * something at least one of the others can see, and the overlap is the point:
+ *
+ * - the CO₂ figure is the most direct measure there is, and it stops at the
+ *   exhaust, so it reads zero for a car whose emissions merely moved to a
+ *   power station and flatters a plug-in hybrid nobody plugs in;
+ * - the class is the same grade FINN prints on its own page, which makes it
+ *   the one figure here a reader can check from outside Lens, and it keeps the
+ *   priority answerable when the raw figure is missing;
+ * - consumption is the only signal that separates two electric cars at all,
+ *   since the first two are identical for every one of them;
+ * - and the fuel type is what tells the reader which of those situations
+ *   they're in.
+ *
+ * A single number can't hold that. Four that disagree in known ways can.
  */
 export const ENVIRONMENTAL_METHOD: EnvironmentalMethodStep[] = [
   {
     id: "emissions",
     label: "CO\u2082 emissions",
-    reads: "The tailpipe figure FINN publishes, in grams per kilometre.",
-    scale: `Scored against a ${CO2_CEILING_G_PER_KM} g/km ceiling: a car emitting nothing at the tailpipe scores full marks, one at ${CO2_CEILING_G_PER_KM} or above scores none.`,
-    formula: `100 × (1 − g/km ÷ ${CO2_CEILING_G_PER_KM})`,
+    reads: "The grams of CO\u2082 per kilometre FINN publishes for the car.",
+    matters:
+      "The most direct measure there is of what driving it costs the climate.",
+    relates:
+      "It stops at the exhaust. An electric car reads zero here because its emissions happen at a power station instead, and a plug-in hybrid's figure assumes a charged battery. Energy use and fuel type are what cover that.",
   },
   {
     id: "co2Class",
     label: "CO\u2082 class",
-    reads: "The EU efficiency label, A through G.",
-    scale: "A scores full marks and G none, in even steps — the same grade you can see on FINN's own page.",
-    formula: "A = 100, B = 83, C = 67, D = 50, E = 33, F = 17, G = 0",
+    reads: "The official A-to-G grade on the car's EU efficiency label.",
+    matters:
+      "The same grade FINN shows on the page, so it's the one figure here you can check without taking Lens's word for it.",
+    relates:
+      "It moves with the CO\u2082 figure rather than independently of it, on purpose: the two confirm each other, and either one can carry the priority when FINN hasn't supplied the other.",
   },
   {
     id: "energy",
     label: "Energy use",
-    reads: "What the car consumes over 100 km.",
-    scale: `Against ${FUEL_CEILING_L_PER_100KM} L/100 km for a combustion car and ${ELECTRIC_CEILING_KWH_PER_100KM} kWh/100 km for an electric one. Litres and kilowatt-hours aren't the same quantity, so they can't share a scale.`,
-    formula: `100 × (1 − consumption ÷ ${FUEL_CEILING_L_PER_100KM} or ${ELECTRIC_CEILING_KWH_PER_100KM})`,
+    reads: "Litres or kilowatt-hours per 100 km.",
+    matters:
+      "What the car actually draws to move — and for an electric car it's the only one of the four that says its footprint isn't nothing, because the CO\u2082 figure and the class are the same for every electric car sold.",
+    relates:
+      "For a combustion car it says much what the CO\u2082 figure already said, which is why it doesn't dominate. Its real work is separating two electric cars the first two signals score identically.",
   },
   {
     id: "powertrain",
     label: "Fuel type",
-    reads: "What the car runs on.",
-    scale: "Electric scores highest, then plug-in hybrid. Diesel and petrol score alike: where one emits less per kilometre, that is already the CO\u2082 figure above.",
-    formula: `Electric = ${POWERTRAIN_SCORE.Electric}, plug-in hybrid = ${POWERTRAIN_SCORE["Plug-in Hybrid"]}, diesel and petrol = ${POWERTRAIN_SCORE.Petrol}`,
+    reads: "Electric, plug-in hybrid, diesel or petrol.",
+    matters: "It decides how to read the other three.",
+    relates:
+      "Diesel and petrol count the same here. Whatever separates them per kilometre is already in the CO\u2082 figure, and counting it twice would make it matter twice.",
   },
 ];
 
 /** What the four steps don't say on their own. */
-/** The last step: what happens to the four marks. */
-export const ENVIRONMENTAL_METHOD_TOTAL =
-  "The four marks are added up and divided by four.";
-
 export const ENVIRONMENTAL_METHOD_NOTES: string[] = [
   "The four count equally, and the result is their average. Where FINN hasn't supplied one of them, it's named and left out rather than counted as zero.",
-  "Two things no figure can say for itself: a plug-in hybrid's official CO\u2082 figure assumes you charge it, and an electric car's zero is a figure about the tailpipe rather than about the electricity you charge it with. Lens says both where they apply.",
+  "None of this is a claim about a car's total footprint — building it and scrapping it aren't in FINN's data and aren't guessed at here. It is what the car does per kilometre, on the figures FINN publishes.",
 ];

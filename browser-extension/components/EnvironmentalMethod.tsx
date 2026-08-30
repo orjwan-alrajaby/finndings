@@ -1,7 +1,6 @@
 import {
     ENVIRONMENTAL_METHOD,
     ENVIRONMENTAL_METHOD_NOTES,
-    ENVIRONMENTAL_METHOD_TOTAL,
 } from "@/lib/reasoning-engine/environmental";
 
 /**
@@ -13,10 +12,12 @@ import {
  * "calculated automatically from the vehicle's emissions and efficiency data"
  * — which tells the reader that something happens and nothing about what.
  *
- * So the four figures are named, with the scale each is read against. The same
- * text is shown in Settings and in step 3 of the compare flow, because it is
- * the same question asked in two places, and it is built from the constants
- * the scoring actually uses so it cannot quietly go out of date.
+ * What it says now is why there are four figures and not one. Each row is a
+ * signal, why it counts, and — the part that makes the set make sense — what
+ * it can't see and which of the others covers for it. The arithmetic that
+ * turns them into a number is deliberately not here: knowing that a car scores
+ * 47 on energy use is worth much less than knowing why energy use is the only
+ * thing separating two electric cars.
  */
 export function EnvironmentalMethod({
     tone = "light",
@@ -45,50 +46,25 @@ export function EnvironmentalMethod({
                             {step.label}
                         </p>
 
-                        <p className="mt-0.5 text-[11px] leading-4 text-finn-black">
+                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
                             {step.reads}
                         </p>
 
-                        {/*
-                          * The rule itself, not a description of it. A reader
-                          * who can see the arithmetic can apply it to a car
-                          * in front of them and check the answer; one who is
-                          * only told there is a scale has to take it on
-                          * trust.
-                          */}
-                        <p className="mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy">
-                            {step.formula}
+                        <p className="mt-1.5 text-[11px] leading-4 text-finn-black">
+                            {step.matters}
                         </p>
 
-                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                            {step.scale}
+                        {/*
+                          * The blind spot, and which of the others covers it.
+                          * This is the row that stops the four reading as four
+                          * attempts at the same measurement.
+                          */}
+                        <p className="mt-1 border-l-2 border-finn-cotton pl-2 text-[11px] leading-4 text-finn-iron">
+                            {step.relates}
                         </p>
                     </div>
                 </div>
             ))}
-
-            <div className={`flex gap-3 rounded-2xl ${card} p-3`}>
-                <span
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-finn-accent-blue text-[10px] font-black text-white"
-                    aria-hidden="true"
-                >
-                    =
-                </span>
-
-                <div className="min-w-0">
-                    <p className="text-xs font-black text-finn-black">
-                        The score
-                    </p>
-
-                    <p className="mt-0.5 text-[11px] leading-4 text-finn-black">
-                        {ENVIRONMENTAL_METHOD_TOTAL}
-                    </p>
-
-                    <p className="mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy">
-                        (mark + mark + mark + mark) ÷ 4
-                    </p>
-                </div>
-            </div>
 
             {ENVIRONMENTAL_METHOD_NOTES.map((note) => (
                 <p
