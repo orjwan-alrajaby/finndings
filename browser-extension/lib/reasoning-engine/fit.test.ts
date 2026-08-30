@@ -143,12 +143,17 @@ describe("buildFitAnalysis", () => {
       }),
     );
 
-    expect(analysis.picked.present.map((item) => item.key)).toEqual([
-      first,
-      second,
-    ]);
-    expect(analysis.picked.absent.map((item) => item.key)).toEqual([third]);
-    expect(analysis.picked.unknown).toHaveLength(0);
+    const picked = analysis.priorities[0]?.picked ?? [];
+
+    expect(
+      picked.filter((item) => item.state === "present").map((item) => item.key),
+    ).toEqual([first, second]);
+
+    expect(
+      picked.filter((item) => item.state === "absent").map((item) => item.key),
+    ).toEqual([third]);
+
+    expect(picked.some((item) => item.state === "unknown")).toBe(false);
   });
 
   it("surfaces a missing pick as a tradeoff and never as a disqualification", () => {
@@ -243,8 +248,8 @@ describe("buildFitAnalysis", () => {
     expect(analysis.equipmentKnown).toBe(false);
     expect(analysis.overall.level).toBe("unknown");
     expect(analysis.priorities[0]?.band.level).toBe("unknown");
-    expect(analysis.picked.unknown).toHaveLength(1);
-    expect(analysis.picked.absent).toHaveLength(0);
+    expect(analysis.priorities[0]?.picked).toHaveLength(1);
+    expect(analysis.priorities[0]?.picked[0]?.state).toBe("unknown");
     expect(analysis.strengths).toEqual([]);
   });
 

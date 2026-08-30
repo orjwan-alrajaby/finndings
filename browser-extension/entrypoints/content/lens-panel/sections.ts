@@ -380,15 +380,49 @@ export function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * One priority, closed by default and openable.
+ * One priority, open.
  *
- * Closed it answers the only question a reader scanning has: how does this car
- * do on the thing I put third? Open it shows the evidence that produced the
- * answer — which features, which figures — because a band nobody can check is
- * just an opinion with a colour.
+ * These used to be rows that opened. Closed, each answered the only question a
+ * reader scanning has — how does this car do on the thing I put third? — and
+ * hid the evidence behind a click. But a reader who has opened this panel has
+ * already asked the question, and the answer to "how does it fit me" is
+ * precisely the evidence: which features, which figures. Charging a click for
+ * each of five priorities to read the thing they came for is a toll, not a
+ * simplification, and the panel is a scroll either way.
+ *
+ * So each priority is a section like any other, headed the way the Advice page
+ * heads the same thing — the reader's own rank, the name, the band — and the
+ * evidence follows underneath it.
  */
-function priorityRow(priority: FitPriority): HTMLElement {
-  const body = el("div", { class: "hidden px-3 pb-3" }, [
+function prioritySection(priority: FitPriority): HTMLElement {
+  return el("section", { class: "border-t border-finn-cotton px-5 py-4" }, [
+    el("div", { class: "flex items-start gap-2.5" }, [
+      el("span", {
+        class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-sm",
+        attrs: { "aria-hidden": "true" },
+        text: priority.icon,
+      }),
+
+      el("div", { class: "min-w-0 flex-1" }, [
+        el("p", {
+          class: "text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue",
+          text: `Your priority #${priority.rank}`,
+        }),
+
+        el("h3", {
+          class: "mt-0.5 text-[15px] font-black leading-5 text-finn-black",
+          text: priority.label,
+        }),
+
+        el("p", {
+          class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+          text: coverageLine(priority),
+        }),
+      ]),
+
+      bandChip(priority.band.level, priority.band.label),
+    ]),
+
     ...priority.sentences.map((line) =>
       el("p", {
         class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
@@ -396,9 +430,9 @@ function priorityRow(priority: FitPriority): HTMLElement {
       }),
     ),
 
-    ...featureGroups(priority),
-
     priority.impact ? impactBreakdown(priority.impact) : null,
+
+    ...featureGroups(priority),
 
     priority.measurements.length && !priority.impact
       ? el(
@@ -424,59 +458,6 @@ function priorityRow(priority: FitPriority): HTMLElement {
         })
       : null,
   ]);
-
-  const chevron = el("span", {
-    class: "text-finn-iron transition-transform duration-150",
-    attrs: { "aria-hidden": "true" },
-    text: "⌄",
-  });
-
-  const button = el(
-    "button",
-    {
-      class: [
-        "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left",
-        "transition-colors hover:bg-finn-snow",
-      ].join(" "),
-      attrs: { type: "button", "aria-expanded": "false" },
-      on: {
-        click: () => {
-          const open = body.classList.toggle("hidden");
-
-          button.setAttribute("aria-expanded", String(!open));
-          chevron.classList.toggle("rotate-180", !open);
-        },
-      },
-    },
-    [
-      el("span", {
-        class: "w-4 shrink-0 text-[11px] font-black text-finn-iron",
-        text: `${priority.rank}`,
-      }),
-
-      el("span", {
-        class: "shrink-0 text-sm",
-        attrs: { "aria-hidden": "true" },
-        text: priority.icon,
-      }),
-
-      el("span", { class: "min-w-0 flex-1" }, [
-        el("span", {
-          class: "block truncate text-[13px] font-bold text-finn-black",
-          text: priority.label,
-        }),
-        el("span", {
-          class: "block text-[11px] text-finn-iron",
-          text: coverageLine(priority),
-        }),
-      ]),
-
-      bandChip(priority.band.level, priority.band.label),
-      chevron,
-    ],
-  );
-
-  return el("li", { class: "rounded-xl" }, [button, body]);
 }
 
 /**
@@ -647,19 +628,8 @@ function coverageLine(priority: FitPriority): string {
     : catalogue;
 }
 
-export function prioritiesSection(analysis: FitAnalysis): HTMLElement {
-  return section(
-    "Your priorities, in your order",
-    el(
-      "ul",
-      { class: "mt-2 flex flex-col" },
-      analysis.priorities.map(priorityRow),
-    ),
-  );
-}
-
 /* -------------------------------------------------------------------------- */
-/* 4. The features they picked out                                            */
+/* Feature rows                                                               */
 /* -------------------------------------------------------------------------- */
 
 const STATE_MARK: Record<FitFeature["state"], string> = {
@@ -739,48 +709,8 @@ function featureRow(feature: FitFeature): HTMLElement {
   return el("li", {}, [row, info?.panel ?? null]);
 }
 
-export function featuresSection(analysis: FitAnalysis): HTMLElement | null {
-  const { present, absent, unknown } = analysis.picked;
-  const total = present.length + absent.length + unknown.length;
-
-  if (total === 0) {
-    return section(
-      "Features you picked out",
-      prose(
-        "You haven't picked out particular features, so each priority above is judged across everything it covers.",
-        "mt-2 text-finn-iron",
-      ),
-    );
-  }
-
-  const summary = unknown.length
-    ? "FINN didn't list this car's equipment, so we can't say either way."
-    : `This car has ${present.length} of the ${total} you picked out.`;
-
-  return section(
-    "Features you picked out",
-    prose(summary, "mt-2 text-finn-iron"),
-    el(
-      "ul",
-      { class: "mt-2.5 flex flex-col gap-1.5" },
-      [...present, ...absent, ...unknown].map(featureRow),
-    ),
-    /*
-     * Said once, here, where the crosses are. A missing pick is a compromise
-     * the reader weighs, and the product's position is that it is never a
-     * reason for Lens to rule a car out on their behalf.
-     */
-    absent.length
-      ? prose(
-          "A feature this car doesn't have never rules it out — it counts against the fit and shows up below as something to consider.",
-          "mt-3 text-[11px] leading-4 text-finn-iron",
-        )
-      : null,
-  );
-}
-
 /* -------------------------------------------------------------------------- */
-/* 5. Cost                                                                    */
+/* 4. Cost                                                                    */
 /* -------------------------------------------------------------------------- */
 
 const SOURCE_LABEL: Record<CostLine["source"], string> = {
@@ -879,7 +809,7 @@ export function costSection(analysis: FitAnalysis): HTMLElement {
 }
 
 /* -------------------------------------------------------------------------- */
-/* 6. Tradeoffs                                                               */
+/* 5. Tradeoffs                                                               */
 /* -------------------------------------------------------------------------- */
 
 function tradeoffRow(tradeoff: Tradeoff): HTMLElement {
@@ -935,8 +865,7 @@ export function analysisBody(
     back,
     fitHeader(analysis),
     strengthsSection(analysis),
-    prioritiesSection(analysis),
-    featuresSection(analysis),
+    ...analysis.priorities.map(prioritySection),
     costSection(analysis),
     tradeoffsSection(analysis),
 

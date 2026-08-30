@@ -216,13 +216,6 @@ export interface FitAnalysis {
   /** The reader's priorities, in their own order. */
   priorities: FitPriority[];
 
-  /** Every feature they picked out, across all priorities. */
-  picked: {
-    present: FitFeature[];
-    absent: FitFeature[];
-    unknown: FitFeature[];
-  };
-
   /** Why it fits, drawn from the priorities it actually serves. */
   strengths: string[];
 
@@ -299,7 +292,6 @@ export function buildFitAnalysis(
     vehicle,
     overall,
     priorities: fitPriorities,
-    picked: collectPicked(fitPriorities),
     strengths: describeStrengths(fitPriorities, reasoning, equipmentKnown),
     tradeoffs: equipmentKnown
       ? reasonAboutTradeoffs(evaluation, reasoning, costReasoning, context, [])
@@ -386,34 +378,6 @@ function toFitPriority(
     hasEvidence: equipmentKnown
       ? breakdown.hasEvidence
       : breakdown.environmental != null || reasoning.measurements.length > 0,
-  };
-}
-
-/**
- * Every pick the reader made, gathered out of the priorities they made it
- * under.
- *
- * Deduplicated, because one feature can be picked under several priorities —
- * adaptive cruise control is offered by both safety and long distance, and a
- * reader who wants it under both is not asking for it twice. The first
- * occurrence wins, which is the highest-ranked priority they picked it under.
- */
-function collectPicked(priorities: FitPriority[]): FitAnalysis["picked"] {
-  const seen = new Set<string>();
-
-  const all = priorities
-    .flatMap((item) => item.picked)
-    .filter((feature) => {
-      if (seen.has(feature.key)) return false;
-
-      seen.add(feature.key);
-      return true;
-    });
-
-  return {
-    present: all.filter((item) => item.state === "present"),
-    absent: all.filter((item) => item.state === "absent"),
-    unknown: all.filter((item) => item.state === "unknown"),
   };
 }
 

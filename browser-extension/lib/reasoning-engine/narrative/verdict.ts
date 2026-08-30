@@ -98,8 +98,13 @@ export function summarisePriority(
   const measured = reasoning.measurements.find((fact) => fact.scored);
 
   if (measured) {
+    /*
+     * "has X of Y" rather than "its X is Y": the labels aren't all singular —
+     * "this car's CO₂ emissions is 0 g/km" — and a construction that needs no
+     * verb agreement is cheaper than a list of which ones are plural.
+     */
     return sentence(
-      `${opener}, and this car's ${inSentence(measured.label)} is ${measured.display}`,
+      `${opener}, and this car has ${inSentence(measured.label)} of ${measured.display}`,
     );
   }
 
