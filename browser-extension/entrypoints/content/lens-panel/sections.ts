@@ -217,34 +217,25 @@ export function configurationDetail(car: FinnCar): string {
 export function configurationsSection({
   cars,
   bandOf,
-  selectedId,
   onSelect,
 }: {
   cars: FinnCar[];
   bandOf: (id: number) => { level: FitLevel; label: string } | null;
-  selectedId: number | null;
   onSelect: (id: number) => void;
 }): HTMLElement | null {
   if (cars.length < 2) return null;
 
   const rows = cars.map((car) => {
-    const selected = car.id === selectedId;
     const band = bandOf(car.id);
 
     return el(
       "button",
       {
         class: [
-          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
-          "transition-colors",
-          selected
-            ? "bg-finn-pale-blue ring-1 ring-finn-accent-blue"
-            : "bg-finn-snow hover:bg-finn-cotton",
+          "flex w-full items-center gap-3 rounded-xl bg-finn-snow px-3 py-2.5",
+          "text-left transition-colors hover:bg-finn-cotton",
         ].join(" "),
-        attrs: {
-          type: "button",
-          ...(selected ? { "aria-current": "true" } : {}),
-        },
+        attrs: { type: "button" },
         on: { click: () => onSelect(car.id) },
       },
       [
@@ -260,26 +251,54 @@ export function configurationsSection({
         ]),
 
         band ? bandChip(band.level, band.label) : null,
+
+        el("span", {
+          class: "shrink-0 text-finn-iron",
+          attrs: { "aria-hidden": "true" },
+          text: "›",
+        }),
       ],
     );
   });
 
-  const list = el("div", { class: "flex flex-col gap-1.5" }, rows);
+  return el("div", { class: "px-5 pb-4 pt-2" }, [
+    el("div", { class: "flex flex-col gap-1.5" }, rows),
+  ]);
+}
 
-  /*
-   * Before a choice is made the panel's opening lines have already asked the
-   * question, so the list is just the list. Afterwards it needs a name and a
-   * reason to still be there.
-   */
-  if (selectedId == null) {
-    return el("div", { class: "px-5 pb-4 pt-2" }, [list]);
-  }
-
-  return section(
-    "Configuration",
-    prose("Switch to compare how each one fits you.", "mt-2 text-finn-iron"),
-    el("div", { class: "mt-2.5" }, [list]),
-  );
+/**
+ * The way back to the list, and the only thing on screen that offers it.
+ *
+ * The list used to stay under the analysis so a reader could switch without
+ * going anywhere. That reads as two screens stacked into one: the answer to
+ * "how does this fit me" sits below a control asking which car we're talking
+ * about, and every time the reader scrolls past it they have to re-establish
+ * which row is the one they're reading. One thing at a time is easier to hold
+ * — the list, or a car — so choosing replaces the list, and this brings it
+ * back.
+ */
+export function backToConfigurations(
+  count: number,
+  onBack: () => void,
+): HTMLElement {
+  return el("div", { class: "px-5 pt-4" }, [
+    el(
+      "button",
+      {
+        class: [
+          "inline-flex items-center gap-1.5 rounded-full bg-finn-snow px-3 py-1.5",
+          "text-[11px] font-bold text-finn-iron transition-colors",
+          "hover:bg-finn-cotton hover:text-finn-black",
+        ].join(" "),
+        attrs: { type: "button" },
+        on: { click: onBack },
+      },
+      [
+        el("span", { attrs: { "aria-hidden": "true" }, text: "‹" }),
+        el("span", { text: `All ${count} configurations` }),
+      ],
+    ),
+  ]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -289,7 +308,7 @@ export function configurationsSection({
 export function fitHeader(analysis: FitAnalysis): HTMLElement {
   const { vehicle } = analysis;
 
-  return el("header", { class: "px-5 pb-4 pt-4" }, [
+  return el("header", { class: "px-5 pb-4 pt-3" }, [
     el("p", {
       class: "text-lg font-black leading-6 text-finn-black",
       text: vehicle.name,
@@ -904,18 +923,17 @@ export function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
 /**
  * The whole analysis of one configuration.
  *
- * `configurations` is slotted directly under the header rather than at the
- * end: on a model page it is the control that decides what everything below
- * it is about, and a switcher a reader has to scroll past six sections to
- * find is a switcher they won't know is there.
+ * `back` sits above the header rather than below it: it is the way out of
+ * this car and back to the choice, and a way out belongs at the top where a
+ * reader looks for it, not six sections down.
  */
 export function analysisBody(
   analysis: FitAnalysis,
-  configurations: Node | null = null,
+  back: Node | null = null,
 ): DocumentFragment {
   return fragment([
+    back,
     fitHeader(analysis),
-    configurations,
     strengthsSection(analysis),
     prioritiesSection(analysis),
     featuresSection(analysis),

@@ -5,7 +5,11 @@ import {
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, panelStyles } from "./dom";
-import { analysisBody, configurationsSection } from "./sections";
+import {
+  analysisBody,
+  backToConfigurations,
+  configurationsSection,
+} from "./sections";
 import { detailsPageRoot, resolvePageCars } from "./currentCar";
 
 /**
@@ -103,14 +107,20 @@ const openSettings = () => {
  * we know which car this is but couldn't load it.
  */
 /**
- * What the reader has chosen inside the panel, kept across re-renders.
+ * Where the reader has navigated inside the panel, kept across re-renders.
  *
  * A re-render is not a fresh start — settings changing in the options tab
  * redraws the analysis, and redrawing it for a different car than the one the
  * reader was reading would be its own small betrayal.
+ *
+ * Three states, not two. `undefined` means they haven't navigated at all and
+ * the URL still decides; a number is the car they opened; and `null` is the
+ * list, which they reached by deliberately going back. Collapsing that last
+ * one into "nothing chosen" would send a reader who had just returned to the
+ * list straight back into the car the URL names.
  */
 interface Session {
-  chosenId: number | null;
+  choice: number | null | undefined;
 }
 
 async function render(
@@ -221,35 +231,52 @@ async function render(
    * With several, the URL decides — and where it says nothing, so does the
    * panel, until the reader picks.
    */
-  const chosen =
-    session.chosenId != null &&
-    page.cars.some((car) => car.id === session.chosenId)
-      ? session.chosenId
-      : null;
+  /* A car they chose that the page no longer offers is no longer a choice. */
+  const navigated =
+    session.choice != null &&
+    !page.cars.some((car) => car.id === session.choice)
+      ? undefined
+      : session.choice;
 
   let subjectId: number | null =
-    chosen ?? page.selectedId ?? (page.cars.length === 1 && first ? first.id : null);
+    navigated !== undefined
+      ? navigated
+      : (page.selectedId ??
+        (page.cars.length === 1 && first ? first.id : null));
+
+  /*
+   * One screen at a time: the list, or one car. Choosing a configuration
+   * replaces the list rather than sitting under it, and the way back is a
+   * link at the top of the analysis.
+   */
+  const show = (id: number | null) => {
+    subjectId = id;
+    session.choice = id;
+    paint();
+  };
 
   const paint = () => {
-    const chooser = configurationsSection({
-      cars: page.cars,
-      bandOf: (id) => analyses.get(id)?.overall ?? null,
-      selectedId: subjectId,
-      onSelect: (id) => {
-        subjectId = id;
-        session.chosenId = id;
-        paint();
-      },
-    });
-
     const analysis = subjectId == null ? null : analyses.get(subjectId);
 
     empty(into);
 
     into.append(
       analysis
-        ? analysisBody(analysis, chooser)
-        : fragment([chooseLead(page.cars.length), chooser]),
+        ? analysisBody(
+            analysis,
+            /* With one configuration there is no list to go back to. */
+            page.cars.length > 1
+              ? backToConfigurations(page.cars.length, () => show(null))
+              : null,
+          )
+        : fragment([
+            chooseLead(page.cars.length),
+            configurationsSection({
+              cars: page.cars,
+              bandOf: (id) => analyses.get(id)?.overall ?? null,
+              onSelect: show,
+            }),
+          ]),
     );
 
     into.scrollTop = 0;
@@ -404,7 +431,7 @@ async function build(): Promise<Panel> {
 
   window.addEventListener("keydown", onKeyDown, true);
 
-  const session: Session = { chosenId: null };
+  const session: Session = { choice: undefined };
 
   const retry = () => void render(scroller, retry, session);
 
