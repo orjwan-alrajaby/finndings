@@ -44,6 +44,40 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * An inline icon, built through the DOM rather than pasted in as markup.
+ *
+ * `el` deliberately has no `innerHTML`, so an icon can't be a string here.
+ * Two namespaced elements is a small price for keeping the one function that
+ * could inject markup out of the file entirely.
+ */
+export function icon(path: string, className: string): SVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.6");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", className);
+
+  const shape = document.createElementNS(SVG_NS, "path");
+
+  shape.setAttribute("d", path);
+  shape.setAttribute("stroke-linecap", "round");
+  shape.setAttribute("stroke-linejoin", "round");
+
+  svg.append(shape);
+
+  return svg;
+}
+
+/** heroicons/24/outline — information-circle. */
+export const INFORMATION_CIRCLE =
+  "m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z";
+
 /** A run of elements with no wrapper of their own. */
 export function fragment(children: Child[]): DocumentFragment {
   const frame = document.createDocumentFragment();

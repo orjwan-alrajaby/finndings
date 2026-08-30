@@ -13,7 +13,7 @@ import { describeFit } from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
-import { el, fragment } from "./dom";
+import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
 
 /**
  * The analysis, drawn.
@@ -100,6 +100,66 @@ function section(title: string, ...children: (Node | null)[]): HTMLElement {
     { class: "border-t border-finn-cotton px-5 py-4" },
     [sectionHeading(title), ...children],
   );
+}
+
+/**
+ * A small "i" that says what something is, without sending the reader away.
+ *
+ * The Advice page has the same affordance on every feature chip, and the
+ * explanations it shows are already carried on the facts the engine produces —
+ * they were simply being thrown away here. A reader who doesn't know what
+ * rear cross-traffic alert is cannot judge whether missing it matters, which
+ * makes the whole list of ticks and crosses harder to act on than it looks.
+ *
+ * A disclosure rather than a tooltip. The panel is 26rem wide on a page it
+ * doesn't own, these explanations run to a sentence or two, and a floating
+ * layer that needs positioning, portalling and a pointer is three problems the
+ * answer doesn't need — a line that opens under the row is none of them, and
+ * it works the same under a thumb.
+ */
+let infoIds = 0;
+
+function explains(subject: string, explanation: string): {
+  button: HTMLElement;
+  panel: HTMLElement;
+} {
+  const id = `finn-lens-info-${(infoIds += 1)}`;
+
+  const panel = el("p", {
+    class: "mt-1 hidden rounded-lg bg-white px-2 py-1.5 text-[11px] leading-4 text-finn-iron",
+    attrs: { id },
+    text: explanation,
+  });
+
+  const button = el(
+    "button",
+    {
+      class: [
+        "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center",
+        "rounded-full align-middle text-finn-iron transition-colors",
+        "hover:text-finn-accent-blue",
+      ].join(" "),
+      attrs: {
+        type: "button",
+        "aria-label": `What is ${subject}?`,
+        "aria-expanded": "false",
+        "aria-controls": id,
+      },
+      on: {
+        click: (event) => {
+          event.stopPropagation();
+
+          const open = panel.classList.toggle("hidden");
+
+          button.setAttribute("aria-expanded", String(!open));
+          button.classList.toggle("text-finn-accent-blue", !open);
+        },
+      },
+    },
+    [icon(INFORMATION_CIRCLE, "h-4 w-4")],
+  );
+
+  return { button, panel };
 }
 
 /** A short line of plain prose, as the engine wrote it. */
@@ -602,7 +662,11 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
 };
 
 function featureRow(feature: FitFeature): HTMLElement {
-  return el("li", { class: "flex items-start gap-2" }, [
+  const info = feature.explanation
+    ? explains(feature.label, feature.explanation)
+    : null;
+
+  const row = el("div", { class: "flex items-start gap-2" }, [
     el("span", {
       class: `w-3 shrink-0 text-[12px] font-black leading-[18px] ${STATE_CLASS[feature.state]}`,
       attrs: { "aria-hidden": "true" },
@@ -619,6 +683,8 @@ function featureRow(feature: FitFeature): HTMLElement {
         ].join(" "),
         text: feature.label,
       }),
+
+      info?.button ?? null,
 
       feature.state === "unknown"
         ? el("span", {
@@ -650,6 +716,8 @@ function featureRow(feature: FitFeature): HTMLElement {
       text: STATE_LABEL[feature.state],
     }),
   ]);
+
+  return el("li", {}, [row, info?.panel ?? null]);
 }
 
 export function featuresSection(analysis: FitAnalysis): HTMLElement | null {
@@ -703,12 +771,20 @@ const SOURCE_LABEL: Record<CostLine["source"], string> = {
 };
 
 function costRow(line: CostLine): HTMLElement {
-  return el("li", { class: "flex items-baseline justify-between gap-3 py-1" }, [
+  /*
+   * The engine writes a full account of every line — where the number came
+   * from, which of the reader's assumptions went into it, and why it is
+   * missing when it is. The panel was showing the figure and discarding all
+   * of that.
+   */
+  const info = explains(line.label, line.explanation);
+
+  const row = el("div", { class: "flex items-baseline justify-between gap-3 py-1" }, [
     el("span", { class: "min-w-0" }, [
-      el("span", {
-        class: "block text-[12px] leading-4 text-finn-black",
-        text: line.label,
-      }),
+      el("span", { class: "block text-[12px] leading-4 text-finn-black" }, [
+        el("span", { text: line.label }),
+        info.button,
+      ]),
       el("span", {
         class: "block text-[10px] leading-4 text-finn-iron",
         text: SOURCE_LABEL[line.source],
@@ -725,6 +801,8 @@ function costRow(line: CostLine): HTMLElement {
         : "Not available",
     }),
   ]);
+
+  return el("li", { class: "py-0.5" }, [row, info.panel]);
 }
 
 export function costSection(analysis: FitAnalysis): HTMLElement {
