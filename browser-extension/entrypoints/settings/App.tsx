@@ -31,6 +31,7 @@ import { ProfilesSettings } from "./tabs/ProfileSettings";
 import { DrivingSettings } from "./tabs/DrivingSettings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { getProfileIssues } from "./utils/PriorityValidation";
+import { snapshot } from "./utils/snapshot";
 
 function registerCustomMeta(priority: PriorityDefinition) {
   registerCategoryMeta(priority.id, {
@@ -49,6 +50,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [loading, setLoading] = useState(true);
 
   const [preferences, setPreferences] = useState<LensPreferences>(DEFAULT_PREFERENCES);
+  const [priorities, setPriorities] = useState<CategoryId[]>(DEFAULT_PRIORITIES);
   const [priorityDefinitions, setPriorityDefinitions] = useState<PriorityDefinition[]>(DEFAULT_PRIORITY_DEFINITIONS);
   const [categoryFeatures, setCategoryFeatures] = useState<Record<CategoryId, FeatureSelection>>(DEFAULT_CATEGORY_FEATURES);
   const [profiles, setProfiles] = useState<Profile[]>(DEFAULT_PROFILES);
@@ -57,27 +59,41 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
+  /*
+   * What is on disk, as text, so the bar can tell the reader whether what
+   * they are looking at is what Lens will actually use. Nothing on this page
+   * takes effect until it is saved, and the priority order in particular is
+   * now something a reader arrives here specifically to set — leaving them
+   * unsure whether they did is the one thing this page must not do.
+   */
+  const [persisted, setPersisted] = useState<string | null>(null);
+
   useEffect(() => {
     loadLensSettings().then((settings) => {
       setPreferences(settings.preferences);
+      setPriorities(settings.priorities);
       setPriorityDefinitions(settings.priorityDefinitions);
       setCategoryFeatures(settings.categoryFeatures);
       setProfiles(settings.profiles);
       setDefaultProfileId(settings.defaultProfileId);
+      setPersisted(snapshot(settings));
       setLoading(false);
     });
   }, []);
 
   const flashSaved = () => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
 
-  // Deliberately without `priorities`.
+  // `priorities` is saved from here now, and that is a change worth naming.
   //
-  // The user's own priority order is owned by the compare flow. Writing the
-  // default profile's order from here would silently undo a customised order
-  // the next time anything on this page was saved — a profile is a starting
-  // point, not something that reasserts itself.
-  const currentSettings = (): Omit<LensSettings, "priorities"> => ({
+  // It used to be omitted because the compare flow was the only place the
+  // order could be set, so writing it from here could only have overwritten a
+  // customised order with a profile's. It is now shown on this page and edited
+  // directly, so saving it is saving what the reader is looking at. Both
+  // places write the same key, which is right: there is one priority order,
+  // not a settings one and a compare one.
+  const currentSettings = (): LensSettings => ({
     preferences,
+    priorities,
     priorityDefinitions,
     categoryFeatures,
     profiles,
@@ -85,7 +101,11 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   });
 
   const save = async () => {
-    await saveLensSettings(currentSettings());
+    const settings = currentSettings();
+
+    await saveLensSettings(settings);
+
+    setPersisted(snapshot(settings));
     flashSaved();
   };
 
@@ -124,6 +144,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       if (p.isCustom) unregisterCategoryMeta(p.id);
     }
     setPreferences(DEFAULT_PREFERENCES);
+    setPriorities(DEFAULT_PRIORITIES);
     setPriorityDefinitions(DEFAULT_PRIORITY_DEFINITIONS);
     setCategoryFeatures(DEFAULT_CATEGORY_FEATURES);
     setProfiles(DEFAULT_PROFILES);
@@ -136,9 +157,26 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       profiles: DEFAULT_PROFILES,
       defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
     });
+    setPersisted(
+      snapshot({
+        preferences: DEFAULT_PREFERENCES,
+        priorities: DEFAULT_PRIORITIES,
+        priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
+        categoryFeatures: DEFAULT_CATEGORY_FEATURES,
+        profiles: DEFAULT_PROFILES,
+        defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+      }),
+    );
     setRestoreOpen(false);
     flashSaved();
   };
+
+  /*
+   * Compared as text rather than field by field: everything on this page is
+   * plain data, and a deep equality helper would be a second description of
+   * the same shape to keep in step with the first.
+   */
+  const dirty = persisted !== null && snapshot(currentSettings()) !== persisted;
 
   const profilesNeedingAttention = profiles.filter((p) => getProfileIssues(p, priorityDefinitions).length > 0).length;
 
@@ -179,8 +217,11 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         <div className="space-y-4 pb-24">
           {tab === "priorities" && (
             <PrioritiesSettings
+              priorities={priorities}
               priorityDefinitions={priorityDefinitions}
               categoryFeatures={categoryFeatures}
+              profiles={profiles}
+              onChangePriorities={setPriorities}
               onSavePriority={handleSavePriority}
             />
           )}
@@ -198,12 +239,27 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
         <div className="fixed inset-x-4 bottom-4 z-30 mx-auto flex flex-col 2xs:flex-row max-w-5xl items-center justify-between gap-4 rounded-3xl bg-finn-black p-3 pl-5 text-white shadow-xl sm:inset-x-6 lg:inset-x-10">
           <div>
-            <p className="text-sm font-black">{saved ? "Saved." : "Settings are local to this extension."}</p>
-            <p className="text-[10px] text-white/55">Changes affect future recommendations.</p>
+            <p className="text-sm font-black">
+              {saved
+                ? "Saved."
+                : dirty
+                  ? "You have unsaved changes."
+                  : "Settings are local to this extension."}
+            </p>
+            <p className="text-[10px] text-white/55">
+              {dirty
+                ? "Nothing here reaches FINN Lens until you save."
+                : "Changes affect future recommendations."}
+            </p>
           </div>
-          <button type="button" onClick={save} className="inline-flex items-center gap-2 rounded-full bg-finn-accent-blue px-5 py-3 text-xs font-black text-white">
+          <button
+            type="button"
+            onClick={save}
+            disabled={!dirty}
+            className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black text-white transition-colors ${dirty ? "bg-finn-accent-blue hover:bg-finn-highlight-navy" : "cursor-default bg-white/15 text-white/50"}`}
+          >
             <CheckIcon className="h-4 w-4" />
-            Save changes
+            {dirty ? "Save changes" : "Saved"}
           </button>
         </div>
       </div>

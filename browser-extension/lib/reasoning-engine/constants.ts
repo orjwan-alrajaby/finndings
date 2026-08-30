@@ -831,6 +831,20 @@ export type ProfileId = keyof typeof PROFILES;
 /** How many priorities every profile carries. */
 export const PROFILE_PRIORITY_COUNT = 5;
 
+/**
+ * How many priorities a reader's own order may hold.
+ *
+ * Below three there isn't enough to separate cars on: the weighting gives the
+ * first priority half the result, and two of them is closer to a filter than
+ * to an ordering. Above five each one is worth so little that the ones at the
+ * bottom stop changing any answer — which is the same as not having asked.
+ *
+ * The compare flow and the settings page both enforce these, so they live
+ * here rather than in either of them.
+ */
+export const MIN_PRIORITIES = 3;
+export const MAX_PRIORITIES = PROFILE_PRIORITY_COUNT;
+
 /* -------------------------------------------------------------------------- */
 /* Derived defaults                                                           */
 /* -------------------------------------------------------------------------- */

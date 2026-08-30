@@ -8,6 +8,8 @@ import {
     DEFAULT_PRIORITIES,
     DEFAULT_PROFILES,
     MAX_FEATURES_PER_CATEGORY,
+    MAX_PRIORITIES,
+    MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
 
 import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
@@ -24,6 +26,9 @@ import type {
 import type { CompareStep } from "./types";
 import type { SelectionMode } from "./steps/StepOneChoosePriorities/types";
 
+/* Where the compare flow's own callers already look for them. */
+export { MAX_PRIORITIES, MIN_PRIORITIES };
+
 /** The steps, in the order the stepper walks them. */
 export const STEP_ORDER: CompareStep[] = [
     "priorities",
@@ -34,12 +39,6 @@ export const STEP_ORDER: CompareStep[] = [
 
 /** Which half of step 3 the reader is looking at. */
 export type PreferencesPhase = "preferences" | "driving";
-
-/** Fewer than this and there isn't enough to rank cars on. */
-export const MIN_PRIORITIES = 3;
-
-/** More than this and no single priority means much. */
-export const MAX_PRIORITIES = 5;
 
 interface CompareState {
     /* ---------------------------------------------------------------- */
