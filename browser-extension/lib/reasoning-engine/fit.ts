@@ -178,6 +178,16 @@ export interface FitPriority {
   /** The reader's picks under this priority, present ones first. */
   picked: FitFeature[];
 
+  /**
+   * Everything else the priority covers, present ones first.
+   *
+   * The picks are what the reader asked for; this is the rest of what the
+   * score counted. Keeping them apart is what lets the panel say "you asked
+   * for three of these and got two" and "the category covers twelve more,
+   * and it has seven of them" as two different sentences — which they are.
+   */
+  alsoCounted: FitFeature[];
+
   /** Figures relevant to this priority. Reported, never scored. */
   measurements: MeasurementFact[];
   traits: TraitFact[];
@@ -306,9 +316,14 @@ function toFitPriority(
   reasoning: PriorityReasoning,
   equipmentKnown: boolean,
 ): FitPriority {
-  const { picked } = reasoning.features;
+  const { picked, coverage } = reasoning.features;
 
   const state = equipmentKnown ? "present" : "unknown";
+
+  /* A pick is listed once, under the reader's own heading rather than twice. */
+  const isPicked = (key: string): boolean =>
+    picked.present.some((fact) => fact.key === key) ||
+    picked.missing.some((fact) => fact.key === key);
 
   const toFeature = (
     fact: FeatureFact,
@@ -345,6 +360,15 @@ function toFitPriority(
       ...picked.missing.map((fact) =>
         toFeature(fact, equipmentKnown ? "absent" : "unknown"),
       ),
+    ],
+
+    alsoCounted: [
+      ...coverage.present
+        .filter((fact) => !isPicked(fact.key))
+        .map((fact) => toFeature(fact, state)),
+      ...coverage.missing
+        .filter((fact) => !isPicked(fact.key))
+        .map((fact) => toFeature(fact, equipmentKnown ? "absent" : "unknown")),
     ],
 
     measurements: reasoning.measurements,

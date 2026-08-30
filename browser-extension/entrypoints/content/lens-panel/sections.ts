@@ -10,6 +10,7 @@ import type { EnvironmentalImpact } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
 import { describeFit } from "@/lib/reasoning-engine/fit";
+import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
 import { el, fragment } from "./dom";
@@ -316,13 +317,7 @@ function priorityRow(priority: FitPriority): HTMLElement {
       }),
     ),
 
-    priority.picked.length
-      ? el(
-          "ul",
-          { class: "mt-3 flex flex-col gap-1.5" },
-          priority.picked.map(featureRow),
-        )
-      : null,
+    ...featureGroups(priority),
 
     priority.impact ? impactBreakdown(priority.impact) : null,
 
@@ -442,21 +437,38 @@ function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
             ]),
           ]),
 
+          /*
+           * The arithmetic, with this car's own numbers in it. Being told
+           * the rule and being able to check it were applied are different
+           * things, and only the second is an explanation.
+           */
           el("p", {
-            class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+            class: "mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy",
+            text: component.working,
+          }),
+
+          el("p", {
+            class: "mt-1 text-[11px] leading-4 text-finn-iron",
             text: component.basis,
           }),
         ]),
       ),
     ),
 
-    el("p", {
-      class: "mt-2.5 border-t border-finn-cotton pt-2 text-[11px] leading-4 text-finn-iron",
-      text:
-        impact.components.length === 1
-          ? "That is the only one of the four FINN supplied, so it is the score."
-          : `The four count equally: this car averages ${impact.score} of 100.`,
-    }),
+    el("div", { class: "mt-2.5 border-t border-finn-cotton pt-2" }, [
+      el("p", {
+        class: "text-[11px] leading-4 text-finn-iron",
+        text:
+          impact.components.length === 1
+            ? "That is the only one of the four FINN supplied, so it is the score."
+            : "Added up and divided by however many FINN supplied:",
+      }),
+
+      el("p", {
+        class: "mt-1 font-mono text-[11px] font-bold leading-4 tabular-nums text-finn-black",
+        text: impact.working,
+      }),
+    ]),
 
     impact.missing.length
       ? el("p", {
@@ -470,6 +482,66 @@ function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
      * already carries it, and saying it twice on one screen reads as the
      * panel not trusting the reader to have read it once.
      */
+  ]);
+}
+
+/**
+ * What the car has and hasn't, in this priority, in four groups.
+ *
+ * The same four the Advice page draws, and in the same order, because they
+ * answer four different questions and collapsing them loses the distinction:
+ * what you asked for and got, what you asked for and didn't, what else counted
+ * and it has, and what else counted and it hasn't. The reader's own picks lead
+ * — they wrote them — and everything else follows under a heading that says it
+ * counted too, because a reader who singled out three features has to be able
+ * to see that Lens looked at more than three.
+ */
+function featureGroups(priority: FitPriority): (HTMLElement | null)[] {
+  const has = (feature: FitFeature) => feature.state === "present";
+  const hasnt = (feature: FitFeature) => feature.state === "absent";
+  const unknown = (feature: FitFeature) => feature.state === "unknown";
+
+  const asked = priority.picked;
+  const rest = priority.alsoCounted;
+
+  return [
+    featureGroup("You gave extra influence, and it has", asked.filter(has)),
+    featureGroup(
+      "You gave extra influence, but it doesn't have",
+      asked.filter(hasnt),
+    ),
+    featureGroup(
+      asked.length ? "Also counted here, and it has" : "It has",
+      rest.filter(has),
+    ),
+    featureGroup(
+      asked.length ? "Also counted here, but it doesn't have" : "It doesn't have",
+      rest.filter(hasnt),
+    ),
+    featureGroup(
+      "FINN didn't say either way",
+      [...asked, ...rest].filter(unknown),
+    ),
+  ];
+}
+
+function featureGroup(
+  label: string,
+  features: FitFeature[],
+): HTMLElement | null {
+  if (!features.length) return null;
+
+  return el("div", { class: "mt-3" }, [
+    el("p", {
+      class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+      text: `${label} (${features.length})`,
+    }),
+
+    el(
+      "ul",
+      { class: "mt-1.5 flex flex-col gap-1.5" },
+      features.map(featureRow),
+    ),
   ]);
 }
 
@@ -556,15 +628,19 @@ function featureRow(feature: FitFeature): HTMLElement {
         : null,
 
       /*
-       * The influence level is shown only where it changes what the row
-       * means: a pick the reader said should count highly, that the car
-       * doesn't have, is the row they most need to see.
+       * Every pick carries the level the reader gave it, present or absent.
+       * Which of the three they chose is the whole of what they said about a
+       * feature, and a row that shows the tick without it has dropped half
+       * the answer. The colours are the influence scale's own, so the level
+       * reads the same here as it does where it was set.
        */
-      feature.state === "absent" && feature.importance === "high"
+      feature.importance
         ? el("span", {
-            class:
-              "ml-1.5 rounded-full bg-finn-influence-red-pale px-1.5 py-px text-[10px] font-bold text-finn-influence-red",
-            text: "counts highly",
+            class: [
+              "ml-1.5 shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold",
+              FEATURE_IMPORTANCE[feature.importance].chipClass,
+            ].join(" "),
+            text: FEATURE_IMPORTANCE[feature.importance].badgeLabel,
           })
         : null,
     ]),

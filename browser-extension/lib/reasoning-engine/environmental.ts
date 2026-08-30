@@ -61,6 +61,8 @@ const ELECTRIC_CEILING_KWH_PER_100KM = 30;
  * see on FINN's own page is the grade this uses. Older labels that carried
  * pluses (A+, A++, A+++) predate the current scale and are read as A.
  */
+const CO2_CLASS_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
+
 const CO2_CLASS_SCORE: Record<string, number> = {
   A: 100,
   B: 83,
@@ -110,11 +112,20 @@ export interface EnvironmentalComponent {
   score: number;
   /** How that figure became that score, in one line. */
   basis: string;
+  /**
+   * The same thing as arithmetic, with this car's own numbers in it.
+   *
+   * A reader who is told a scale still has to trust that it was applied. A
+   * reader shown "100 × (1 − 0 ÷ 250) = 100" can check it.
+   */
+  working: string;
 }
 
 export interface EnvironmentalImpact {
   /** The mean of whatever could be worked out. 0–100. */
   score: number;
+  /** How the components became that mean, as arithmetic. */
+  working: string;
   components: EnvironmentalComponent[];
   /** Signals FINN supplied nothing for, named in plain English. */
   missing: string[];
@@ -132,6 +143,13 @@ const clamp = (value: number): number =>
 /** Distance below a ceiling, as a percentage of it. */
 const againstCeiling = (value: number, ceiling: number): number =>
   clamp(100 * (1 - value / ceiling));
+
+/** The ceiling rule as the reader would work it out on paper. */
+const ceilingWorking = (value: number, ceiling: number): string =>
+  `100 × (1 − ${formatNumber(value)} ÷ ${ceiling}) = ${againstCeiling(
+    value,
+    ceiling,
+  )}`;
 
 const isMeasured = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
@@ -167,6 +185,7 @@ export function environmentalImpact(
       display: `${formatNumber(co2)} g/km`,
       score: againstCeiling(co2, CO2_CEILING_G_PER_KM),
       basis: `Scored against a ${CO2_CEILING_G_PER_KM} g/km ceiling, so a car emitting nothing at the tailpipe scores full marks.`,
+      working: ceilingWorking(co2, CO2_CEILING_G_PER_KM),
     });
   } else {
     missing.push("its CO₂ figure");
@@ -182,6 +201,9 @@ export function environmentalImpact(
       display: letter,
       score: CO2_CLASS_SCORE[letter] as number,
       basis: "The EU efficiency class FINN publishes for this car, A through G.",
+      working: `Class ${letter} is step ${
+        CO2_CLASS_LETTERS.indexOf(letter) + 1
+      } of ${CO2_CLASS_LETTERS.length}, counting down evenly from A = 100 to G = 0`,
     });
   } else {
     missing.push("its CO₂ class");
@@ -205,6 +227,7 @@ export function environmentalImpact(
       basis: `Scored against a ${ceiling} ${unit} ceiling — the scale for ${
         isElectric ? "an electric car" : "a combustion car"
       }, since litres and kilowatt-hours aren't the same quantity.`,
+      working: ceilingWorking(consumption, ceiling),
     });
   } else {
     missing.push("what it consumes");
@@ -221,6 +244,7 @@ export function environmentalImpact(
       score: powertrain,
       basis:
         "What the car burns, which the figures above can't say on their own.",
+      working: `${vehicle.fuelType} is fixed at ${powertrain}`,
     });
   } else {
     missing.push("what it runs on");
@@ -233,7 +257,15 @@ export function environmentalImpact(
       components.length,
   );
 
-  return { score, components, missing, caveat: caveatFor(vehicle) };
+  return {
+    score,
+    working: `(${components
+      .map((item) => item.score)
+      .join(" + ")}) ÷ ${components.length} = ${score}`,
+    components,
+    missing,
+    caveat: caveatFor(vehicle),
+  };
 }
 
 /**
@@ -333,6 +365,8 @@ export interface EnvironmentalMethodStep {
   reads: string;
   /** How that figure becomes a mark out of a hundred. */
   scale: string;
+  /** The rule itself, so the reader can apply it to a car of their own. */
+  formula: string;
 }
 
 /**
@@ -348,28 +382,36 @@ export const ENVIRONMENTAL_METHOD: EnvironmentalMethodStep[] = [
     label: "CO\u2082 emissions",
     reads: "The tailpipe figure FINN publishes, in grams per kilometre.",
     scale: `Scored against a ${CO2_CEILING_G_PER_KM} g/km ceiling: a car emitting nothing at the tailpipe scores full marks, one at ${CO2_CEILING_G_PER_KM} or above scores none.`,
+    formula: `100 × (1 − g/km ÷ ${CO2_CEILING_G_PER_KM})`,
   },
   {
     id: "co2Class",
     label: "CO\u2082 class",
     reads: "The EU efficiency label, A through G.",
     scale: "A scores full marks and G none, in even steps — the same grade you can see on FINN's own page.",
+    formula: "A = 100, B = 83, C = 67, D = 50, E = 33, F = 17, G = 0",
   },
   {
     id: "energy",
     label: "Energy use",
     reads: "What the car consumes over 100 km.",
     scale: `Against ${FUEL_CEILING_L_PER_100KM} L/100 km for a combustion car and ${ELECTRIC_CEILING_KWH_PER_100KM} kWh/100 km for an electric one. Litres and kilowatt-hours aren't the same quantity, so they can't share a scale.`,
+    formula: `100 × (1 − consumption ÷ ${FUEL_CEILING_L_PER_100KM} or ${ELECTRIC_CEILING_KWH_PER_100KM})`,
   },
   {
     id: "powertrain",
     label: "Fuel type",
     reads: "What the car runs on.",
     scale: "Electric scores highest, then plug-in hybrid. Diesel and petrol score alike: where one emits less per kilometre, that is already the CO\u2082 figure above.",
+    formula: `Electric = ${POWERTRAIN_SCORE.Electric}, plug-in hybrid = ${POWERTRAIN_SCORE["Plug-in Hybrid"]}, diesel and petrol = ${POWERTRAIN_SCORE.Petrol}`,
   },
 ];
 
 /** What the four steps don't say on their own. */
+/** The last step: what happens to the four marks. */
+export const ENVIRONMENTAL_METHOD_TOTAL =
+  "The four marks are added up and divided by four.";
+
 export const ENVIRONMENTAL_METHOD_NOTES: string[] = [
   "The four count equally, and the result is their average. Where FINN hasn't supplied one of them, it's named and left out rather than counted as zero.",
   "Two things no figure can say for itself: a plug-in hybrid's official CO\u2082 figure assumes you charge it, and an electric car's zero is a figure about the tailpipe rather than about the electricity you charge it with. Lens says both where they apply.",

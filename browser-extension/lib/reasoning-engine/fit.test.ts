@@ -333,3 +333,79 @@ describe("describeFit", () => {
     expect(line).toMatch(/hasn't supplied an equipment list/);
   });
 });
+
+describe("what the car has, in the reader's terms and the category's", () => {
+  const [first, second, third] = SAFETY as [string, string, string];
+
+  const analysis = () =>
+    buildFitAnalysis(
+      makeCar({ id: 1, features: SAFETY.slice(0, 6) as never }),
+      ["safetyAssistance"],
+      prefs(),
+      picks({
+        safetyAssistance: [
+          { key: first as never, importance: "high" },
+          { key: third as never, importance: "low" },
+          { key: SAFETY[9] as never, importance: "medium" },
+        ],
+      }),
+    );
+
+  it("keeps the reader's picks apart from the rest of the category", () => {
+    const safety = analysis().priorities[0];
+
+    const pickedKeys = safety?.picked.map((item) => item.key) ?? [];
+    const restKeys = safety?.alsoCounted.map((item) => item.key) ?? [];
+
+    /* A pick is listed once, under the reader's own heading. */
+    for (const key of pickedKeys) expect(restKeys).not.toContain(key);
+
+    expect(pickedKeys).toHaveLength(3);
+    expect(pickedKeys.length + restKeys.length).toBe(SAFETY.length);
+  });
+
+  it("says which of the category's features the car hasn't got", () => {
+    const safety = analysis().priorities[0];
+
+    const absent = safety?.alsoCounted.filter(
+      (item) => item.state === "absent",
+    );
+
+    /* Six of fifteen present, three of those picked out. */
+    expect(safety?.alsoCounted.filter((i) => i.state === "present")).toHaveLength(4);
+    expect(absent?.length).toBe(SAFETY.length - 6 - 1);
+  });
+
+  it("carries the level the reader gave each pick, present or absent", () => {
+    const safety = analysis().priorities[0];
+
+    const held = safety?.picked.find((item) => item.key === first);
+    const wanted = safety?.picked.find((item) => item.key === SAFETY[9]);
+
+    expect(held?.state).toBe("present");
+    expect(held?.importance).toBe("high");
+
+    expect(wanted?.state).toBe("absent");
+    expect(wanted?.importance).toBe("medium");
+  });
+
+  it("gives the rest of the category no invented importance", () => {
+    for (const item of analysis().priorities[0]?.alsoCounted ?? []) {
+      expect(item.importance).toBeNull();
+    }
+  });
+
+  it("reads unknown for everything when FINN listed no equipment", () => {
+    const blind = buildFitAnalysis(
+      makeCar({ id: 2, features: [] }),
+      ["safetyAssistance"],
+      prefs(),
+    );
+
+    const safety = blind.priorities[0];
+
+    for (const item of [...(safety?.picked ?? []), ...(safety?.alsoCounted ?? [])]) {
+      expect(item.state).toBe("unknown");
+    }
+  });
+});

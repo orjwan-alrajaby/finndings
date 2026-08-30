@@ -1,6 +1,7 @@
 import {
     ENVIRONMENTAL_METHOD,
     ENVIRONMENTAL_METHOD_NOTES,
+    ENVIRONMENTAL_METHOD_TOTAL,
 } from "@/lib/reasoning-engine/environmental";
 
 /**
@@ -48,12 +49,46 @@ export function EnvironmentalMethod({
                             {step.reads}
                         </p>
 
+                        {/*
+                          * The rule itself, not a description of it. A reader
+                          * who can see the arithmetic can apply it to a car
+                          * in front of them and check the answer; one who is
+                          * only told there is a scale has to take it on
+                          * trust.
+                          */}
+                        <p className="mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy">
+                            {step.formula}
+                        </p>
+
                         <p className="mt-1 text-[11px] leading-4 text-finn-iron">
                             {step.scale}
                         </p>
                     </div>
                 </div>
             ))}
+
+            <div className={`flex gap-3 rounded-2xl ${card} p-3`}>
+                <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-finn-accent-blue text-[10px] font-black text-white"
+                    aria-hidden="true"
+                >
+                    =
+                </span>
+
+                <div className="min-w-0">
+                    <p className="text-xs font-black text-finn-black">
+                        The score
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] leading-4 text-finn-black">
+                        {ENVIRONMENTAL_METHOD_TOTAL}
+                    </p>
+
+                    <p className="mt-1 rounded-md bg-white px-2 py-1 font-mono text-[10px] leading-4 tabular-nums text-finn-highlight-navy">
+                        (mark + mark + mark + mark) ÷ 4
+                    </p>
+                </div>
+            </div>
 
             {ENVIRONMENTAL_METHOD_NOTES.map((note) => (
                 <p
