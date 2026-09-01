@@ -13,11 +13,16 @@ import {
 } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
-import { describeFit } from "@/lib/reasoning-engine/fit";
+import {
+  describeFit,
+  FIT_BANDS,
+  FIT_SEGMENTS,
+} from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
 import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
+import { pinControl } from "./pin-control";
 
 /**
  * The analysis, drawn.
@@ -41,19 +46,14 @@ import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
  *
  * A band is a summary of a score the reader is deliberately never shown, so
  * the indicator has to read as "how much of this" without reading as a mark
- * out of ten. Four segments in one colour do that; a number or a coloured
- * grade would not.
+ * out of ten. Four segments do that; a number or a letter grade would not.
+ *
+ * Coloured by band rather than in one accent, so the four are told apart
+ * before they are read — see FIT_BANDS.
  */
-const SEGMENTS: Record<FitLevel, number> = {
-  strong: 4,
-  good: 3,
-  partial: 2,
-  limited: 1,
-  unknown: 0,
-};
-
 function meter(level: FitLevel): HTMLElement {
-  const filled = SEGMENTS[level];
+  const filled = FIT_SEGMENTS[level];
+  const band = FIT_BANDS[level];
 
   return el(
     "span",
@@ -65,7 +65,7 @@ function meter(level: FitLevel): HTMLElement {
       el("span", {
         class: [
           "block h-3 w-[3px] rounded-full",
-          index < filled ? "bg-finn-accent-blue" : "bg-finn-accent-blue/20",
+          index < filled ? band.barClass : band.emptyBarClass,
         ].join(" "),
       }),
     ),
@@ -73,18 +73,13 @@ function meter(level: FitLevel): HTMLElement {
 }
 
 function bandChip(level: FitLevel, label: string): HTMLElement {
-  const tone =
-    level === "unknown"
-      ? "bg-finn-cotton text-finn-iron"
-      : "bg-finn-pale-blue text-finn-highlight-navy";
-
   return el(
     "span",
     {
       class: [
         "inline-flex items-center gap-2 rounded-full px-2.5 py-1",
         "text-[11px] font-bold whitespace-nowrap",
-        tone,
+        FIT_BANDS[level].chipClass,
       ].join(" "),
     },
     [meter(level), el("span", { text: label })],
@@ -332,8 +327,15 @@ export function fitHeader(analysis: FitAnalysis): HTMLElement {
       text: configurationDetail(vehicle),
     }),
 
-    el("div", { class: "mt-3 flex items-center gap-2" }, [
+    /*
+     * The verdict and the one action it invites, on the same line. A reader
+     * who has just been told a car suits them shouldn't have to go and find a
+     * small circle on a card to do anything about it.
+     */
+    el("div", { class: "mt-3 flex flex-wrap items-center gap-2" }, [
       bandChip(analysis.overall.level, analysis.overall.label),
+      el("span", { class: "flex-1" }),
+      pinControl(analysis.vehicle as never),
     ]),
 
     el("p", {

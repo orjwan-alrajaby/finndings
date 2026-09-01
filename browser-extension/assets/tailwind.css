@@ -35,6 +35,30 @@
   --color-finn-influence-red: #c70036;
   --color-finn-influence-red-pale: #fff1f2;
 
+  /* -- Fit bands --
+     How well one car serves what the reader asked for. Four steps, and they
+     have to be told apart before they are read: a page of cards is scanned,
+     not studied, and four chips of the same blue make the reader stop and
+     read every one of them.
+
+     A green-to-red ramp, because that is what a quality scale reads as
+     everywhere else. These are deliberately not the influence scale's
+     emerald/orange/rose — that answers "how much does this feature count",
+     which is the reader's own statement about a feature and not a verdict
+     about a car, and one scale wearing two meanings is worse than two scales.
+
+     Darker than the influence hues on purpose. These carry 11px bold text on
+     their own pale backgrounds, so they are picked for contrast at that size
+     rather than for brightness: 5.4:1, 4.6:1, 5.1:1 and 6.0:1 on white. */
+  --color-finn-fit-strong: #047857;
+  --color-finn-fit-strong-pale: #ecfdf5;
+  --color-finn-fit-good: #0072ea;
+  --color-finn-fit-good-pale: #eaf4ff;
+  --color-finn-fit-partial: #b45309;
+  --color-finn-fit-partial-pale: #fff7ed;
+  --color-finn-fit-limited: #c70036;
+  --color-finn-fit-limited-pale: #fff1f2;
+
   /* -- Breakpoints --
      Redeclaring these overrides Tailwind's defaults and generates
      2xs:, xs:, sm:, md:, lg:, xl:, 2xl:, 3xl:, 4xl:, 5xl: variants. */

@@ -71,12 +71,67 @@ export interface FitBand {
   label: string;
 }
 
-const BAND_LABEL: Record<FitLevel, string> = {
-  strong: "Strong match",
-  good: "Good match",
-  partial: "Partial match",
-  limited: "Limited match",
-  unknown: "Not enough data",
+/**
+ * What each band is called, and what it looks like.
+ *
+ * The colours live here beside the words for the same reason the influence
+ * scale keeps its own: a band shown in one place and coloured in another drifts
+ * the moment either changes. Every surface that shows a band — the panel, the
+ * badge on a card — reads its look from this, so a "Good match" is the same
+ * blue wherever the reader meets it.
+ *
+ * The one rule the palette has to obey is that the four are distinguishable
+ * before they are read. A list of cards is scanned rather than studied, and
+ * four chips in the same colour make the reader stop and read each one.
+ */
+export const FIT_BANDS = {
+  strong: {
+    label: "Strong match",
+    chipClass: "bg-finn-fit-strong-pale text-finn-fit-strong",
+    barClass: "bg-finn-fit-strong",
+    emptyBarClass: "bg-finn-fit-strong/20",
+  },
+  good: {
+    label: "Good match",
+    chipClass: "bg-finn-fit-good-pale text-finn-fit-good",
+    barClass: "bg-finn-fit-good",
+    emptyBarClass: "bg-finn-fit-good/20",
+  },
+  partial: {
+    label: "Partial match",
+    chipClass: "bg-finn-fit-partial-pale text-finn-fit-partial",
+    barClass: "bg-finn-fit-partial",
+    emptyBarClass: "bg-finn-fit-partial/20",
+  },
+  limited: {
+    label: "Limited match",
+    chipClass: "bg-finn-fit-limited-pale text-finn-fit-limited",
+    barClass: "bg-finn-fit-limited",
+    emptyBarClass: "bg-finn-fit-limited/20",
+  },
+  unknown: {
+    label: "Not enough data",
+    chipClass: "bg-finn-cotton text-finn-iron",
+    barClass: "bg-finn-iron/40",
+    emptyBarClass: "bg-finn-iron/15",
+  },
+} as const satisfies Record<
+  FitLevel,
+  {
+    label: string;
+    chipClass: string;
+    barClass: string;
+    emptyBarClass: string;
+  }
+>;
+
+/** How many of the four segments a band fills. */
+export const FIT_SEGMENTS: Record<FitLevel, number> = {
+  strong: 4,
+  good: 3,
+  partial: 2,
+  limited: 1,
+  unknown: 0,
 };
 
 /**
@@ -106,7 +161,9 @@ const PARTIAL_FROM = 25;
 
 /** Bands a score the engine produced. Never produces a score of its own. */
 export function classifyFit(score: number, hasEvidence = true): FitBand {
-  if (!hasEvidence) return { level: "unknown", label: BAND_LABEL.unknown };
+  if (!hasEvidence) {
+    return { level: "unknown", label: FIT_BANDS.unknown.label };
+  }
 
   const level: FitLevel =
     score >= STRONG_FROM
@@ -117,7 +174,7 @@ export function classifyFit(score: number, hasEvidence = true): FitBand {
           ? "partial"
           : "limited";
 
-  return { level, label: BAND_LABEL[level] };
+  return { level, label: FIT_BANDS[level].label };
 }
 
 /* -------------------------------------------------------------------------- */

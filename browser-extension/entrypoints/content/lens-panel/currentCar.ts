@@ -8,7 +8,10 @@ import {
   getPinnedCars,
   mergeLoadedCars,
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
-import { buildCarUrl } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
+import {
+  buildCarUrl,
+  extractConfigId,
+} from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
 
 /**
  * Which car the reader is actually looking at, and what we know about it.
@@ -99,6 +102,42 @@ export function resolveCurrentConfigId(
   const [only] = cards;
 
   return cards.length === 1 && only != null ? only : null;
+}
+
+/** Every card FINN draws that stands for one car the reader could open. */
+export const CARD_SELECTORS = [
+  '[data-testid="product-card"]',
+  '[data-testid="group-comparison"] [id^="product-"]',
+].join(",");
+
+/**
+ * The config id a card stands for.
+ *
+ * Listing cards carry it inside `data-productid`
+ * ("byd-dolphin-36933-obsidianblack") and configuration cards inside their own
+ * `id` ("product-34889") — which is exactly what the pin button already reads
+ * from each, so nothing that marks a card can disagree with anything else
+ * about which car it is.
+ */
+export function cardConfigId(card: HTMLElement): number | null {
+  const own = /^product-(\d+)$/.exec(card.id)?.[1];
+
+  if (own) return Number(own);
+
+  return extractConfigId(card.dataset.productid ?? "");
+}
+
+/** The card on this page for one car, wherever FINN drew it. */
+export function cardForCar(id: number): HTMLElement | null {
+  const byId = document.getElementById(`product-${id}`);
+
+  if (byId) return byId;
+
+  for (const card of document.querySelectorAll<HTMLElement>(CARD_SELECTORS)) {
+    if (cardConfigId(card) === id) return card;
+  }
+
+  return null;
 }
 
 /** The details page root, or null when this isn't one. */

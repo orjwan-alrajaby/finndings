@@ -246,3 +246,31 @@ describe("highlightConfiguration", () => {
     expect(document.documentElement.outerHTML).toBe(before);
   });
 });
+
+describe("cards that aren't configuration cards", () => {
+  it("marks a listing card, which identifies itself differently", () => {
+    /*
+     * A configuration card carries its id in `id="product-34889"`; a listing
+     * card carries it inside `data-productid`. The panel can be opened from
+     * either, so the mark has to land on either.
+     */
+    const { document: page } = parseHTML(
+      `<!doctype html><html><body>
+        <div data-testid="product-card" data-productid="byd-dolphin-36933-obsidianblack">
+          <div class="finn-lens-add-car-btn"></div>
+        </div>
+      </body></html>`,
+    );
+
+    Object.assign(globalThis, { document: page });
+
+    highlightConfiguration(36933);
+
+    expect(
+      page.querySelectorAll(".finn-lens-current"),
+    ).toHaveLength(1);
+    expect(
+      page.querySelector(".finn-lens-current")?.getAttribute("data-productid"),
+    ).toBe("byd-dolphin-36933-obsidianblack");
+  });
+});

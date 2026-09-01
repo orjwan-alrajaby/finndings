@@ -27,6 +27,8 @@
  * to be near each other.
  */
 
+import { cardForCar } from "./currentCar";
+
 const STYLE_ID = "finn-lens-highlight-style";
 const HIGHLIGHTING = "finn-lens-highlighting";
 const CURRENT = "finn-lens-current";
@@ -66,9 +68,16 @@ const CSS = `
   }
 `;
 
-/** The card FINN draws for one configuration. */
+/**
+ * The card FINN drew for one car, wherever it drew it.
+ *
+ * A configuration on a detail page and a car in a listing are the same
+ * question with two different markup answers, and the mark has to land on
+ * either — the panel can now be opened from a list, so the card it is talking
+ * about is often not a configuration card at all.
+ */
 export function configurationCard(id: number): HTMLElement | null {
-  return document.getElementById(`product-${id}`);
+  return cardForCar(id);
 }
 
 let marked: HTMLElement | null = null;

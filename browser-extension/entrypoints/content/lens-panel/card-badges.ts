@@ -1,15 +1,20 @@
-import { buildFitAnalysis, type FitLevel } from "@/lib/reasoning-engine/fit";
+import {
+  buildFitAnalysis,
+  FIT_BANDS,
+  FIT_SEGMENTS,
+  type FitLevel,
+} from "@/lib/reasoning-engine/fit";
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import type { FinnCar, PinnedFinnCar } from "@/lib/types";
 
 import { el } from "./dom";
 import { openPanel } from "./panel";
+import { cardConfigId, CARD_SELECTORS } from "./currentCar";
 import {
   getLoadedCars,
   getPinnedCars,
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
-import { extractConfigId } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
 
 /**
  * Lens's answer on the card, before the reader opens anything.
@@ -41,46 +46,13 @@ import { extractConfigId } from "../injectors/inject-pin-button/injectPinCarButt
 const BADGE = "finn-lens-fit-badge";
 const MARKER = "data-finn-lens-fit";
 
-/** Where FINN draws a car the reader could open. */
-const CARD_SELECTORS = [
-  '[data-testid="product-card"]',
-  '[data-testid="group-comparison"] [id^="product-"]',
-];
-
-/* -------------------------------------------------------------------------- */
-/* What a card is about                                                       */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The config id a card stands for.
- *
- * Listing cards carry it inside `data-productid`
- * ("byd-dolphin-36933-obsidianblack") and configuration cards inside their own
- * `id` ("product-34889"), which is exactly what the pin button already reads
- * from each — so a badge and a pin on the same card can never disagree about
- * which car it is.
- */
-export function cardConfigId(card: HTMLElement): number | null {
-  if (/^product-\d+$/.test(card.id)) {
-    return Number(/^product-(\d+)$/.exec(card.id)?.[1]);
-  }
-
-  return extractConfigId(card.dataset.productid ?? "");
-}
-
 /* -------------------------------------------------------------------------- */
 /* The badge                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const SEGMENTS: Record<FitLevel, number> = {
-  strong: 4,
-  good: 3,
-  partial: 2,
-  limited: 1,
-  unknown: 0,
-};
-
 function meter(level: FitLevel): HTMLElement {
+  const band = FIT_BANDS[level];
+
   return el(
     "span",
     {
@@ -91,9 +63,7 @@ function meter(level: FitLevel): HTMLElement {
       el("span", {
         class: [
           "block h-2.5 w-[3px] rounded-full",
-          index < SEGMENTS[level]
-            ? "bg-finn-accent-blue"
-            : "bg-finn-accent-blue/25",
+          index < FIT_SEGMENTS[level] ? band.barClass : band.emptyBarClass,
         ].join(" "),
       }),
     ),
@@ -120,11 +90,11 @@ function badgeFor(
       class: [
         BADGE,
         "mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2",
-        "bg-finn-pale-blue text-left text-finn-highlight-navy",
-        "cursor-pointer border-0 transition-colors",
-        "hover:bg-finn-accent-blue hover:text-white",
+        "text-left cursor-pointer border-0 transition-all",
+        "hover:brightness-95",
         "focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-finn-accent-blue/50",
+        FIT_BANDS[level].chipClass,
       ].join(" "),
       attrs: {
         type: "button",
@@ -195,9 +165,7 @@ async function context(): Promise<{
 }
 
 export async function injectFitBadges(): Promise<void> {
-  const cards = document.querySelectorAll<HTMLElement>(
-    CARD_SELECTORS.join(","),
-  );
+  const cards = document.querySelectorAll<HTMLElement>(CARD_SELECTORS);
 
   if (!cards.length) return;
 

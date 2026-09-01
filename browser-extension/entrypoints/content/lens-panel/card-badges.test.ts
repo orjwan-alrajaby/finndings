@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
 
 import {
-  cardConfigId,
   injectFitBadges,
   refreshFitBadges,
   removeFitBadges,
 } from "./card-badges";
+import { cardConfigId } from "./currentCar";
 import { AVAILABLE_CATEGORY_FEATURES } from "@/lib/reasoning-engine/constants";
 import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 import type { FinnCar } from "@/lib/types";

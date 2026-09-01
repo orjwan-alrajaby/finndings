@@ -42,6 +42,8 @@ const WATCHED_KEYS = [
 ];
 
 interface Panel {
+  /** Point an already-open panel at a different car. */
+  show: (request: PanelRequest) => void;
   destroy: () => void;
 }
 
@@ -220,6 +222,9 @@ async function render(
     }
 
     const settings = await loadLensSettings();
+
+    /* Marked, not scrolled to: the card is already under the reader's cursor. */
+    highlightConfiguration(car.id);
 
     empty(into);
     into.append(
@@ -534,7 +539,25 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   const session: Session = { choice: undefined };
 
-  const retry = () => void render(scroller, retry, session, request);
+  /*
+   * Which car the panel is currently about. It changes without the panel
+   * being rebuilt: a reader clicking through the verdicts on a list is asking
+   * the same question of one car after another, and tearing the panel down
+   * and building it again between each would throw away the scroll position,
+   * the styles and the room the page has already made.
+   */
+  let current = request;
+
+  const retry = () => void render(scroller, retry, session, current);
+
+  const show = (next: PanelRequest) => {
+    current = next;
+
+    /* A different car is a different question, so nothing carries over. */
+    session.choice = undefined;
+
+    retry();
+  };
 
   /*
    * Settings changed in the options tab reach an open panel, which is what
@@ -562,12 +585,12 @@ async function build(request: PanelRequest): Promise<Panel> {
     host.remove();
   };
 
-  void render(scroller, retry, session, request);
+  void render(scroller, retry, session, current);
 
   document.body.append(host);
   closeButton.focus();
 
-  return { destroy };
+  return { show, destroy };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -577,7 +600,15 @@ async function build(request: PanelRequest): Promise<Panel> {
 let opener: Element | null = null;
 
 export async function openPanel(request: PanelRequest = {}): Promise<void> {
-  if (open) return;
+  /*
+   * An open panel is pointed at the new car rather than left showing the old
+   * one. Returning early here was a bug the badges made obvious: every card
+   * on a list has a button, and clicking the second one did nothing at all.
+   */
+  if (open) {
+    open.show(request);
+    return;
+  }
 
   opener = document.activeElement;
 
