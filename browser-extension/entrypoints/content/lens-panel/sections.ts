@@ -98,15 +98,10 @@ function sectionHeading(text: string): HTMLElement {
   });
 }
 
-/*
- * `break-inside-avoid` costs nothing in a single column and is what keeps a
- * section whole when the panel lays them out in columns — a cost breakdown
- * split down the middle of its own table is worse than a shorter column.
- */
 function section(title: string, ...children: (Node | null)[]): HTMLElement {
   return el(
     "section",
-    { class: "break-inside-avoid border-t border-finn-cotton px-5 py-4" },
+    { class: "border-t border-finn-cotton px-5 py-4" },
     [sectionHeading(title), ...children],
   );
 }
@@ -317,7 +312,7 @@ export function backToConfigurations(
 export function fitHeader(analysis: FitAnalysis): HTMLElement {
   const { vehicle } = analysis;
 
-  return el("header", { class: "break-inside-avoid px-5 pb-4 pt-3" }, [
+  return el("header", { class: "px-5 pb-4 pt-3" }, [
     el("p", {
       class: "text-lg font-black leading-6 text-finn-black",
       text: vehicle.name,
@@ -404,10 +399,7 @@ export function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
  * evidence follows underneath it.
  */
 function prioritySection(priority: FitPriority): HTMLElement {
-  return el(
-    "section",
-    { class: "break-inside-avoid border-t border-finn-cotton px-5 py-4" },
-    [
+  return el("section", { class: "border-t border-finn-cotton px-5 py-4" }, [
     el("div", { class: "flex items-start gap-2.5" }, [
       el("span", {
         class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-sm",
@@ -469,8 +461,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
           text: "FINN's data doesn't carry anything we can judge this priority on for this car.",
         })
       : null,
-    ],
-  );
+  ]);
 }
 
 /**
@@ -885,7 +876,7 @@ export function analysisBody(
     costSection(analysis),
     tradeoffsSection(analysis),
 
-    el("footer", { class: "break-inside-avoid border-t border-finn-cotton px-5 py-4" }, [
+    el("footer", { class: "border-t border-finn-cotton px-5 py-4" }, [
       el("p", {
         class: "text-[11px] leading-4 text-finn-iron",
         text: analysis.cost.disclaimer,

@@ -7,12 +7,6 @@ import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 import { el, empty, fragment, panelStyles } from "./dom";
 import { canDock, dockPage, undockPage } from "./page-dock";
 import {
-  findInsetAnchor,
-  insetGeometry,
-  insetPage,
-  uninsetPage,
-} from "./page-inset";
-import {
   analysisBody,
   backToConfigurations,
   configurationsSection,
@@ -38,19 +32,6 @@ const HOST_ID = "finn-lens-analysis-root";
  * narrowed by. They have to be the same or the seam shows.
  */
 const PANEL_WIDTH = 416;
-
-/**
- * How tall the panel stands when it sits in the page rather than beside it.
- *
- * Tall enough that the answer starts rather than teases, short enough that
- * FINN's configurations stay visible below it — the reader should be able to
- * see the gap has an end. Capped against the viewport so it never becomes a
- * page of its own on a short screen.
- */
-const PANEL_HEIGHT = 560;
-
-const panelHeight = (): number =>
-  Math.min(PANEL_HEIGHT, Math.round(window.innerHeight * 0.75));
 
 /** The stored settings that change what an analysis says. */
 const WATCHED_KEYS = [
@@ -349,43 +330,21 @@ async function build(): Promise<Panel> {
   const host = el("div", { attrs: { id: HOST_ID } });
 
   /*
-   * Three placements, in order of how much the panel behaves like part of
-   * the page:
+   * A rail down the right, not a sheet over everything.
    *
-   *   inset  — a band in the page's own flow, in the gap between the car and
-   *            the configurations it comes in. Scrolls with the page, because
-   *            it is at a place on the page rather than a place on the screen.
-   *   docked — a rail down the right, when there is no seam to sit in.
-   *   over   — a sheet over the page, when there is no room for either.
+   * The host used to cover the viewport so a backdrop could fill it. Nothing
+   * outside the panel's own width is ours to occupy: the page beside it stays
+   * clickable, scrollable and selectable, which is the entire point of making
+   * room rather than covering.
    *
-   * Nothing outside the panel's own box is ours to occupy in the first two:
-   * the page around it stays clickable, scrollable and selectable, which is
-   * the entire point of making room rather than covering.
+   * Where there isn't room to sit beside the car — a narrow window, a phone —
+   * it covers the page instead and nothing is narrowed at all.
    */
   const root = detailsPageRoot();
-  const anchor = root ? findInsetAnchor(root) : null;
 
-  const placement: "inset" | "docked" | "over" = anchor
-    ? "inset"
-    : root && canDock(PANEL_WIDTH)
-      ? "docked"
-      : "over";
-
-  /** Puts the host where the placement says, in page or screen coordinates. */
   const position = () => {
-    if (placement === "inset" && anchor) {
-      const height = panelHeight();
-      const { top, left, width } = insetGeometry(anchor, height);
-
-      host.style.cssText =
-        `position:absolute;top:${top}px;left:${left}px;` +
-        `width:${width}px;height:${height}px;z-index:2147483000;`;
-
-      return;
-    }
-
     host.style.cssText =
-      placement === "docked"
+      root && canDock(PANEL_WIDTH)
         ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
         : "position:fixed;inset:0;z-index:2147483000;";
   };
@@ -394,18 +353,8 @@ async function build(): Promise<Panel> {
 
   shadow.append(el("style", { text: await panelStyles() }));
 
-  /*
-   * Laid out in columns when the panel is wide and stacked when it is narrow.
-   * Same sections either way — a band the width of FINN's own container with
-   * one 26rem column of text down the left would be mostly empty page.
-   */
   const scroller = el("div", {
-    class: [
-      "min-h-0 flex-1 overflow-y-auto overscroll-contain",
-      placement === "inset"
-        ? "[column-gap:0px] md:columns-2 xl:columns-3"
-        : "",
-    ].join(" "),
+    class: "min-h-0 flex-1 overflow-y-auto overscroll-contain",
   });
 
   const close = () => closePanel();
@@ -466,9 +415,7 @@ async function build(): Promise<Panel> {
       class: [
         "absolute inset-0 flex flex-col overflow-hidden bg-white",
         "font-sans text-finn-black",
-        placement === "inset"
-          ? "rounded-2xl border border-finn-cotton shadow-[0_2px_16px_rgba(0,0,0,0.06)]"
-          : "border-l border-finn-cotton shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
+        "border-l border-finn-cotton shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
       ].join(" "),
       attrs: {
         role: "complementary",
@@ -480,8 +427,7 @@ async function build(): Promise<Panel> {
 
   shadow.append(drawer);
 
-  if (placement === "inset" && anchor) insetPage(anchor, panelHeight());
-  else if (placement === "docked" && root) dockPage(root, PANEL_WIDTH);
+  if (root && canDock(PANEL_WIDTH)) dockPage(root, PANEL_WIDTH);
 
   position();
 
@@ -506,37 +452,18 @@ async function build(): Promise<Panel> {
   window.addEventListener("keydown", onKeyDown, true);
 
   /*
-   * The gap is at a place on the page, and the page moves: images load, FINN
-   * renders something above it, the window changes width and everything
-   * reflows. An observer on the section the gap sits above catches all of
-   * that, where a resize listener alone would catch only the last.
+   * A window wide enough to dock into can stop being one — a resize, or
+   * devtools opening beside the page. Docking is re-decided rather than
+   * decided once, so a squeezed page isn't left squeezed.
    */
   const onResize = () => {
-    if (placement === "inset" && anchor) {
-      insetPage(anchor, panelHeight());
-      position();
-      return;
-    }
-
-    const room = root != null && canDock(PANEL_WIDTH);
-
-    if (room && root) dockPage(root, PANEL_WIDTH);
+    if (root && canDock(PANEL_WIDTH)) dockPage(root, PANEL_WIDTH);
     else undockPage();
 
     position();
   };
 
   window.addEventListener("resize", onResize);
-
-  const reflow =
-    placement === "inset" && anchor && typeof ResizeObserver !== "undefined"
-      ? new ResizeObserver(() => position())
-      : null;
-
-  if (reflow && anchor) {
-    reflow.observe(anchor);
-    reflow.observe(document.body);
-  }
 
   const session: Session = { choice: undefined };
 
@@ -560,10 +487,8 @@ async function build(): Promise<Panel> {
     browser.storage.onChanged.removeListener(onStorageChanged);
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("resize", onResize);
-    reflow?.disconnect();
 
-    /* The page gets its room back before the panel that borrowed it goes. */
-    uninsetPage();
+    /* The car gets its width back before the panel that borrowed it goes. */
     undockPage();
 
     host.remove();
