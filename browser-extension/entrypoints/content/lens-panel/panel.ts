@@ -367,7 +367,7 @@ async function build(): Promise<Panel> {
 
   const placement: "inset" | "docked" | "over" = anchor
     ? "inset"
-    : canDock(PANEL_WIDTH)
+    : root && canDock(PANEL_WIDTH)
       ? "docked"
       : "over";
 
@@ -481,7 +481,7 @@ async function build(): Promise<Panel> {
   shadow.append(drawer);
 
   if (placement === "inset" && anchor) insetPage(anchor, panelHeight());
-  else if (placement === "docked") dockPage(PANEL_WIDTH);
+  else if (placement === "docked" && root) dockPage(root, PANEL_WIDTH);
 
   position();
 
@@ -518,9 +518,9 @@ async function build(): Promise<Panel> {
       return;
     }
 
-    const room = canDock(PANEL_WIDTH);
+    const room = root != null && canDock(PANEL_WIDTH);
 
-    if (room) dockPage(PANEL_WIDTH);
+    if (room && root) dockPage(root, PANEL_WIDTH);
     else undockPage();
 
     position();
