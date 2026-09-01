@@ -53,7 +53,12 @@ function syncCardButton(id: number, pinned: boolean): void {
 }
 
 export function pinControl(car: PinnedFinnCar): HTMLElement {
-  const label = el("span", { text: "Pin for comparison" });
+  const label = el("span", {});
+
+  const mark = el("span", {
+    class: "text-[15px] leading-none",
+    attrs: { "aria-hidden": "true" },
+  });
 
   const button = el(
     "button",
@@ -66,23 +71,37 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
         },
       },
     },
-    [label],
+    [mark, label],
   );
 
   let pinned = false;
   let busy = false;
 
+  /*
+   * Loud when it is an offer, quiet once it is a state.
+   *
+   * Unpinned it is the only thing the panel asks the reader to do, so it looks
+   * like it: full width, solid, FINN's own accent. Pinned it has nothing left
+   * to ask, and a second solid blue button sitting under a blue verdict chip
+   * would compete with the answer it is meant to follow — so it steps back to
+   * a confirmation the reader can still press again to undo.
+   */
   const paint = () => {
     button.className = [
-      "flex h-9 items-center justify-center gap-1.5 rounded-full px-4",
-      "text-[12px] font-black transition-colors",
+      "mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full",
+      "text-[13px] font-black transition-colors",
       pinned
-        ? "bg-finn-accent-blue text-white hover:bg-finn-highlight-navy"
-        : "border border-finn-cotton bg-white text-finn-black hover:bg-finn-snow",
+        ? "bg-finn-pale-blue text-finn-highlight-navy hover:bg-finn-cotton"
+        : "bg-finn-accent-blue text-white shadow-sm hover:bg-finn-highlight-navy",
     ].join(" ");
 
     button.setAttribute("aria-pressed", String(pinned));
-    label.textContent = pinned ? "Pinned ✓" : "Pin for comparison";
+
+    label.textContent = pinned
+      ? "Pinned — compare it later"
+      : "Pin this car for comparison";
+
+    mark.textContent = pinned ? "✓" : "+";
   };
 
   const toggle = async () => {

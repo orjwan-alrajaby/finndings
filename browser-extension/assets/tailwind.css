@@ -41,19 +41,21 @@
      not studied, and four chips of the same blue make the reader stop and
      read every one of them.
 
-     A green-to-red ramp, because that is what a quality scale reads as
-     everywhere else. These are deliberately not the influence scale's
+     Blue at the top because blue is FINN's own accent and the best answer
+     Lens can give about a car should look like the site it is given on; then
+     green, amber and red down the ramp. These are deliberately not the
+     influence scale's
      emerald/orange/rose — that answers "how much does this feature count",
      which is the reader's own statement about a feature and not a verdict
      about a car, and one scale wearing two meanings is worse than two scales.
 
      Darker than the influence hues on purpose. These carry 11px bold text on
      their own pale backgrounds, so they are picked for contrast at that size
-     rather than for brightness: 5.4:1, 4.6:1, 5.1:1 and 6.0:1 on white. */
-  --color-finn-fit-strong: #047857;
-  --color-finn-fit-strong-pale: #ecfdf5;
-  --color-finn-fit-good: #0072ea;
-  --color-finn-fit-good-pale: #eaf4ff;
+     rather than for brightness: 4.6:1, 5.4:1, 5.1:1 and 6.0:1 on white. */
+  --color-finn-fit-strong: #0072ea;
+  --color-finn-fit-strong-pale: #eaf4ff;
+  --color-finn-fit-good: #047857;
+  --color-finn-fit-good-pale: #ecfdf5;
   --color-finn-fit-partial: #b45309;
   --color-finn-fit-partial-pale: #fff7ed;
   --color-finn-fit-limited: #c70036;

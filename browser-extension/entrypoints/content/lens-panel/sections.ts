@@ -79,6 +79,7 @@ function bandChip(level: FitLevel, label: string): HTMLElement {
       class: [
         "inline-flex items-center gap-2 rounded-full px-2.5 py-1",
         "text-[11px] font-bold whitespace-nowrap",
+        "shadow-[0_1px_6px_rgba(0,0,0,0.12)]",
         FIT_BANDS[level].chipClass,
       ].join(" "),
     },
@@ -307,53 +308,98 @@ export function backToConfigurations(
 export function fitHeader(analysis: FitAnalysis): HTMLElement {
   const { vehicle } = analysis;
 
-  return el("header", { class: "px-5 pb-4 pt-3" }, [
-    el("p", {
-      class: "text-lg font-black leading-6 text-finn-black",
-      text: vehicle.name,
-    }),
+  return el("header", { class: "pb-4" }, [
+    photo(analysis),
 
-    /*
-     * The configuration, said in the same words the chooser used. Everything
-     * below this line is about this one car and no other.
-     */
-    el("p", {
-      class: "mt-0.5 text-[13px] font-bold leading-5 text-finn-accent-blue",
-      text: configurationName(vehicle),
-    }),
+    el("div", { class: "px-5 pt-3" }, [
+      el("p", {
+        class: "text-lg font-black leading-6 text-finn-black",
+        text: vehicle.name,
+      }),
 
-    el("p", {
-      class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-      text: configurationDetail(vehicle),
-    }),
+      /*
+       * The configuration, said in the same words the chooser used. Everything
+       * below this line is about this one car and no other.
+       */
+      el("p", {
+        class: "mt-0.5 text-[13px] font-bold leading-5 text-finn-accent-blue",
+        text: configurationName(vehicle),
+      }),
 
-    /*
-     * The verdict and the one action it invites, on the same line. A reader
-     * who has just been told a car suits them shouldn't have to go and find a
-     * small circle on a card to do anything about it.
-     */
-    el("div", { class: "mt-3 flex flex-wrap items-center gap-2" }, [
-      bandChip(analysis.overall.level, analysis.overall.label),
-      el("span", { class: "flex-1" }),
-      pinControl(analysis.vehicle as never),
+      el("p", {
+        class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+        text: configurationDetail(vehicle),
+      }),
+
+      el("p", {
+        class: "mt-2.5 text-[13px] leading-5 text-finn-black",
+        text: describeFit(analysis),
+      }),
+
+      /*
+       * The one action the answer invites, and the only reason to make it
+       * loud: a reader who has just been told a car suits them is exactly the
+       * reader who wants to keep it, and the alternative is hunting for a
+       * small circle on a card.
+       */
+      pinControl(vehicle as never),
+
+      /*
+       * Requirement, not decoration. The same car opened by somebody else gets a
+       * different word, and a panel that says "Strong match" without saying what
+       * it is a match *with* invites being read as a verdict on the car.
+       */
+      el("p", {
+        class: "mt-3 text-[11px] leading-4 text-finn-iron",
+        text:
+          "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
+      }),
     ]),
-
-    el("p", {
-      class: "mt-2.5 text-[13px] leading-5 text-finn-black",
-      text: describeFit(analysis),
-    }),
-
-    /*
-     * Requirement, not decoration. The same car opened by somebody else gets a
-     * different word, and a panel that says "Strong match" without saying what
-     * it is a match *with* invites being read as a verdict on the car.
-     */
-    el("p", {
-      class: "mt-2 text-[11px] leading-4 text-finn-iron",
-      text:
-        "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
-    }),
   ]);
+}
+
+/**
+ * The car, with its verdict over it.
+ *
+ * The same photograph FINN shows on the card, marked the same way — so a
+ * reader who clicked a pill on a listing sees the pill again on the thing that
+ * opened, and knows without checking that the panel is about the car they
+ * asked about. It is the cheapest confirmation available and the only one that
+ * survives being glanced at.
+ */
+function photo(analysis: FitAnalysis): HTMLElement {
+  const source = analysis.vehicle.images?.thumbnail;
+
+  return el(
+    "div",
+    {
+      class: [
+        "relative flex h-[150px] items-center justify-center overflow-hidden",
+        "border-b border-finn-cotton bg-finn-snow",
+      ].join(" "),
+    },
+    [
+      source
+        ? el("img", {
+            class: "h-full w-full object-contain mix-blend-multiply",
+            attrs: {
+              src: source,
+              alt: analysis.vehicle.name,
+              loading: "lazy",
+            },
+          })
+        : el("span", {
+            class: "text-[11px] text-finn-iron",
+            text: "No photo supplied",
+          }),
+
+      el(
+        "span",
+        { class: "absolute bottom-2 left-2" },
+        [bandChip(analysis.overall.level, analysis.overall.label)],
+      ),
+    ],
+  );
 }
 
 /* -------------------------------------------------------------------------- */

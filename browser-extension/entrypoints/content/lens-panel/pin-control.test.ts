@@ -66,7 +66,7 @@ describe("pinControl", () => {
     const button = pinControl(car());
     await settle();
 
-    expect(button.textContent).toBe("Pin for comparison");
+    expect(button.textContent).toContain("Pin this car for comparison");
     expect(button.getAttribute("aria-pressed")).toBe("false");
   });
 

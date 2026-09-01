@@ -10,7 +10,7 @@ import type { FinnCar, PinnedFinnCar } from "@/lib/types";
 
 import { el } from "./dom";
 import { openPanel } from "./panel";
-import { cardConfigId, CARD_SELECTORS } from "./currentCar";
+import { cardConfigId, cardPhoto, CARD_SELECTORS } from "./currentCar";
 import {
   getLoadedCars,
   getPinnedCars,
@@ -71,13 +71,16 @@ function meter(level: FitLevel): HTMLElement {
 }
 
 /**
- * A strip along the bottom of the card rather than a mark floating on it.
+ * A pill over the photograph, in the corner nothing else uses.
  *
- * The corners are taken — FINN's compare control on one, this extension's own
- * pin on the other — and a verdict is about the whole card anyway, not about
- * the part of the photograph it happens to sit over. Appended as the card's
- * last child, so it lands under the content in normal flow and pushes nothing
- * around.
+ * It began as a strip under the card, which was safe and read as a row of
+ * furniture bolted on below FINN's own — a second card stacked under the
+ * first. On the photograph it reads as part of the card, the way a discount
+ * flash or an availability tag would, and it costs the card no height at all.
+ *
+ * Bottom-left because the top-right is the pin and the top-left is FINN's own
+ * compare control. The photo blocks are already positioned, so this lays over
+ * one without changing anything about the layout underneath it.
  */
 function badgeFor(
   car: FinnCar,
@@ -89,9 +92,11 @@ function badgeFor(
     {
       class: [
         BADGE,
-        "mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2",
-        "text-left cursor-pointer border-0 transition-all",
-        "hover:brightness-95",
+        "absolute bottom-2 left-2 z-10 flex max-w-[calc(100%-1rem)]",
+        "items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5",
+        "cursor-pointer border-0 text-left",
+        "shadow-[0_1px_6px_rgba(0,0,0,0.14)] transition-all",
+        "hover:shadow-[0_2px_10px_rgba(0,0,0,0.2)]",
         "focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-finn-accent-blue/50",
         FIT_BANDS[level].chipClass,
@@ -119,14 +124,14 @@ function badgeFor(
       meter(level),
 
       el("span", {
-        class: "min-w-0 flex-1 truncate text-[11px] font-black",
+        class: "min-w-0 truncate text-[11px] font-black",
         text: label,
       }),
 
       el("span", {
-        class: "shrink-0 text-[11px] font-bold opacity-70",
+        class: "shrink-0 text-[11px] font-bold opacity-60",
         attrs: { "aria-hidden": "true" },
-        text: "Why ›",
+        text: "›",
       }),
     ],
   );
@@ -192,7 +197,10 @@ export async function injectFitBadges(): Promise<void> {
     if (analysis.overall.level === "unknown") continue;
 
     card.setAttribute(MARKER, String(car.id));
-    card.append(badgeFor(car, analysis.overall.level, analysis.overall.label));
+
+    cardPhoto(card).append(
+      badgeFor(car, analysis.overall.level, analysis.overall.label),
+    );
   }
 }
 

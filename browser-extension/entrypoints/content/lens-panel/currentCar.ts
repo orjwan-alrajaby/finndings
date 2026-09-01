@@ -140,6 +140,33 @@ export function cardForCar(id: number): HTMLElement | null {
   return null;
 }
 
+/**
+ * The part of a card FINN puts the photograph in.
+ *
+ * Two shapes, because there are two kinds of card: a listing card wraps its
+ * media block one level deeper than a configuration card does. Rather than
+ * guess which is which, both candidates are tried in order and each is checked
+ * for actually holding the image — a selector that matches the wrong block
+ * would put the verdict pill over the price.
+ *
+ * Falls back to the card itself, which is positioned too, so a card built some
+ * third way gets its mark in a corner rather than not at all.
+ */
+export function cardPhoto(card: HTMLElement): HTMLElement {
+  const candidates = [
+    ":scope > div:first-child > div:first-child",
+    ":scope > div:first-child",
+  ];
+
+  for (const selector of candidates) {
+    const block = card.querySelector<HTMLElement>(selector);
+
+    if (block?.querySelector("img")) return block;
+  }
+
+  return card;
+}
+
 /** The details page root, or null when this isn't one. */
 export function detailsPageRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>(DETAILS_PAGE_SELECTOR);
