@@ -1,8 +1,8 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "finn-lens",
+  "description": "Browser extension that helps you choose between FINN car subscriptions by ranking the ones you pin against the things you said matter.",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

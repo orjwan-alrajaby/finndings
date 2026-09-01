@@ -77,10 +77,13 @@ export function DrivingAssumptions({
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <AssumptionInput
                     label="Monthly budget"
-                    hint="The most you want to spend per month in total, including running costs. This one decides which cars are eligible at all."
+                    hint="Optional. The most you want to spend per month in total, including running costs — the one figure here that decides which cars are eligible at all. Leave it blank and every car you pinned stays in the running."
                     unit="€/month"
                     value={preferences.monthlyBudget}
                     step={50}
+                    /* Blank rather than €0: nobody's budget is zero. */
+                    optional
+                    placeholder="No limit"
                     onChange={(value) => update("monthlyBudget", value)}
                 />
 
@@ -128,9 +131,15 @@ export function DrivingAssumptions({
             </div>
 
             <p className="mt-4 text-[11px] leading-5 text-finn-iron">
-                Your budget decides which cars are eligible to be recommended.
-                It is not ranked alongside your priorities, and it never adds
-                or removes points from a car's score.
+                {preferences.monthlyBudget > 0
+                    ? `Your budget decides which cars are eligible to be
+                       recommended. It is not ranked alongside your priorities,
+                       and it never adds or removes points from a car's score.`
+                    : `You haven't set a budget, so every car you pinned is
+                       eligible and the recommendation comes down to your
+                       priorities alone. Set one and Lens will only recommend a
+                       car it can confirm fits — it still never adds or removes
+                       points from a car's score.`}
             </p>
         </section>
     );
@@ -192,6 +201,8 @@ function AssumptionInput({
     unit,
     value,
     step,
+    optional,
+    placeholder,
     onChange,
 }: {
     label: string;
@@ -199,6 +210,9 @@ function AssumptionInput({
     unit: string;
     value: number;
     step: number;
+    /** Renders 0 as an empty field, so "unset" doesn't read as "zero". */
+    optional?: boolean;
+    placeholder?: string;
     onChange: (value: number) => void;
 }) {
     return (
@@ -212,9 +226,10 @@ function AssumptionInput({
                     type="number"
                     min="0"
                     step={step}
-                    value={value}
+                    placeholder={placeholder}
+                    value={optional && value === 0 ? "" : value}
                     onChange={(event) =>
-                        onChange(Number(event.target.value))
+                        onChange(Number(event.target.value) || 0)
                     }
                     className={[
                         "h-11 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none",

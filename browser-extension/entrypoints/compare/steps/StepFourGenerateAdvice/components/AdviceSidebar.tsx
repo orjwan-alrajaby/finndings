@@ -26,7 +26,17 @@ export function AdviceSidebar({
     onAdjustSettings,
 }: AdviceSidebarProps) {
     const assumptions: [string, string][] = [
-        ["Monthly budget", `${formatEUR(preferences.monthlyBudget)}/month`],
+        /*
+         * No budget is a state, not a €0 budget. Reading it back as "€0/month"
+         * would report a limit the reader never set — and one that nothing on
+         * this page has actually applied.
+         */
+        [
+            "Monthly budget",
+            preferences.monthlyBudget > 0
+                ? `${formatEUR(preferences.monthlyBudget)}/month`
+                : "No limit set",
+        ],
         ["Your mileage", `${formatKm(preferences.monthlyKm)}/month`],
         ["Included by FINN", `${formatKm(FINN_INCLUDED_MONTHLY_KM)}/month`],
         ["Contract", preferences.contractType === "business" ? "Business" : "Private"],

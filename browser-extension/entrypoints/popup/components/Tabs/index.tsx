@@ -68,7 +68,15 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                             .map((car) => {
                                 return (
                                     <CarPreviewCard
-                                        key={car.name}
+                                        /*
+                                         * The config id, not the name. Two
+                                         * configurations of one model share a
+                                         * name — "BYD Dolphin" is both of them
+                                         * — so keying on it collapses them to
+                                         * one row and leaves React reusing the
+                                         * wrong card when the set changes.
+                                         */
+                                        key={car.id}
                                         name={car.name}
                                         price={car.pricing?.customerMonthly?.price}
                                         url={car?.url}
@@ -80,8 +88,15 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                                 )
                             })
                         }
+                        {/*
+                          * Opens the Compare page, which is where every pinned
+                          * car is listed and ranked. The popup shows three; the
+                          * rest live there, so "view all" is a way into it
+                          * rather than a view of its own.
+                          */}
                         <button
-                            onClick={() => { }}
+                            type="button"
+                            onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                             className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-[0.99] sm:col-span-2 ${accent
                                 ? "bg-finn-accent-blue hover:bg-finn-highlight-navy"
                                 : "bg-finn-black hover:bg-finn-black/90"
@@ -97,17 +112,25 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                 <div className="space-y-2 sm:grid sm:grid-cols-1 sm:gap-2 sm:space-y-0">
                     <ActionButton
                         title="Compare Pinned Cars"
-                        description="Compare pricing and key details."
+                        description="Rank your pinned cars against your priorities and budget."
                         icon={<ScaleIcon className="h-5 w-5" />}
+                        /* Genuinely nothing to compare until something is pinned. */
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                         accent={accent}
                     />
                     <ActionButton
                         title="Go To Settings"
-                        description="Compare pricing and key details."
+                        description="Set your priorities, what counts inside each one, and your driving assumptions."
                         icon={<CogIcon className="h-5 w-5" />}
-                        disabled={!pinnedCount}
+                        /*
+                         * Never gated on pinned cars. Settings is where a reader
+                         * tells Lens what they care about, and it is what the
+                         * in-page badges and panel read — both of which stay
+                         * silent until it has been filled in. Requiring a pinned
+                         * car first made the one screen that unlocks the product
+                         * the last one you could reach.
+                         */
                         onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
                         accent={accent}
                     />

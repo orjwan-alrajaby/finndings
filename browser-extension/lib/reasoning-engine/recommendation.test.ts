@@ -15,6 +15,7 @@ import type { CategoryId, FeatureSelection } from "./types";
 import {
   CATEGORY_IDS,
   DEFAULT_CATEGORY_FEATURES,
+  DEFAULT_PREFERENCES,
   DEFAULT_PRIORITIES,
   DEFAULT_PROFILES,
 } from "./constants";
@@ -233,6 +234,80 @@ describe("buildRecommendation", () => {
     // €900 + €50 energy = €950 against a €600 budget.
     expect(cost?.totalMonthly).toBeCloseTo(950, 6);
     expect(cost?.budgetDifference).toBeCloseTo(350, 6);
+  });
+
+  /*
+   * The shipped defaults must not decide anything on the reader's behalf.
+   *
+   * Lens used to ship a €300 budget as a placeholder. Because the budget is
+   * the product's one hard constraint and FINN subscriptions routinely cost
+   * more than that, a reader who had never opened the driving settings had
+   * their first recommendation overridden — and the page then reported the
+   * €300 back to them as their own budget. This is the regression.
+   */
+  it("recommends normally on the defaults a fresh install ships with", () => {
+    const cheaper = makeCar({
+      id: 1,
+      customerMonthly: 520,
+      consumption: 5,
+      features: ["hasEmergencyBrakingAssist"],
+    });
+
+    const stronger = makeCar({
+      id: 2,
+      customerMonthly: 890,
+      consumption: 5,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+        "hasEmergencyCallSystem",
+      ],
+    });
+
+    const result = buildRecommendation(
+      [cheaper, stronger],
+      SAFETY_FIRST,
+      { ...DEFAULT_PREFERENCES },
+      features(),
+    );
+
+    /* The better match wins on its merits, at any price. */
+    expect(result?.winner.id).toBe(2);
+    expect(result?.isFallback).toBe(false);
+    expect(result?.fallbackReason).toBeNull();
+    expect(result?.budgetChangedTheAnswer).toBe(false);
+
+    /* And no limit is claimed anywhere downstream. */
+    expect(result?.budget.budget).toBeNull();
+    expect(result?.budget.over).toHaveLength(0);
+    expect(result?.context.costs[2]?.budgetDifference).toBeNull();
+    expect(result?.evaluation.cost.budgetSentence).toBeNull();
+  });
+
+  it("still applies the budget once the reader actually sets one", () => {
+    const affordable = makeCar({ id: 1, customerMonthly: 300, consumption: 5 });
+    const dear = makeCar({
+      id: 2,
+      customerMonthly: 900,
+      consumption: 5,
+      features: [
+        "hasEmergencyBrakingAssist",
+        "hasBlindSpotAssist",
+        "hasLaneKeepingAssist",
+      ],
+    });
+
+    const result = buildRecommendation(
+      [affordable, dear],
+      SAFETY_FIRST,
+      { ...DEFAULT_PREFERENCES, monthlyBudget: 500, monthlyKm: 500 },
+      features(),
+    );
+
+    expect(result?.winner.id).toBe(1);
+    expect(result?.topScorer.id).toBe(2);
+    expect(result?.budgetChangedTheAnswer).toBe(true);
   });
 
   it("distinguishes 'none fit' from 'we can't confirm any fit'", () => {
@@ -969,7 +1044,7 @@ describe("preference migration", () => {
     });
 
     expect(migrated.petrolPrice).toBeGreaterThan(0);
-    expect(migrated.monthlyBudget).toBe(300);
+    expect(migrated.monthlyBudget).toBe(DEFAULT_PREFERENCES.monthlyBudget);
     expect(migrated.monthlyKm).toBe(1_000);
   });
 });

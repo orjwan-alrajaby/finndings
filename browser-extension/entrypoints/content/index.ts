@@ -3,7 +3,10 @@ import { injectPinBtnIntoDetailsPage } from "./injectors/inject-pin-button/injec
 import { injectPinBtnIntoCarListItem } from "./injectors/inject-pin-button/injectPinBtnIntoCarListItem";
 import { HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR, DETAILS_PAGE_SELECTOR } from "./constants";
 import { mapFinnConfigToAll } from "./manipulateApiData";
-import { getPinnedCars } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
+import {
+  getPinnedCars,
+  mergeLoadedCars,
+} from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { mountLauncher, unmountLauncher } from "./lens-panel/launcher";
 import {
   injectFitBadges,
@@ -15,8 +18,6 @@ export default defineContentScript({
   matches: ["https://www.finn.com/*"],
 
   async main() {
-    let allLoadedSoFar = { cars: {}, total: 0 };
-
     try {
       await injectScript("/network-interceptor.js");
       console.info("[FinnLens] interceptor injected");
@@ -41,27 +42,32 @@ export default defineContentScript({
     /*
      * Every car FINN's own page loads, kept.
      *
-     * The interceptor forwards each /api/cars response and this is the only
-     * place that accumulates them, so the in-page analysis usually needs no
-     * request of its own: the car the reader is looking at was fetched by the
-     * page that is showing it.
+     * The interceptor forwards each /api/cars response, so the in-page analysis
+     * usually needs no request of its own: the car the reader is looking at was
+     * fetched by the page that is showing it.
+     *
+     * Merged into whatever is already stored rather than accumulated here. This
+     * used to keep its own running copy of the cache, starting empty on every
+     * page load and writing that copy back — so the first response after any
+     * navigation replaced the entire cache with one page's worth of cars, and
+     * quietly threw away everything the pin button and the panel had written
+     * through `mergeLoadedCars` in the meantime.
      */
     window.addEventListener("message", async (event) => {
       if (event.source !== window) return;
       if (event.data?.source !== "finn-lens") return;
       if (event.data?.type !== "FINN_CARS_RESPONSE") return;
 
-      const batchLoaded = event.data.payload.results;
-      const formatted = mapFinnConfigToAll(batchLoaded);
+      const batchLoaded = event.data.payload?.results;
 
-      allLoadedSoFar = {
-        cars: { ...allLoadedSoFar.cars, ...formatted },
-        total: allLoadedSoFar.total + batchLoaded.length,
-      };
+      /* FINN's response shape is not ours to rely on. */
+      if (!Array.isArray(batchLoaded) || !batchLoaded.length) return;
 
-      await browser.storage.local.set({
-        loadedCarsFromFinnApi: allLoadedSoFar,
-      });
+      try {
+        await mergeLoadedCars(mapFinnConfigToAll(batchLoaded));
+      } catch (error) {
+        console.error("[FinnLens] couldn't keep this page's cars", error);
+      }
     });
 
     let activeObserver: MutationObserver | null = null;

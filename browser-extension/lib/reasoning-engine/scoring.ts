@@ -124,6 +124,50 @@ function relativeScore(
   return Math.round((lowerIsBetter ? 1 - ratio : ratio) * 100);
 }
 
+/**
+ * How far apart a set has to be before the full 0–100 is earned.
+ *
+ * The same 35% `classifyMeasurementGap` calls "decisive", so the scale and the
+ * prose agree about when a difference is real. See `spreadAwareScore`.
+ */
+const DECISIVE_SPREAD = 0.35;
+
+/** The score for a set the measurement cannot separate at all. */
+const INDIFFERENT = 50;
+
+/**
+ * A relative score that only claims as much of the scale as the figures support.
+ *
+ * Plain min-max hands the worst car 0 and the best 100 whatever the spread, so
+ * 495 km against 500 km comes out as the widest gap the engine can express. In
+ * a category built out of one measurement that is not a rounding error — it is
+ * the whole category score, and from there a third of the overall result.
+ *
+ * So the spread decides the reach: a set spanning 35% or more of its own top
+ * figure uses the full scale, and anything tighter is compressed proportionally
+ * toward the middle. Ordering is untouched — the better car still scores
+ * higher, every time — and what changes is how much that lead is allowed to be
+ * worth. Two cars a few kilometres apart end up a few points apart, which is
+ * what leaves the rest of the priority free to decide the result.
+ */
+function spreadAwareScore(
+  value: number,
+  values: number[],
+  lowerIsBetter: boolean,
+): number {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+
+  if (max === min || max === 0) return INDIFFERENT;
+
+  const ratio = (value - min) / (max - min);
+  const placed = lowerIsBetter ? 1 - ratio : ratio;
+
+  const reach = Math.min(1, (max - min) / max / DECISIVE_SPREAD);
+
+  return Math.round(INDIFFERENT + (placed - 0.5) * 100 * reach);
+}
+
 interface NumericResult {
   score: number;
   /** Null where the score rests on several figures rather than one. */
@@ -145,6 +189,72 @@ function evidence(
     display: unit ? `${formatNumber(value)} ${unit}` : formatNumber(value),
     lowerIsBetter,
   };
+}
+
+/**
+ * The three things that can be measured about how a car travels a long way,
+ * and which of them applies to one car.
+ *
+ * They are cohorts rather than a preference order: a car belongs to exactly
+ * one, and is only ever ranked inside it. `range` beats `energy` for an
+ * electric car because kilometres between stops is the more direct answer to
+ * the question and FINN publishes it.
+ */
+type LongDistanceBasis = "range" | "energyElectric" | "energyFuel";
+
+interface LongDistanceReading {
+  basis: LongDistanceBasis;
+  value: number;
+  label: string;
+  unit: string;
+  lowerIsBetter: boolean;
+}
+
+function longDistanceReading(
+  vehicle: PinnedFinnCar,
+): LongDistanceReading | null {
+  const isElectric = vehicle.fuelType === "Electric";
+
+  const rawRange = vehicle.electric?.range;
+
+  const range =
+    rawRange != null && rawRange !== "Unknown" ? Number(rawRange) : Number.NaN;
+
+  if (Number.isFinite(range) && range > 0) {
+    return {
+      basis: "range",
+      value: range,
+      label: "Electric range",
+      unit: "km",
+      lowerIsBetter: false,
+    };
+  }
+
+  const consumption = Number(vehicle.consumption?.combined);
+
+  if (!Number.isFinite(consumption) || consumption <= 0) return null;
+
+  /*
+   * `consumption.unit` is hard-coded to litres by the mapper for every car, so
+   * the powertrain is what says which quantity this actually is. A plug-in
+   * hybrid's figure is litres — FINN publishes one combined fuel figure and no
+   * electric split — so it sits with the combustion cars.
+   */
+  return isElectric
+    ? {
+        basis: "energyElectric",
+        value: consumption,
+        label: "Consumption",
+        unit: "kWh/100km",
+        lowerIsBetter: true,
+      }
+    : {
+        basis: "energyFuel",
+        value: consumption,
+        label: "Consumption",
+        unit: "L/100km",
+        lowerIsBetter: true,
+      };
 }
 
 /**
@@ -175,45 +285,43 @@ function numericScore(
     }
 
     case "longDistance": {
-      const ranges = vehicles
-        .map((item) =>
-          item.electric?.range && item.electric.range !== "Unknown"
-            ? Number(item.electric.range)
-            : null,
-        )
+      const own = longDistanceReading(vehicle);
+
+      if (!own) return null;
+
+      /*
+       * Measured only against cars carrying the same reading.
+       *
+       * This used to pool everything: a car with an electric range was ranked
+       * against the other ranges, and everything else was ranked on
+       * consumption across the whole set — which put an electric car's
+       * kilowatt-hours into the same min-max as a petrol car's litres. FINN
+       * reports both in `consumption.combined` and the mapper labels the field
+       * litres regardless, so a 17 kWh/100 km electric car was read as a
+       * catastrophically thirsty one and scored near zero for it.
+       *
+       * Kilometres of range, litres per 100 km and kilowatt-hours per 100 km
+       * are three different quantities. Nothing in FINN's data converts
+       * between them — a combustion car's real range needs a tank size FINN
+       * doesn't publish, and an electric car's needs a charging network this
+       * has no view of — so no cross-powertrain ordering is claimed. Each car
+       * is placed among its own kind, which is the same thing
+       * `assessEfficiency` does when it says "frugal for a petrol car".
+       */
+      const cohort = vehicles
+        .map((item) => longDistanceReading(item))
         .filter(
-          (value): value is number => value != null && Number.isFinite(value),
-        );
+          (reading): reading is LongDistanceReading =>
+            reading != null && reading.basis === own.basis,
+        )
+        .map((reading) => reading.value);
 
-      if (
-        vehicle.electric?.range &&
-        vehicle.electric.range !== "Unknown" &&
-        ranges.length > 1
-      ) {
-        const range = Number(vehicle.electric.range);
-
-        return {
-          score: relativeScore(range, ranges, false),
-          evidence: evidence("Electric range", range, "km", false),
-        };
-      }
-
-      const consumption = Number(vehicle.consumption.combined);
-
-      const values = vehicles
-        .map((item) => Number(item.consumption.combined))
-        .filter(Number.isFinite);
-
-      if (!Number.isFinite(consumption) || values.length < 2) return null;
+      /* One car of its kind has nothing to be relative to. */
+      if (cohort.length < 2) return null;
 
       return {
-        score: relativeScore(consumption, values, true),
-        evidence: evidence(
-          "Consumption",
-          consumption,
-          vehicle.fuelType === "Electric" ? "kWh/100km" : "L/100km",
-          true,
-        ),
+        score: spreadAwareScore(own.value, cohort, own.lowerIsBetter),
+        evidence: evidence(own.label, own.value, own.unit, own.lowerIsBetter),
       };
     }
 

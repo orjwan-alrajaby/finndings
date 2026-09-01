@@ -931,10 +931,26 @@ export const DEFAULT_PRIORITIES: CategoryId[] = [
 export const FINN_INCLUDED_MONTHLY_KM = 500;
 
 /**
- * Placeholder starting point for a brand-new install — not a claim about what
- * anyone can or should spend. The user is expected to edit it.
+ * No budget, until the reader sets one.
+ *
+ * Zero is how this product has always said "no limit" — `calculateCost` reads
+ * any non-positive budget as `null`, `partitionByBudget` then leaves every car
+ * eligible, and no recommendation is flagged as a budget fallback. So this is
+ * the existing three-state model's own way of expressing an absence, not a new
+ * sentinel.
+ *
+ * It used to ship as 300. That was documented as a placeholder nobody should
+ * read as advice, but it did not behave like one: the budget is the single
+ * hard constraint in the product, FINN subscriptions plus energy plus excess
+ * mileage routinely land well above it, and so a reader who never opened the
+ * driving settings had their first recommendation overridden by a figure Lens
+ * had invented on their behalf and then reported as *their* budget. A number
+ * the user has never seen must not decide which car they are shown.
+ *
+ * The budget is untouched as a feature. Set one and every constraint, notice
+ * and fallback works exactly as before.
  */
-export const DEFAULT_MONTHLY_BUDGET = 300;
+export const DEFAULT_MONTHLY_BUDGET = 0;
 
 export const DEFAULT_PREFERENCES: LensPreferences = {
   monthlyKm: 1_000,

@@ -9,24 +9,41 @@ interface DrivingSettingsProps {
 
 type NumericField = Exclude<keyof LensPreferences, "contractType">;
 
-const FIELDS: [NumericField, string, string, string, string][] = [
-    [
-        "monthlyBudget",
-        "Monthly budget",
-        "€/month",
-        "50",
-        "The most you want to spend per month in total, including running costs.",
-    ],
-    [
-        "monthlyKm",
-        "Monthly mileage",
-        "km/month",
-        "100",
-        "Roughly how far you drive in a typical month. An estimate is fine.",
-    ],
-    ["petrolPrice", "Petrol price", "€/L", "0.01", ""],
-    ["dieselPrice", "Diesel price", "€/L", "0.01", ""],
-    ["electricityPrice", "Electricity price", "€/kWh", "0.01", ""],
+interface Field {
+    key: NumericField;
+    label: string;
+    unit: string;
+    step: string;
+    hint: string;
+    /**
+     * Shown blank at 0, because 0 means "not set" rather than "zero euros".
+     * Only the budget is optional; the rest are assumptions Lens has to have a
+     * figure for to estimate anything at all.
+     */
+    optional?: boolean;
+    placeholder?: string;
+}
+
+const FIELDS: Field[] = [
+    {
+        key: "monthlyBudget",
+        label: "Monthly budget",
+        unit: "€/month",
+        step: "50",
+        hint: "Optional. The most you want to spend per month in total, including running costs. Leave it blank and no car is ruled out on price.",
+        optional: true,
+        placeholder: "No limit",
+    },
+    {
+        key: "monthlyKm",
+        label: "Monthly mileage",
+        unit: "km/month",
+        step: "100",
+        hint: "Roughly how far you drive in a typical month. An estimate is fine.",
+    },
+    { key: "petrolPrice", label: "Petrol price", unit: "€/L", step: "0.01", hint: "" },
+    { key: "dieselPrice", label: "Diesel price", unit: "€/L", step: "0.01", hint: "" },
+    { key: "electricityPrice", label: "Electricity price", unit: "€/kWh", step: "0.01", hint: "" },
 ];
 
 const CONTRACT_OPTIONS: [ContractType, string, string][] = [
@@ -41,7 +58,7 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
             description="These describe you, not FINN — how far you actually drive, what fuel or electricity costs where you live, and what you're willing to spend. FINN Lens can't know this on its own, so estimates are only as good as what you enter here."
         >
             <div className="grid gap-4 sm:grid-cols-2">
-                {FIELDS.map(([key, label, unit, step, hint]) => (
+                {FIELDS.map(({ key, label, unit, step, hint, optional, placeholder }) => (
                     <label key={key}>
                         <span className="text-xs font-bold text-finn-black">{label}</span>
                         <div className="mt-1 flex rounded-2xl bg-finn-snow px-3">
@@ -49,8 +66,9 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                                 type="number"
                                 min="0"
                                 step={step}
-                                value={preferences[key]}
-                                onChange={(event) => onChange({ ...preferences, [key]: Number(event.target.value) })}
+                                placeholder={placeholder}
+                                value={optional && preferences[key] === 0 ? "" : preferences[key]}
+                                onChange={(event) => onChange({ ...preferences, [key]: Number(event.target.value) || 0 })}
                                 className="h-12 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none"
                             />
                             <span className="flex items-center text-xs text-finn-iron">{unit}</span>
@@ -108,7 +126,8 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                 </p>
                 <p>
                     Your budget is a limit, not a preference you rank. Lens won't reward a car for being cheap or penalise it for
-                    being expensive — it only checks whether the estimated total fits.
+                    being expensive — it only checks whether the estimated total fits. With no budget set, nothing is ruled out on
+                    price and the recommendation comes down to your priorities alone.
                 </p>
             </div>
         </Section>

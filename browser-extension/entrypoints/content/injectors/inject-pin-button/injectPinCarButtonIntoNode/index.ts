@@ -8,6 +8,26 @@ import type { FinnCar } from "@/lib/types";
 
 let pinQueue = Promise.resolve();
 
+/**
+ * Tells the popup and the Compare tab that the pinned set has changed.
+ *
+ * Both have always listened for this and nothing had ever sent it, so they
+ * refreshed only by accident: the mutation observer broadcasts `CARDS_LOADED`
+ * as finn.com redraws, and a pin usually happened to be followed by one. On a
+ * quiet page — pin a car, switch to the Compare tab — there was no redraw and
+ * the tab went on showing the old set.
+ *
+ * Sent after storage has been written, so a listener that reads immediately
+ * sees the change. Failure is swallowed on purpose: nobody may be listening,
+ * and a rejected send must not surface to the reader as a failed pin when the
+ * pin itself succeeded.
+ */
+function announcePinnedCarsChanged(): void {
+  void browser.runtime
+    .sendMessage({ type: "PINNED_CARS_UPDATED" })
+    .catch(() => {});
+}
+
 async function handlePinButtonClick(
   event: MouseEvent,
   anchorElement: HTMLElement,
@@ -74,6 +94,8 @@ async function doHandlePinButtonClick(
         equipmentLine: carDetails.equipmentLine ?? "",
       }
     );
+
+    announcePinnedCarsChanged();
   } catch (error) {
     console.error("Failed to pin/unpin car:", error);
     showToast(

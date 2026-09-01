@@ -4,6 +4,14 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: () => ({
+    /*
+     * Set here rather than left to package.json, which would install this as
+     * "finn-lens" — the npm package name, not the product's.
+     */
+    name: "FINN Lens",
+    description:
+      "Choose between FINN car subscriptions. Pin the cars you're weighing up and Lens ranks them against the things you said matter, with the reasoning and the compromises spelled out.",
+
     host_permissions: ["https://www.finn.com/*"],
     permissions: [
       "tabs",
