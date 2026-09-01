@@ -5,6 +5,11 @@ import { HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR, DETAILS_PAGE_SELECTOR } fro
 import { mapFinnConfigToAll } from "./manipulateApiData";
 import { getPinnedCars } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { mountLauncher, unmountLauncher } from "./lens-panel/launcher";
+import {
+  injectFitBadges,
+  refreshFitBadges,
+  removeFitBadges,
+} from "./lens-panel/card-badges";
 
 export default defineContentScript({
   matches: ["https://www.finn.com/*"],
@@ -86,6 +91,14 @@ export default defineContentScript({
         injectPinBtnIntoDetailsPage();
         void mountLauncher();
       }
+
+      /*
+       * Every car FINN draws gets Lens's verdict on it, wherever it is drawn —
+       * the listing, the similar-cars rail, the configurations of one model.
+       * Cards already carrying one are left alone, so this is cheap to call
+       * from the same mutation pass the pin buttons use.
+       */
+      void injectFitBadges();
     };
 
     const startObserving = () => {
@@ -137,6 +150,7 @@ export default defineContentScript({
        * the reader has just left is worse than no panel at all.
        */
       unmountLauncher();
+      removeFitBadges();
 
       navDebounceTimer = setTimeout(() => {
         navDebounceTimer = null;
@@ -145,6 +159,23 @@ export default defineContentScript({
     };
 
     window.addEventListener("finnlens:navigate", onNavigate);
+
+    /*
+     * A verdict is only as current as the settings behind it. Saving new
+     * priorities in the options tab re-reads every card rather than leaving
+     * the page answering to what the reader used to care about.
+     */
+    browser.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local") return;
+
+      const touched = [
+        "finnLensPreferences",
+        "finnLensPriorities",
+        "finnLensCategoryFeatures",
+      ].some((key) => key in changes);
+
+      if (touched) void refreshFitBadges();
+    });
 
     handleNavigation();
   },

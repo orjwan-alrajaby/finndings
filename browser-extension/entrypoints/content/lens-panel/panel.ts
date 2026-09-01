@@ -12,7 +12,7 @@ import {
   backToConfigurations,
   configurationsSection,
 } from "./sections";
-import { detailsPageRoot, resolvePageCars } from "./currentCar";
+import { detailsPageRoot, resolveCar, resolvePageCars } from "./currentCar";
 
 /**
  * The panel itself: a drawer over finn.com, and the states it can be in.
@@ -147,10 +147,22 @@ interface Session {
   choice: number | null | undefined;
 }
 
+/**
+ * The car the panel was opened about, when it was opened about one.
+ *
+ * Undefined means "whatever this page is showing", which is how the launcher
+ * on a detail page asks. A card badge asks the other way: it names the car,
+ * and the page it was clicked on may be a list of forty others.
+ */
+export interface PanelRequest {
+  carId?: number;
+}
+
 async function render(
   into: HTMLElement,
   retry: () => void,
   session: Session,
+  request: PanelRequest,
 ): Promise<void> {
   empty(into);
   into.append(loadingState());
@@ -183,6 +195,45 @@ async function render(
         { label: "Choose your priorities", onClick: openSettings },
       ),
     );
+
+    return;
+  }
+
+  /*
+   * Asked about one particular car, so the page it was asked from doesn't
+   * come into it. No chooser either — the reader already chose, by clicking
+   * the card they were looking at.
+   */
+  if (request.carId != null) {
+    const car = await resolveCar(request.carId);
+
+    if (!car) {
+      empty(into);
+      into.append(
+        message("We couldn't load this car", "FINN's data for it isn't in hand any more.", {
+          label: "Try again",
+          onClick: retry,
+        }),
+      );
+
+      return;
+    }
+
+    const settings = await loadLensSettings();
+
+    empty(into);
+    into.append(
+      analysisBody(
+        buildFitAnalysis(
+          car,
+          settings.priorities,
+          settings.preferences,
+          settings.categoryFeatures,
+        ),
+      ),
+    );
+
+    into.scrollTop = 0;
 
     return;
   }
@@ -342,7 +393,7 @@ function chooseLead(count: number): HTMLElement {
 /* The drawer                                                                 */
 /* -------------------------------------------------------------------------- */
 
-async function build(): Promise<Panel> {
+async function build(request: PanelRequest): Promise<Panel> {
   const host = el("div", { attrs: { id: HOST_ID } });
 
   /*
@@ -483,7 +534,7 @@ async function build(): Promise<Panel> {
 
   const session: Session = { choice: undefined };
 
-  const retry = () => void render(scroller, retry, session);
+  const retry = () => void render(scroller, retry, session, request);
 
   /*
    * Settings changed in the options tab reach an open panel, which is what
@@ -511,7 +562,7 @@ async function build(): Promise<Panel> {
     host.remove();
   };
 
-  void render(scroller, retry, session);
+  void render(scroller, retry, session, request);
 
   document.body.append(host);
   closeButton.focus();
@@ -525,12 +576,12 @@ async function build(): Promise<Panel> {
 
 let opener: Element | null = null;
 
-export async function openPanel(): Promise<void> {
+export async function openPanel(request: PanelRequest = {}): Promise<void> {
   if (open) return;
 
   opener = document.activeElement;
 
-  open = await build();
+  open = await build(request);
 
   onVisibility?.(true);
 }

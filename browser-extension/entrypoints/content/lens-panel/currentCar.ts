@@ -188,6 +188,30 @@ export async function resolvePageCars(
 }
 
 /**
+ * One car by id, from what we already have.
+ *
+ * Deliberately no network. This answers for a car the reader has clicked on a
+ * card for, and a card only carries a Lens verdict when its data was already
+ * in hand — so a miss here means the cache was cleared underneath us, not that
+ * a request would help.
+ */
+export async function resolveCar(id: number): Promise<PinnedFinnCar | null> {
+  try {
+    const pinned = (await getPinnedCars())[id];
+
+    if (pinned) return pinned;
+
+    const cached = (await getLoadedCars())[id];
+
+    return cached ? asEvaluatable(cached) : null;
+  } catch (error) {
+    console.error("[FinnLens] couldn't read what we know about a car", error);
+
+    return null;
+  }
+}
+
+/**
  * The engine's vehicle type is `PinnedFinnCar` because the Compare flow is the
  * only thing that has ever fed it cars, and everything it pins has a URL and a
  * pinned date. Neither field is read by any scoring, costing or narrative
