@@ -1,84 +1,105 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
 
-import { canDock, dockPage, undockPage } from "./page-dock";
+import { canDock, dockPage, needsShifting, undockPage } from "./page-dock";
 
 /**
- * Borrowing width from the car, not from the site.
+ * Borrowing width from a page that isn't ours.
  *
- * Two things to protect. Only the product block gives up room — FINN's header
- * is the site's furniture and not this car's, and narrowing it would tell the
- * reader the whole site had changed when one panel opened. And it all comes
- * back: everything docking does is a class, a custom property and one
- * stylesheet, so afterwards the page has to be indistinguishable from the one
- * that was there before.
+ * The property worth protecting is that it all comes back. Everything docking
+ * does to finn.com is a class, a custom property and one stylesheet, and after
+ * undocking the page has to be indistinguishable from the page that was there
+ * before Lens was opened — no leftover attributes, no orphaned style element,
+ * nothing for a second open to trip over.
  */
 
 const PANEL = 416;
 
-const page = `
-  <header class="site-header" id="header">FINN</header>
-  <div class="md:mt-6" data-appid="product-details" id="product">
-    <div class="container"><h1>BYD Dolphin Surf</h1></div>
-  </div>
-  <footer id="footer">FINN</footer>
-`;
-
-function render() {
+function page(html = "<p>FINN</p>") {
   const { document, window } = parseHTML(
-    `<!doctype html><html><head></head><body>${page}</body></html>`,
+    `<!doctype html><html><head></head><body>${html}</body></html>`,
   );
 
   Object.assign(globalThis, {
     document,
     window: Object.assign(window, { innerWidth: 1440 }),
+    getComputedStyle: () => ({ position: "static" }),
   });
 
-  return document as unknown as Document;
+  return document;
 }
 
 let document: Document;
 
-const product = () =>
-  document.querySelector('[data-appid="product-details"]') as HTMLElement;
-
 beforeEach(() => {
-  document = render();
+  document = page() as unknown as Document;
 });
 
 afterEach(() => {
   undockPage();
 });
 
-const setWidth = (value: number) => {
-  (globalThis as { window: { innerWidth: number } }).window.innerWidth = value;
-};
-
 describe("canDock", () => {
   it("makes room when there is room for both", () => {
-    setWidth(1440);
+    (globalThis as { window: { innerWidth: number } }).window.innerWidth = 1440;
 
     expect(canDock(PANEL)).toBe(true);
   });
 
-  it("won't narrow the car to nothing", () => {
-    setWidth(600);
+  it("won't narrow a page to nothing", () => {
+    (globalThis as { window: { innerWidth: number } }).window.innerWidth = 600;
 
     expect(canDock(PANEL)).toBe(false);
   });
 
   it("needs a whole panel's width left over, not a sliver", () => {
-    setWidth(PANEL * 2 - 1);
+    (globalThis as { window: { innerWidth: number } }).window.innerWidth =
+      PANEL * 2 - 1;
 
     expect(canDock(PANEL)).toBe(false);
   });
 });
 
-describe("dockPage", () => {
-  it("narrows the product block by exactly the panel's width", () => {
-    dockPage(product(), PANEL);
+describe("needsShifting", () => {
+  const edge = 1440 - PANEL;
+  const box = (over = {}) => ({ width: 1440, height: 60, right: 1440, ...over });
 
-    expect(product().classList.contains("finn-lens-narrowed")).toBe(true);
+  it("moves a fixed header that reaches under the panel", () => {
+    expect(needsShifting("fixed", box(), edge)).toBe(true);
+  });
+
+  it("moves a widget parked in the corner the panel now occupies", () => {
+    expect(
+      needsShifting("fixed", box({ width: 60, right: 1424 }), edge),
+    ).toBe(true);
+  });
+
+  it("leaves anything anchored on the left alone", () => {
+    expect(needsShifting("fixed", box({ width: 300, right: 300 }), edge)).toBe(
+      false,
+    );
+  });
+
+  it("leaves ordinary flow content to the margin on body", () => {
+    /* Sticky and static elements follow the document; only fixed doesn't. */
+    for (const position of ["static", "relative", "absolute", "sticky"]) {
+      expect(needsShifting(position, box(), edge)).toBe(false);
+    }
+  });
+
+  it("ignores what isn't drawn", () => {
+    expect(needsShifting("fixed", box({ width: 0 }), edge)).toBe(false);
+    expect(needsShifting("fixed", box({ height: 0 }), edge)).toBe(false);
+  });
+});
+
+describe("dockPage", () => {
+  it("narrows the page by exactly the panel's width", () => {
+    dockPage(PANEL);
+
+    expect(document.documentElement.classList.contains("finn-lens-docked")).toBe(
+      true,
+    );
     expect(
       document.documentElement.style.getPropertyValue(
         "--finn-lens-panel-width",
@@ -86,49 +107,32 @@ describe("dockPage", () => {
     ).toBe(`${PANEL}px`);
   });
 
-  it("leaves the header and everything else on the page alone", () => {
-    const before = {
-      header: document.getElementById("header")?.outerHTML,
-      footer: document.getElementById("footer")?.outerHTML,
-      body: document.body.getAttribute("style"),
-    };
-
-    dockPage(product(), PANEL);
-
-    expect(document.getElementById("header")?.outerHTML).toBe(before.header);
-    expect(document.getElementById("footer")?.outerHTML).toBe(before.footer);
-    expect(document.body.getAttribute("style")).toBe(before.body);
-  });
-
-  it("marks one element and no others", () => {
-    dockPage(product(), PANEL);
-
-    expect(document.querySelectorAll(".finn-lens-narrowed")).toHaveLength(1);
-  });
-
   it("puts its stylesheet in the page rather than in the panel", () => {
-    dockPage(product(), PANEL);
+    dockPage(PANEL);
 
     const style = document.getElementById("finn-lens-dock-style");
 
-    /* The panel is in a shadow root; the block it narrows is not. */
+    /* The panel is in a shadow root; the page it narrows is not. */
+    expect(style).not.toBeNull();
     expect(style?.textContent).toContain("margin-right");
   });
 
   it("gives everything back", () => {
     const before = document.documentElement.outerHTML;
 
-    dockPage(product(), PANEL);
+    dockPage(PANEL);
     undockPage();
 
     expect(document.documentElement.outerHTML).toBe(before);
   });
 
   it("docks twice without stacking two stylesheets", () => {
-    dockPage(product(), PANEL);
-    dockPage(product(), PANEL);
+    dockPage(PANEL);
+    dockPage(PANEL);
 
-    expect(document.querySelectorAll("#finn-lens-dock-style")).toHaveLength(1);
+    expect(
+      document.querySelectorAll("#finn-lens-dock-style"),
+    ).toHaveLength(1);
   });
 
   it("undocks a page that was never docked without complaint", () => {

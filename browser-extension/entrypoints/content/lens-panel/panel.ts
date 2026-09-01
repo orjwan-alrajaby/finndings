@@ -6,6 +6,7 @@ import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, panelStyles } from "./dom";
 import { canDock, dockPage, undockPage } from "./page-dock";
+import { clearHighlight, highlightConfiguration } from "./highlight";
 import {
   analysisBody,
   backToConfigurations,
@@ -275,6 +276,15 @@ async function render(
   const show = (id: number | null) => {
     subjectId = id;
     session.choice = id;
+
+    /*
+     * Choosing in the panel is a request to be shown the car, so FINN's own
+     * page goes to it. Going back to the list is a request for the opposite,
+     * and clears the mark rather than leaving one car singled out on a page
+     * the panel has stopped talking about.
+     */
+    highlightConfiguration(id, { scroll: true });
+
     paint();
   };
 
@@ -305,6 +315,12 @@ async function render(
     into.scrollTop = 0;
   };
 
+  /*
+   * Marked on arrival but not scrolled to. A reader who opened a car FINN
+   * already had selected hasn't asked to be moved anywhere.
+   */
+  highlightConfiguration(subjectId);
+
   paint();
 }
 
@@ -330,24 +346,21 @@ async function build(): Promise<Panel> {
   const host = el("div", { attrs: { id: HOST_ID } });
 
   /*
-   * A rail down the right, not a sheet over everything.
+   * A strip down the right, not a sheet over everything.
    *
    * The host used to cover the viewport so a backdrop could fill it. Nothing
-   * outside the panel's own width is ours to occupy: the page beside it stays
-   * clickable, scrollable and selectable, which is the entire point of making
-   * room rather than covering.
+   * outside the panel's own width is ours to occupy now: the page beside it
+   * stays clickable, scrollable and selectable, which is the entire point of
+   * docking rather than overlaying.
    *
-   * Where there isn't room to sit beside the car — a narrow window, a phone —
-   * it covers the page instead and nothing is narrowed at all.
+   * On a narrow viewport there is no room to sit beside anything, so it
+   * covers the page instead and the page is not narrowed at all.
    */
-  const root = detailsPageRoot();
+  const docked = canDock(PANEL_WIDTH);
 
-  const position = () => {
-    host.style.cssText =
-      root && canDock(PANEL_WIDTH)
-        ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
-        : "position:fixed;inset:0;z-index:2147483000;";
-  };
+  host.style.cssText = docked
+    ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
+    : "position:fixed;inset:0;z-index:2147483000;";
 
   const shadow = host.attachShadow({ mode: "open" });
 
@@ -413,9 +426,10 @@ async function build(): Promise<Panel> {
     "div",
     {
       class: [
-        "absolute inset-0 flex flex-col overflow-hidden bg-white",
+        "absolute inset-0 flex flex-col",
+        "bg-white shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
+        "border-l border-finn-cotton",
         "font-sans text-finn-black",
-        "border-l border-finn-cotton shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
       ].join(" "),
       attrs: {
         role: "complementary",
@@ -427,9 +441,7 @@ async function build(): Promise<Panel> {
 
   shadow.append(drawer);
 
-  if (root && canDock(PANEL_WIDTH)) dockPage(root, PANEL_WIDTH);
-
-  position();
+  if (docked) dockPage(PANEL_WIDTH);
 
   /**
    * Escape closes it, and Tab is left alone.
@@ -452,15 +464,19 @@ async function build(): Promise<Panel> {
   window.addEventListener("keydown", onKeyDown, true);
 
   /*
-   * A window wide enough to dock into can stop being one — a resize, or
+   * A window narrow enough to dock into can stop being one — a resize, or
    * devtools opening beside the page. Docking is re-decided rather than
    * decided once, so a squeezed page isn't left squeezed.
    */
   const onResize = () => {
-    if (root && canDock(PANEL_WIDTH)) dockPage(root, PANEL_WIDTH);
-    else undockPage();
+    const room = canDock(PANEL_WIDTH);
 
-    position();
+    host.style.cssText = room
+      ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
+      : "position:fixed;inset:0;z-index:2147483000;";
+
+    if (room) dockPage(PANEL_WIDTH);
+    else undockPage();
   };
 
   window.addEventListener("resize", onResize);
@@ -488,7 +504,8 @@ async function build(): Promise<Panel> {
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("resize", onResize);
 
-    /* The car gets its width back before the panel that borrowed it goes. */
+    /* The page gets its width and its unmarked cards back. */
+    clearHighlight();
     undockPage();
 
     host.remove();

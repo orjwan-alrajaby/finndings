@@ -43,7 +43,7 @@ export type PageCars =
   | { status: "unavailable"; reason: string };
 
 /** Where FINN lists the configurations a model is available in. */
-const CONFIGURATIONS_SELECTOR = '[data-testid="group-comparison"]';
+export const CONFIGURATIONS_SELECTOR = '[data-testid="group-comparison"]';
 
 /**
  * The configuration cards on a model page.
