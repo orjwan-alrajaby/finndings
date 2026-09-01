@@ -1,5 +1,5 @@
 import { el, panelStyles } from "./dom";
-import { closePanel, openPanel } from "./panel";
+import { closePanel, openPanel, watchPanelVisibility } from "./panel";
 import { detailsPageRoot } from "./currentCar";
 
 /**
@@ -89,6 +89,18 @@ async function attach(mountedFor: number): Promise<void> {
   );
 
   shadow.append(button);
+
+  /*
+   * Out of the way while the panel is open.
+   *
+   * Docked, the panel is the thing on the right of the screen; a floating
+   * button offering to open what is already open would sit on top of it and
+   * say nothing. Closing brings it back, which is what the panel's own ✕ is
+   * for.
+   */
+  watchPanelVisibility((visible) => {
+    node.style.display = visible ? "none" : "";
+  });
 
   /* A slow stylesheet fetch can outlive the page it was for. */
   if (mountedFor !== generation || !detailsPageRoot()) return;

@@ -5,6 +5,7 @@ import {
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, panelStyles } from "./dom";
+import { canDock, dockPage, undockPage } from "./page-dock";
 import {
   analysisBody,
   backToConfigurations,
@@ -24,6 +25,14 @@ import { detailsPageRoot, resolvePageCars } from "./currentCar";
 
 const HOST_ID = "finn-lens-analysis-root";
 
+/**
+ * How wide the panel sits, and how much room the page gives up for it.
+ *
+ * One number, used twice: the host's width and the margin the page is
+ * narrowed by. They have to be the same or the seam shows.
+ */
+const PANEL_WIDTH = 416;
+
 /** The stored settings that change what an analysis says. */
 const WATCHED_KEYS = [
   "finnLensPreferences",
@@ -36,6 +45,20 @@ interface Panel {
 }
 
 let open: Panel | null = null;
+
+/**
+ * Told when the panel comes and goes, so the launcher can get out of its way.
+ *
+ * A callback rather than the launcher being imported here: it already imports
+ * this module, and the dependency should keep pointing one way.
+ */
+let onVisibility: ((visible: boolean) => void) | null = null;
+
+export function watchPanelVisibility(
+  listener: (visible: boolean) => void,
+): void {
+  onVisibility = listener;
+}
 
 /* -------------------------------------------------------------------------- */
 /* States                                                                     */
@@ -307,10 +330,21 @@ async function build(): Promise<Panel> {
   const host = el("div", { attrs: { id: HOST_ID } });
 
   /*
-   * Above FINN's own overlays without being hostile about it, and out of the
-   * page's flow entirely so nothing it does can move anything FINN drew.
+   * A strip down the right, not a sheet over everything.
+   *
+   * The host used to cover the viewport so a backdrop could fill it. Nothing
+   * outside the panel's own width is ours to occupy now: the page beside it
+   * stays clickable, scrollable and selectable, which is the entire point of
+   * docking rather than overlaying.
+   *
+   * On a narrow viewport there is no room to sit beside anything, so it
+   * covers the page instead and the page is not narrowed at all.
    */
-  host.style.cssText = "position:fixed;inset:0;z-index:2147483000;";
+  const docked = canDock(PANEL_WIDTH);
+
+  host.style.cssText = docked
+    ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
+    : "position:fixed;inset:0;z-index:2147483000;";
 
   const shadow = host.attachShadow({ mode: "open" });
 
@@ -364,72 +398,72 @@ async function build(): Promise<Panel> {
     ],
   );
 
+  /*
+   * A region beside the page, not a dialog over it.
+   *
+   * `aria-modal` would now be a lie, and a lie that costs something: it tells
+   * a screen reader everything else on the page is inert, when in fact the
+   * reader is meant to be reading FINN's page alongside this. A labelled
+   * complementary region is what this actually is.
+   */
   const drawer = el(
     "div",
     {
       class: [
-        "absolute inset-y-0 right-0 flex w-full max-w-[26rem] flex-col",
-        "bg-white shadow-[0_0_40px_rgba(0,0,0,0.18)]",
+        "absolute inset-0 flex flex-col",
+        "bg-white shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
+        "border-l border-finn-cotton",
         "font-sans text-finn-black",
       ].join(" "),
       attrs: {
-        role: "dialog",
-        "aria-modal": "true",
+        role: "complementary",
         "aria-labelledby": "finn-lens-title",
       },
     },
     [bar, scroller],
   );
 
-  const backdrop = el("div", {
-    class: "absolute inset-0 bg-finn-black/25",
-    on: { click: close },
-  });
+  shadow.append(drawer);
 
-  shadow.append(backdrop, drawer);
+  if (docked) dockPage(PANEL_WIDTH);
 
   /**
-   * A dialog's two keyboard obligations.
+   * Escape closes it, and Tab is left alone.
    *
-   * Escape is listened for on the window because a reader who clicked the
-   * backdrop has moved focus out of the drawer and still expects it to work.
-   * Tab is kept inside, because a modal that tabs you into the page behind it
-   * is a modal in appearance only — and here the page behind it belongs to
-   * somebody else.
+   * The panel used to trap Tab, which is right for a modal and wrong for
+   * this: the page beside it is meant to be reachable, and a reader who tabs
+   * off the end of the panel should land on finn.com rather than being sent
+   * back to the top of a region they have finished with.
+   *
+   * Escape is listened for on the window rather than on the host, because
+   * focus may well be out in the page when the reader reaches for it.
    */
-  const focusable = (): HTMLElement[] =>
-    Array.from(
-      shadow.querySelectorAll<HTMLElement>("button, [href], [tabindex]"),
-    ).filter((node) => !node.hasAttribute("disabled"));
-
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      close();
-      return;
-    }
+    if (event.key !== "Escape") return;
 
-    if (event.key !== "Tab") return;
-    if (!host.contains(event.target as Node) && event.target !== host) return;
-
-    const nodes = focusable();
-    const first = nodes[0];
-    const last = nodes[nodes.length - 1];
-
-    if (!first || !last) return;
-
-    const active = shadow.activeElement;
-
-    if (event.shiftKey && active === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    event.stopPropagation();
+    close();
   };
 
   window.addEventListener("keydown", onKeyDown, true);
+
+  /*
+   * A window narrow enough to dock into can stop being one — a resize, or
+   * devtools opening beside the page. Docking is re-decided rather than
+   * decided once, so a squeezed page isn't left squeezed.
+   */
+  const onResize = () => {
+    const room = canDock(PANEL_WIDTH);
+
+    host.style.cssText = room
+      ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
+      : "position:fixed;inset:0;z-index:2147483000;";
+
+    if (room) dockPage(PANEL_WIDTH);
+    else undockPage();
+  };
+
+  window.addEventListener("resize", onResize);
 
   const session: Session = { choice: undefined };
 
@@ -452,6 +486,11 @@ async function build(): Promise<Panel> {
   const destroy = () => {
     browser.storage.onChanged.removeListener(onStorageChanged);
     window.removeEventListener("keydown", onKeyDown, true);
+    window.removeEventListener("resize", onResize);
+
+    /* The page gets its width back before the panel that borrowed it goes. */
+    undockPage();
+
     host.remove();
   };
 
@@ -475,6 +514,8 @@ export async function openPanel(): Promise<void> {
   opener = document.activeElement;
 
   open = await build();
+
+  onVisibility?.(true);
 }
 
 export function closePanel(): void {
@@ -486,4 +527,6 @@ export function closePanel(): void {
   if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
 
   opener = null;
+
+  onVisibility?.(false);
 }
