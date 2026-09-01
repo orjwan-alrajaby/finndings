@@ -1,23 +1,19 @@
-import {
-    ENVIRONMENTAL_METHOD,
-    ENVIRONMENTAL_METHOD_NOTES,
-} from "@/lib/reasoning-engine/environmental";
+import { ENVIRONMENTAL_METHOD } from "@/lib/reasoning-engine/environmental";
 
 /**
  * How environmental impact is judged, explained where there is no car yet.
  *
- * Every other priority explains itself by the list of features underneath it:
- * a reader opens Safety, sees fifteen things, and understands immediately what
- * the score is counting. This one has no list, and what stood here instead was
- * "calculated automatically from the vehicle's emissions and efficiency data"
- * — which tells the reader that something happens and nothing about what.
+ * Every other priority explains itself through the list of features beneath
+ * it: a reader opens Safety, sees fifteen things, and understands what the
+ * score is counting. This one has no list, so what it needs to say instead is
+ * which figure decides the result and — more usefully — which figures
+ * deliberately don't.
  *
- * What it says now is why there are four figures and not one. Each row is a
- * signal, why it counts, and — the part that makes the set make sense — what
- * it can't see and which of the others covers for it. The arithmetic that
- * turns them into a number is deliberately not here: knowing that a car scores
- * 47 on energy use is worth much less than knowing why energy use is the only
- * thing separating two electric cars.
+ * That is most of what changed here. The old version described four signals
+ * counted equally, which was an honest account of a model that shouldn't have
+ * existed: three of the four were the CO₂ figure in other units. The text now
+ * says there is one measurement, why the others are shown but not counted, and
+ * what the result does not cover.
  */
 export function EnvironmentalMethod({
     tone = "light",
@@ -29,50 +25,19 @@ export function EnvironmentalMethod({
 
     return (
         <div className="space-y-2">
-            {ENVIRONMENTAL_METHOD.map((step, index) => (
+            {ENVIRONMENTAL_METHOD.map((note) => (
                 <div
-                    key={step.id}
-                    className={`flex gap-3 rounded-2xl ${card} p-3`}
+                    key={note.heading}
+                    className={`rounded-2xl ${card} px-3 py-2.5`}
                 >
-                    <span
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-finn-pale-blue text-[10px] font-black text-finn-accent-blue"
-                        aria-hidden="true"
-                    >
-                        {index + 1}
-                    </span>
+                    <p className="text-xs font-black text-finn-black">
+                        {note.heading}
+                    </p>
 
-                    <div className="min-w-0">
-                        <p className="text-xs font-black text-finn-black">
-                            {step.label}
-                        </p>
-
-                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                            {step.reads}
-                        </p>
-
-                        <p className="mt-1.5 text-[11px] leading-4 text-finn-black">
-                            {step.matters}
-                        </p>
-
-                        {/*
-                          * The blind spot, and which of the others covers it.
-                          * This is the row that stops the four reading as four
-                          * attempts at the same measurement.
-                          */}
-                        <p className="mt-1 border-l-2 border-finn-cotton pl-2 text-[11px] leading-4 text-finn-iron">
-                            {step.relates}
-                        </p>
-                    </div>
+                    <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                        {note.body}
+                    </p>
                 </div>
-            ))}
-
-            {ENVIRONMENTAL_METHOD_NOTES.map((note) => (
-                <p
-                    key={note}
-                    className="px-1 text-[11px] leading-4 text-finn-iron"
-                >
-                    {note}
-                </p>
             ))}
         </div>
     );

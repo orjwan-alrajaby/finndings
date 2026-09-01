@@ -1,264 +1,395 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  describeEnvironmentalMethod,
+  assessEfficiency,
+  assessEnvironment,
+  co2ClassFor,
+  describeEnvironment,
   ENVIRONMENTAL_METHOD,
-  ENVIRONMENTAL_METHOD_NOTES,
-  environmentalImpact,
-  environmentalPhrases,
+  positionForCo2,
 } from "./environmental";
-import { categoryDetail } from "./scoring";
 import { buildFitAnalysis } from "./fit";
 import { makeCar, prefs } from "./test-fixtures";
+import type { FuelType } from "@/lib/types";
 
 /**
- * Emissions, judged on their own.
+ * Emissions, efficiency, and the difference between them.
  *
- * The case these exist for is the one that was broken: an electric car emits
- * zero, and zero is a figure. It was being read as an absent one, which made
- * the cleanest car on FINN the only one Lens claimed to know nothing about.
+ * The model these protect is the one the research forced: CO₂ decides the
+ * result, consumption answers a separate question inside the car's own
+ * powertrain, and the CO₂ class and the fuel type are shown rather than
+ * counted. Most of what is asserted here is an absence — that the same fact is
+ * not counted twice.
  */
 
-const electric = (over = {}) =>
-  makeCar({
-    id: 1,
-    fuelType: "Electric",
-    co2: 0,
-    co2Class: "A",
-    consumption: 15,
-    range: 400,
-    ...over,
+const car = (over: Record<string, unknown> = {}) =>
+  makeCar({ id: 1, ...over } as never);
+
+const petrol = (co2: number, consumption: number) =>
+  car({ fuelType: "Petrol", co2, consumption });
+
+const diesel = (co2: number, consumption: number) =>
+  car({ fuelType: "Diesel", co2, consumption });
+
+const electric = (consumption: number | null) =>
+  car({ fuelType: "Electric", co2: 0, consumption, range: 400 });
+
+const phev = (co2: number, consumption: number) =>
+  car({ fuelType: "Plug-in Hybrid", co2, consumption });
+
+/* -------------------------------------------------------------------------- */
+
+describe("the CO₂ class", () => {
+  it("follows the boundaries the regulation sets", () => {
+    /* Pkw-EnVKV §3a as amended 2024: A 0, B ≤95, C ≤115, D ≤135, E ≤155, F ≤175. */
+    expect(co2ClassFor(0)).toBe("A");
+    expect(co2ClassFor(1)).toBe("B");
+    expect(co2ClassFor(95)).toBe("B");
+    expect(co2ClassFor(96)).toBe("C");
+    expect(co2ClassFor(115)).toBe("C");
+    expect(co2ClassFor(116)).toBe("D");
+    expect(co2ClassFor(135)).toBe("D");
+    expect(co2ClassFor(136)).toBe("E");
+    expect(co2ClassFor(155)).toBe("E");
+    expect(co2ClassFor(156)).toBe("F");
+    expect(co2ClassFor(175)).toBe("F");
+    expect(co2ClassFor(176)).toBe("G");
+    expect(co2ClassFor(400)).toBe("G");
   });
 
-const petrol = (over = {}) =>
-  makeCar({ id: 2, fuelType: "Petrol", co2: 130, co2Class: "D", consumption: 6.5, ...over });
+  it("is computed from the figure, not read from FINN's field", () => {
+    /*
+     * A car predating the 2024 scale can carry a letter that disagrees with
+     * its own emissions. The regulation is the better authority on its classes.
+     */
+    const stale = car({ fuelType: "Petrol", co2: 130, co2Class: "A" });
 
-describe("environmentalImpact", () => {
-  it("scores an electric car rather than calling its zero a gap", () => {
-    const impact = environmentalImpact(electric());
+    expect(assessEnvironment(stale)?.co2?.className).toBe("D");
+  });
 
-    expect(impact).not.toBeNull();
-    expect(impact?.components.map((item) => item.id)).toEqual([
-      "emissions",
-      "co2Class",
-      "energy",
-      "powertrain",
+  it("is never a second vote on top of the figure", () => {
+    /* Two cars, same emissions, different stored letters: same result. */
+    const honest = assessEnvironment(car({ fuelType: "Petrol", co2: 130, co2Class: "D" }));
+    const stale = assessEnvironment(car({ fuelType: "Petrol", co2: 130, co2Class: "A" }));
+
+    expect(honest?.score).toBe(stale?.score);
+  });
+});
+
+describe("where a CO₂ figure lands", () => {
+  it("falls as emissions rise, all the way down", () => {
+    const grams = [0, 50, 95, 110, 125, 145, 165, 185, 250];
+    const scores = grams.map(positionForCo2);
+
+    for (let i = 1; i < scores.length; i += 1) {
+      expect(scores[i]).toBeLessThanOrEqual(scores[i - 1] as number);
+    }
+  });
+
+  it("separates two cars inside the same class", () => {
+    /* 118 and 134 g/km are both class D and are not the same car. */
+    expect(positionForCo2(118)).toBeGreaterThan(positionForCo2(134));
+  });
+
+  it("puts each class where the reader's band expects it", () => {
+    /* Bands are strong ≥65, good ≥45, partial ≥25, limited below. */
+    expect(positionForCo2(0)).toBeGreaterThanOrEqual(65);
+    expect(positionForCo2(60)).toBeGreaterThanOrEqual(65);
+    expect(positionForCo2(105)).toBeGreaterThanOrEqual(45);
+    expect(positionForCo2(105)).toBeLessThan(65);
+    expect(positionForCo2(127)).toBeGreaterThanOrEqual(25);
+    expect(positionForCo2(127)).toBeLessThan(45);
+    expect(positionForCo2(165)).toBeLessThan(25);
+  });
+
+  it("stays on the scale for a car far past the last class", () => {
+    expect(positionForCo2(400)).toBeGreaterThanOrEqual(0);
+    expect(positionForCo2(400)).toBeLessThanOrEqual(100);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("efficiency", () => {
+  it("is judged inside the car's own powertrain", () => {
+    /*
+     * 5.0 L/100 km is frugal for a petrol car and ordinary for a diesel,
+     * because a litre of diesel carries more carbon and diesels use fewer.
+     */
+    expect(assessEfficiency(petrol(112, 4.8))?.level).toBe("high");
+    expect(assessEfficiency(diesel(127, 4.8))?.level).toBe("moderate");
+  });
+
+  it("recognises a frugal petrol car as frugal", () => {
+    expect(assessEfficiency(petrol(105, 4.5))?.label).toBe("Highly efficient");
+  });
+
+  it("recognises a thirsty petrol car as thirsty", () => {
+    expect(assessEfficiency(petrol(190, 8.2))?.label).toBe("Less efficient");
+  });
+
+  it("separates an efficient EV from an inefficient one", () => {
+    expect(assessEfficiency(electric(14))?.level).toBe("high");
+    expect(assessEfficiency(electric(17))?.level).toBe("moderate");
+    expect(assessEfficiency(electric(23))?.level).toBe("low");
+  });
+
+  it("says what it is relative to, in the reader's terms", () => {
+    expect(assessEfficiency(petrol(117, 4.5))?.explanation).toMatch(
+      /less fuel than a typical new petrol car/,
+    );
+    expect(assessEfficiency(electric(14))?.explanation).toMatch(
+      /less electricity than a typical new electric car/,
+    );
+  });
+
+  it("refuses to grade a plug-in hybrid's single blended figure", () => {
+    /* One weighted number over two energy sources has no cohort. */
+    expect(assessEfficiency(phev(32, 1.4))).toBeNull();
+  });
+
+  it("says nothing where FINN published no consumption", () => {
+    expect(assessEfficiency(electric(null))).toBeNull();
+    expect(assessEfficiency(petrol(120, 0))).toBeNull();
+  });
+
+  it("uses words a car shopper would use", () => {
+    const labels = [
+      assessEfficiency(petrol(100, 4.0))?.label,
+      assessEfficiency(petrol(130, 5.8))?.label,
+      assessEfficiency(petrol(190, 8.5))?.label,
+    ];
+
+    expect(labels).toEqual([
+      "Highly efficient",
+      "Moderately efficient",
+      "Less efficient",
     ]);
-    expect(impact?.missing).toEqual([]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("the assessment as a whole", () => {
+  it("scores on emissions and nothing else", () => {
+    /*
+     * The same emissions with wildly different consumption score the same.
+     * Efficiency is a separate answer, not a second contribution to this one.
+     */
+    const a = assessEnvironment(petrol(130, 4.0));
+    const b = assessEnvironment(petrol(130, 9.0));
+
+    expect(a?.score).toBe(b?.score);
+    expect(a?.efficiency?.level).not.toBe(b?.efficiency?.level);
   });
 
-  it("gives a zero-emission car full marks on the emissions figure", () => {
-    const emissions = environmentalImpact(electric())?.components.find(
-      (item) => item.id === "emissions",
+  it("doesn't mark a car down twice for what it burns", () => {
+    /* Two cars at the same g/km score alike whatever the fuel is called. */
+    const asPetrol = assessEnvironment(petrol(120, 5.2));
+    const asDiesel = assessEnvironment(diesel(120, 4.5));
+
+    expect(asPetrol?.score).toBe(asDiesel?.score);
+  });
+
+  it("puts an electric car at the top on tailpipe emissions", () => {
+    const ev = assessEnvironment(electric(16));
+
+    expect(ev?.score).toBe(100);
+    expect(ev?.co2?.className).toBe("A");
+  });
+
+  it("won't claim an electric car has no environmental impact", () => {
+    const ev = assessEnvironment(electric(16));
+
+    expect(ev?.caveats.join(" ")).toMatch(/zero at the tailpipe/i);
+    expect(ev?.caveats.join(" ")).toMatch(/aren't estimated here/i);
+  });
+
+  it("keeps a frugal petrol car ahead of a thirsty one", () => {
+    const frugal = assessEnvironment(petrol(105, 4.5));
+    const thirsty = assessEnvironment(petrol(180, 7.7));
+
+    expect(frugal?.score).toBeGreaterThan(thirsty?.score as number);
+  });
+
+  it("keeps a frugal diesel ahead of a thirsty one", () => {
+    const frugal = assessEnvironment(diesel(110, 4.2));
+    const thirsty = assessEnvironment(diesel(175, 6.6));
+
+    expect(frugal?.score).toBeGreaterThan(thirsty?.score as number);
+  });
+
+  it("still puts an electric car ahead of the cleanest combustion car", () => {
+    const ev = assessEnvironment(electric(16));
+    const best = assessEnvironment(petrol(96, 4.1));
+
+    expect(ev?.score).toBeGreaterThan(best?.score as number);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("plug-in hybrids", () => {
+  it("won't call one a strong match on its official figure alone", () => {
+    /*
+     * A 30 g/km official figure would otherwise sit near the top of the scale.
+     * On-road studies put real emissions several times higher where the car is
+     * charged less than the test assumes, so the top of the scale is refused.
+     */
+    const assessment = assessEnvironment(phev(30, 1.4));
+
+    expect(assessment?.score).toBeLessThanOrEqual(60);
+    expect(assessment?.confidence).toBe("optimistic");
+  });
+
+  it("doesn't invent a real-world figure to replace it", () => {
+    const assessment = assessEnvironment(phev(30, 1.4));
+
+    /* The number shown is still FINN's own. */
+    expect(assessment?.co2?.gPerKm).toBe(30);
+    expect(assessment?.co2?.display).toContain("30");
+  });
+
+  it("says what the figure actually assumes", () => {
+    expect(assessEnvironment(phev(30, 1.4))?.caveats.join(" ")).toMatch(
+      /charged less often than the test assumes/i,
+    );
+  });
+
+  it("leaves a high-emitting one where its emissions put it", () => {
+    /* The cap is a ceiling, not a floor: a dirty PHEV isn't lifted to it. */
+    const dirty = assessEnvironment(phev(140, 5.6));
+
+    expect(dirty?.score).toBeLessThan(60);
+  });
+
+  it("keeps two plug-in hybrids apart from each other", () => {
+    /*
+     * Clipping them to a ceiling made a 26 g/km car and a 75 g/km car
+     * identical, which threw away the one distinction between them that the
+     * data actually supports.
+     */
+    const clean = assessEnvironment(phev(26, 1.1));
+    const heavy = assessEnvironment(phev(75, 3.3));
+
+    expect(clean?.score).toBeGreaterThan(heavy?.score as number);
+  });
+
+  it("is never treated as equivalent to a battery electric car", () => {
+    const hybrid = assessEnvironment(phev(28, 1.2));
+    const battery = assessEnvironment(electric(16));
+
+    expect(battery?.score).toBeGreaterThan(hybrid?.score as number);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("missing data", () => {
+  it("reports on consumption alone when there is no CO₂ figure", () => {
+    const assessment = assessEnvironment(
+      car({ fuelType: "Petrol", co2: Number.NaN, consumption: 4.4 }),
     );
 
-    expect(emissions?.score).toBe(100);
-    expect(emissions?.display).toBe("0 g/km");
+    expect(assessment?.score).toBeNull();
+    expect(assessment?.efficiency?.level).toBe("high");
+    expect(assessment?.missing).toContain("its CO₂ figure");
   });
 
-  it("puts an electric car well ahead of a petrol one", () => {
-    const clean = environmentalImpact(electric())?.score ?? 0;
-    const dirty = environmentalImpact(petrol())?.score ?? 0;
-
-    expect(clean).toBeGreaterThan(dirty);
-    expect(clean).toBeLessThanOrEqual(100);
-    expect(dirty).toBeGreaterThanOrEqual(0);
-  });
-
-  it("never leaves the 0–100 scale, whatever the figures", () => {
-    for (const car of [
-      electric(),
-      petrol(),
-      petrol({ co2: 400, consumption: 20, co2Class: "G" }),
-      petrol({ co2: 0, consumption: 0.1, co2Class: "A" }),
-    ]) {
-      const impact = environmentalImpact(car);
-
-      expect(impact?.score).toBeGreaterThanOrEqual(0);
-      expect(impact?.score).toBeLessThanOrEqual(100);
-
-      for (const component of impact?.components ?? []) {
-        expect(component.score).toBeGreaterThanOrEqual(0);
-        expect(component.score).toBeLessThanOrEqual(100);
-      }
-    }
-  });
-
-  it("reads the CO₂ class off the label, pluses and whitespace included", () => {
-    for (const [written, score] of [
-      ["A", 100],
-      [" a ", 100],
-      ["A+++", 100],
-      ["D", 50],
-      ["G", 0],
-    ] as [string, number][]) {
-      const found = environmentalImpact(
-        petrol({ co2Class: written }),
-      )?.components.find((item) => item.id === "co2Class");
-
-      expect(found?.score).toBe(score);
-    }
-  });
-
-  it("measures energy on the scale the powertrain is sold in", () => {
-    const kwh = environmentalImpact(electric({ consumption: 15 }))?.components.find(
-      (item) => item.id === "energy",
+  it("reports on emissions alone when there is no consumption", () => {
+    const assessment = assessEnvironment(
+      car({ fuelType: "Petrol", co2: 120, consumption: null }),
     );
 
-    const litres = environmentalImpact(petrol({ consumption: 6 }))?.components.find(
-      (item) => item.id === "energy",
-    );
-
-    expect(kwh?.display).toContain("kWh/100km");
-    expect(litres?.display).toContain("L/100km");
-    /* 15 of 30 and 6 of 12 are the same fraction of their own ceiling. */
-    expect(kwh?.score).toBe(litres?.score);
+    expect(assessment?.score).toBe(positionForCo2(120));
+    expect(assessment?.efficiency).toBeNull();
+    expect(assessment?.missing).toContain("what it consumes");
   });
 
-  it("scores diesel and petrol alike, leaving the difference to the CO₂ figure", () => {
-    const diesel = environmentalImpact(
-      petrol({ fuelType: "Diesel" }),
-    )?.components.find((item) => item.id === "powertrain");
+  it("never reads a missing consumption as a frugal one", () => {
+    const assessment = assessEnvironment(electric(null));
 
-    const unleaded = environmentalImpact(petrol())?.components.find(
-      (item) => item.id === "powertrain",
-    );
-
-    expect(diesel?.score).toBe(unleaded?.score);
+    expect(assessment?.efficiency).toBeNull();
+    expect(describeEnvironment(assessment as never)).toMatch(/unknown/i);
   });
 
-  it("names what's missing instead of scoring it as zero", () => {
-    const impact = environmentalImpact(
-      petrol({ co2: Number.NaN, co2Class: "", consumption: null }),
-    );
-
-    expect(impact?.components.map((item) => item.id)).toEqual(["powertrain"]);
-    expect(impact?.missing).toHaveLength(3);
-    expect(impact?.score).toBe(20);
-  });
-
-  it("returns nothing when there is genuinely nothing to go on", () => {
+  it("says nothing at all when there is nothing to say", () => {
     expect(
-      environmentalImpact(
-        petrol({
-          co2: Number.NaN,
-          co2Class: "",
-          consumption: null,
-          fuelType: "Unknown" as never,
-        }),
+      assessEnvironment(
+        car({ fuelType: "Unknown" as FuelType, co2: Number.NaN, consumption: null }),
       ),
     ).toBeNull();
   });
-
-  it("says what a plug-in hybrid's figure assumes", () => {
-    expect(
-      environmentalImpact(petrol({ fuelType: "Plug-in Hybrid" }))?.caveat,
-    ).toMatch(/charge it/i);
-  });
-
-  it("says that an electric car's zero is a tailpipe figure", () => {
-    expect(environmentalImpact(electric())?.caveat).toMatch(/tailpipe/i);
-  });
 });
 
-describe("the explanation", () => {
-  it("says why there are four figures rather than one", () => {
-    const lines = describeEnvironmentalMethod(
-      environmentalImpact(electric()) as never,
-    ).join(" ");
+/* -------------------------------------------------------------------------- */
 
-    expect(lines).toMatch(/count equally/i);
-    expect(lines).toMatch(/blind to something the others catch/i);
+describe("what the reader is told", () => {
+  it("gives a frugal petrol car both halves of the truth", () => {
+    const line = describeEnvironment(assessEnvironment(petrol(117, 4.6)) as never);
+
+    expect(line).toMatch(/Highly efficient for a petrol car/);
+    expect(line).toMatch(/an electric car emits none at the tailpipe/);
   });
 
-  it("says which figures were missing when some were", () => {
-    const lines = describeEnvironmentalMethod(
-      environmentalImpact(petrol({ co2Class: "" })) as never,
-    ).join(" ");
+  it("doesn't tell an electric car's owner about fuel", () => {
+    const line = describeEnvironment(assessEnvironment(electric(15)) as never);
 
-    expect(lines).toMatch(/didn't supply its CO₂ class/i);
+    expect(line).toMatch(/No CO₂ at the tailpipe/);
+    expect(line).not.toMatch(/petrol|diesel/i);
   });
 
-  it("reads the figures as English", () => {
-    expect(environmentalPhrases(environmentalImpact(electric()) as never)).toEqual([
-      "emits 0 g/km",
-      "sits in CO₂ class A",
-      "uses 15 kWh/100km",
-      "runs on electricity",
-    ]);
-  });
-});
+  it("never claims a percentage improvement it can't support", () => {
+    for (const vehicle of [petrol(120, 5), diesel(130, 4.8), electric(16), phev(30, 1.4)]) {
+      const line = describeEnvironment(assessEnvironment(vehicle) as never);
 
-describe("the priority as a whole", () => {
-  it("is answerable for a single car, which is why any of this changed", () => {
-    const detail = categoryDetail(
-      "environmental",
-      electric(),
-      [electric()],
-      prefs(),
-    );
-
-    expect(detail.hasEvidence).toBe(true);
-    expect(detail.environmental).not.toBeNull();
-  });
-
-  it("no longer tells a reader looking at an electric car that we don't know", () => {
-    const analysis = buildFitAnalysis(electric(), ["environmental"], prefs());
-
-    const environmental = analysis.priorities[0];
-
-    expect(environmental?.band.level).not.toBe("unknown");
-    expect(environmental?.hasEvidence).toBe(true);
-    expect(environmental?.impact).not.toBeNull();
-    expect(environmental?.sentences.join(" ")).toMatch(/emits 0 g\/km/);
-  });
-
-  it("explains itself even when the car's equipment list is missing", () => {
-    /* Emissions don't depend on the equipment list, so the answer stands. */
-    const analysis = buildFitAnalysis(
-      electric({ features: [] }),
-      ["environmental"],
-      prefs(),
-    );
-
-    expect(analysis.priorities[0]?.band.level).not.toBe("unknown");
-    expect(analysis.priorities[0]?.impact).not.toBeNull();
-  });
-});
-
-describe("the method as shown before there is a car", () => {
-  it("covers the same four signals the scoring uses", () => {
-    const scored = environmentalImpact(electric())?.components.map((c) => c.id);
-
-    expect(ENVIRONMENTAL_METHOD.map((step) => step.id)).toEqual(scored);
-  });
-
-  it("says, for each signal, what it can't see on its own", () => {
-    /*
-     * The set only makes sense if each figure's blind spot is named. Without
-     * that the four read as four attempts at the same measurement.
-     */
-    for (const step of ENVIRONMENTAL_METHOD) {
-      expect(step.matters.length).toBeGreaterThan(20);
-      expect(step.relates.length).toBeGreaterThan(20);
+      expect(line).not.toMatch(/\d+%/);
     }
-
-    const emissions = ENVIRONMENTAL_METHOD.find((s) => s.id === "emissions");
-    const energy = ENVIRONMENTAL_METHOD.find((s) => s.id === "energy");
-
-    /* The tailpipe figure's blind spot, and the signal that covers it. */
-    expect(emissions?.relates).toMatch(/electric/i);
-    expect(energy?.matters).toMatch(/electric/i);
   });
 
-  it("says the four count equally, which is what the score does", () => {
-    expect(ENVIRONMENTAL_METHOD_NOTES.join(" ")).toMatch(/count equally/i);
+  it("explains the method without exposing the arithmetic", () => {
+    const method = ENVIRONMENTAL_METHOD.map(
+      (note) => `${note.heading} ${note.body}`,
+    ).join(" ");
 
-    /* All four at full marks is full marks; nothing is weighted up. */
-    const perfect = environmentalImpact(
-      electric({ consumption: 0.01, co2: 0, co2Class: "A" }),
+    expect(method).toMatch(/shown|not counted/i);
+    expect(method).toMatch(/not a lifecycle assessment/i);
+    expect(method).not.toMatch(/count equally/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("the priority as the panel sees it", () => {
+  const analyse = (vehicle: ReturnType<typeof car>) =>
+    buildFitAnalysis(vehicle, ["environmental"], prefs()).priorities[0];
+
+  it("answers for a single car, whatever it runs on", () => {
+    for (const vehicle of [petrol(130, 5.6), diesel(120, 4.5), electric(16), phev(30, 1.4)]) {
+      expect(analyse(vehicle)?.band.level).not.toBe("unknown");
+    }
+  });
+
+  it("reads an efficient petrol car as a partial match, honestly", () => {
+    /* Efficient for what it is, and still an average emitter overall. */
+    const band = analyse(petrol(127, 5.6));
+
+    expect(band?.band.label).toBe("Partial match");
+    expect(band?.impact?.efficiency?.label).toBe("Moderately efficient");
+  });
+
+  it("reads an electric car as a strong match", () => {
+    expect(analyse(electric(16))?.band.label).toBe("Strong match");
+  });
+
+  it("holds up across a large thirsty car and a tiny frugal one", () => {
+    /* Nothing here is size-adjusted, and the ordering still makes sense. */
+    const cityCar = analyse(petrol(105, 4.5));
+    const largeSuv = analyse(petrol(185, 7.9));
+
+    expect(cityCar?.band.level).not.toBe(largeSuv?.band.level);
+    expect(cityCar?.impact?.score).toBeGreaterThan(
+      largeSuv?.impact?.score as number,
     );
-
-    expect(perfect?.score).toBe(100);
   });
 });

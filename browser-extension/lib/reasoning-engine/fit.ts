@@ -6,7 +6,7 @@ import type {
   LensPreferences,
   PriorityBreakdown,
 } from "./types";
-import type { EnvironmentalImpact } from "./environmental";
+import type { EnvironmentalAssessment } from "./environmental";
 import type {
   CostReasoning,
   FeatureFact,
@@ -255,7 +255,7 @@ export interface FitPriority {
    * whose result a reader can't check against a list of features — so the
    * panel shows what went into it.
    */
-  impact: EnvironmentalImpact | null;
+  impact: EnvironmentalAssessment | null;
 
   /** The engine's explanation, already written. */
   sentences: string[];

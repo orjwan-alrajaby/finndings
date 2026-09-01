@@ -24,8 +24,8 @@ import {
 
 import { formatNumber } from "./format";
 import {
-  environmentalImpact,
-  type EnvironmentalImpact,
+  assessEnvironment,
+  type EnvironmentalAssessment,
 } from "./environmental";
 
 /* -------------------------------------------------------------------------- */
@@ -128,8 +128,8 @@ interface NumericResult {
   score: number;
   /** Null where the score rests on several figures rather than one. */
   evidence: NumericEvidence | null;
-  /** The full working, where a category has more than one figure behind it. */
-  impact?: EnvironmentalImpact;
+  /** The reading behind a category scored on figures rather than equipment. */
+  environmental?: EnvironmentalAssessment;
 }
 
 function evidence(
@@ -218,25 +218,23 @@ function numericScore(
     }
 
     /*
-     * The one category not scored by comparison. See `environmentalImpact`:
-     * emissions have absolute reference points where boot space doesn't, and
-     * scoring them relatively made a single car unanswerable and an electric
-     * one unreadable.
+     * The one category not scored by comparison, and the one scored on a
+     * single figure. See `assessEnvironment`: emissions have an absolute,
+     * published scale where boot space doesn't, and the three things that used
+     * to be averaged alongside CO₂ all turned out to be the CO₂ figure wearing
+     * different clothes.
      */
     case "environmental": {
-      const impact = environmentalImpact(vehicle);
+      const assessment = assessEnvironment(vehicle);
 
-      if (!impact) return null;
-
-      const co2 = Number(vehicle.co2?.value);
+      if (!assessment || assessment.score == null) return null;
 
       return {
-        score: impact.score,
-        /* The headline figure, for prose that wants to quote one number. */
-        evidence: Number.isFinite(co2)
-          ? evidence("CO₂ emissions", co2, "g/km", true)
+        score: assessment.score,
+        evidence: assessment.co2
+          ? evidence("CO₂ emissions", assessment.co2.gPerKm, "g/km", true)
           : null,
-        impact,
+        environmental: assessment,
       };
     }
 
@@ -367,7 +365,7 @@ export function categoryDetail(
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,
-    environmental: numeric?.impact ?? null,
+    environmental: numeric?.environmental ?? null,
     hasEvidence: featureScore != null || numeric != null,
   };
 }

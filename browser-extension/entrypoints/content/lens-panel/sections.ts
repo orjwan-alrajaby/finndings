@@ -6,10 +6,10 @@ import type {
 } from "@/lib/reasoning-engine/fit";
 import type { CostLine } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
-import type { EnvironmentalImpact } from "@/lib/reasoning-engine/environmental";
+import type { EnvironmentalAssessment } from "@/lib/reasoning-engine/environmental";
 import {
+  describeEnvironment,
   ENVIRONMENTAL_METHOD,
-  ENVIRONMENTAL_METHOD_NOTES,
 } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
@@ -475,12 +475,19 @@ function prioritySection(priority: FitPriority): HTMLElement {
       bandChip(priority.band.level, priority.band.label),
     ]),
 
-    ...priority.sentences.map((line) =>
-      el("p", {
-        class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
-        text: line,
-      }),
-    ),
+    ...(priority.impact
+      ? [
+          el("p", {
+            class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
+            text: describeEnvironment(priority.impact),
+          }),
+        ]
+      : priority.sentences.map((line) =>
+          el("p", {
+            class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
+            text: line,
+          }),
+        )),
 
     priority.impact ? impactBreakdown(priority.impact) : null,
 
@@ -512,91 +519,134 @@ function prioritySection(priority: FitPriority): HTMLElement {
   ]);
 }
 
-/**
- * The four figures behind an emissions result, and why there are four.
- *
- * Every other priority can be checked against a list of features the car has
- * or hasn't. This one is figures, so what has to be shown is not the sum but
- * the reasoning: what each figure is, what it earned, and what it can't see
- * on its own. A reader who knows that the tailpipe number reads zero for every
- * electric car understands immediately why energy use is in the set — and that
- * is worth more than watching the average being taken.
- */
-function impactBreakdown(impact: EnvironmentalImpact): HTMLElement {
-  const methodFor = (id: string) =>
-    ENVIRONMENTAL_METHOD.find((step) => step.id === id);
-
-  return el("div", { class: "mt-3 rounded-xl bg-finn-snow p-3" }, [
+/** One reading, with its figure and what the figure means. */
+function readout(
+  label: string,
+  value: string,
+  meaning: string | null = null,
+): HTMLElement {
+  return el("div", { class: "min-w-0" }, [
     el("p", {
-      class: "text-[11px] font-black uppercase tracking-[0.1em] text-finn-iron",
-      text: "How this is judged",
+      class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+      text: label,
     }),
 
-    /*
-     * No lead sentence here: the prose immediately above already says why
-     * there are four, and this box's job is the four themselves.
-     */
-    el(
-      "ul",
-      { class: "mt-2 flex flex-col gap-2.5" },
-      impact.components.map((component) => {
-        const method = methodFor(component.id);
+    el("p", {
+      class: "mt-0.5 text-[13px] font-black leading-5 text-finn-black",
+      text: value,
+    }),
 
-        return el("li", {}, [
-          el("div", { class: "flex items-baseline justify-between gap-3" }, [
-            el("span", {
-              class: "text-[12px] font-bold text-finn-black",
-              text: component.label,
-            }),
-            el("span", { class: "flex shrink-0 items-baseline gap-2" }, [
-              el("span", {
-                class: "text-[12px] font-bold tabular-nums text-finn-black",
-                text: component.display,
-              }),
-              el("span", {
-                class: "text-[10px] tabular-nums text-finn-iron",
-                text: `${component.score}/100`,
-              }),
-            ]),
-          ]),
+    meaning
+      ? el("p", {
+          class: "text-[11px] leading-4 text-finn-iron",
+          text: meaning,
+        })
+      : null,
+  ]);
+}
 
-          method
-            ? el("p", {
-                class: "mt-0.5 text-[11px] leading-4 text-finn-black",
-                text: method.matters,
-              })
-            : null,
+/**
+ * The emissions reading: three plain figures, and the method folded away.
+ *
+ * This used to be four scored components with a mark out of a hundred beside
+ * each and an average underneath. Those numbers are gone because three of the
+ * four were the same measurement — see `assessEnvironment` — and because a
+ * figure a reader can't explain to themselves is worse than no figure. What is
+ * left is what the car actually is: what it emits, how frugally it uses what
+ * it burns, and what it burns.
+ *
+ * The CO₂ class sits with the CO₂ figure rather than on a line of its own,
+ * because it is that figure written in the form FINN's own page uses and not a
+ * second fact about the car.
+ */
+function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
+  const method = el(
+    "div",
+    { class: "mt-2 hidden flex-col gap-2" },
+    ENVIRONMENTAL_METHOD.map((note) =>
+      el("div", { class: "rounded-lg bg-white px-2.5 py-2" }, [
+        el("p", {
+          class: "text-[11px] font-black text-finn-black",
+          text: note.heading,
+        }),
+        el("p", {
+          class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+          text: note.body,
+        }),
+      ]),
+    ),
+  );
 
-          method
-            ? el("p", {
-                class: "mt-1 border-l-2 border-finn-cotton pl-2 text-[11px] leading-4 text-finn-iron",
-                text: method.relates,
-              })
-            : null,
-        ]);
+  const toggle = el("button", {
+    class: [
+      "mt-3 text-[11px] font-bold text-finn-iron underline-offset-2",
+      "transition-colors hover:text-finn-black hover:underline",
+    ].join(" "),
+    attrs: { type: "button", "aria-expanded": "false" },
+    text: "How this is judged",
+    on: {
+      click: () => {
+        const open = method.classList.toggle("hidden");
+
+        method.classList.toggle("flex", !open);
+        toggle.setAttribute("aria-expanded", String(!open));
+      },
+    },
+  });
+
+  return el("div", { class: "mt-3 rounded-xl bg-finn-snow p-3" }, [
+    el("div", { class: "flex flex-col gap-2.5" }, [
+      impact.co2
+        ? readout(
+            "CO₂ emissions",
+            `${impact.co2.display} · Class ${impact.co2.className}`,
+          )
+        : readout("CO₂ emissions", "Not published by FINN"),
+
+      impact.efficiency
+        ? readout(
+            impact.powertrain === "Electric"
+              ? "Energy efficiency"
+              : "Fuel efficiency",
+            `${impact.efficiency.label} · ${impact.efficiency.display}`,
+            impact.efficiency.explanation,
+          )
+        : null,
+
+      /*
+       * A plug-in hybrid's consumption is shown and not graded. One weighted
+       * figure covering two energy sources has no cohort to be frugal within,
+       * and FINN publishes no separate electric consumption to build one from.
+       */
+      !impact.efficiency && impact.powertrain === "Plug-in Hybrid"
+        ? readout(
+            "Consumption",
+            "One combined figure",
+            "FINN publishes a single weighted figure for plug-in hybrids, which can't be compared with either petrol or electric cars on its own.",
+          )
+        : null,
+
+      impact.powertrain
+        ? readout("Powertrain", impact.powertrain)
+        : null,
+    ]),
+
+    ...impact.caveats.map((caveat) =>
+      el("p", {
+        class: "mt-2.5 text-[11px] leading-4 text-finn-iron",
+        text: caveat,
       }),
     ),
 
-    el("p", {
-      class: "mt-2.5 border-t border-finn-cotton pt-2 text-[11px] leading-4 text-finn-iron",
-      text:
-        impact.components.length === 1
-          ? "That is the only one of the four FINN supplied, so it is the result on its own."
-          : (ENVIRONMENTAL_METHOD_NOTES[0] as string),
-    }),
-
     impact.missing.length
       ? el("p", {
-          class: "mt-1 text-[11px] leading-4 text-finn-iron",
+          class: "mt-2 text-[11px] leading-4 text-finn-iron",
           text: `FINN didn't supply ${impact.missing.join(" or ")} for this car.`,
         })
       : null,
 
-    /*
-     * The caveat is deliberately not repeated here — the prose above this box
-     * already carries it, and saying it twice on one screen reads as the
-     * panel not trusting the reader to have read it once.
-     */
+    toggle,
+    method,
   ]);
 }
 
@@ -662,11 +712,7 @@ function featureGroup(
 
 /** The count behind the band, which is the part a reader can check. */
 function coverageLine(priority: FitPriority): string {
-  if (priority.impact) {
-    const counted = priority.impact.components.length;
-
-    return `Judged on ${counted} emissions figure${counted === 1 ? "" : "s"}, not on equipment`;
-  }
+  if (priority.impact) return "Judged on emissions, not on equipment";
 
   if (priority.band.level === "unknown") return "Equipment not listed by FINN";
 

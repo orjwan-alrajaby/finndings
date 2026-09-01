@@ -1,6 +1,6 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type { CATEGORIES, FEATURES, PROFILES } from "./constants";
-import type { EnvironmentalImpact } from "./environmental";
+import type { EnvironmentalAssessment } from "./environmental";
 
 /* -------------------------------------------------------------------------- */
 /* Configuration-derived types                                                */
@@ -227,7 +227,7 @@ export interface CategoryDetail {
    * The working behind a category scored on figures rather than equipment.
    * Only environmental impact has one — see `environmentalImpact`.
    */
-  environmental?: EnvironmentalImpact | null;
+  environmental?: EnvironmentalAssessment | null;
 
   hasEvidence: boolean;
 }
@@ -415,7 +415,7 @@ export interface PriorityBreakdown {
   numeric: NumericEvidence | null;
   /** See `CategoryDetail.hasEvidence`. */
   /** See `CategoryDetail.environmental`. */
-  environmental: EnvironmentalImpact | null;
+  environmental: EnvironmentalAssessment | null;
 
   hasEvidence: boolean;
 

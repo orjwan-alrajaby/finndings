@@ -1,393 +1,526 @@
-import type { FinnCar } from "@/lib/types";
+import type { FinnCar, FuelType } from "@/lib/types";
 
 import { formatNumber } from "./format";
 
 /**
- * What a car costs the environment, judged on its own.
+ * What a car emits, how efficiently it uses what it burns, and what neither
+ * figure can say on its own.
  *
- * Every other priority is scored by comparing cars, because "roomy" and
- * "well equipped" only mean anything relative to something else. Emissions
- * aren't like that. A gram of CO₂ is a gram of CO₂ whether or not another car
- * is parked next to it, and the EU already publishes an absolute grade for
- * exactly this. So this priority is scored against fixed reference points
- * rather than against the rest of the reader's list, which is both more
- * honest and the reason it now works for a single car on finn.com.
+ * This replaces a model that scored four things and averaged them: CO₂ g/km,
+ * CO₂ class, consumption, and fuel type. Three of those four were not
+ * independent of the first, and the research says so plainly.
  *
- * It replaces a relative score that was wrong in three ways at once:
+ * **The CO₂ class is the CO₂ figure.** Since the Pkw-EnVKV was amended in
+ * February 2024 the German class is a pure function of WLTP combined CO₂ in
+ * g/km — A at 0, B to 95, C to 115, D to 135, E to 155, F to 175, G above
+ * that — and the amendment's own summary of what changed is that the reference
+ * to vehicle weight was dropped. Scoring the figure and the class as two votes
+ * counted one measurement twice.
  *
- * - it needed two cars carrying a CO₂ figure, so a car looked at on its own
- *   was always reported as "not enough data";
- * - it filtered out figures of zero as missing, so an electric car — the one
- *   case where the number is unambiguous — was treated as having no data;
- * - and an electric car ranked among petrol ones fell outside the range being
- *   normalised, producing scores in the hundreds.
+ * **Consumption is the CO₂ figure too, for anything that burns fuel.** The
+ * Commission's real-world monitoring puts 1.2 L/100 km of petrol at 28 g
+ * CO₂/km, which is the carbon in a litre of petrol and nothing else. A petrol
+ * car's CO₂ per kilometre is its litres per kilometre times a constant.
  *
- * Four signals, because no one of them is enough. The tailpipe figure says
- * nothing about a plug-in hybrid nobody plugs in; the class is a coarse
- * bucket; consumption alone can't compare a litre with a kilowatt-hour; and
- * the fuel type is the only one that says what the car burns at all.
+ * **Fuel type is not a measurement at all.** It is what tells you how to read
+ * the other two — that a zero is a tailpipe zero, that a plug-in hybrid's
+ * figure assumes charging — and giving it its own score marked a petrol car
+ * down twice for being petrol: once in its CO₂ and again for the fuel that
+ * produced it.
+ *
+ * So there is one score here, not four:
+ *
+ * - **Environmental impact** is tailpipe CO₂, placed on the EU's own class
+ *   scale. The boundaries are the regulation's, not ours.
+ *
+ * - **Efficiency** is a separate, cohort-relative reading of consumption —
+ *   "frugal for a petrol car" — because a litre and a kilowatt-hour are not
+ *   comparable quantities, and because a reader who wants a petrol car is
+ *   entitled to know which petrol car is the frugal one rather than being told
+ *   again that petrol cars burn petrol.
+ *
+ * - **Powertrain** is context, and carries the caveats.
+ *
+ * The two answers are allowed to disagree, and that disagreement is the useful
+ * part: a frugal petrol car is genuinely efficient *and* genuinely a worse
+ * emitter than an electric one, and a reader deciding between petrol cars
+ * needs the first while a reader deciding between powertrains needs the second.
+ *
+ * Sources: Pkw-EnVKV §3a and ADAC's summary of the 2024 amendment; the
+ * European Commission's report on real-world CO₂ from on-board monitoring;
+ * ICCT's European vehicle market statistics and its work on plug-in hybrid
+ * utility factors.
  */
 
 /* -------------------------------------------------------------------------- */
-/* Reference points                                                           */
+/* Reference points, all of them published                                    */
 /* -------------------------------------------------------------------------- */
 
 /**
- * The tailpipe figure at which this stops distinguishing between cars.
+ * The EU CO₂ classes, as the upper bound of each band in g/km.
  *
- * Chosen as a scale, not a threshold: at 250 g/km a car is at the dirty end of
- * anything FINN rents, and everything at or above it scores zero rather than
- * going negative. The EU's fleet-average target of about 95 g/km lands at 62
- * on this scale, and a zero-tailpipe car at 100.
+ * Straight out of the regulation. `G` has no upper bound in law; the figure
+ * here is where this stops distinguishing, one band-width past where G starts.
  */
-const CO2_CEILING_G_PER_KM = 250;
+const CO2_CLASS_BANDS: { letter: string; upTo: number }[] = [
+  { letter: "A", upTo: 0 },
+  { letter: "B", upTo: 95 },
+  { letter: "C", upTo: 115 },
+  { letter: "D", upTo: 135 },
+  { letter: "E", upTo: 155 },
+  { letter: "F", upTo: 175 },
+  { letter: "G", upTo: 195 },
+];
 
 /**
- * The same idea for energy, on the two scales cars are actually measured on.
+ * Where each class sits on the 0–100 the rest of the engine speaks in.
  *
- * A litre of fuel and a kilowatt-hour are not comparable quantities, so they
- * cannot share a ceiling. Each is set where the figure stops being a
- * meaningful distinction: 12 L/100 km is a thirsty combustion car, and
- * 30 kWh/100 km is a heavy, inefficient electric one.
- */
-const FUEL_CEILING_L_PER_100KM = 12;
-const ELECTRIC_CEILING_KWH_PER_100KM = 30;
-
-/**
- * The EU's CO₂ class, as a score.
+ * The one product judgement in this file, and a single table tied to the
+ * official classes rather than a set of ceilings pulled out of the air.
  *
- * Seven official buckets, scored at even steps, so the grade the reader can
- * see on FINN's own page is the grade this uses. Older labels that carried
- * pluses (A+, A++, A+++) predate the current scale and are read as A.
+ * Each class occupies a range rather than a point, and every range sits wholly
+ * inside one of the reader's bands: A and B read as a strong match, C as good,
+ * D and E as partial, F and G as limited. So the class a car is in decides the
+ * word a reader sees, and where it sits inside that class decides where in the
+ * band — two class D cars twenty grams apart are not reported as the same car,
+ * and neither of them is ever reported as better than a class C one.
+ *
+ * D is the commonest class among cars that burn fuel. A car of average
+ * emissions reading as a partial match to somebody who put the environment
+ * near the top of their list is the intended result, not an accident.
  */
-const CO2_CLASS_LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
-
-const CO2_CLASS_SCORE: Record<string, number> = {
-  A: 100,
-  B: 83,
-  C: 67,
-  D: 50,
-  E: 33,
-  F: 17,
-  G: 0,
+const CLASS_POSITION: Record<string, { from: number; to: number }> = {
+  A: { from: 100, to: 100 },
+  B: { from: 88, to: 70 },
+  C: { from: 64, to: 52 },
+  D: { from: 44, to: 34 },
+  E: { from: 33, to: 28 },
+  F: { from: 22, to: 14 },
+  G: { from: 12, to: 0 },
 };
 
 /**
- * What the car runs on, as a score.
+ * Grams of CO₂ per litre burned.
  *
- * The coarsest of the four signals, and here because the other three can't say
- * what it is: a plug-in hybrid's official CO₂ figure assumes it is charged,
- * and an electric car's zero is a tailpipe figure rather than a claim about
- * the grid it charges from.
- *
- * Diesel and petrol score the same on purpose. Where one of them genuinely
- * emits less per kilometre than the other, that difference is already the CO₂
- * figure above, and scoring it twice would be counting the same fact twice.
+ * Physical constants, not estimates: the Commission's monitoring report gives
+ * 1.2 L/100 km of petrol as 28 g CO₂/km, which is this number. They are used
+ * to turn the emissions cohort average into a consumption one, so the
+ * efficiency reference is derived from published data rather than set by hand.
  */
-const POWERTRAIN_SCORE: Record<string, number> = {
-  Electric: 100,
-  "Plug-in Hybrid": 55,
-  Diesel: 20,
-  Petrol: 20,
+const CARBON_PER_LITRE: Partial<Record<FuelType, number>> = {
+  Petrol: 2330,
+  Diesel: 2640,
 };
+
+/**
+ * The average new car that burns fuel, in WLTP CO₂ g/km.
+ *
+ * ICCT's European market statistics: combustion vehicles including hybrids
+ * have sat at about this figure since 2021.
+ */
+const COMBUSTION_FLEET_CO2 = 136;
+
+/**
+ * The average new battery-electric car, in WLTP kWh/100 km.
+ *
+ * ICCT reports real-world consumption averaging 19 kWh/100 km and running
+ * about 12% above the type-approval figure, which puts the WLTP average here.
+ * There is no CO₂ figure to derive an electric cohort from — every electric
+ * car is 0 g/km — so consumption is the only thing separating one from another.
+ */
+const ELECTRIC_FLEET_KWH = 17;
+
+/**
+ * How far from typical a car has to be before the word changes.
+ *
+ * One CO₂ class is 20 g/km wide, which is 15% of the combustion fleet average.
+ * Using that proportion for every cohort makes "highly efficient" the same
+ * distance from ordinary whether it is measured in litres or kilowatt-hours,
+ * and it is a width the label already uses rather than one chosen to make cars
+ * look good.
+ */
+const EFFICIENCY_BAND = 20 / COMBUSTION_FLEET_CO2;
 
 /* -------------------------------------------------------------------------- */
 /* Shapes                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type EnvironmentalSignal =
-  | "emissions"
-  | "co2Class"
-  | "energy"
-  | "powertrain";
+export type EfficiencyLevel = "high" | "moderate" | "low";
 
-/** One of the four signals, with the figure behind it and how it was read. */
-export interface EnvironmentalComponent {
-  id: EnvironmentalSignal;
+export interface EfficiencyAssessment {
+  level: EfficiencyLevel;
+  /** "Highly efficient". */
   label: string;
-  /** The car's own figure, as it should be shown. */
+  /** What that means, naming the cohort it is relative to. */
+  explanation: string;
+  /** The figure it was read from. */
   display: string;
-  /** 0–100. */
-  score: number;
+  /** What an ordinary car of this kind uses, so the reader can judge it. */
+  typical: string;
 }
 
-export interface EnvironmentalImpact {
-  /** The mean of whatever could be worked out. 0–100. */
-  score: number;
-  components: EnvironmentalComponent[];
-  /** Signals FINN supplied nothing for, named in plain English. */
+/**
+ * How far the emissions figure can be trusted as a description of the car.
+ *
+ * `optimistic` is the plug-in hybrid case: the number is real, but it measures
+ * an assumed pattern of use as much as it measures the car.
+ */
+export type EmissionsConfidence = "measured" | "optimistic" | "unknown";
+
+export interface EnvironmentalAssessment {
+  /** 0–100 on the class scale. Null when FINN supplied no CO₂ figure. */
+  score: number | null;
+
+  /** The primary signal, with the class that is its published shorthand. */
+  co2: { gPerKm: number; className: string; display: string } | null;
+
+  /** The separate question: how well it uses what it burns. */
+  efficiency: EfficiencyAssessment | null;
+
+  powertrain: FuelType | null;
+  confidence: EmissionsConfidence;
+
+  /** What the figures can't say for themselves. */
+  caveats: string[];
+
+  /** Measurements FINN didn't supply, named in plain English. */
   missing: string[];
-  /** Something true about this car that the score alone would misrepresent. */
-  caveat: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Calculation                                                                */
+/* Reading the figures                                                        */
 /* -------------------------------------------------------------------------- */
-
-const clamp = (value: number): number =>
-  Math.max(0, Math.min(100, Math.round(value)));
-
-/** Distance below a ceiling, as a percentage of it. */
-const againstCeiling = (value: number, ceiling: number): number =>
-  clamp(100 * (1 - value / ceiling));
 
 const isMeasured = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0;
 
-/**
- * Reads a CO₂ class label into its letter.
- *
- * FINN supplies these as they appear on the label — "A", sometimes with
- * whitespace or a legacy plus — so the letter is taken rather than the string
- * matched.
- */
-function co2ClassLetter(raw: string | null | undefined): string | null {
-  const letter = String(raw ?? "").trim().toUpperCase().charAt(0);
+/** The official class for a CO₂ figure, computed rather than trusted. */
+export function co2ClassFor(gPerKm: number): string {
+  for (const band of CO2_CLASS_BANDS) {
+    if (gPerKm <= band.upTo) return band.letter;
+  }
 
-  return letter in CO2_CLASS_SCORE ? letter : null;
+  return "G";
 }
 
-export function environmentalImpact(
-  vehicle: FinnCar,
-): EnvironmentalImpact | null {
-  const components: EnvironmentalComponent[] = [];
-  const missing: string[] = [];
+/**
+ * Where a CO₂ figure sits on the 0–100 scale.
+ *
+ * The class decides which stretch of the scale; the figure's position inside
+ * its own class decides where in that stretch. So the answer moves smoothly
+ * with the emissions while never letting a car cross into a band its class
+ * doesn't belong to.
+ */
+export function positionForCo2(gPerKm: number): number {
+  for (let index = 0; index < CO2_CLASS_BANDS.length; index += 1) {
+    const band = CO2_CLASS_BANDS[index] as { letter: string; upTo: number };
 
-  const isElectric = vehicle.fuelType === "Electric";
+    if (gPerKm > band.upTo) continue;
 
-  /* 1. Tailpipe CO₂. Zero is a figure, not a gap — that is the whole point. */
-  const co2 = Number(vehicle.co2?.value);
+    const { from, to } = CLASS_POSITION[band.letter] as {
+      from: number;
+      to: number;
+    };
 
-  if (isMeasured(co2)) {
-    components.push({
-      id: "emissions",
-      label: "CO₂ emissions",
-      display: `${formatNumber(co2)} g/km`,
-      score: againstCeiling(co2, CO2_CEILING_G_PER_KM),
-    });
-  } else {
-    missing.push("its CO₂ figure");
+    /* Where in its own class this car sits: 0 at the clean end, 1 at the dirty. */
+    const floor = index === 0 ? 0 : (CO2_CLASS_BANDS[index - 1]?.upTo ?? 0) + 1;
+    const span = band.upTo - floor;
+    const into = span > 0 ? Math.min(1, (gPerKm - floor) / span) : 0;
+
+    return Math.round(from + (to - from) * into);
   }
 
-  /* 2. The official class. */
-  const letter = co2ClassLetter(vehicle.co2?.class);
+  return 0;
+}
 
-  if (letter) {
-    components.push({
-      id: "co2Class",
-      label: "CO₂ class",
-      display: letter,
-      score: CO2_CLASS_SCORE[letter] as number,
-    });
-  } else {
-    missing.push("its CO₂ class");
+/* -------------------------------------------------------------------------- */
+/* Efficiency, within the powertrain the reader is looking at                 */
+/* -------------------------------------------------------------------------- */
+
+const EFFICIENCY_LABEL: Record<EfficiencyLevel, string> = {
+  high: "Highly efficient",
+  moderate: "Moderately efficient",
+  low: "Less efficient",
+};
+
+interface Cohort {
+  typical: number;
+  unit: string;
+  /** "fuel" or "electricity". */
+  noun: string;
+  /** "a typical new petrol car". */
+  peer: string;
+}
+
+/** What an ordinary car of this powertrain uses, and in what unit. */
+function cohortFor(fuel: FuelType): Cohort | null {
+  if (fuel === "Electric") {
+    return {
+      typical: ELECTRIC_FLEET_KWH,
+      unit: "kWh/100km",
+      noun: "electricity",
+      peer: "a typical new electric car",
+    };
   }
 
-  /* 3. What it uses, on the scale its powertrain is measured on. */
-  const consumption = Number(vehicle.consumption?.combined);
+  const carbon = CARBON_PER_LITRE[fuel];
 
-  if (isMeasured(consumption) && consumption > 0) {
-    const ceiling = isElectric
-      ? ELECTRIC_CEILING_KWH_PER_100KM
-      : FUEL_CEILING_L_PER_100KM;
-
-    const unit = isElectric ? "kWh/100km" : "L/100km";
-
-    components.push({
-      id: "energy",
-      label: "Energy use",
-      display: `${formatNumber(consumption)} ${unit}`,
-      score: againstCeiling(consumption, ceiling),
-    });
-  } else {
-    missing.push("what it consumes");
-  }
-
-  /* 4. What it runs on. */
-  const powertrain = POWERTRAIN_SCORE[vehicle.fuelType];
-
-  if (powertrain != null) {
-    components.push({
-      id: "powertrain",
-      label: "Fuel type",
-      display: vehicle.fuelType,
-      score: powertrain,
-    });
-  } else {
-    missing.push("what it runs on");
-  }
-
-  if (!components.length) return null;
-
-  const score = Math.round(
-    components.reduce((total, item) => total + item.score, 0) /
-      components.length,
-  );
+  if (!carbon) return null;
 
   return {
-    score,
-    components,
-    missing,
-    caveat: caveatFor(vehicle),
+    /* The fleet's emissions average, read through the fuel's own carbon. */
+    typical: (COMBUSTION_FLEET_CO2 / carbon) * 100,
+    unit: "L/100km",
+    noun: "fuel",
+    peer: fuel === "Diesel" ? "a typical new diesel car" : "a typical new petrol car",
   };
 }
 
 /**
- * The thing the score can't say for itself.
+ * How efficiently this car uses its own kind of energy.
  *
- * Both of these are about the difference between a measurement and its
- * meaning, and both would be dishonest to leave out: an official plug-in
- * hybrid figure assumes a charged battery, and a tailpipe figure of zero is
- * about the tailpipe and not about the electricity.
+ * Cohort-relative on purpose, and separate from the emissions answer on
+ * purpose. There is no honest single number covering litres and kilowatt-hours
+ * at once, and a reader who wants a petrol car needs to know which petrol car
+ * is the frugal one.
+ *
+ * Returns null for a plug-in hybrid: its single figure is a blend of two
+ * energy sources over an assumed pattern of charging, there is no cohort it
+ * can honestly be placed in, and FINN publishes no separate electric
+ * consumption to build one from.
  */
-function caveatFor(vehicle: FinnCar): string | null {
-  if (vehicle.fuelType === "Plug-in Hybrid") {
-    return "A plug-in hybrid's official CO₂ figure assumes you charge it. Driven on petrol it emits far more than the number above.";
-  }
+export function assessEfficiency(
+  vehicle: FinnCar,
+): EfficiencyAssessment | null {
+  const fuel = vehicle.fuelType;
+  const consumption = Number(vehicle.consumption?.combined);
 
-  if (vehicle.fuelType === "Electric") {
-    return "Zero here means zero at the tailpipe. What the car is responsible for depends on how the electricity you charge it with was generated.";
-  }
+  if (!fuel || !isMeasured(consumption) || consumption <= 0) return null;
+  if (fuel === "Plug-in Hybrid") return null;
 
-  return null;
+  const cohort = cohortFor(fuel);
+
+  if (!cohort) return null;
+
+  const margin = cohort.typical * EFFICIENCY_BAND;
+
+  const level: EfficiencyLevel =
+    consumption <= cohort.typical - margin
+      ? "high"
+      : consumption >= cohort.typical + margin
+        ? "low"
+        : "moderate";
+
+  const explanation = {
+    high: `Uses noticeably less ${cohort.noun} than ${cohort.peer}.`,
+    moderate: `Uses about as much ${cohort.noun} as ${cohort.peer}.`,
+    low: `Uses noticeably more ${cohort.noun} than ${cohort.peer}.`,
+  }[level];
+
+  return {
+    level,
+    label: EFFICIENCY_LABEL[level],
+    explanation,
+    display: `${formatNumber(consumption)} ${cohort.unit}`,
+    typical: `${formatNumber(cohort.typical)} ${cohort.unit} is typical`,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Explanation                                                                */
+/* Powertrain context                                                         */
 /* -------------------------------------------------------------------------- */
 
 /**
- * How this priority is judged, said to the reader.
+ * What the figures can't say about themselves.
  *
- * Environmental impact is the one priority scored on figures rather than on
- * equipment, so the reader has no list of features to look at and check the
- * result against. That makes saying how it was worked out part of the answer
- * rather than a footnote.
+ * Each is a limit of the measurement rather than an opinion about the car, and
+ * each is a reason not to take the number in front of the reader at face value.
  */
-export function describeEnvironmentalMethod(
-  impact: EnvironmentalImpact,
-): string[] {
-  const lines = [
-    "This priority isn't judged on equipment — it's judged on what the car emits and what it uses. Four figures count equally, and they're four rather than one because each is blind to something the others catch.",
-  ];
+function caveatsFor(vehicle: FinnCar): string[] {
+  const caveats: string[] = [];
 
-  if (impact.missing.length) {
-    lines.push(
-      `FINN didn't supply ${impact.missing.join(
-        " or ",
-      )} for this car, so the result is the average of what's left rather than of all four.`,
+  if (vehicle.fuelType === "Electric") {
+    caveats.push(
+      "Zero here is zero at the tailpipe. What charging actually costs the climate depends on how the electricity was generated, which isn't in FINN's data.",
     );
   }
 
-  if (impact.caveat) lines.push(impact.caveat);
+  if (vehicle.fuelType === "Plug-in Hybrid") {
+    caveats.push(
+      "A plug-in hybrid's official CO₂ assumes a share of electric driving set by the test rather than by the driver. On-road studies have found real emissions several times the official figure where cars are charged less often than the test assumes, so this number describes a pattern of use as much as it describes the car.",
+    );
+  }
 
-  return lines;
-}
+  caveats.push(
+    "Based on the emissions and energy figures FINN publishes, which cover what the car does per kilometre. Building it, its battery and its disposal aren't in that data and aren't estimated here.",
+  );
 
-/**
- * Each signal as a clause, so the figures can be read as a sentence rather
- * than as a table.
- *
- * The fuel type gets its own wording because "runs on electric" is not
- * English and "runs on plug-in hybrid" is not either.
- */
-export function environmentalPhrases(impact: EnvironmentalImpact): string[] {
-  return impact.components.map((component) => {
-    switch (component.id) {
-      case "emissions":
-        return `emits ${component.display}`;
-      case "co2Class":
-        return `sits in CO\u2082 class ${component.display}`;
-      case "energy":
-        return `uses ${component.display}`;
-      case "powertrain":
-        return component.display === "Plug-in Hybrid"
-          ? "is a plug-in hybrid"
-          : `runs on ${
-              component.display === "Electric"
-                ? "electricity"
-                : component.display.toLowerCase()
-            }`;
-    }
-  });
+  return caveats;
 }
 
 /* -------------------------------------------------------------------------- */
-/* The method, without a car                                                  */
+/* The assessment                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** One signal: what it is, why it counts, and what it can't see. */
-export interface EnvironmentalMethodStep {
-  id: EnvironmentalSignal;
-  label: string;
-  /** What it reads off the car. */
-  reads: string;
-  /** Why it counts towards the result at all. */
-  matters: string;
-  /** What it is blind to, and which of the others covers that. */
-  relates: string;
+/**
+ * The whole environmental reading of one car.
+ *
+ * Null only when there is nothing at all to say — no CO₂ figure and no usable
+ * consumption. A car with one but not the other is reported on what it has,
+ * with the gap named rather than filled in.
+ */
+export function assessEnvironment(
+  vehicle: FinnCar,
+): EnvironmentalAssessment | null {
+  const fuel = vehicle.fuelType ?? null;
+  const raw = Number(vehicle.co2?.value);
+  const missing: string[] = [];
+
+  const co2 = isMeasured(raw)
+    ? {
+        gPerKm: raw,
+        /*
+         * Computed from the figure rather than read from FINN's field. Where a
+         * car predates the 2024 scale its stored letter can disagree with its
+         * own emissions, and the regulation is the better authority on its own
+         * classes.
+         */
+        className: co2ClassFor(raw),
+        display: `${formatNumber(raw)} g/km`,
+      }
+    : null;
+
+  if (!co2) missing.push("its CO₂ figure");
+
+  const efficiency = assessEfficiency(vehicle);
+  const consumption = Number(vehicle.consumption?.combined);
+
+  if (!isMeasured(consumption) || consumption <= 0) {
+    missing.push("what it consumes");
+  }
+
+  if (!fuel) missing.push("what it runs on");
+
+  if (!co2 && !efficiency) return null;
+
+  let score = co2 ? positionForCo2(co2.gPerKm) : null;
+  let confidence: EmissionsConfidence = co2 ? "measured" : "unknown";
+
+  /*
+   * A plug-in hybrid's scale is compressed rather than its figure corrected.
+   *
+   * The research is clear that official plug-in hybrid CO₂ understates real
+   * emissions by a large and growing margin, and equally clear that the size
+   * of the gap depends on how one particular driver charges — which FINN's
+   * data cannot tell us. So no real-world figure is invented here. What is
+   * refused is the top of the scale: this will not call a car a strong
+   * environmental match on a number that assumes a habit we can't check.
+   *
+   * Compressed and not clipped, because clipping flattened them. A plug-in
+   * hybrid at 26 g/km and one at 75 g/km both hit the ceiling and came out
+   * identical, which threw away the one real distinction between them. Scaling
+   * the whole range keeps them ordered against each other while keeping all of
+   * them below the cars whose figures don't need this caveat.
+   */
+  if (score != null && fuel === "Plug-in Hybrid") {
+    confidence = "optimistic";
+    score = Math.round(
+      score * ((CLASS_POSITION.C as { to: number }).to / 100),
+    );
+  }
+
+  return {
+    score,
+    co2,
+    efficiency,
+    powertrain: fuel,
+    confidence,
+    caveats: caveatsFor(vehicle),
+    missing,
+  };
 }
 
-/**
- * How this priority works, and why it is made of four things rather than one.
- *
- * The four are not four attempts at the same measurement. Each is blind to
- * something at least one of the others can see, and the overlap is the point:
- *
- * - the CO₂ figure is the most direct measure there is, and it stops at the
- *   exhaust, so it reads zero for a car whose emissions merely moved to a
- *   power station and flatters a plug-in hybrid nobody plugs in;
- * - the class is the same grade FINN prints on its own page, which makes it
- *   the one figure here a reader can check from outside Lens, and it keeps the
- *   priority answerable when the raw figure is missing;
- * - consumption is the only signal that separates two electric cars at all,
- *   since the first two are identical for every one of them;
- * - and the fuel type is what tells the reader which of those situations
- *   they're in.
- *
- * A single number can't hold that. Four that disagree in known ways can.
- */
-export const ENVIRONMENTAL_METHOD: EnvironmentalMethodStep[] = [
-  {
-    id: "emissions",
-    label: "CO\u2082 emissions",
-    reads: "The grams of CO\u2082 per kilometre FINN publishes for the car.",
-    matters:
-      "The most direct measure there is of what driving it costs the climate.",
-    relates:
-      "It stops at the exhaust. An electric car reads zero here because its emissions happen at a power station instead, and a plug-in hybrid's figure assumes a charged battery. Energy use and fuel type are what cover that.",
-  },
-  {
-    id: "co2Class",
-    label: "CO\u2082 class",
-    reads: "The official A-to-G grade on the car's EU efficiency label.",
-    matters:
-      "The same grade FINN shows on the page, so it's the one figure here you can check without taking Lens's word for it.",
-    relates:
-      "It moves with the CO\u2082 figure rather than independently of it, on purpose: the two confirm each other, and either one can carry the priority when FINN hasn't supplied the other.",
-  },
-  {
-    id: "energy",
-    label: "Energy use",
-    reads: "Litres or kilowatt-hours per 100 km.",
-    matters:
-      "What the car actually draws to move — and for an electric car it's the only one of the four that says its footprint isn't nothing, because the CO\u2082 figure and the class are the same for every electric car sold.",
-    relates:
-      "For a combustion car it says much what the CO\u2082 figure already said, which is why it doesn't dominate. Its real work is separating two electric cars the first two signals score identically.",
-  },
-  {
-    id: "powertrain",
-    label: "Fuel type",
-    reads: "Electric, plug-in hybrid, diesel or petrol.",
-    matters: "It decides how to read the other three.",
-    relates:
-      "Diesel and petrol count the same here. Whatever separates them per kilometre is already in the CO\u2082 figure, and counting it twice would make it matter twice.",
-  },
-];
+/* -------------------------------------------------------------------------- */
+/* Saying it                                                                  */
+/* -------------------------------------------------------------------------- */
 
-/** What the four steps don't say on their own. */
-export const ENVIRONMENTAL_METHOD_NOTES: string[] = [
-  "The four count equally, and the result is their average. Where FINN hasn't supplied one of them, it's named and left out rather than counted as zero.",
-  "None of this is a claim about a car's total footprint — building it and scrapping it aren't in FINN's data and aren't guessed at here. It is what the car does per kilometre, on the figures FINN publishes.",
+/**
+ * The reading in one or two sentences.
+ *
+ * Where the two answers differ, both are given. That is the whole value of
+ * separating them: "efficient for a petrol car, and still a worse emitter than
+ * an electric one" is two true things a single score cannot hold.
+ */
+export function describeEnvironment(
+  assessment: EnvironmentalAssessment,
+): string {
+  const { co2, efficiency, powertrain } = assessment;
+
+  if (!co2) {
+    return efficiency
+      ? `FINN doesn't publish a CO₂ figure for this car, so this is judged on what it uses: ${efficiency.explanation.toLowerCase()}`
+      : "FINN doesn't publish the figures this priority is judged on.";
+  }
+
+  if (powertrain === "Electric") {
+    return efficiency
+      ? `No CO₂ at the tailpipe, and ${efficiency.label.toLowerCase()} for an electric car at ${efficiency.display}.`
+      : "No CO₂ at the tailpipe. FINN doesn't publish what it consumes, so how efficiently it uses that electricity is unknown.";
+  }
+
+  if (powertrain === "Plug-in Hybrid") {
+    return `Its official figure is ${co2.display}, class ${co2.className} — low, but it assumes the car is charged as often as the test does, and that is not something FINN's data can confirm.`;
+  }
+
+  const grams = co2.gPerKm;
+
+  const standing =
+    grams <= 115
+      ? "low for a car that burns fuel"
+      : grams <= 155
+        ? "around average for a car that burns fuel"
+        : "high even among cars that burn fuel";
+
+  const fuelName = powertrain === "Diesel" ? "diesel" : "petrol";
+
+  return efficiency
+    ? `${efficiency.label} for a ${fuelName} car at ${efficiency.display}, but at ${co2.display} its CO₂ is ${standing} — an electric car emits none at the tailpipe.`
+    : `At ${co2.display}, class ${co2.className}, its CO₂ is ${standing}.`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The method, for a reader who wants it                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface EnvironmentalMethodNote {
+  heading: string;
+  body: string;
+}
+
+/** How this priority is judged, said where there is no car to say it about. */
+export const ENVIRONMENTAL_METHOD: EnvironmentalMethodNote[] = [
+  {
+    heading: "CO₂ emissions decide the result",
+    body: "The car's CO₂ per kilometre is placed on the EU's own scale — the A-to-G classes from the label, where A is 0 g/km and G starts at 176. Nothing else moves the result.",
+  },
+  {
+    heading: "The CO₂ class is shown, not counted",
+    body: "Since 2024 the class is worked out from the CO₂ figure alone; vehicle weight no longer comes into it. So it carries nothing the figure doesn't, and it's here because it's the form you'll recognise from FINN's own page rather than as a second opinion.",
+  },
+  {
+    heading: "Efficiency is a separate question",
+    body: "How much fuel or electricity a car uses is reported against other cars of the same powertrain, because a litre and a kilowatt-hour aren't comparable quantities. It tells you whether this is a frugal example of what it is, which is a different question from how much it emits.",
+  },
+  {
+    heading: "The powertrain explains the figures rather than scoring them",
+    body: "What a car runs on isn't counted separately. For anything burning fuel the CO₂ figure is its consumption times the carbon in a litre, so scoring both would mark the same car down twice for the same fact.",
+  },
+  {
+    heading: "Plug-in hybrids are capped, not corrected",
+    body: "Their official CO₂ assumes a share of electric driving the test sets rather than the driver does, and on-road studies find real emissions several times higher where cars are charged less than assumed. No real-world figure is invented here — what's refused is calling such a car a strong match on a number that can't be checked.",
+  },
+  {
+    heading: "This is what the car does per kilometre",
+    body: "Building it, its battery, the electricity mix it charges from and its disposal aren't in FINN's data and aren't estimated here. This is not a lifecycle assessment.",
+  },
 ];

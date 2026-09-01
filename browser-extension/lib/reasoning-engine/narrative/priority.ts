@@ -25,10 +25,7 @@ import {
   isEffectivelyLevel,
 } from "./magnitude";
 
-import {
-  describeEnvironmentalMethod,
-  environmentalPhrases,
-} from "../environmental";
+import { describeEnvironment } from "../environmental";
 
 import {
   coverage,
@@ -290,21 +287,20 @@ const article = (word: string): string =>
  * The one priority judged on figures rather than on equipment, explained.
  *
  * Everywhere else the reader can check a result against a list of features the
- * car does or doesn't have. Here there is no list, so the working has to be
- * shown instead: the figures that were read, and then how they were judged.
- * Without that, "Partial match" on emissions is a number the reader has no way
- * to argue with.
+ * car does or doesn't have. Here there is no list, so what stands in its place
+ * is the reading itself — see `describeEnvironment`, which says what the car
+ * emits and, separately, how frugal it is for the kind of car it is. Those two
+ * often disagree, and the disagreement is the useful part.
  */
 function describeEmissions(breakdown: PriorityBreakdown): string[] {
-  const impact = breakdown.environmental;
+  const assessment = breakdown.environmental;
 
-  if (!impact) return [];
-
-  const phrases = environmentalPhrases(impact);
+  if (!assessment) return [];
 
   return paragraph(
-    phrases.length ? sentence(`It ${joinList(phrases)}`) : null,
-    ...describeEnvironmentalMethod(impact),
+    describeEnvironment(assessment),
+    /* One caveat in prose; the panel shows the rest beside the figures. */
+    assessment.caveats[0] ?? null,
   );
 }
 
