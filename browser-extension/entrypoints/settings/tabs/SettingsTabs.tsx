@@ -1,9 +1,10 @@
-export type SettingsTab = "priorities" | "profiles" | "driving";
+export type SettingsTab = "priorities" | "profiles" | "driving" | "data";
 
 const TABS: { id: SettingsTab; label: string }[] = [
     { id: "priorities", label: "Priorities" },
     { id: "profiles", label: "Profiles" },
     { id: "driving", label: "Driving" },
+    { id: "data", label: "Data" },
 ];
 
 export function SettingsTabs({ active, onChange, badges }: { active: SettingsTab; onChange: (tab: SettingsTab) => void; badges?: Partial<Record<SettingsTab, number>> }) {

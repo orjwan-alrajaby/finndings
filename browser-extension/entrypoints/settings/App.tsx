@@ -29,9 +29,11 @@ import { SettingsTabs, type SettingsTab } from "./tabs/SettingsTabs";
 import { PrioritiesSettings } from "./tabs/PrioritiesSettings";
 import { ProfilesSettings } from "./tabs/ProfileSettings";
 import { DrivingSettings } from "./tabs/DrivingSettings";
+import { DataSettings } from "./tabs/DataSettings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { getProfileIssues } from "./utils/PriorityValidation";
 import { snapshot } from "./utils/snapshot";
+import type { StoredDataGroupId } from "@/lib/stored-data";
 import { openBrowserTab } from "../popup/utils";
 
 function registerCustomMeta(priority: PriorityDefinition) {
@@ -136,6 +138,53 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       const replacement = next.find((p) => p.enabled);
       if (replacement) setDefaultProfileId(replacement.id);
     }
+  };
+
+  // ── Deleting stored data ────────────────────────────────────────────────
+
+  /**
+   * Put the page back in step with storage after something was deleted.
+   *
+   * This page holds the settings in React state and compares them against a
+   * snapshot of what is on disk. Delete the settings from under it and both
+   * are stale: the form still shows the values that were just removed, and
+   * the save bar would cheerfully offer to write them back — which would
+   * undo the deletion by the most confusing route available.
+   *
+   * Only the settings group needs this. Pinned cars, the browsing cache and
+   * the setup record are not on this page, so deleting them changes nothing
+   * it is holding.
+   */
+  const handleDataCleared = (groups: StoredDataGroupId[]) => {
+    if (!groups.includes("settings")) return;
+
+    for (const p of priorityDefinitions) {
+      if (p.isCustom) unregisterCategoryMeta(p.id);
+    }
+
+    setPreferences(DEFAULT_PREFERENCES);
+    setPriorities(DEFAULT_PRIORITIES);
+    setPriorityDefinitions(DEFAULT_PRIORITY_DEFINITIONS);
+    setCategoryFeatures(DEFAULT_CATEGORY_FEATURES);
+    setProfiles(DEFAULT_PROFILES);
+    setDefaultProfileId(DEFAULT_DEFAULT_PROFILE_ID);
+
+    /*
+     * The snapshot is set to the defaults rather than re-read, because that
+     * is exactly what storage now holds: nothing, which `loadLensSettings`
+     * reads as the defaults. Saving is left disabled until the reader
+     * changes something, so a deletion is not silently written back.
+     */
+    setPersisted(
+      snapshot({
+        preferences: DEFAULT_PREFERENCES,
+        priorities: DEFAULT_PRIORITIES,
+        priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
+        categoryFeatures: DEFAULT_CATEGORY_FEATURES,
+        profiles: DEFAULT_PROFILES,
+        defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+      }),
+    );
   };
 
   // ── Restore defaults ────────────────────────────────────────────────────
@@ -247,6 +296,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
             />
           )}
           {tab === "driving" && <DrivingSettings preferences={preferences} onChange={setPreferences} />}
+          {tab === "data" && <DataSettings onCleared={handleDataCleared} />}
         </div>
 
         <div className="fixed inset-x-4 bottom-4 z-30 mx-auto flex flex-col 2xs:flex-row max-w-5xl items-center justify-between gap-4 rounded-3xl bg-finn-black p-3 pl-5 text-white shadow-xl sm:inset-x-6 lg:inset-x-10">
