@@ -164,6 +164,92 @@ describe("injectFitBadges", () => {
 
     expect(badges()).toHaveLength(1);
   });
+
+  /*
+   * The failure this whole mechanism exists to avoid, and the one that made
+   * badges appear on some page loads and not others.
+   *
+   * A badge needs the car's data, and that does not arrive with the card:
+   * finn.com draws the cards, and the interceptor's copy of FINN's own
+   * response is written to storage some time afterwards. Every pass before
+   * that write finds nothing — and must leave the card alone rather than
+   * recording a decision, or the pass that could have answered never gets
+   * the chance.
+   */
+  it("leaves a card it has no data for open to a later pass", async () => {
+    configured();
+
+    await injectFitBadges();
+
+    expect(badges()).toHaveLength(0);
+
+    /* The interceptor's response lands. */
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    await injectFitBadges();
+
+    expect(badges()).toHaveLength(1);
+  });
+
+  it("does not mark a card it said nothing about", async () => {
+    configured();
+
+    await injectFitBadges();
+
+    expect(document.querySelectorAll("[data-finn-lens-fit]")).toHaveLength(0);
+  });
+
+  /*
+   * finn.com moves between cars without reloading, and reading the settings
+   * and the cache takes four storage round-trips — so a pass is easily still
+   * in flight when the reader navigates and the page is cleared. It must not
+   * come back and paint the previous page's verdicts onto the new one.
+   */
+  it("abandons a pass the reader has navigated away from", async () => {
+    configured();
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    const inFlight = injectFitBadges();
+
+    removeFitBadges();
+
+    await inFlight;
+
+    expect(badges()).toHaveLength(0);
+  });
+
+  it("gives the block it hangs the pill on a positioning context", async () => {
+    configured();
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    await injectFitBadges();
+
+    const badge = badges()[0] as HTMLElement;
+
+    /*
+     * An absolutely positioned pill inside a static parent escapes to
+     * whichever ancestor is positioned — which reads to the user as a badge
+     * that didn't load, because it is drawn somewhere other than the card it
+     * belongs to.
+     */
+    expect(
+      (badge.parentElement as HTMLElement).classList.contains("relative"),
+    ).toBe(true);
+  });
+
+  it("offers the reasoning rather than only hinting at it", async () => {
+    configured();
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    await injectFitBadges();
+
+    /*
+     * The pill sits on a photograph inside a card that is itself a link, so
+     * a bare chevron reads as "this opens the car" — the one thing this
+     * control does not do.
+     */
+    expect(badges()[0]?.textContent).toContain("Why");
+  });
 });
 
 describe("removeFitBadges", () => {
@@ -187,5 +273,20 @@ describe("removeFitBadges", () => {
     await refreshFitBadges();
 
     expect(badges()).toHaveLength(1);
+  });
+
+  /* Including the positioning it had to add to hang the pill on. */
+  it("hands back a block it made positioned", async () => {
+    configured();
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    await injectFitBadges();
+    removeFitBadges();
+
+    expect(
+      document.querySelectorAll("[data-finn-lens-anchored]"),
+    ).toHaveLength(0);
+
+    expect(document.body.innerHTML).not.toContain("relative");
   });
 });
