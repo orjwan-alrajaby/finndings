@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
 
 import {
+  applyFitVerdicts,
   injectFitBadges,
+  injectFitButtons,
   refreshFitBadges,
   removeFitBadges,
 } from "./card-badges";
@@ -12,12 +14,20 @@ import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 import type { FinnCar } from "@/lib/types";
 
 /**
- * Lens's verdict on the cards, before anything is opened.
+ * Lens's control on the cards, and the verdict that catches up with it.
  *
- * What these protect is restraint. A badge is a claim about the reader's own
- * preferences, so it appears only where there are preferences to claim it
- * from and data to base it on — and where either is missing, the card is left
- * exactly as FINN drew it.
+ * Two separate promises, and the tests are split the same way.
+ *
+ * The **control** is unconditional. It goes on with the pin button, needs
+ * nothing but the card, and is always clickable — because the thing that used
+ * to gate it, the car's data, arrives after the card does, and gating on it
+ * made the button appear on some page loads and not others.
+ *
+ * The **verdict** keeps every ounce of the restraint the control gave up. It
+ * is a claim about the reader's own preferences, so it appears only where
+ * there are preferences to claim it from and data to base it on. Where either
+ * is missing the pill stays a question, which is the honest thing for it to
+ * be — and the card still gets its markup back untouched at the end.
  */
 
 const SAFETY = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
@@ -98,7 +108,80 @@ describe("cardConfigId", () => {
   });
 });
 
-describe("injectFitBadges", () => {
+const verdicts = () => document.querySelectorAll("[data-finn-lens-verdict]");
+
+describe("injectFitButtons", () => {
+  /*
+   * The whole point of splitting this out. The pin button appears the moment
+   * a card exists because it needs nothing else; this now does too, so the
+   * two controls on one card never appear at different times again.
+   */
+  it("puts a control on every card with nothing read at all", () => {
+    injectFitButtons();
+
+    expect(badges()).toHaveLength(3);
+    expect(verdicts()).toHaveLength(0);
+  });
+
+  it("needs no settings, no cars and no awaiting", () => {
+    /* Synchronous on purpose: it runs inside the pin button's own pass. */
+    injectFitButtons();
+
+    expect(badges()).toHaveLength(3);
+  });
+
+  it("asks a question rather than making a claim", () => {
+    injectFitButtons();
+
+    expect(badges()[0]?.textContent).toContain("How does it fit?");
+    expect(badges()[0]?.textContent).not.toMatch(/match/i);
+  });
+
+  it("names the car it will open, for anyone not looking at it", () => {
+    injectFitButtons();
+
+    expect(badges()[0]?.getAttribute("aria-label")).toBe(
+      "FINN Lens: see how BYD Dolphin fits you.",
+    );
+  });
+
+  it("puts one control on a card, however many passes run over it", () => {
+    injectFitButtons();
+    injectFitButtons();
+    injectFitButtons();
+
+    expect(badges()).toHaveLength(3);
+  });
+
+  it("gives the block it hangs the pill on a positioning context", () => {
+    injectFitButtons();
+
+    const badge = badges()[0] as HTMLElement;
+
+    /*
+     * An absolutely positioned pill inside a static parent escapes to
+     * whichever ancestor is positioned — which reads to the user as a badge
+     * that didn't load, because it is drawn somewhere other than the card it
+     * belongs to.
+     */
+    expect(
+      (badge.parentElement as HTMLElement).classList.contains("relative"),
+    ).toBe(true);
+  });
+
+  it("offers the reasoning rather than only hinting at it", () => {
+    injectFitButtons();
+
+    /*
+     * The pill sits on a photograph inside a card that is itself a link, so
+     * a bare chevron reads as "this opens the car" — the one thing this
+     * control does not do.
+     */
+    expect(badges()[0]?.textContent).toContain("Why");
+  });
+});
+
+describe("applyFitVerdicts", () => {
   it("puts a verdict on every card it has both settings and data for", async () => {
     configured();
     cache(
@@ -108,39 +191,44 @@ describe("injectFitBadges", () => {
 
     await injectFitBadges();
 
-    expect(badges()).toHaveLength(2);
+    expect(verdicts()).toHaveLength(2);
     expect(badges()[0]?.textContent).toMatch(/match/i);
   });
 
-  it("says nothing at all when the reader hasn't set Lens up", async () => {
+  it("claims nothing when the reader hasn't set Lens up", async () => {
     /* A verdict measured against defaults they've never seen isn't theirs. */
     cache(makeCar({ id: 36933, features: SAFETY as never }));
 
     await injectFitBadges();
 
-    expect(badges()).toHaveLength(0);
+    /* The way in survives; only the claim is withheld. */
+    expect(badges()).toHaveLength(3);
+    expect(verdicts()).toHaveLength(0);
   });
 
-  it("says nothing about a car it doesn't already have", async () => {
+  it("claims nothing about a car it doesn't already have", async () => {
     /* Forty cards are not forty reasons to call FINN's API. */
     configured();
     cache(makeCar({ id: 36933, features: SAFETY as never }));
 
     await injectFitBadges();
 
-    expect(badges()).toHaveLength(1);
+    expect(verdicts()).toHaveLength(1);
     expect(
-      document.getElementById("product-34889")?.querySelector(".finn-lens-fit-badge"),
+      document.getElementById("product-34889")?.getAttribute(
+        "data-finn-lens-verdict",
+      ),
     ).toBeNull();
   });
 
-  it("says nothing about a car FINN listed no equipment for", async () => {
+  it("claims nothing about a car FINN listed no equipment for", async () => {
     configured();
     cache(makeCar({ id: 36933, features: [] }));
 
     await injectFitBadges();
 
-    expect(badges()).toHaveLength(0);
+    expect(verdicts()).toHaveLength(0);
+    expect(badges()[0]?.textContent).toContain("How does it fit?");
   });
 
   it("names the car and the verdict for anyone not looking at it", async () => {
@@ -154,49 +242,40 @@ describe("injectFitBadges", () => {
     );
   });
 
-  it("badges a card once, however many passes run over it", async () => {
-    configured();
-    cache(makeCar({ id: 36933, features: SAFETY as never }));
-
-    await injectFitBadges();
-    await injectFitBadges();
-    await injectFitBadges();
-
-    expect(badges()).toHaveLength(1);
-  });
-
   /*
-   * The failure this whole mechanism exists to avoid, and the one that made
-   * badges appear on some page loads and not others.
-   *
-   * A badge needs the car's data, and that does not arrive with the card:
-   * finn.com draws the cards, and the interceptor's copy of FINN's own
-   * response is written to storage some time afterwards. Every pass before
-   * that write finds nothing — and must leave the card alone rather than
-   * recording a decision, or the pass that could have answered never gets
-   * the chance.
+   * The car's data arrives after the card. A control drawn before it must
+   * pick the verdict up when it lands rather than staying a question — and
+   * must not be torn down and rebuilt to do it, or a reader mid-click loses
+   * the button under their cursor.
    */
-  it("leaves a card it has no data for open to a later pass", async () => {
+  it("upgrades a control in place when the data lands", async () => {
     configured();
 
-    await injectFitBadges();
+    injectFitButtons();
 
-    expect(badges()).toHaveLength(0);
+    const before = badges()[0];
 
-    /* The interceptor's response lands. */
+    expect(before?.textContent).toContain("How does it fit?");
+
+    /* The interceptor's response reaches storage. */
+    cache(makeCar({ id: 36933, features: SAFETY as never }));
+
+    await applyFitVerdicts();
+
+    expect(badges()[0]).toBe(before);
+    expect(before?.textContent).toMatch(/match/i);
+  });
+
+  it("verdicts a card once, however many passes run over it", async () => {
+    configured();
     cache(makeCar({ id: 36933, features: SAFETY as never }));
 
     await injectFitBadges();
-
-    expect(badges()).toHaveLength(1);
-  });
-
-  it("does not mark a card it said nothing about", async () => {
-    configured();
-
+    await injectFitBadges();
     await injectFitBadges();
 
-    expect(document.querySelectorAll("[data-finn-lens-fit]")).toHaveLength(0);
+    expect(badges()).toHaveLength(3);
+    expect(verdicts()).toHaveLength(1);
   });
 
   /*
@@ -215,40 +294,7 @@ describe("injectFitBadges", () => {
 
     await inFlight;
 
-    expect(badges()).toHaveLength(0);
-  });
-
-  it("gives the block it hangs the pill on a positioning context", async () => {
-    configured();
-    cache(makeCar({ id: 36933, features: SAFETY as never }));
-
-    await injectFitBadges();
-
-    const badge = badges()[0] as HTMLElement;
-
-    /*
-     * An absolutely positioned pill inside a static parent escapes to
-     * whichever ancestor is positioned — which reads to the user as a badge
-     * that didn't load, because it is drawn somewhere other than the card it
-     * belongs to.
-     */
-    expect(
-      (badge.parentElement as HTMLElement).classList.contains("relative"),
-    ).toBe(true);
-  });
-
-  it("offers the reasoning rather than only hinting at it", async () => {
-    configured();
-    cache(makeCar({ id: 36933, features: SAFETY as never }));
-
-    await injectFitBadges();
-
-    /*
-     * The pill sits on a photograph inside a card that is itself a link, so
-     * a bare chevron reads as "this opens the car" — the one thing this
-     * control does not do.
-     */
-    expect(badges()[0]?.textContent).toContain("Why");
+    expect(verdicts()).toHaveLength(0);
   });
 });
 
@@ -272,7 +318,8 @@ describe("removeFitBadges", () => {
     await injectFitBadges();
     await refreshFitBadges();
 
-    expect(badges()).toHaveLength(1);
+    expect(badges()).toHaveLength(3);
+    expect(verdicts()).toHaveLength(1);
   });
 
   /* Including the positioning it had to add to hang the pill on. */

@@ -25,7 +25,8 @@ car card or detail page to save it. Opens the extension's Compare page and answe
 questions: which five things matter to you → in what order → which specific features inside
 them, plus what your driving actually costs → then reads the advice. Separately, while still
 browsing, they can open a side panel on any car to see how that one car scores against the
-same settings, and every card on the page gets a small "Strong match / Good match / …" badge.
+same settings, and every card on the page gets a Lens control that fills in with a "Strong
+match / Good match / …" verdict once there is one to give.
 
 **What it gives them.** One recommended car, with a written argument for it in their own
 priority order, a named list of what they're giving up, an estimated all-in monthly cost
@@ -43,8 +44,19 @@ contains, and the compromises are stated as loudly as the recommendation.
 ## 2. Current user flow
 
 **Step 0 — on finn.com.** A content script (`entrypoints/content/index.ts`) injects a pin
-button into every `product-card` and onto detail pages, and — only if the user has saved
-settings — a fit badge onto each card's photo. A floating launcher button appears on detail
+button into every `product-card` and onto detail pages, and a Lens control onto each card's
+photo. The control is drawn in the same synchronous pass as the pin button and needs nothing
+but the card; the verdict on it — "Strong match / Good match / …" — is filled in separately
+once the settings and the car's data are both in hand, and until then the pill reads "How
+does it fit?". Clicking it works throughout: the panel names the car and waits for its data
+(`resolveCar(id, { waitMs })`, which wakes on the storage write rather than polling).
+
+That split is deliberate and is the fix for a real defect. The control used to be drawn only
+where a verdict could already be worked out, and a verdict needs the car's data, which does
+not arrive with the card — the interceptor's copy of FINN's own `/api/cars` response reaches
+storage afterwards. So whether a card got a badge came down to whether finn.com happened to
+mutate the DOM again after that write, which it does on a busy page and doesn't on a quiet
+one. The pin button beside it appeared every time, because it needs nothing. A floating launcher button appears on detail
 pages only. Pinning writes the full normalized car into `browser.storage.local` under
 `pinnedCars`.
 
@@ -311,7 +323,8 @@ stated as such in the source.
 - **Missing data** — category with no catalogue and no measurement scores a flat **50** with
   `hasEvidence: false`; prose says "FINN's data doesn't tell us enough" rather than dressing
   the 50 up. Cost components go unavailable rather than zero. No equipment list at all →
-  `hasEquipmentData` returns false → badge suppressed, panel says so.
+  `hasEquipmentData` returns false → no verdict on the pill (it keeps its neutral label),
+  panel says so.
 
 ---
 
@@ -346,7 +359,8 @@ stated as such in the source.
    extension pages: broadcast `CARDS_LOADED` (and, post-audit, `PINNED_CARS_UPDATED`).
    Popup/compare → background: `OPEN_COMPARE_PAGE` / `OPEN_SETTINGS_PAGE`, handled by
    `openOrFocusNewPage` in `background.ts`. Settings changes reach live finn.com tabs via
-   `browser.storage.onChanged` → `refreshFitBadges`.
+   `browser.storage.onChanged` → `refreshFitBadges` for settings, `applyFitVerdicts`
+   (debounced, additive) for `loadedCarsFromFinnApi` / `pinnedCars`.
 
 ---
 
@@ -364,7 +378,7 @@ stated as such in the source.
 | **Settings — Profiles** | Enable/disable, set default | **Working** |
 | **Settings — Driving** | Assumptions | **Working** |
 | **Pin buttons** | Pin from card, detail page, config card | **Working**, fragile against FINN DOM changes |
-| **Fit badges** (`card-badges.ts`) | Band pill on each card photo | **Working**, gated on saved settings and cached data |
+| **Fit badges** (`card-badges.ts`) | Control on each card photo, verdict filled in after | **Working**. `injectFitButtons` is synchronous and unconditional; `applyFitVerdicts` is gated on saved settings and cached data |
 | **Lens panel** (`panel.ts` + `sections.ts`) | Shadow-DOM drawer, single-car analysis, config chooser, page dock, card highlight | **Working**, most impressive integration |
 | **Custom priorities** | `registerCategoryMeta`, `isCustom`, `slugify`, `generateId`, `PriorityDefinition.enabled` | **Dead.** Full infrastructure, no UI to create one; `isNew` hard-coded `false` |
 | **Profile "functionality"** | Enable/disable + default only | **Implemented but questionable** — profiles cannot be created, renamed or reordered by design |

@@ -127,6 +127,23 @@ export function cardConfigId(card: HTMLElement): number | null {
   return extractConfigId(card.dataset.productid ?? "");
 }
 
+/**
+ * The name FINN prints on a card, for the panel's loading state.
+ *
+ * A hint and nothing more: it names what is being loaded while it loads, and
+ * is thrown away the moment the real car arrives. Every word of the analysis
+ * itself comes from the car FINN sent, never from the page — the page is
+ * markup we don't own and can't hold to a shape.
+ *
+ * `h3` on a listing card; a configuration card has no name of its own, since
+ * the model page's own heading carries it.
+ */
+export function cardName(card: HTMLElement): string | undefined {
+  const heading = card.querySelector("h3")?.textContent?.trim();
+
+  return heading || undefined;
+}
+
 /** The card on this page for one car, wherever FINN drew it. */
 export function cardForCar(id: number): HTMLElement | null {
   const byId = document.getElementById(`product-${id}`);
@@ -256,25 +273,98 @@ export async function resolvePageCars(
 /**
  * One car by id, from what we already have.
  *
- * Deliberately no network. This answers for a car the reader has clicked on a
- * card for, and a card only carries a Lens verdict when its data was already
- * in hand — so a miss here means the cache was cleared underneath us, not that
- * a request would help.
+ * Deliberately no network: everything this can answer for is a car FINN's own
+ * page has already fetched, and the interceptor keeps a copy of every one of
+ * those. A request here would be asking FINN twice for something it has
+ * already sent us.
+ *
+ * What it will do is wait. The button that leads here is now drawn the moment
+ * the card exists — the same moment the pin button appears — while the car's
+ * data arrives separately, when the interceptor's copy of FINN's response
+ * reaches storage. So a miss is usually not "we don't have this car"; it is
+ * "we don't have it *yet*", and the gap is the few hundred milliseconds
+ * between finn.com drawing a card and finishing the request that drew it.
+ * Failing instantly in that window would tell the reader something untrue.
  */
-export async function resolveCar(id: number): Promise<PinnedFinnCar | null> {
+export async function resolveCar(
+  id: number,
+  { waitMs = 0 }: { waitMs?: number } = {},
+): Promise<PinnedFinnCar | null> {
   try {
-    const pinned = (await getPinnedCars())[id];
+    const found = await readCar(id);
 
-    if (pinned) return pinned;
+    if (found || waitMs <= 0) return found;
 
-    const cached = (await getLoadedCars())[id];
-
-    return cached ? asEvaluatable(cached) : null;
+    return await waitForCar(id, waitMs);
   } catch (error) {
     console.error("[FinnLens] couldn't read what we know about a car", error);
 
     return null;
   }
+}
+
+/** What storage holds for one car right now. */
+async function readCar(id: number): Promise<PinnedFinnCar | null> {
+  const pinned = (await getPinnedCars())[id];
+
+  if (pinned) return pinned;
+
+  const cached = (await getLoadedCars())[id];
+
+  return cached ? asEvaluatable(cached) : null;
+}
+
+/**
+ * Wait for a car to arrive, or give up.
+ *
+ * Driven by the storage event rather than by polling: the only thing that can
+ * make this car appear is a write, so a write is the only thing worth waking
+ * up for. The timeout is what stops a car FINN never sent from leaving the
+ * panel spinning — past it the reader gets told plainly that we don't have it.
+ */
+function waitForCar(
+  id: number,
+  waitMs: number,
+): Promise<PinnedFinnCar | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const finish = (car: PinnedFinnCar | null) => {
+      if (settled) return;
+
+      settled = true;
+
+      clearTimeout(timer);
+      browser.storage.onChanged.removeListener(onChanged);
+
+      resolve(car);
+    };
+
+    const onChanged = (
+      changes: Record<string, unknown>,
+      areaName: string,
+    ) => {
+      if (areaName !== "local") return;
+
+      const relevant =
+        "loadedCarsFromFinnApi" in changes || "pinnedCars" in changes;
+
+      if (!relevant) return;
+
+      void readCar(id).then((car) => {
+        if (car) finish(car);
+      });
+    };
+
+    const timer = setTimeout(() => finish(null), waitMs);
+
+    browser.storage.onChanged.addListener(onChanged);
+
+    /* Re-checked after subscribing, so a write in between isn't missed. */
+    void readCar(id).then((car) => {
+      if (car) finish(car);
+    });
+  });
 }
 
 /**

@@ -9,7 +9,8 @@ import {
 } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { mountLauncher, unmountLauncher } from "./lens-panel/launcher";
 import {
-  injectFitBadges,
+  applyFitVerdicts,
+  injectFitButtons,
   refreshFitBadges,
   removeFitBadges,
 } from "./lens-panel/card-badges";
@@ -76,7 +77,7 @@ export default defineContentScript({
     let badgeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     /*
-     * A badge pass is worth doing once after a burst, not once per write.
+     * A verdict pass is worth doing once after a burst, not once per write.
      * Several `/api/cars` responses land together on a listing page and each
      * one writes the cache.
      */
@@ -86,7 +87,7 @@ export default defineContentScript({
       badgeDebounceTimer = setTimeout(() => {
         badgeDebounceTimer = null;
 
-        void injectFitBadges().catch(reportBadgeFailure);
+        void applyFitVerdicts().catch(reportBadgeFailure);
       }, 80);
     };
 
@@ -115,12 +116,18 @@ export default defineContentScript({
       }
 
       /*
-       * Every car FINN draws gets Lens's verdict on it, wherever it is drawn —
-       * the listing, the similar-cars rail, the configurations of one model.
-       * Cards already carrying one are left alone, so this is cheap to call
-       * from the same mutation pass the pin buttons use.
+       * Every car FINN draws gets a Lens control, wherever it is drawn — the
+       * listing, the similar-cars rail, the configurations of one model.
+       *
+       * Synchronous, and in the same pass as the pin buttons on purpose: the
+       * two controls sit on the same card and appearing at different moments
+       * is what made this one look unreliable. Drawing it asks storage
+       * nothing, so there is nothing to wait for.
        */
-      void injectFitBadges().catch(reportBadgeFailure);
+      injectFitButtons();
+
+      /* The verdict follows whenever there is one to give. */
+      scheduleBadgePass();
     };
 
     const startObserving = () => {
@@ -190,20 +197,18 @@ export default defineContentScript({
      * makes every badge on the page a claim about what the reader used to
      * care about, so all of them come off and are worked out again.
      *
-     * **The cars arrived.** This is the one that was missing, and it is why
-     * badges appeared on some page loads and not others. A badge needs the
-     * car's data, which does not arrive with the card: the interceptor
-     * forwards FINN's own `/api/cars` response and `mergeLoadedCars` writes
-     * it some time after the cards are already on screen. Every badge pass
-     * before that write finds no car and does nothing — so whether the page
-     * ended up with badges came down to whether finn.com happened to mutate
-     * the DOM again after the write, which it does on a busy page and
-     * doesn't on a quiet one. Now the write itself is the signal.
+     * **The cars arrived.** A verdict needs the car's data, which does not
+     * arrive with the card: the interceptor forwards FINN's own `/api/cars`
+     * response and `mergeLoadedCars` writes it some time after the cards are
+     * already on screen. The control is on the card either way now, so this
+     * is no longer the difference between a badge and no badge — but it is
+     * still the difference between a verdict and a question, and the write
+     * is what settles it.
      *
      * Additive rather than a refresh, because this fires several times per
-     * page — FINN makes more than one request — and taking every badge off
+     * page — FINN makes more than one request — and taking every verdict off
      * to put most of them straight back would flicker the whole page each
-     * time. `injectFitBadges` only touches cards that have none.
+     * time. `applyFitVerdicts` only touches controls that have none.
      */
     browser.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local") return;

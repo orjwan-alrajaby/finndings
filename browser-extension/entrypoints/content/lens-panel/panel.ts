@@ -34,6 +34,16 @@ const HOST_ID = "finn-lens-analysis-root";
  */
 const PANEL_WIDTH = 416;
 
+/**
+ * How long the panel will wait for a car FINN has not finished sending.
+ *
+ * Long enough to cover the gap between a card being drawn and the request
+ * that drew it completing, which is where nearly every wait falls; short
+ * enough that a car FINN never sends does not leave the panel spinning while
+ * the reader wonders whether it is broken.
+ */
+const CAR_WAIT_MS = 6000;
+
 /** The stored settings that change what an analysis says. */
 const WATCHED_KEYS = [
   "finnLensPreferences",
@@ -99,7 +109,18 @@ function message(
   ]);
 }
 
-function loadingState(): DocumentFragment {
+/**
+ * What the panel says while it is still finding out.
+ *
+ * Named after the car whenever the thing that opened the panel knows the
+ * name — which a card badge always does, because it is sitting on the card
+ * that says it. That matters more than it sounds: the button is now drawn
+ * before the car's data has arrived, so this state is the ordinary way a
+ * reader meets the panel from a listing rather than a rare one. "Reading
+ * this car…" on a page of forty leaves them wondering which; naming it
+ * confirms they clicked the one they meant before the answer arrives.
+ */
+function loadingState(carName?: string): DocumentFragment {
   return fragment([
     el("div", { class: "flex items-center gap-3 px-5 py-6" }, [
       el("span", {
@@ -109,7 +130,9 @@ function loadingState(): DocumentFragment {
       }),
       el("p", {
         class: "text-[13px] text-finn-iron",
-        text: "Reading this car…",
+        text: carName
+          ? `Loading ${carName} data…`
+          : "Reading this car…",
       }),
     ]),
   ]);
@@ -168,6 +191,12 @@ interface Session {
  */
 export interface PanelRequest {
   carId?: number;
+  /**
+   * The car's name as the card that was clicked spells it, so the loading
+   * state can name what it is loading. Only ever used for that: the analysis
+   * itself takes every word from the car FINN sent, never from the page.
+   */
+  carName?: string;
 }
 
 async function render(
@@ -177,7 +206,7 @@ async function render(
   request: PanelRequest,
 ): Promise<void> {
   empty(into);
-  into.append(loadingState());
+  into.append(loadingState(request.carName));
 
   let configured: boolean;
 
@@ -217,15 +246,25 @@ async function render(
    * the card they were looking at.
    */
   if (request.carId != null) {
-    const car = await resolveCar(request.carId);
+    /*
+     * Waited for rather than demanded. The badge is drawn as soon as the card
+     * is, which is before the interceptor's copy of FINN's response has
+     * reached storage — so on a listing the reader can very reasonably click
+     * a car we are about to know about. See `resolveCar`.
+     */
+    const car = await resolveCar(request.carId, { waitMs: CAR_WAIT_MS });
 
     if (!car) {
       empty(into);
       into.append(
-        message("We couldn't load this car", "FINN's data for it isn't in hand any more.", {
-          label: "Try again",
-          onClick: retry,
-        }),
+        message(
+          "We couldn't load this car",
+          "FINN hasn't sent us its data for this one. Opening the car on finn.com usually settles it.",
+          {
+            label: "Try again",
+            onClick: retry,
+          },
+        ),
       );
 
       return;

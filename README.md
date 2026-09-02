@@ -26,8 +26,9 @@ everything you pinned and explains the result:
 - **four close alternatives** you can put in a hot seat for a head-to-head, which changes
   what is *examined* and never what is recommended.
 
-While you're still on finn.com, every card gets a small match badge, and a side panel scores
-whichever car you're looking at against the same settings.
+While you're still on finn.com, every card gets a Lens button — appearing with the pin
+button, and filling in with a match verdict once Lens has the car's data — and a side panel
+scores whichever car you're looking at against the same settings.
 
 The design rule throughout: every claim traces to something you said and something FINN's
 data contains. Where the data can't answer, the product says so instead of guessing.
