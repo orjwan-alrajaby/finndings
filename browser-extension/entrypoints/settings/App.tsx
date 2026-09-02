@@ -1,7 +1,7 @@
 import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowLeftIcon, ArrowPathIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { AcademicCapIcon, ArrowLeftIcon, ArrowPathIcon, CheckIcon } from "@heroicons/react/24/outline";
 import {
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
@@ -32,6 +32,7 @@ import { DrivingSettings } from "./tabs/DrivingSettings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { getProfileIssues } from "./utils/PriorityValidation";
 import { snapshot } from "./utils/snapshot";
+import { openBrowserTab } from "../popup/utils";
 
 function registerCustomMeta(priority: PriorityDefinition) {
   registerCategoryMeta(priority.id, {
@@ -209,9 +210,20 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
         <div className="mb-5 flex flex-col-reverse xs:flex-row items-center justify-between gap-3">
           <SettingsTabs active={tab} onChange={setTab} badges={{ profiles: profilesNeedingAttention }} />
-          <button type="button" onClick={() => setRestoreOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
-            <ArrowPathIcon className="h-3.5 w-3.5" /> Restore defaults
-          </button>
+          <div className="flex items-center gap-4">
+            {/*
+              * The setup flow opens itself once, on install. Anyone who
+              * skipped it, or who wants the explanation back, has no other
+              * way to reach it — a page that can only be seen by accident of
+              * timing may as well not exist.
+              */}
+            <button type="button" onClick={() => void openBrowserTab("OPEN_ONBOARDING_PAGE")} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
+              <AcademicCapIcon className="h-3.5 w-3.5" /> Setup guide
+            </button>
+            <button type="button" onClick={() => setRestoreOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
+              <ArrowPathIcon className="h-3.5 w-3.5" /> Restore defaults
+            </button>
+          </div>
         </div>
 
         <div className="space-y-4 pb-24">

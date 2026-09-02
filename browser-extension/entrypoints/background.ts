@@ -1,4 +1,5 @@
 import type { PublicPath } from "wxt/browser";
+import { needsOnboarding } from "@/lib/onboarding";
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((req) => {
@@ -8,6 +9,32 @@ export default defineBackground(() => {
     else if (req.type === "OPEN_SETTINGS_PAGE") {
       void openOrFocusNewPage("/settings.html");
     }
+    else if (req.type === "OPEN_ONBOARDING_PAGE") {
+      void openOrFocusNewPage("/onboarding.html");
+    }
+  });
+
+  /**
+   * Meet a new reader with an explanation rather than an empty product.
+   *
+   * Only on a first install: an update must never interrupt someone
+   * mid-task to re-explain a product they already use. `needsOnboarding`
+   * is checked as well as the reason, because an extension can be removed
+   * and reinstalled with its stored settings intact, and a reader who
+   * already answered these questions should not be asked them again.
+   */
+  browser.runtime.onInstalled.addListener(({ reason }) => {
+    if (reason !== "install") return;
+
+    void (async () => {
+      try {
+        if (await needsOnboarding()) {
+          await openOrFocusNewPage("/onboarding.html");
+        }
+      } catch (error) {
+        console.error("FINN Lens: could not open the setup flow", error);
+      }
+    })();
   });
 });
 

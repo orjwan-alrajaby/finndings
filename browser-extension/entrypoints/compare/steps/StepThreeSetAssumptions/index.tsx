@@ -5,7 +5,7 @@ import {
 } from "@heroicons/react/24/outline";
 import type { LensPreferences } from "@/lib/reasoning-engine/types";
 import { DEFAULT_PREFERENCES } from "@/lib/reasoning-engine/constants";
-import { DrivingAssumptions } from "./DrivingAssumptions";
+import { DrivingAssumptions } from "@/components/DrivingAssumptions";
 import { useCompareStore } from "../../store";
 
 /**

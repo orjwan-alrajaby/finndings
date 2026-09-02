@@ -48,8 +48,38 @@ settings — a fit badge onto each card's photo. A floating launcher button appe
 pages only. Pinning writes the full normalized car into `browser.storage.local` under
 `pinnedCars`.
 
+**Setup flow (`entrypoints/onboarding/`).** Opened once, by `runtime.onInstalled` when the
+reason is `install` and `needsOnboarding()` agrees. Five screens: what Lens is and what it
+does with your data; how it works in three parts; your priorities (the shared
+`PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
+a worked example. That last screen runs the real `buildRecommendation` +
+`buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
+just set, so the reader sees the actual output before pinning anything — the cars are
+labelled on screen as fictional and their ids are negative so they can never collide with a
+FINN vehicle id.
+
+Nothing is written until the reader finishes, and only `priorities` and `preferences` are
+written — feature picks, profile toggles and the default profile are left alone so a
+returning reader's configuration is not replaced by whatever the flow was holding. Skip is
+on every screen, saves nothing, and is recorded separately from finishing.
+
+`lib/onboarding.ts` owns the one storage key (`finnLensOnboarding`: `completedAt`,
+`skippedAt`, `seenAdvice`, `checklistDismissed`). `needsOnboarding()` is false if any of
+finished, skipped, or `hasSavedLensSettings()` — that last conjunct is what stops the flow
+appearing for anyone who configured Lens before it existed.
+
 **Popup.** Shows whether you're on finn.com, pinned-car metrics, the three most recent
 pinned cars, and action buttons (Compare, Settings). Compare opens `compare.html` in a tab.
+Above all of it, a getting-started checklist — set your priorities, pin two cars, read your
+first recommendation — every line derived from the real source rather than a stored copy. It
+retires itself once all three are done, and can be dismissed by hand.
+
+**Compare launch screen (`compare/components/Launch.tsx`).** A reader with saved answers
+does not get asked for them again: the compare page opens on a summary of their order,
+picks, budget and mileage with **See my advice** (straight to step 4, every step marked
+visited so the stepper stays walkable) and **Change something first** (step 1). It is not a
+step and the stepper hides while it shows. A reader with nothing saved never sees it and
+gets step 1 as before.
 
 **Step 1 — Your priorities.** One screen that both chooses and orders. It opens with an
 explanation of what a priority is and does (it weighs, it does not filter), then offers the
@@ -75,7 +105,8 @@ working value, run-scoped and **not** persisted. This was the second half of ste
 a tab pair, and is now its own step — it asks about the reader rather than the cars, and it
 feeds the cost estimate and budget eligibility rather than the ranking.
 
-**Step 4 — Advice.** The engine runs over every pinned car. The page shows, in order: budget
+**Step 4 — Advice.** Reaching it calls `markAdviceSeen()`, which is what retires the popup
+checklist. The engine runs over every pinned car. The page shows, in order: budget
 notice (if applicable) → hero with the winner and its estimated monthly cost → "Why it wins"
 per priority → "What you're giving up" → the four closest alternatives as a picker → hot-seat
 head-to-head if one is selected → cost breakdown → "Behind the recommendation" (the ranking
@@ -536,6 +567,12 @@ Then stop. Do not touch the engine, the migrations, the narrative layer, or the 
 
 **Product / UI**
 
+- `entrypoints/onboarding/App.tsx` — the setup flow, its five screens and its one write
+- `lib/onboarding.ts` — `needsOnboarding`, and what the product remembers about explaining
+  itself
+- `lib/demo-cars.ts` — the three invented cars the setup flow's worked example runs on
+- `entrypoints/compare/components/Launch.tsx` — what a returning reader sees instead of the
+  setup questions
 - `entrypoints/compare/root.tsx` — the four-step shell
 - `entrypoints/compare/store.ts` — `useCompareStore`, `canEnterStep`, `isStepReachable`,
   `featuresChanged`

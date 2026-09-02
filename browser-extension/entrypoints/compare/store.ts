@@ -13,7 +13,11 @@ import {
     MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
 
-import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
+import {
+    hasSavedLensSettings,
+    loadLensSettings,
+    saveLensSettings,
+} from "@/lib/reasoning-engine";
 
 import type {
     CategoryId,
@@ -44,6 +48,21 @@ interface CompareState {
     /* ---------------------------------------------------------------- */
 
     step: CompareStep;
+
+    /**
+     * Whether the reader has answered the setup questions before — in the
+     * setup flow, in Settings, or in an earlier run.
+     */
+    hasSavedSetup: boolean;
+
+    /**
+     * Whether they have chosen how to start this run.
+     *
+     * False only for the launch screen, and the launch screen only exists
+     * for a reader who has answered before. Someone who hasn't is walked
+     * through the steps, because for them there is nothing to launch from.
+     */
+    started: boolean;
 
     /**
      * Every step the reader has opened, so the stepper stays walkable in
@@ -121,6 +140,11 @@ interface CompareState {
     next: () => void;
     back: () => void;
 
+    /** Take the saved answers as they are and go straight to the advice. */
+    startFromSaved: () => void;
+    /** Walk the steps, starting at the priority order. */
+    startFromStepOne: () => void;
+
     setPriorities: (priorities: CategoryId[]) => void;
 
     setPreferences: (preferences: LensPreferences) => void;
@@ -191,6 +215,8 @@ export function isStepReachable(
 
 export const useCompareStore = create<CompareState>((set, get) => ({
     step: "priorities",
+    hasSavedSetup: false,
+    started: false,
     visited: ["priorities"],
 
     settingsLoaded: false,
@@ -215,10 +241,14 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     async loadSettings() {
         if (get().settingsLoaded) return;
 
-        const settings = await loadLensSettings();
+        const [settings, hasSavedSetup] = await Promise.all([
+            loadLensSettings(),
+            hasSavedLensSettings().catch(() => false),
+        ]);
 
         set({
             settingsLoaded: true,
+            hasSavedSetup,
             savedPreferences: settings.preferences,
             savedCategoryFeatures: settings.categoryFeatures,
             priorityDefinitions: settings.priorityDefinitions,
@@ -264,6 +294,22 @@ export const useCompareStore = create<CompareState>((set, get) => ({
      * here, because the list in step 1 hands back the array it wants rather
      * than describing the edit it made.
      */
+    /**
+     * Everything is already answered, so go and answer the actual question.
+     *
+     * Every step is marked visited rather than only the advice, because the
+     * reader really has been through all of them — in an earlier run or in
+     * Settings — and the stepper above must stay walkable so that "actually,
+     * change the budget" is one click rather than a restart.
+     */
+    startFromSaved() {
+        set({ started: true, step: "advice", visited: [...STEP_ORDER] });
+    },
+
+    startFromStepOne() {
+        set({ started: true, step: "priorities" });
+    },
+
     setPriorities(priorities) {
         const { expandedPriority } = get();
 

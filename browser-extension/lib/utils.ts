@@ -122,9 +122,10 @@ export function formatIsoDate(dateString: string): string {
 }
    
 export const openBrowserTab = async (actionType: ActionType) => {
-        const map = {
+        const map: Record<ActionType, string> = {
             "OPEN_COMPARE_PAGE": "compare",
-            "OPEN_SETTINGS_PAGE": "settings"
+            "OPEN_SETTINGS_PAGE": "settings",
+            "OPEN_ONBOARDING_PAGE": "setup"
         }
         try {
             await browser.runtime.sendMessage({ type: actionType });

@@ -18,6 +18,7 @@ import { CostAnalysis } from "./components/CostAnalysis";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
+import { markAdviceSeen } from "@/lib/onboarding";
 import { useCompareStore } from "../../store";
 
 /**
@@ -48,6 +49,16 @@ export function StepFourGenerateAdvice({
     cars: PinnedFinnCar[];
     onSettings: () => void;
 }) {
+    /*
+     * Reaching this page is the moment the product actually happens, and the
+     * getting-started checklist in the popup has nothing left to tell a
+     * reader who has. Recorded here rather than on the button that leads
+     * here, because there is more than one way in.
+     */
+    useEffect(() => {
+        void markAdviceSeen();
+    }, []);
+
     const priorities = useCompareStore((state) => state.priorities);
     const preferences = useCompareStore((state) => state.preferences);
     const categoryFeatures = useCompareStore((state) => state.features);

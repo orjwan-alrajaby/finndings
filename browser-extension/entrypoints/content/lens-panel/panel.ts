@@ -119,6 +119,16 @@ const openSettings = () => {
   void browser.runtime.sendMessage({ type: "OPEN_SETTINGS_PAGE" });
 };
 
+/*
+ * A reader who has configured nothing is sent to the setup flow rather than
+ * to Settings. Settings is a page of controls for someone who knows what
+ * they control; this reader has just met the product on a car listing and
+ * needs the explanation that comes with the questions.
+ */
+const openSetup = () => {
+  void browser.runtime.sendMessage({ type: "OPEN_ONBOARDING_PAGE" });
+};
+
 /* -------------------------------------------------------------------------- */
 /* Content                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -194,7 +204,7 @@ async function render(
       message(
         "Set up FINN Lens to personalise this car",
         "Choose the things that matter to you and put them in order, and Lens can tell you how well this car serves them. It takes about a minute, and you only do it once.",
-        { label: "Choose your priorities", onClick: openSettings },
+        { label: "Set up FINN Lens", onClick: openSetup },
       ),
     );
 

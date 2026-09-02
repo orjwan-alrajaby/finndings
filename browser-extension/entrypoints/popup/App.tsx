@@ -2,6 +2,7 @@ import "@/assets/tailwind.css";
 import { useState, useEffect } from "react";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { FINN_BASE_URL } from "@/lib/constants";
+import { GettingStarted } from "./components/GettingStarted";
 import { GoToFinnSection } from "./components/GoToFinnSection";
 import Logo from "/icon/128.png";
 import Tabs from "./components/Tabs";
@@ -222,6 +223,14 @@ function App() {
             {statusLabel}
           </div>
         </section>
+      </div>
+
+      {/*
+        * Above everything else, because a reader who still needs it needs it
+        * before the metrics — and it removes itself the moment they don't.
+        */}
+      <div className="px-4">
+        <GettingStarted pinnedCount={pinnedCarsCount} />
       </div>
 
       {hasUsableContent ? (

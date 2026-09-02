@@ -1,11 +1,15 @@
 import toast from "react-hot-toast";
    
-type ActionType = "OPEN_COMPARE_PAGE" | "OPEN_SETTINGS_PAGE";
+type ActionType =
+    | "OPEN_COMPARE_PAGE"
+    | "OPEN_SETTINGS_PAGE"
+    | "OPEN_ONBOARDING_PAGE";
 
 export const openBrowserTab = async (actionType: ActionType) => {
         const map = {
             "OPEN_COMPARE_PAGE": "compare",
-            "OPEN_SETTINGS_PAGE": "settings"
+            "OPEN_SETTINGS_PAGE": "settings",
+            "OPEN_ONBOARDING_PAGE": "setup"
         }
         try {
             await browser.runtime.sendMessage({ type: actionType });

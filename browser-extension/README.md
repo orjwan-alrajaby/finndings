@@ -23,9 +23,12 @@ Load unpacked from `.output/chrome-mv3` via `chrome://extensions` → Developer 
 | `entrypoints/background.ts` | opens and focuses the extension's own tabs |
 | `entrypoints/network-interceptor.unlisted.ts` | patches `window.fetch` in the page context |
 | `entrypoints/content/` | pin buttons, card badges, the in-page analysis panel |
-| `entrypoints/popup/` | page status, recent pins, actions |
+| `entrypoints/popup/` | page status, recent pins, the getting-started checklist, actions |
+| `entrypoints/onboarding/` | the five-screen setup flow, opened once on install |
 | `entrypoints/compare/` | the four-step flow (React + Zustand) |
 | `entrypoints/settings/` | priorities, profiles, driving assumptions |
 | `lib/reasoning-engine/` | scoring, cost, environmental, narrative — pure, UI-free |
+| `lib/onboarding.ts` | whether the reader has been shown the setup flow, and how far they got |
+| `lib/demo-cars.ts` | three invented cars the setup flow's worked example runs on |
 | `lib/types.ts` | `FinnApiConfig` → `FinnCar` → `PinnedFinnCar` |
 | `lib/helpers.ts` | the German → internal field mapping |

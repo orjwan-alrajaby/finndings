@@ -8,6 +8,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
 
+import { Launch } from "./components/Launch";
 import { Stepper } from "./components/Stepper";
 import { StepOnePrioritiesStep } from "./steps/StepOnePriorities";
 import { StepTwoSetPreferences } from "./steps/StepTwoSetPreferences";
@@ -35,9 +36,21 @@ export default function CompareTab({
   const step = useCompareStore((state) => state.step);
   const loadSettings = useCompareStore((state) => state.loadSettings);
 
+  const settingsLoaded = useCompareStore((state) => state.settingsLoaded);
+  const hasSavedSetup = useCompareStore((state) => state.hasSavedSetup);
+  const started = useCompareStore((state) => state.started);
+
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
+
+  /*
+   * A reader with saved answers is offered them rather than asked for them
+   * again. Held until the settings have actually been read, so the launch
+   * screen never shows an order that is about to be replaced by the stored
+   * one a tick later.
+   */
+  const showLaunch = settingsLoaded && hasSavedSetup && !started;
 
   if (cars.length === 0) {
     return (
@@ -93,7 +106,7 @@ export default function CompareTab({
           <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-finn-cotton/70 bg-finn-snow/90 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-10">
             <div />
 
-            <Stepper />
+            {showLaunch ? <div /> : <Stepper />}
 
             <button
               type="button"
@@ -108,15 +121,26 @@ export default function CompareTab({
 
           <div className="px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
             <div className="mx-auto flex max-w-6xl items-center justify-center">
-              {step === "priorities" && (
+              {showLaunch && (
+                <Launch
+                  carCount={cars.length}
+                  onSettings={onSettings}
+                />
+              )}
+
+              {!showLaunch && step === "priorities" && (
                 <StepOnePrioritiesStep onSettings={onSettings} />
               )}
 
-              {step === "preferences" && <StepTwoSetPreferences />}
+              {!showLaunch && step === "preferences" && (
+                <StepTwoSetPreferences />
+              )}
 
-              {step === "assumptions" && <StepThreeSetAssumptions />}
+              {!showLaunch && step === "assumptions" && (
+                <StepThreeSetAssumptions />
+              )}
 
-              {step === "advice" && (
+              {!showLaunch && step === "advice" && (
                 <StepFourGenerateAdvice
                   cars={cars}
                   onSettings={onSettings}

@@ -184,4 +184,7 @@ export interface PinnedFinnCar extends FinnCar {
 
 export type ViewMode = "grid" | "list";
 
-export type ActionType = "OPEN_COMPARE_PAGE" | "OPEN_SETTINGS_PAGE";
+export type ActionType =
+  | "OPEN_COMPARE_PAGE"
+  | "OPEN_SETTINGS_PAGE"
+  | "OPEN_ONBOARDING_PAGE";
