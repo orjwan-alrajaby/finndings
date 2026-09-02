@@ -125,7 +125,8 @@ export const openBrowserTab = async (actionType: ActionType) => {
         const map: Record<ActionType, string> = {
             "OPEN_COMPARE_PAGE": "compare",
             "OPEN_SETTINGS_PAGE": "settings",
-            "OPEN_ONBOARDING_PAGE": "setup"
+            "OPEN_ONBOARDING_PAGE": "setup",
+            "OPEN_PINS_PAGE": "pinned cars"
         }
         try {
             await browser.runtime.sendMessage({ type: actionType });

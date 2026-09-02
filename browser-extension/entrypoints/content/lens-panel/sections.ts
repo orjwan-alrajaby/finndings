@@ -21,6 +21,12 @@ import {
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
+import {
+  configurationDetail,
+  configurationName,
+  describeCoverage,
+} from "@/lib/car-labels";
+
 import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
 import { pinControl } from "./pin-control";
 
@@ -170,40 +176,6 @@ function prose(text: string, tone = "text-finn-black"): HTMLElement {
 /* -------------------------------------------------------------------------- */
 /* Configurations                                                             */
 /* -------------------------------------------------------------------------- */
-
-/**
- * What distinguishes one configuration of a model from another.
- *
- * FINN sells a Dolphin Surf as a Boost with 88 PS and as a Comfort with 156
- * PS, and the whole analysis changes between them. The same two lines are used
- * to label a configuration in the chooser and to head the analysis of one, so
- * that a reader who picks the second row and then reads two screens of prose
- * never has to wonder which car it is about.
- */
-export function configurationName(car: FinnCar): string {
-  const named = [car.trim, car.equipmentLine].filter(Boolean).join(" ");
-
-  return named || car.engine || `Configuration ${car.id}`;
-}
-
-/** The figures a reader tells configurations apart by. */
-export function configurationDetail(car: FinnCar): string {
-  const range =
-    car.electric?.range != null && car.electric.range !== "Unknown"
-      ? `${formatNumber(Number(car.electric.range))} km range`
-      : null;
-
-  const price = car.pricing?.customerMonthly?.price;
-
-  return [
-    car.power?.inHp ? `${car.power.inHp} PS` : null,
-    car.fuelType,
-    range,
-    price ? `from ${formatEUR(price)}/mo` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 /**
  * The configurations this model comes in, as a choice.
@@ -468,7 +440,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
 
         el("p", {
           class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-          text: coverageLine(priority),
+          text: describeCoverage(priority),
         }),
       ]),
 
@@ -711,24 +683,6 @@ function featureGroup(
 }
 
 /** The count behind the band, which is the part a reader can check. */
-function coverageLine(priority: FitPriority): string {
-  if (priority.impact) return "Judged on emissions, not on equipment";
-
-  if (priority.band.level === "unknown") return "Equipment not listed by FINN";
-
-  const picks = priority.picked.length;
-
-  const held = priority.picked.filter(
-    (feature) => feature.state === "present",
-  ).length;
-
-  const catalogue = `${priority.covered} of ${priority.catalogueSize} systems it covers`;
-
-  return picks
-    ? `${held} of your ${picks} pick${picks === 1 ? "" : "s"} · ${catalogue}`
-    : catalogue;
-}
-
 /* -------------------------------------------------------------------------- */
 /* Feature rows                                                               */
 /* -------------------------------------------------------------------------- */

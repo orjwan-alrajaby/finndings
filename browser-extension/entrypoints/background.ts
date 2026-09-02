@@ -12,6 +12,9 @@ export default defineBackground(() => {
     else if (req.type === "OPEN_ONBOARDING_PAGE") {
       void openOrFocusNewPage("/onboarding.html");
     }
+    else if (req.type === "OPEN_PINS_PAGE") {
+      void openOrFocusNewPage("/pins.html");
+    }
   });
 
   /**

@@ -1,6 +1,7 @@
 import {
     ScaleIcon,
     ArrowTopRightOnSquareIcon,
+    BookmarkIcon,
     CogIcon,
 } from "@heroicons/react/24/outline";
 import * as RadixTabs from "@radix-ui/react-tabs";
@@ -89,14 +90,15 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                             })
                         }
                         {/*
-                          * Opens the Compare page, which is where every pinned
-                          * car is listed and ranked. The popup shows three; the
-                          * rest live there, so "view all" is a way into it
-                          * rather than a view of its own.
+                          * The pinned-cars page, not Compare. The popup shows
+                          * three of the set; "view all" means see the set —
+                          * which is a different request from "rank them", and
+                          * the only one of the two that also lets the reader
+                          * remove something.
                           */}
                         <button
                             type="button"
-                            onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
+                            onClick={() => openBrowserTab("OPEN_PINS_PAGE")}
                             className={`mt-3 flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold text-white shadow-sm transition active:scale-[0.99] sm:col-span-2 ${accent
                                 ? "bg-finn-accent-blue hover:bg-finn-highlight-navy"
                                 : "bg-finn-black hover:bg-finn-black/90"
@@ -117,6 +119,14 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                         /* Genuinely nothing to compare until something is pinned. */
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
+                        accent={accent}
+                    />
+                    <ActionButton
+                        title="Manage Pinned Cars"
+                        description="See everything you pinned, read how each one suits you, and unpin what you're done with."
+                        icon={<BookmarkIcon className="h-5 w-5" />}
+                        disabled={!pinnedCount}
+                        onClick={() => openBrowserTab("OPEN_PINS_PAGE")}
                         accent={accent}
                     />
                     <ActionButton

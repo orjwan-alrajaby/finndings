@@ -2,6 +2,7 @@ import {
     AdjustmentsHorizontalIcon,
     ArrowRightIcon,
     BoltIcon,
+    BookmarkIcon,
     Cog6ToothIcon,
     PencilSquareIcon,
 } from "@heroicons/react/24/outline";
@@ -29,9 +30,11 @@ import { useCompareStore } from "../store";
 export function Launch({
     carCount,
     onSettings,
+    onManagePins,
 }: {
     carCount: number;
     onSettings: () => void;
+    onManagePins: () => void;
 }) {
     const priorities = useCompareStore((state) => state.priorities);
     const features = useCompareStore((state) => state.features);
@@ -57,6 +60,15 @@ export function Launch({
                 <h1 className="mt-3 text-3xl font-black tracking-tight text-finn-black sm:text-4xl">
                     {carCount} pinned cars, ranked your way
                 </h1>
+
+                <button
+                    type="button"
+                    onClick={onManagePins}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-finn-accent-blue underline-offset-2 transition hover:underline"
+                >
+                    <BookmarkIcon className="h-3.5 w-3.5" />
+                    See or change what's pinned
+                </button>
 
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-finn-iron">
                     Lens already has your answers — you don't have to give them

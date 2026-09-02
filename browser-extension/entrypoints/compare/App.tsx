@@ -45,6 +45,7 @@ export default function ReviewOrCompare() {
       <CompareTab
         cars={cars}
         onSettings={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
+        onManagePins={() => openBrowserTab("OPEN_PINS_PAGE")}
       />
     </main>
   );

@@ -184,6 +184,13 @@ npm run test:watch
 The in-page badges and panel stay silent until you have answered — deliberately: a verdict
 measured against defaults you have never seen isn't your verdict.
 
+**Pinned cars** (popup → Manage Pinned Cars) is the whole set: open any one for the same
+reading the in-page panel gives, unpin what you're no longer weighing up, and sort by fit,
+price or when you pinned it.
+
+**Settings → Data** lists everything Lens has stored, with live counts, and deletes any of
+it by category — your settings, your pinned cars, the browsing cache, your setup progress.
+
 ---
 
 ## Layout
@@ -196,11 +203,14 @@ browser-extension/
 │  ├─ content/                   pin buttons, card badges, the in-page panel
 │  ├─ popup/                     status, getting-started checklist, actions
 │  ├─ onboarding/                the five-screen setup flow, opened on install
+│  ├─ pins/                      the pinned set: read one, unpin what you're done with
 │  ├─ compare/                   the four-step flow (React + Zustand)
-│  └─ settings/                  priorities, profiles, driving assumptions
+│  └─ settings/                  priorities, profiles, driving, and your stored data
 └─ lib/
    ├─ reasoning-engine/          scoring, cost, environmental, narrative
    ├─ onboarding.ts              what the product remembers about explaining itself
+   ├─ stored-data.ts             the one list of what is stored, and how to delete it
+   ├─ car-labels.ts              how a car and its coverage are named, everywhere
    ├─ demo-cars.ts               three cars that don't exist, for the setup flow
    ├─ types.ts                   FinnApiConfig → FinnCar → PinnedFinnCar
    └─ helpers.ts                 the German → internal field mapping

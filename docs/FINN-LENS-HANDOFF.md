@@ -74,6 +74,40 @@ Above all of it, a getting-started checklist — set your priorities, pin two ca
 first recommendation — every line derived from the real source rather than a stored copy. It
 retires itself once all three are done, and can be dismissed by hand.
 
+**Pinned cars page (`entrypoints/pins/`).** The whole pinned set, which nothing else showed:
+the compare flow ranked it and gave no way to change it, the popup showed three, and the pin
+button on finn.com could only unpin a car from the page it was pinned on. Rows carry the
+car, its fit band and its price; the panel beside them is the full analysis of whichever is
+open. Sort by pinned date, fit, price or name; tick rows for a bulk unpin; every removal is
+confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also listens for it, so a pin made
+on finn.com while it is open lands without a reload.
+
+Scoring is gated on `hasSavedLensSettings()` exactly as the in-page panel is — a reader who
+has configured nothing gets the list, an explanation, and a link into the setup flow, not a
+verdict measured against defaults they have never seen. Analyses are built once per car in a
+`useMemo` and shared by the row chip and the open panel, so the two can never disagree.
+
+**`components/FitAnalysisView/`.** The in-page panel's reading, in React. The panel is
+hand-rolled DOM because it lives in a shadow root inside finn.com and cannot carry React in
+there, so the *rendering* exists twice — but nothing that decides anything does: both read
+the same `FitAnalysis` fields in the same order, and a claim not in the analysis is on
+neither. The strings they shared (`configurationName`, `configurationDetail`,
+`describeCoverage`) moved to `lib/car-labels.ts`, since `sections.ts` reaches for the DOM at
+import time and an extension page cannot have it.
+
+**Settings → Data (`settings/tabs/DataSettings/`).** An inventory of what is stored, with
+live counts, and deletion by category the way clearing browsing data works. Distinct from
+"Restore defaults", which puts settings back to the shipped values and leaves the product
+working; this removes keys, so afterwards Lens knows nothing about the reader.
+
+`lib/stored-data.ts` is the single list of what the extension stores — a key written
+anywhere and missing from `STORED_DATA_GROUPS` is a key the reader cannot delete, and a test
+asserts the list is complete. Deletion uses `storage.local.remove`, never a write of empty
+values: `hasSavedLensSettings` and `needsOnboarding` both read an absent key as "never
+answered", so blanking would delete the settings while leaving the product convinced it was
+configured. The settings page resets its own React state and its saved-snapshot when the
+settings group goes, or its save bar would offer to write the deleted values back.
+
 **Compare launch screen (`compare/components/Launch.tsx`).** A reader with saved answers
 does not get asked for them again: the compare page opens on a summary of their order,
 picks, budget and mileage with **See my advice** (straight to step 4, every step marked
@@ -118,8 +152,9 @@ that docks the page and shows a single-car fit analysis against the *saved* sett
 per-priority feature lists, environmental working, cost, tradeoffs. On a model page with
 several configurations it lists all of them and lets you switch.
 
-**Settings page.** Three tabs: Priorities (order + per-category feature picks), Profiles
-(enable/disable, choose the default), Driving (the same assumptions as step 3). Explicit
+**Settings page.** Four tabs: Priorities (order + per-category feature picks), Profiles
+(enable/disable, choose the default), Driving (the same assumptions as step 3), and Data
+(what is stored, and deleting it). Explicit
 Save button; a dirty indicator compares against a snapshot of what's on disk.
 
 ---
@@ -571,6 +606,10 @@ Then stop. Do not touch the engine, the migrations, the narrative layer, or the 
 - `lib/onboarding.ts` — `needsOnboarding`, and what the product remembers about explaining
   itself
 - `lib/demo-cars.ts` — the three invented cars the setup flow's worked example runs on
+- `entrypoints/pins/App.tsx` — the pinned set, read and managed
+- `components/FitAnalysisView/` — one car against the reader's settings, in React
+- `lib/stored-data.ts` — the inventory, `clearStoredData`, `unpinCars`
+- `lib/car-labels.ts` — `configurationName`, `configurationDetail`, `describeCoverage`
 - `entrypoints/compare/components/Launch.tsx` — what a returning reader sees instead of the
   setup questions
 - `entrypoints/compare/root.tsx` — the four-step shell

@@ -187,4 +187,5 @@ export type ViewMode = "grid" | "list";
 export type ActionType =
   | "OPEN_COMPARE_PAGE"
   | "OPEN_SETTINGS_PAGE"
-  | "OPEN_ONBOARDING_PAGE";
+  | "OPEN_ONBOARDING_PAGE"
+  | "OPEN_PINS_PAGE";

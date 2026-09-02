@@ -29,9 +29,11 @@ import { useCompareStore } from "./store";
 export default function CompareTab({
   cars,
   onSettings,
+  onManagePins,
 }: {
   cars: PinnedFinnCar[];
   onSettings: () => void;
+  onManagePins: () => void;
 }) {
   const step = useCompareStore((state) => state.step);
   const loadSettings = useCompareStore((state) => state.loadSettings);
@@ -94,6 +96,18 @@ export default function CompareTab({
             the full pinned set automatically — there is no
             separate selection step.
           </p>
+
+          {/*
+            * The one car can still be read on its own, which is the only
+            * useful thing to offer someone who cannot compare yet.
+            */}
+          <button
+            type="button"
+            onClick={onManagePins}
+            className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-finn-accent-blue px-5 text-xs font-black text-white shadow-sm transition hover:bg-finn-highlight-navy"
+          >
+            See how this one suits you
+          </button>
         </div>
       </div>
     );
@@ -125,6 +139,7 @@ export default function CompareTab({
                 <Launch
                   carCount={cars.length}
                   onSettings={onSettings}
+                  onManagePins={onManagePins}
                 />
               )}
 
