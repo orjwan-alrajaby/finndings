@@ -9,9 +9,9 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { Stepper } from "./components/Stepper";
-import { StepOneChoosePrioritiesStep } from "./steps/StepOneChoosePriorities";
-import { StepTwoOrderPrioritiesStep } from "./steps/StepTwoOrderPriorities";
-import { StepThreeSetPreferences } from "./steps/StepThreeSetPreferences";
+import { StepOnePrioritiesStep } from "./steps/StepOnePriorities";
+import { StepTwoSetPreferences } from "./steps/StepTwoSetPreferences";
+import { StepThreeSetAssumptions } from "./steps/StepThreeSetAssumptions";
 import { StepFourGenerateAdvice } from "./steps/StepFourGenerateAdvice";
 import { useCompareStore } from "./store";
 
@@ -109,12 +109,12 @@ export default function CompareTab({
           <div className="px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
             <div className="mx-auto flex max-w-6xl items-center justify-center">
               {step === "priorities" && (
-                <StepOneChoosePrioritiesStep onSettings={onSettings} />
+                <StepOnePrioritiesStep onSettings={onSettings} />
               )}
 
-              {step === "order" && <StepTwoOrderPrioritiesStep />}
+              {step === "preferences" && <StepTwoSetPreferences />}
 
-              {step === "preferences" && <StepThreeSetPreferences />}
+              {step === "assumptions" && <StepThreeSetAssumptions />}
 
               {step === "advice" && (
                 <StepFourGenerateAdvice

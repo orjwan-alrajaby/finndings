@@ -7,14 +7,18 @@ import type {
 type NumericField = Exclude<keyof LensPreferences, "contractType">;
 
 /**
- * What the reader's driving costs, as its own half of step 3.
+ * The fields behind every cost estimate Lens makes.
  *
  * Every field here arrives with a working value, so this is a panel to
- * correct rather than a form to fill in — which is why the defaults are
+ * correct rather than a form to fill in — which is why the saved values are
  * offered as a button and not merely as placeholder text. The budget is the
  * one that changes what the reader sees rather than what a car costs, so it
  * says so, and it is called out again when it is still sitting on the
  * placeholder Lens ships with.
+ *
+ * The step around it carries the heading, so this says only what the step
+ * cannot: which of these values are the reader's own and how to get them
+ * back.
  */
 export function DrivingAssumptions({
     preferences,
@@ -39,21 +43,11 @@ export function DrivingAssumptions({
     return (
         <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <p className="text-xs font-black uppercase tracking-[0.14em] text-finn-accent-blue">
-                        Your driving
-                    </p>
-
-                    <h3 className="mt-1 text-xl font-black text-finn-black">
-                        Driving assumptions
-                    </h3>
-
-                    <p className="mt-1 max-w-xl text-xs leading-5 text-finn-iron">
-                        Lens uses these to estimate what each car costs you.
-                        Change anything here and it applies to this comparison
-                        only — your saved values stay as they are.
-                    </p>
-                </div>
+                <p className="min-w-0 max-w-xl text-xs leading-5 text-finn-iron">
+                    Lens uses these to estimate what each car costs you.
+                    Change anything here and it applies to this comparison
+                    only — your saved values stay as they are.
+                </p>
 
                 {onUseSaved && (
                     <button

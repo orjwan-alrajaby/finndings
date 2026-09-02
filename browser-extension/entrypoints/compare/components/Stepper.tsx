@@ -9,9 +9,9 @@ import {
 } from "../store";
 
 const STEP_SHORT: Record<CompareStep, string> = {
-    priorities: "Choose priorities",
-    order: "Order priorities",
+    priorities: "Your priorities",
     preferences: "Set preferences",
+    assumptions: "Set assumptions",
     advice: "Advice",
 };
 

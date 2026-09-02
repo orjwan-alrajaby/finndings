@@ -6,6 +6,7 @@ import {
     DEFAULT_FEATURE_IMPORTANCE,
     DEFAULT_PREFERENCES,
     DEFAULT_PRIORITIES,
+    DEFAULT_PRIORITY_DEFINITIONS,
     DEFAULT_PROFILES,
     MAX_FEATURES_PER_CATEGORY,
     MAX_PRIORITIES,
@@ -20,11 +21,11 @@ import type {
     FeatureImportance,
     FeatureSelection,
     LensPreferences,
+    PriorityDefinition,
     Profile,
 } from "@/lib/reasoning-engine/types";
 
 import type { CompareStep } from "./types";
-import type { SelectionMode } from "./steps/StepOneChoosePriorities/types";
 
 /* Where the compare flow's own callers already look for them. */
 export { MAX_PRIORITIES, MIN_PRIORITIES };
@@ -32,13 +33,10 @@ export { MAX_PRIORITIES, MIN_PRIORITIES };
 /** The steps, in the order the stepper walks them. */
 export const STEP_ORDER: CompareStep[] = [
     "priorities",
-    "order",
     "preferences",
+    "assumptions",
     "advice",
 ];
-
-/** Which half of step 3 the reader is looking at. */
-export type PreferencesPhase = "preferences" | "driving";
 
 interface CompareState {
     /* ---------------------------------------------------------------- */
@@ -67,6 +65,13 @@ interface CompareState {
     /** The saved feature picks, and the starting point for a run. */
     savedCategoryFeatures: Record<CategoryId, FeatureSelection>;
 
+    /**
+     * The label, icon and on/off state of every priority, as Settings has
+     * them. Step 1 draws its list from these, so a priority switched off
+     * there is not offered here.
+     */
+    priorityDefinitions: PriorityDefinition[];
+
     profiles: Profile[];
 
     /** Which profile is selected automatically when nothing else is. */
@@ -79,8 +84,8 @@ interface CompareState {
     priorities: CategoryId[];
 
     /*
-     * This run's copy of the saved values. Steps 3 and 4 read these and
-     * never the saved ones. What a reader does on the way to one
+     * This run's copy of the saved values. Every step after the first reads
+     * these and never the saved ones. What a reader does on the way to one
      * recommendation is a question about these cars today — "what if I only
      * had 800 a month", "what if I stopped caring about the boot" — and
      * answering it must not quietly rewrite what they'll be asked next time.
@@ -100,19 +105,7 @@ interface CompareState {
     /* What each step was left looking at                               */
     /* ---------------------------------------------------------------- */
 
-    /** Step 1: profile or hand-picked. */
-    selectionMode: SelectionMode;
-
-    /** Step 1: the category whose features are expanded. */
-    expandedCategory: CategoryId | null;
-
-    /** Step 2: the card opened out of the order grid. */
-    expandedOrderCategory: CategoryId | null;
-
-    /** Step 3: which of its two halves. */
-    phase: PreferencesPhase;
-
-    /** Step 3: the priority whose feature editor is open. */
+    /** Step 2: the priority whose feature editor is open. */
     expandedPriority: CategoryId | null;
 
     /** Step 4: the car in the hot seat. Null means the recommendation. */
@@ -129,8 +122,6 @@ interface CompareState {
     back: () => void;
 
     setPriorities: (priorities: CategoryId[]) => void;
-    togglePriority: (category: CategoryId) => void;
-    movePriority: (from: CategoryId, to: CategoryId) => void;
 
     setPreferences: (preferences: LensPreferences) => void;
     useSavedPreferences: () => void;
@@ -143,10 +134,6 @@ interface CompareState {
     ) => void;
     resetFeaturesToSaved: () => void;
 
-    setSelectionMode: (mode: SelectionMode) => void;
-    setExpandedCategory: (category: CategoryId | null) => void;
-    setExpandedOrderCategory: (category: CategoryId | null) => void;
-    setPhase: (phase: PreferencesPhase) => void;
     setExpandedPriority: (category: CategoryId | null) => void;
     setChallengerId: (id: number | null) => void;
 }
@@ -209,6 +196,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     settingsLoaded: false,
     savedPreferences: DEFAULT_PREFERENCES,
     savedCategoryFeatures: DEFAULT_CATEGORY_FEATURES,
+    priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
     profiles: DEFAULT_PROFILES,
     defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
 
@@ -216,10 +204,6 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     preferences: DEFAULT_PREFERENCES,
     features: copyFeatures(DEFAULT_CATEGORY_FEATURES),
 
-    selectionMode: "profile",
-    expandedCategory: null,
-    expandedOrderCategory: null,
-    phase: "preferences",
     expandedPriority: null,
     challengerId: null,
 
@@ -237,6 +221,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
             settingsLoaded: true,
             savedPreferences: settings.preferences,
             savedCategoryFeatures: settings.categoryFeatures,
+            priorityDefinitions: settings.priorityDefinitions,
             profiles: settings.profiles,
             defaultProfileId: settings.defaultProfileId,
             priorities: settings.priorities,
@@ -251,8 +236,8 @@ export const useCompareStore = create<CompareState>((set, get) => ({
 
         if (step === current || !canEnterStep(priorities, step)) return;
 
-        /* Leaving the two steps that decide the order commits it. */
-        if (current === "priorities" || current === "order") {
+        /* Leaving the step that decides the order commits it. */
+        if (current === "priorities") {
             persistPriorities(priorities);
         }
 
@@ -274,6 +259,11 @@ export const useCompareStore = create<CompareState>((set, get) => ({
         if (previousStep) get().goTo(previousStep);
     },
 
+    /**
+     * The whole order at once — adding, removing and reordering all arrive
+     * here, because the list in step 1 hands back the array it wants rather
+     * than describing the edit it made.
+     */
     setPriorities(priorities) {
         const { expandedPriority } = get();
 
@@ -282,7 +272,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
             challengerId: null,
 
             /*
-             * Step 3 opens on a priority the reader still has. Keeping a
+             * Step 2 opens on a priority the reader still has. Keeping a
              * card open for a category they just dropped would leave that
              * step showing nothing at all.
              */
@@ -291,41 +281,6 @@ export const useCompareStore = create<CompareState>((set, get) => ({
                     ? expandedPriority
                     : (priorities[0] ?? null),
         });
-    },
-
-    togglePriority(category) {
-        const { priorities } = get();
-
-        if (priorities.includes(category)) {
-            get().setPriorities(
-                priorities.filter((id) => id !== category),
-            );
-            return;
-        }
-
-        if (priorities.length >= MAX_PRIORITIES) return;
-
-        get().setPriorities([...priorities, category]);
-    },
-
-    movePriority(from, to) {
-        const { priorities } = get();
-
-        if (from === to) return;
-
-        const fromIndex = priorities.indexOf(from);
-        const toIndex = priorities.indexOf(to);
-
-        if (fromIndex === -1 || toIndex === -1) return;
-
-        const next = [...priorities];
-        const [moved] = next.splice(fromIndex, 1);
-
-        if (!moved) return;
-
-        next.splice(toIndex, 0, moved);
-
-        get().setPriorities(next);
     },
 
     setPreferences(preferences) {
@@ -408,22 +363,6 @@ export const useCompareStore = create<CompareState>((set, get) => ({
         }
 
         set({ features: restored, challengerId: null });
-    },
-
-    setSelectionMode(selectionMode) {
-        set({ selectionMode });
-    },
-
-    setExpandedCategory(expandedCategory) {
-        set({ expandedCategory });
-    },
-
-    setExpandedOrderCategory(expandedOrderCategory) {
-        set({ expandedOrderCategory });
-    },
-
-    setPhase(phase) {
-        set({ phase });
     },
 
     setExpandedPriority(expandedPriority) {

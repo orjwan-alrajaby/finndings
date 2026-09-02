@@ -51,18 +51,29 @@ pages only. Pinning writes the full normalized car into `browser.storage.local` 
 **Popup.** Shows whether you're on finn.com, pinned-car metrics, the three most recent
 pinned cars, and action buttons (Compare, Settings). Compare opens `compare.html` in a tab.
 
-**Step 1 — Choose priorities.** Pick a profile (six fixed ones: Nervous Driver, City
-Commuter, Family First, Road Tripper, Eco-Conscious, Balanced) or hand-pick 3–5 of the seven
-categories. Collected: an unordered set of `CategoryId`s.
+**Step 1 — Your priorities.** One screen that both chooses and orders. It opens with an
+explanation of what a priority is and does (it weighs, it does not filter), then offers the
+six fixed profiles as presets — Nervous Driver, City Commuter, Family First, Road Tripper,
+Eco-Conscious, Balanced — as cards naming who each is for and the five priorities it would
+apply, then the order itself: a draggable list of 3–5 of the seven categories with
+arrow-key equivalents and an "add a priority" row. The list is
+`components/PriorityOrder.tsx`, shared verbatim with Settings > Priorities; only the framing
+around it differs. Collected: an ordered array. This array — and only this array — is
+written back to persistent settings when you leave the step.
 
-**Step 2 — Order priorities.** Drag to rank them. Collected: an ordered array. This array —
-and only this array — is written back to persistent settings when you leave the step.
+Until recently this was two steps, choose and then order. They were merged because they are
+one decision, and because a reader choosing on one screen could not see the order they were
+building on the next.
 
-**Step 3 — Set preferences.** Two halves. (a) For each chosen priority, optionally single
-out up to five features and set each one's influence to Somewhat / Moderately / Highly.
-(b) Driving assumptions: monthly km, petrol/diesel/electricity price, monthly budget,
-private vs business contract. Both halves are skippable; both are held in the run-scoped
-Zustand store and are **not** persisted.
+**Step 2 — Set preferences.** For each chosen priority, optionally single out up to five
+features and set each one's influence to Somewhat / Moderately / Highly. Skippable; held in
+the run-scoped Zustand store and **not** persisted.
+
+**Step 3 — Set assumptions.** Driving assumptions: monthly km, petrol/diesel/electricity
+price, monthly budget, private vs business contract. Skippable, every field ships with a
+working value, run-scoped and **not** persisted. This was the second half of step 3 behind
+a tab pair, and is now its own step — it asks about the reader rather than the cars, and it
+feeds the cost estimate and budget eligibility rather than the ranking.
 
 **Step 4 — Advice.** The engine runs over every pinned car. The page shows, in order: budget
 notice (if applicable) → hero with the winner and its estimated monthly cost → "Why it wins"
@@ -77,7 +88,7 @@ per-priority feature lists, environmental working, cost, tradeoffs. On a model p
 several configurations it lists all of them and lets you switch.
 
 **Settings page.** Three tabs: Priorities (order + per-category feature picks), Profiles
-(enable/disable, choose the default), Driving (the same assumptions as step 3b). Explicit
+(enable/disable, choose the default), Driving (the same assumptions as step 3). Explicit
 Save button; a dirty indicator compares against a snapshot of what's on disk.
 
 ---
@@ -403,8 +414,8 @@ class is capped below class C, with no user-facing control.
 intended, and it means an ordinary petrol car reads as a mediocre environmental match to
 anyone who ranked environment at all.
 
-**Priorities are editable in two places.** Compare steps 1/2 and Settings > Priorities write
-the same key. Meanwhile budget and feature picks set in Compare are deliberately run-scoped.
+**Priorities are editable in two places.** Compare step 1 and Settings > Priorities write
+the same key, now through the same shared control. Meanwhile budget and feature picks set in Compare are deliberately run-scoped.
 The rule is documented in the store but will read as a bug to a user.
 
 **Profiles are barely a feature.** Six fixed strategies you can only switch on or off.
@@ -531,7 +542,9 @@ Then stop. Do not touch the engine, the migrations, the narrative layer, or the 
 - `entrypoints/compare/steps/StepFourGenerateAdvice/index.tsx` — the advice page
 - `entrypoints/settings/App.tsx` — settings root, save/restore
 - `entrypoints/popup/App.tsx`
-- `components/FeatureInfluencePicker.tsx` — pick + influence control, shared by step 3 and
+- `components/PriorityOrder.tsx` — `ProfilePresets`, `PriorityOrderList`,
+  `applicableProfiles`; the priority order control, shared by compare step 1 and settings
+- `components/FeatureInfluencePicker.tsx` — pick + influence control, shared by step 2 and
   settings
 
 **Recommendation engine**

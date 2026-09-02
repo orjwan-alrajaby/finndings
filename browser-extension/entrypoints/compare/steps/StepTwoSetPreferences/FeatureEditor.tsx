@@ -11,7 +11,7 @@ import {
     type PickedElsewhere,
 } from "@/components/FeatureInfluencePicker";
 
-interface StepThreeFeatureEditorProps {
+interface FeatureEditorProps {
     categoryId: CategoryId;
     /** What the user has picked out for this run. May legitimately be empty. */
     features: FeatureSelection;
@@ -36,7 +36,7 @@ interface StepThreeFeatureEditorProps {
  * only decides whether the priority has anything to pick at all: the
  * calculated ones are read from vehicle data and have no catalogue.
  */
-export function StepThreeFeatureEditor({
+export function FeatureEditor({
     categoryId,
     features,
     availableFeatures,
@@ -44,7 +44,7 @@ export function StepThreeFeatureEditor({
     pickedElsewhere,
     onToggleFeature,
     onImportanceChange,
-}: StepThreeFeatureEditorProps) {
+}: FeatureEditorProps) {
     const category = CATEGORIES[categoryId];
 
     if (category.numericOnly) {
