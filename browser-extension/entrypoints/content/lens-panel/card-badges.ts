@@ -4,7 +4,7 @@ import {
   FIT_SEGMENTS,
   type FitLevel,
 } from "@/lib/reasoning-engine/fit";
-import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
+import { loadLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
@@ -54,14 +54,18 @@ import {
  *   to report, so the control keeps its neutral label rather than claiming a
  *   band it can't support.
  *
- * - **No verdict without settings.** A band measured against defaults the
- *   reader has never seen is not their verdict. With nothing saved the button
- *   stays neutral — and opening it offers the setup flow, which is a better
- *   answer to "what is this?" than an absent control.
- *
  * - ~~Nothing without data.~~ Gone. It was a rule about what to *draw*, and
  *   its effect was to hide the way in to the one screen that could have
  *   filled the gap it was reacting to.
+ *
+ * - ~~No verdict without settings.~~ Also gone, and for a related reason.
+ *   Lens ships defaults now — a priority order, and the five features most
+ *   drivers say they care about in each — so it has a real opinion to give
+ *   before the reader has said anything. The rule behind the rule survives
+ *   intact: a verdict built from Lens's assumptions must never be passed off
+ *   as the reader's own. There is no room on a pill to say that, so the
+ *   panel one click away says it, at the top, before the reading. See
+ *   `defaultsNotice`.
  */
 
 const BADGE = "finn-lens-fit-badge";
@@ -269,8 +273,6 @@ async function context(): Promise<{
   settings: LensSettings;
   carFor: (id: number) => PinnedFinnCar | null;
 } | null> {
-  if (!(await hasSavedLensSettings())) return null;
-
   const [settings, pinned, loaded] = await Promise.all([
     loadLensSettings(),
     getPinnedCars(),

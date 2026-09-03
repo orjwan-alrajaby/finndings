@@ -43,6 +43,33 @@ contains, and the compromises are stated as loudly as the recommendation.
 
 ## 2. Current user flow
 
+**Defaults, and telling them from the reader's answers.** Lens ships a working
+configuration: the default profile's priority order, driving assumptions, and — new — five
+features raised in each non-numeric category, weighted high/medium/low from published buyer
+demand (AutoPacific's Future Attribute Demand Study, Cars.com's 2025 buyer survey, and the
+family/long-distance guidance that says the same things). `DEFAULT_CATEGORY_FEATURES` in
+`lib/reasoning-engine/constants.ts` carries the reasoning, including why eCall is *not*
+raised (mandatory in the EU since 2018, so it separates no cars) and why air conditioning is
+raised only moderately.
+
+This is a deliberate reversal. The picks used to ship empty, on the argument that shipping
+five puts words in the reader's mouth. The counter-argument, and the reason it changed:
+empty was not neutral either — a category with nothing raised is scored on its whole
+catalogue, which asserts every feature in it matters equally — and it meant the product's
+first answer to a new reader was a form rather than a verdict.
+
+What keeps it honest is `lib/personalisation.ts`. `hasSavedLensSettings()` still reads
+absent keys, so a fresh install is still "they have told us nothing", and every surface that
+can produce a verdict before the reader has answered labels it: the in-page panel leads with
+`defaultsNotice`, the pinned-cars page with `<UsingDefaultsNotice>`, and `fitHeader` swaps
+its "measured against your saved settings" line for one that doesn't claim they are the
+reader's. **If you add a surface that shows a verdict, it owes the reader that label.**
+
+Known rough edge: the narrative layer writes "you picked out adaptive cruise control"
+because it reasons about a `FeatureSelection` and has no idea whose it is. The notice is
+worded to own that pronoun rather than contradict it ("it has assumed for you… and calls
+those picks yours"), but a provenance-aware engine would say it better.
+
 **Step 0 — on finn.com.** A content script (`entrypoints/content/index.ts`) injects a pin
 button into every `product-card` and onto detail pages, and a Lens control onto each card's
 photo. The control is drawn in the same synchronous pass as the pin button and needs nothing
@@ -94,9 +121,9 @@ open. Sort by pinned date, fit, price or name; tick rows for a bulk unpin; every
 confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also listens for it, so a pin made
 on finn.com while it is open lands without a reload.
 
-Scoring is gated on `hasSavedLensSettings()` exactly as the in-page panel is — a reader who
-has configured nothing gets the list, an explanation, and a link into the setup flow, not a
-verdict measured against defaults they have never seen. Analyses are built once per car in a
+Scoring is no longer gated on `hasSavedLensSettings()` — Lens ships defaults, so there is
+always something honest to say. The flag now decides whether the page shows
+`<UsingDefaultsNotice>` above the list, not whether it scores anything. Analyses are built once per car in a
 `useMemo` and shared by the row chip and the open panel, so the two can never disagree.
 
 **`components/FitAnalysisView/`.** The in-page panel's reading, in React. The panel is

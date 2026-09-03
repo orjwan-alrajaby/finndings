@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildFitAnalysis, classifyFit, describeFit, hasEquipmentData } from "./fit";
 import { buildRecommendation } from "./index";
-import { AVAILABLE_CATEGORY_FEATURES } from "./constants";
+import { AVAILABLE_CATEGORY_FEATURES, CATEGORY_IDS } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
 import type { CategoryId, FeatureSelection } from "./types";
 
@@ -284,6 +284,12 @@ describe("buildFitAnalysis", () => {
      * The guarantee worth having: for the half of the score that doesn't need
      * a population — equipment — one car alone is judged exactly as it is
      * inside a full comparison.
+     *
+     * Asserted on the coverage counts rather than on the score, because the
+     * score is the *weighted* share once anything is picked out, and Lens now
+     * ships picks. Coverage is the same measurement on both sides whatever
+     * the weighting, which is what makes this a test of the two engines
+     * agreeing rather than a restatement of one formula.
      */
     const subject = makeCar({ id: 1, features: SAFETY.slice(0, 9) });
     const other = makeCar({ id: 2, features: SAFETY.slice(0, 3) });
@@ -296,7 +302,46 @@ describe("buildFitAnalysis", () => {
       prefs(),
     );
 
+    const here = alone.priorities[0];
+    const there = compared?.evaluation.priorities[0];
+
     expect(compared?.winner.id).toBe(subject.id);
+    expect(here?.covered).toBe(there?.matched.length);
+    expect(here?.catalogueSize).toBe(
+      (there?.matched.length ?? 0) + (there?.missing.length ?? 0),
+    );
+    expect(there?.coverageScore).toBe(
+      here && Math.round((here.covered / here.catalogueSize) * 100),
+    );
+  });
+
+  /*
+   * And with nothing picked out, the weighted score collapses back onto plain
+   * coverage — which is what makes "picked nothing" a coherent answer rather
+   * than a different scoring model.
+   */
+  it("scores on plain coverage when nothing is picked out", () => {
+    const subject = makeCar({ id: 1, features: SAFETY.slice(0, 9) });
+    const other = makeCar({ id: 2, features: SAFETY.slice(0, 3) });
+
+    const nothingPicked = Object.fromEntries(
+      CATEGORY_IDS.map((id) => [id, []]),
+    ) as Record<CategoryId, never[]>;
+
+    const alone = buildFitAnalysis(
+      subject,
+      ["safetyAssistance"],
+      prefs(),
+      nothingPicked,
+    );
+
+    const compared = buildRecommendation(
+      [subject, other],
+      ["safetyAssistance"],
+      prefs(),
+      nothingPicked,
+    );
+
     expect(compared?.score.byCategory.safetyAssistance).toBe(
       alone.priorities[0] &&
         Math.round(

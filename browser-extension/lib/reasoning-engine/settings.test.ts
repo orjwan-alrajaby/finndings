@@ -37,7 +37,7 @@ vi.stubGlobal("browser", {
   },
 });
 
-const { loadLensSettings } = await import("./index");
+const { hasSavedLensSettings, loadLensSettings } = await import("./index");
 
 beforeEach(() => {
   stored = {};
@@ -227,11 +227,19 @@ describe("stored feature lists are brought up to the current rules", () => {
   });
 
   /* And a fresh install picks nothing on the user's behalf. */
-  it("opens a fresh install with nothing picked", async () => {
+  /*
+   * A fresh install is configured, not blank. What makes that honest is that
+   * `hasSavedLensSettings` still reads it as unanswered, so every surface can
+   * label the verdict as Lens's default rather than the reader's own.
+   */
+  it("opens a fresh install on Lens's own picks", async () => {
     const settings = await loadLensSettings();
 
-    expect(settings.categoryFeatures.practicality).toEqual([]);
-    expect(DEFAULT_CATEGORY_FEATURES.practicality).toEqual([]);
+    expect(settings.categoryFeatures.practicality).toEqual(
+      DEFAULT_CATEGORY_FEATURES.practicality,
+    );
+    expect(settings.categoryFeatures.practicality.length).toBeGreaterThan(0);
+    expect(await hasSavedLensSettings()).toBe(false);
   });
 
   it("leaves untouched categories on their defaults", async () => {

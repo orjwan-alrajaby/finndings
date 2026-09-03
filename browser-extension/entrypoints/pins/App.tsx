@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import { FitAnalysisView } from "@/components/FitAnalysisView";
+import { UsingDefaultsNotice } from "@/components/UsingDefaultsNotice";
 import { FINN_BASE_URL } from "@/lib/constants";
 import {
     hasSavedLensSettings,
@@ -89,18 +90,18 @@ export default function PinsPage() {
     }, []);
 
     /*
-     * Every car analysed once, against the saved settings, and reused by both
-     * the list and the open panel. Scoring on demand would let the chip in
-     * the list and the band on the reading drift apart, which is exactly the
-     * kind of disagreement this product cannot afford.
+     * Every car analysed once, and reused by both the list and the open
+     * panel. Scoring on demand would let the chip in the list and the band on
+     * the reading drift apart, which is exactly the kind of disagreement this
+     * product cannot afford.
      *
-     * Gated on the reader having answered: judging a car against defaults
-     * they have never seen and calling the result "how it fits you" is the
-     * one thing the in-page panel refuses to do, and this page is the same
-     * reading.
+     * No longer gated on the reader having answered. Lens ships defaults, so
+     * there is always something honest to say; `configured` now decides
+     * whether the page captions the answers as Lens's assumptions rather than
+     * whether it gives any.
      */
     const analyses = useMemo(() => {
-        if (!cars || !settings || !configured) {
+        if (!cars || !settings) {
             return new Map<number, FitAnalysis>();
         }
 
@@ -115,7 +116,7 @@ export default function PinsPage() {
                 ),
             ]),
         );
-    }, [cars, settings, configured]);
+    }, [cars, settings]);
 
     const sorted = useMemo(
         () => (cars ? sortCars(cars, sort, analyses) : []),
@@ -207,26 +208,15 @@ export default function PinsPage() {
                     </header>
 
                     {!configured && cars.length > 0 && (
-                        <p className="mb-4 rounded-[22px] bg-finn-pale-blue px-5 py-4 text-xs leading-5 text-finn-highlight-navy">
-                            <strong className="font-black">
-                                Lens can't score these yet.
-                            </strong>{" "}
-                            It doesn't know what matters to you, and judging a
-                            car against defaults you've never seen wouldn't be
-                            your answer.{" "}
-                            <button
-                                type="button"
-                                onClick={() =>
+                        <div className="mb-4">
+                            <UsingDefaultsNotice
+                                onPersonalise={() =>
                                     void openBrowserTab(
                                         "OPEN_ONBOARDING_PAGE",
                                     )
                                 }
-                                className="font-black underline underline-offset-2"
-                            >
-                                Set up FINN Lens
-                            </button>{" "}
-                            and every car here gets a verdict.
-                        </p>
+                            />
+                        </div>
                     )}
 
                     {cars.length === 0 ? (
@@ -517,7 +507,7 @@ function NothingOpen({ configured }: { configured: boolean }) {
             <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-finn-iron">
                 {configured
                     ? "You'll get the same reading the side panel gives you on finn.com — how it does on each of your priorities, which of your picks it has, what it costs you a month, and what you'd be accepting."
-                    : "Once you've told Lens what matters to you, every car here gets a full reading: each of your priorities in turn, the features behind the verdict, and what it costs you a month."}
+                    : "You'll get the same reading the side panel gives you on finn.com — each priority in turn, the features behind the verdict, what it costs you a month, and what you'd be accepting. On Lens's own assumptions until you give it yours."}
             </p>
         </div>
     );

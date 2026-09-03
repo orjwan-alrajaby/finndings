@@ -60,10 +60,16 @@ export function GettingStarted({ pinnedCount }: { pinnedCount: number }) {
         {
             id: "priorities",
             done: configured,
-            label: "Tell Lens what matters to you",
-            todo: "Pick your priorities and put them in order. About a minute, once.",
-            doneNote: "Your priorities are saved.",
-            action: "Set up",
+            label: "Make Lens yours",
+            /*
+             * Not "set Lens up" any more. It already works — on its own
+             * defaults — so calling this setup would be describing a blocked
+             * product that isn't blocked. What it actually offers is the
+             * difference between Lens's assumptions and the reader's.
+             */
+            todo: "Lens is using its own defaults. Swap them for what matters to you — about a minute, once.",
+            doneNote: "Lens is using your answers.",
+            action: "Personalise",
             onClick: () => void openBrowserTab("OPEN_ONBOARDING_PAGE"),
         },
         {

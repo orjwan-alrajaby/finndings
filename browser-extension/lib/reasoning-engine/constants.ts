@@ -866,21 +866,115 @@ export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
 ) as Record<CategoryId, FeatureId[]>;
 
 /**
- * What a category starts with picked out: nothing.
+ * What a category starts with picked out, and how much each one counts.
  *
- * An earlier build pre-selected the five most relevant features. That was
- * defensible when a pick was a weightless hint, and isn't now: a pick says
- * "this matters to me" and carries an importance the user chose, so putting
- * five of them in their mouth before they have said anything is the product
- * inventing preferences and then reasoning from them.
+ * This was empty, on the argument that a pick says "this matters to me" and
+ * carries an importance the reader chose, so shipping five of them puts words
+ * in their mouth and then reasons from them. The argument was right about the
+ * risk and wrong about the remedy. Empty did not mean Lens made no assumption
+ * — a category with nothing picked is judged on its whole catalogue, which
+ * assumes every feature in it matters exactly the same amount, and *that* is
+ * the claim nobody would make if asked. It also meant the product's first
+ * answer to a new reader was a shrug, and the only way out of it was a form.
  *
- * Starting empty means a reader who configures nothing is compared on each
- * category's whole catalogue, which is the honest reading of having told us
- * nothing.
+ * So Lens now ships an opinion and says whose it is. Everywhere a verdict
+ * appears before the reader has saved anything, it is labelled as Lens's
+ * default rather than theirs, with the way to change it beside it — see
+ * `hasSavedLensSettings`, which is what the whole product reads to tell "ours"
+ * from "theirs".
+ *
+ * The five per category are not the first five in the catalogue and are not
+ * anyone here's taste. They come from what large samples of car buyers
+ * actually say they want, and the weightings say how loudly:
+ *
+ * - AutoPacific's Future Attribute Demand Study (19,000+ intending buyers)
+ *   puts heated seats first outright, heated steering wheels at 38% and
+ *   heated-and-ventilated front seats at 37%, and wireless CarPlay/Android
+ *   Auto and power front seats in its top four.
+ * - Cars.com's 2025 buyer survey has rear automatic emergency braking tied
+ *   top at 43%, with blind-spot cameras and parking sensors scoring high on
+ *   "must have" rather than "nice to have".
+ * - Family-car guidance is consistent to the point of monotony: ISOFIX
+ *   points first, then folding rear seats for a pram plus luggage, then
+ *   rearward visibility.
+ * - Long-distance advice names adaptive cruise and adjustable lumbar support
+ *   ahead of everything else, both as fatigue rather than luxury.
+ *
+ * Two deliberate departures from "the obvious five", both for the same
+ * reason — a feature every car has separates no cars:
+ *
+ * - **The emergency call system is not picked**, though it is a safety
+ *   feature and a good one. eCall has been mandatory on new cars sold in the
+ *   EU since 2018, so every car FINN rents has it and raising it would add
+ *   weight to a fact that never varies.
+ * - **Air conditioning is picked but only moderately**, for the same reason
+ *   softened: near-universal, so it rarely moves a comparison, but its
+ *   absence is severe enough to be worth catching when it happens.
  */
-export const DEFAULT_CATEGORY_FEATURES = Object.fromEntries(
-  CATEGORY_IDS.map((id) => [id, [] as FeatureSelection])
-) as Record<CategoryId, FeatureSelection>;
+export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> = {
+  safetyAssistance: [
+    /* The one system that acts to prevent the collision rather than warn about it. */
+    { key: "hasEmergencyBrakingAssist", importance: "high" },
+    { key: "hasBlindSpotAssist", importance: "high" },
+    { key: "hasLaneKeepingAssist", importance: "medium" },
+    { key: "hasAdaptiveCruiseControl", importance: "medium" },
+    /* The closest thing FINN lists to the rear visibility buyers rank top. */
+    { key: "hasOneEightyDegreesReversingCamera", importance: "medium" },
+  ],
+
+  familyFriendly: [
+    { key: "hasIsofix", importance: "high" },
+    /* A pram and the luggage, without choosing between them. */
+    { key: "hasSplitFoldingRearSeats", importance: "high" },
+    { key: "hasOneEightyDegreesReversingCamera", importance: "medium" },
+    { key: "hasParkingSensors", importance: "medium" },
+    /* Real, but a convenience rather than a reason to rule a car out. */
+    { key: "hasElectricTailgate", importance: "low" },
+  ],
+
+  practicality: [
+    { key: "hasSplitFoldingRearSeats", importance: "high" },
+    { key: "hasRoofRails", importance: "medium" },
+    { key: "hasElectricTailgate", importance: "medium" },
+    { key: "hasParkingSensors", importance: "medium" },
+    /* A minority need, and decisive for the minority that has it. */
+    { key: "hasTowbar", importance: "low" },
+  ],
+
+  longDistance: [
+    { key: "hasAdaptiveCruiseControl", importance: "high" },
+    /* Named as fatigue rather than luxury wherever long drives are discussed. */
+    { key: "hasLumbarSupport", importance: "high" },
+    { key: "hasElectricFrontSeatAdjustment", importance: "medium" },
+    { key: "hasHeatedSeats", importance: "medium" },
+    /* Phone mirroring has largely taken this over, so it counts least. */
+    { key: "hasIntegratedNavigationSystem", importance: "low" },
+  ],
+
+  climateSuitability: [
+    { key: "hasHeatedSeats", importance: "high" },
+    { key: "hasHeatedSteeringWheel", importance: "high" },
+    /* The summer half of the same question. */
+    { key: "hasSeatCooling", importance: "medium" },
+    { key: "hasAirConditioning", importance: "medium" },
+    { key: "hasRainSlashLightSensors", importance: "low" },
+  ],
+
+  comfort: [
+    { key: "hasHeatedSeats", importance: "high" },
+    { key: "hasAppleCarPlaySlashAndroidAuto", importance: "high" },
+    { key: "hasElectricFrontSeatAdjustment", importance: "medium" },
+    { key: "hasLumbarSupport", importance: "medium" },
+    { key: "hasSeatCooling", importance: "low" },
+  ],
+
+  /*
+   * Nothing, and not for want of an opinion: this category has no feature
+   * catalogue at all. It is scored from CO₂ and the drivetrain, straight off
+   * the vehicle data. See `numericOnly`.
+   */
+  environmental: [],
+};
 
 export const DEFAULT_PRIORITY_DEFINITIONS: PriorityDefinition[] =
   CATEGORY_IDS.map((id) => ({

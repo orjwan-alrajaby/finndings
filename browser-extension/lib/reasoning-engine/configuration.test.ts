@@ -73,9 +73,73 @@ describe("feature selection", () => {
    * me" and carries an importance they chose, so pre-selecting five would be
    * the product inventing preferences and then reasoning from them.
    */
-  it("picks nothing for the user", () => {
+  /*
+   * Lens ships an opinion rather than a shrug, and these are the rules that
+   * keep it an opinion the product can stand behind: it is a subset of what
+   * each category actually offers, it is inside the cap the reader is held
+   * to, and it is a real selection rather than a token one.
+   */
+  it("picks five features in every category that has any", () => {
     for (const id of CATEGORY_IDS) {
-      expect(DEFAULT_CATEGORY_FEATURES[id]).toEqual([]);
+      const picked = DEFAULT_CATEGORY_FEATURES[id];
+
+      if (CATEGORIES[id].numericOnly) {
+        /* Scored from vehicle data; there is no catalogue to pick from. */
+        expect(picked).toEqual([]);
+        continue;
+      }
+
+      expect(picked).toHaveLength(5);
+    }
+  });
+
+  it("never picks a feature the category doesn't offer", () => {
+    for (const id of CATEGORY_IDS) {
+      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
+        expect(AVAILABLE_CATEGORY_FEATURES[id]).toContain(pick.key);
+      }
+    }
+  });
+
+  it("never picks the same feature twice in one category", () => {
+    for (const id of CATEGORY_IDS) {
+      const keys = DEFAULT_CATEGORY_FEATURES[id].map((pick) => pick.key);
+
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+  });
+
+  it("stays inside the cap the reader is held to", () => {
+    for (const id of CATEGORY_IDS) {
+      expect(
+        DEFAULT_CATEGORY_FEATURES[id].length,
+      ).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
+    }
+  });
+
+  /*
+   * A default that raised everything to "highly" would be the same as raising
+   * nothing: the point of the scale is that some of these matter more than
+   * others, and the shipped opinion has to demonstrate that or it teaches the
+   * reader the control does nothing.
+   */
+  it("uses more than one level of importance", () => {
+    for (const id of CATEGORY_IDS) {
+      const picked = DEFAULT_CATEGORY_FEATURES[id];
+
+      if (picked.length === 0) continue;
+
+      const levels = new Set(picked.map((pick) => pick.importance));
+
+      expect(levels.size).toBeGreaterThan(1);
+    }
+  });
+
+  it("gives every pick a real level", () => {
+    for (const id of CATEGORY_IDS) {
+      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
+        expect(IMPORTANCE_LEVELS).toContain(pick.importance);
+      }
     }
   });
 

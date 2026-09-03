@@ -11,6 +11,7 @@ import {
   analysisBody,
   backToConfigurations,
   configurationsSection,
+  defaultsNotice,
 } from "./sections";
 import { detailsPageRoot, resolveCar, resolvePageCars } from "./currentCar";
 
@@ -208,6 +209,19 @@ async function render(
   empty(into);
   into.append(loadingState(request.carName));
 
+  /*
+   * Whether the reader has answered for themselves — which no longer decides
+   * whether they get an answer, only what it is captioned with.
+   *
+   * The panel used to stop here and offer the setup flow, on the grounds that
+   * a verdict measured against defaults the reader has never seen is not
+   * their verdict. That was right about the verdict and wrong about the
+   * refusal: it meant the first thing anyone met on a car listing was a form,
+   * and the product's best argument for filling the form in — an actual
+   * worked answer about the car in front of them — was the thing being
+   * withheld until they had. Lens ships defaults now, so it can answer, and
+   * `defaultsNotice` says whose assumptions the answer came from.
+   */
   let configured: boolean;
 
   try {
@@ -221,19 +235,6 @@ async function render(
         "We couldn't read your settings",
         "Lens couldn't reach the browser storage your preferences live in. Nothing on this page is affected — try again in a moment.",
         { label: "Try again", onClick: retry },
-      ),
-    );
-
-    return;
-  }
-
-  if (!configured) {
-    empty(into);
-    into.append(
-      message(
-        "Set up FINN Lens to personalise this car",
-        "Choose the things that matter to you and put them in order, and Lens can tell you how well this car serves them. It takes about a minute, and you only do it once.",
-        { label: "Set up FINN Lens", onClick: openSetup },
       ),
     );
 
@@ -284,6 +285,8 @@ async function render(
           settings.preferences,
           settings.categoryFeatures,
         ),
+        null,
+        configured ? null : defaultsNotice(openSetup),
       ),
     );
 
@@ -406,6 +409,7 @@ async function render(
             page.cars.length > 1
               ? backToConfigurations(page.cars.length, () => show(null))
               : null,
+            configured ? null : defaultsNotice(openSetup),
           )
         : fragment([
             chooseLead(page.cars.length),

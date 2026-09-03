@@ -23,11 +23,14 @@ import type { FinnCar } from "@/lib/types";
  * to gate it, the car's data, arrives after the card does, and gating on it
  * made the button appear on some page loads and not others.
  *
- * The **verdict** keeps every ounce of the restraint the control gave up. It
- * is a claim about the reader's own preferences, so it appears only where
- * there are preferences to claim it from and data to base it on. Where either
- * is missing the pill stays a question, which is the honest thing for it to
- * be — and the card still gets its markup back untouched at the end.
+ * The **verdict** needs the car's data, and says nothing without it — a pill
+ * that stayed a question is the honest state for a car FINN told us nothing
+ * about. What it no longer needs is the reader's settings: Lens ships
+ * defaults, so it always has an opinion, and the honesty that used to be
+ * bought by silence is bought by the panel instead, which names whose
+ * assumptions produced the band before showing it.
+ *
+ * The card still gets its markup back untouched at the end.
  */
 
 const SAFETY = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
@@ -195,15 +198,22 @@ describe("applyFitVerdicts", () => {
     expect(badges()[0]?.textContent).toMatch(/match/i);
   });
 
-  it("claims nothing when the reader hasn't set Lens up", async () => {
-    /* A verdict measured against defaults they've never seen isn't theirs. */
+  /*
+   * Lens ships defaults, so it has an opinion before the reader gives it one
+   * and there is no reason to withhold it — the pill would otherwise sit on
+   * the card saying nothing about a car we can perfectly well read.
+   *
+   * The rule behind the old refusal is kept where there is room to keep it:
+   * the panel this pill opens leads with `defaultsNotice`, which says whose
+   * assumptions produced the band before the reader gets to the band.
+   */
+  it("gives a verdict from Lens's own defaults before the reader answers", async () => {
     cache(makeCar({ id: 36933, features: SAFETY as never }));
 
     await injectFitBadges();
 
-    /* The way in survives; only the claim is withheld. */
-    expect(badges()).toHaveLength(3);
-    expect(verdicts()).toHaveLength(0);
+    expect(verdicts()).toHaveLength(1);
+    expect(badges()[0]?.textContent).toMatch(/match/i);
   });
 
   it("claims nothing about a car it doesn't already have", async () => {

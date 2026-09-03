@@ -26,6 +26,11 @@ import {
   configurationName,
   describeCoverage,
 } from "@/lib/car-labels";
+import {
+  DEFAULTS_ACTION,
+  DEFAULTS_BODY,
+  DEFAULTS_TITLE,
+} from "@/lib/personalisation";
 
 import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
 import { pinControl } from "./pin-control";
@@ -277,7 +282,10 @@ export function backToConfigurations(
 /* 1. Overall fit                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function fitHeader(analysis: FitAnalysis): HTMLElement {
+export function fitHeader(
+  analysis: FitAnalysis,
+  usingDefaults = false,
+): HTMLElement {
   const { vehicle } = analysis;
 
   return el("header", { class: "pb-4" }, [
@@ -320,11 +328,17 @@ export function fitHeader(analysis: FitAnalysis): HTMLElement {
        * Requirement, not decoration. The same car opened by somebody else gets a
        * different word, and a panel that says "Strong match" without saying what
        * it is a match *with* invites being read as a verdict on the car.
+       *
+       * Which settings, though, has to be true. Saying "your saved settings"
+       * to a reader who has saved none — which is now a reader who still gets
+       * a full reading — would be the panel asserting the one thing the
+       * notice above it exists to deny.
        */
       el("p", {
         class: "mt-3 text-[11px] leading-4 text-finn-iron",
-        text:
-          "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
+        text: usingDefaults
+          ? "Measured against the priorities and picks Lens starts you on, not ones you have given it. Someone with different settings would see a different answer."
+          : "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
       }),
     ]),
   ]);
@@ -912,13 +926,52 @@ export function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
  * this car and back to the choice, and a way out belongs at the top where a
  * reader looks for it, not six sections down.
  */
+/**
+ * Whose assumptions this reading came from, when they aren't the reader's.
+ *
+ * Above the verdict rather than below it. The panel used to refuse to draw
+ * anything at all without saved settings, and the reason was sound — a
+ * verdict measured against defaults nobody has seen is not their verdict.
+ * What replaced the refusal is this: the answer, with the assumption named
+ * before it is read rather than after.
+ */
+export function defaultsNotice(onPersonalise: () => void): HTMLElement {
+  return el(
+    "section",
+    { class: "border-b border-finn-cotton bg-finn-pale-blue px-5 py-4" },
+    [
+      el("p", {
+        class: "text-[13px] font-black text-finn-highlight-navy",
+        text: DEFAULTS_TITLE,
+      }),
+
+      el("p", {
+        class: "mt-1 text-[12px] leading-[18px] text-finn-highlight-navy/80",
+        text: DEFAULTS_BODY,
+      }),
+
+      el("button", {
+        class: [
+          "mt-3 rounded-full bg-finn-accent-blue px-4 py-2",
+          "text-[12px] font-black text-white",
+        ].join(" "),
+        attrs: { type: "button" },
+        text: DEFAULTS_ACTION,
+        on: { click: onPersonalise },
+      }),
+    ],
+  );
+}
+
 export function analysisBody(
   analysis: FitAnalysis,
   back: Node | null = null,
+  notice: Node | null = null,
 ): DocumentFragment {
   return fragment([
     back,
-    fitHeader(analysis),
+    notice,
+    fitHeader(analysis, notice != null),
     strengthsSection(analysis),
     ...analysis.priorities.map(prioritySection),
     costSection(analysis),

@@ -182,8 +182,10 @@ npm run test:watch
    saved answers with **See my advice** rather than asking again; **Change something first**
    walks the four steps.
 
-The in-page badges and panel stay silent until you have answered — deliberately: a verdict
-measured against defaults you have never seen isn't your verdict.
+Lens works before you answer anything: it ships a starting priority order and, in each
+priority, the five features buyer surveys say drivers care about most. Everywhere it shows a
+verdict built from those rather than from your own answers, it says so and offers to swap
+them — an assumption you can see is a different thing from one you can't.
 
 **Pinned cars** (popup → Manage Pinned Cars) is the whole set: open any one for the same
 reading the in-page panel gives, unpin what you're no longer weighing up, and sort by fit,
