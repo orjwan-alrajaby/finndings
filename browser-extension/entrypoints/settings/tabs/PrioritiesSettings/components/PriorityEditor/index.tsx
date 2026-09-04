@@ -93,7 +93,7 @@ export function PriorityEditor({
     };
 
     return (
-        <div className="border-t border-white p-4">
+        <div className="border-t border-finn-cotton p-4">
             <FeatureInfluencePicker
                 categoryLabel={priority.label}
                 features={features}

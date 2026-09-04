@@ -222,9 +222,23 @@ This forced `DEFAULT_CATEGORY_FEATURES` to be de-duplicated — nine of twenty r
 lived in two or three categories, which under the new rule would have shipped a state the
 reader could see but never recreate. Each shared feature went to the category with the
 strongest claim on it and the losers backfilled from their own catalogue; a test asserts no
-feature has two homes. Note that **existing saved settings with duplicates keep working**:
-the lock is computed per row from the *other* categories, and a feature raised here is never
-locked against itself, so nothing a reader already saved is silently removed.
+feature has two homes.
+
+Settings saved before the rule existed are migrated on load rather than left alone
+(`giveEachFeatureOneHome` in `lib/reasoning-engine/index.ts`). Leaving them was the first
+attempt, on the ground that nothing a reader saved should be taken away; it turned out to
+leave the product displaying a configuration it would refuse to let anyone build, with the
+reader unaware their one pick was being counted three times. A contest is decided by
+`winner`: **a saved answer beats a shipped default outright**, whatever the levels say —
+a default is Lens guessing and a guess never overrules the person it was guessing about —
+then by the importance the reader gave it, then by `CATEGORY_IDS` order, which is arbitrary
+but stable so the same settings always migrate the same way.
+
+**Colour.** A raised row carries a full-strength bar down its left edge, the tint behind it,
+and its name in the same colour. Three signals of one fact, which is right for the fact this
+list exists to show — the tint alone read as a slightly different shade of nothing. The
+priority card's blue is confined to its header: it used to wash the whole card, tinting the
+very rows whose own colour is the point.
 
 Each category also gets **Reset all** (everything back to standard) and **Reset to defaults**
 (back to what Lens ships). The compare step gets only the first — there, "defaults" would

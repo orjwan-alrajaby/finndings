@@ -70,10 +70,25 @@ export function FeatureOption({
     const locked = elsewhere.length > 0;
     const blocked = locked || atCap;
 
+    /**
+     * How loudly a row states its level.
+     *
+     * The tint alone was too quiet: five pale rows in a list of fifteen read
+     * as a slightly different shade of nothing, and the whole reason to raise
+     * a feature is that it should be visible at a glance which ones you did.
+     * The bar down the left edge is what carries it — full-strength colour in
+     * a shape nothing else on the row uses — with the tint behind it and the
+     * name in the same colour. Three signals of one fact, which is right for
+     * a fact this list exists to show.
+     */
     const rowClass = () => {
-        if (level) return level.selectedCardClass;
+        if (level) {
+            return `${level.selectedCardClass} ${level.borderClass} border-l-4`;
+        }
 
-        return locked ? "bg-white/40" : "bg-white shadow-sm";
+        return locked
+            ? "bg-white/40 border-l-4 border-l-transparent"
+            : "bg-white shadow-sm border-l-4 border-l-finn-cotton";
     };
 
     return (
@@ -90,27 +105,17 @@ export function FeatureOption({
         >
             <div className="flex flex-col items-start gap-1.5 @sm:flex-row @sm:items-center @sm:gap-3">
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                    {locked ? (
+                    {locked && (
                         <LockClosedIcon
                             aria-hidden
                             className="h-3 w-3 shrink-0 text-finn-iron/50"
-                        />
-                    ) : (
-                        <span
-                            aria-hidden
-                            className={[
-                                "h-2 w-2 shrink-0 rounded-full transition",
-                                level
-                                    ? level.dotClass
-                                    : STANDARD_INFLUENCE.dotClass,
-                            ].join(" ")}
                         />
                     )}
 
                     <span
                         className={[
-                            "min-w-0 truncate text-xs font-bold leading-4",
-                            locked ? "text-finn-iron" : "text-finn-black",
+                            "min-w-0 truncate text-xs leading-4",
+                            nameClass(level, locked),
                         ].join(" ")}
                     >
                         {label}
@@ -203,6 +208,16 @@ function ElsewhereNote({ elsewhere }: { elsewhere: FeatureElsewhere[] }) {
             </span>
         </span>
     );
+}
+
+/** A raised feature says so in its own name, not only in its background. */
+function nameClass(
+    level: (typeof FEATURE_IMPORTANCE)[FeatureImportance] | null,
+    locked: boolean,
+): string {
+    if (level) return `font-black ${level.accentTextClass}`;
+
+    return locked ? "font-bold text-finn-iron" : "font-bold text-finn-black";
 }
 
 function segmentClass(

@@ -27,6 +27,7 @@ import type {
 import {
   AVAILABLE_CATEGORY_FEATURES,
   CATEGORIES,
+  CATEGORY_IDS,
   DEFAULT_FEATURE_IMPORTANCE,
   FEATURE_IMPORTANCE,
   DEFAULT_CATEGORY_FEATURES,
@@ -978,7 +979,88 @@ function migrateCategoryFeatures(
     result[category] = [...kept.values()].slice(0, MAX_FEATURES_PER_CATEGORY);
   }
 
-  return result;
+  /*
+   * Only the categories the reader actually stored something for count as
+   * theirs; the rest are still sitting on the shipped defaults.
+   */
+  return giveEachFeatureOneHome(
+    result,
+    new Set(Object.keys(merged) as CategoryId[]),
+  );
+}
+
+/**
+ * Enforce the one-home rule on settings saved before it existed.
+ *
+ * A feature counts extra in one priority only. The picker enforces it — a
+ * feature raised elsewhere shows as locked, naming the category that holds
+ * it — and the shipped defaults obey it. Settings saved by an earlier build
+ * do not: they can raise heated seats under climate, comfort and long
+ * distance at once.
+ *
+ * Leaving those alone was the previous behaviour, on the reasonable-sounding
+ * ground that nothing a reader saved should be taken away. It turned out to
+ * be the wrong call: it left the product displaying a configuration it would
+ * refuse to let anyone build, with no way to see why or to fix it, and the
+ * reader has no idea their heated-seats pick is being counted three times.
+ *
+ * So a duplicate is resolved rather than kept. See `winner` for which side
+ * of a contest wins, and why a saved answer always beats a shipped default.
+ */
+function giveEachFeatureOneHome(
+  selections: Record<CategoryId, FeatureSelection>,
+  answered: Set<CategoryId>,
+): Record<CategoryId, FeatureSelection> {
+  const home = new Map<FeatureId, CategoryId>();
+
+  /**
+   * Which of two categories keeps a feature they both raise.
+   *
+   * The reader's own answer beats a shipped default outright, whatever the
+   * levels say — a default is Lens guessing, and a guess never overrules the
+   * person it was guessing about. Between two of the reader's own, the one
+   * they said it mattered more in keeps it. A dead tie goes to whichever
+   * comes first in `CATEGORY_IDS`: arbitrary, but stable, so the same
+   * settings always migrate the same way rather than depending on the order
+   * storage happened to hand them back.
+   */
+  const winner = (a: CategoryId, b: CategoryId, key: FeatureId): CategoryId => {
+    if (answered.has(a) !== answered.has(b)) {
+      return answered.has(a) ? a : b;
+    }
+
+    const levelIn = (category: CategoryId) => {
+      const found = (selections[category] ?? []).find(
+        (item) => item.key === key,
+      );
+
+      return found ? FEATURE_IMPORTANCE[found.importance].weight : 0;
+    };
+
+    if (levelIn(a) !== levelIn(b)) return levelIn(a) > levelIn(b) ? a : b;
+
+    return CATEGORY_IDS.indexOf(a) <= CATEGORY_IDS.indexOf(b) ? a : b;
+  };
+
+  for (const category of CATEGORY_IDS) {
+    for (const preference of selections[category] ?? []) {
+      const held = home.get(preference.key);
+
+      home.set(
+        preference.key,
+        held ? winner(held, category, preference.key) : category,
+      );
+    }
+  }
+
+  return Object.fromEntries(
+    CATEGORY_IDS.map((category) => [
+      category,
+      (selections[category] ?? []).filter(
+        (preference) => home.get(preference.key) === category,
+      ),
+    ]),
+  ) as Record<CategoryId, FeatureSelection>;
 }
 
 /**

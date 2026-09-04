@@ -152,6 +152,80 @@ describe("the safety merge reaches existing users without breaking them", () => 
     ]);
   });
 
+  /*
+   * A feature counts extra in one priority only — the picker enforces it and
+   * the shipped defaults obey it. Settings saved before the rule existed do
+   * not, and leaving them alone would leave the product displaying a
+   * configuration it would refuse to let anyone build.
+   */
+  describe("one feature, one home", () => {
+    it("keeps a duplicate where the reader said it mattered most", async () => {
+      stored.finnLensCategoryFeatures = {
+        comfort: [{ key: "hasHeatedSeats", importance: "low" }],
+        climateSuitability: [{ key: "hasHeatedSeats", importance: "high" }],
+      };
+
+      const settings = await loadLensSettings();
+
+      expect(
+        settings.categoryFeatures.climateSuitability.map((p) => p.key),
+      ).toContain("hasHeatedSeats");
+
+      expect(
+        settings.categoryFeatures.comfort.map((p) => p.key),
+      ).not.toContain("hasHeatedSeats");
+    });
+
+    /*
+     * The direction that matters most. A default is Lens guessing, and a
+     * guess never overrules the person it was guessing about — even when the
+     * default claims the feature matters more.
+     */
+    it("lets a saved answer beat a shipped default", async () => {
+      stored.finnLensCategoryFeatures = {
+        comfort: [{ key: "hasHeatedSeats", importance: "low" }],
+      };
+
+      const settings = await loadLensSettings();
+
+      expect(
+        settings.categoryFeatures.comfort.map((p) => p.key),
+      ).toContain("hasHeatedSeats");
+
+      expect(
+        settings.categoryFeatures.climateSuitability.map((p) => p.key),
+      ).not.toContain("hasHeatedSeats");
+    });
+
+    it("leaves a feature raised in only one category alone", async () => {
+      stored.finnLensCategoryFeatures = {
+        comfort: [{ key: "hasSunroof", importance: "medium" }],
+      };
+
+      const settings = await loadLensSettings();
+
+      expect(settings.categoryFeatures.comfort).toEqual([
+        { key: "hasSunroof", importance: "medium" },
+      ]);
+    });
+
+    it("resolves every duplicate, whatever the reader saved", async () => {
+      stored.finnLensCategoryFeatures = {
+        comfort: [{ key: "hasHeatedSeats", importance: "high" }],
+        climateSuitability: [{ key: "hasHeatedSeats", importance: "high" }],
+        longDistance: [{ key: "hasHeatedSeats", importance: "high" }],
+      };
+
+      const settings = await loadLensSettings();
+
+      const homes = Object.values(settings.categoryFeatures).filter(
+        (picks) => picks.some((p) => p.key === "hasHeatedSeats"),
+      );
+
+      expect(homes).toHaveLength(1);
+    });
+  });
+
   /* The selection-only build stored bare ids and no importance at all. */
   it("reads a flat id list as an unrated selection", async () => {
     stored.finnLensCategoryFeatures = {

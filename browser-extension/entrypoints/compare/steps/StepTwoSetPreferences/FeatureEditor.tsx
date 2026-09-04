@@ -52,14 +52,14 @@ export function FeatureEditor({
 
     if (category.numericOnly) {
         return (
-            <div className="border-t border-white p-4">
+            <div className="border-t border-finn-cotton p-4">
                 <CalculatedPriorityDetails categoryId={categoryId} />
             </div>
         );
     }
 
     return (
-        <div className="border-t border-white p-4">
+        <div className="border-t border-finn-cotton p-4">
             <FeatureInfluencePicker
                 categoryLabel={category.label}
                 features={features}

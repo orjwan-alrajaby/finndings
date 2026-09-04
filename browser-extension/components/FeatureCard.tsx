@@ -10,6 +10,16 @@ interface FeatureCardProps {
     children?: ReactNode;
 }
 
+/**
+ * One priority, and what it opens into.
+ *
+ * The blue belongs to the header and stops there. It used to wash the whole
+ * card, which meant an open priority tinted everything inside it — and what
+ * is inside it is a list of rows whose own colour is the entire point, each
+ * one saying how much a feature counts. A tint under all of them flattens
+ * that: the pale levels have to read against white, not against a colour
+ * competing with them.
+ */
 export function FeatureCard({
     icon,
     label,
@@ -23,11 +33,16 @@ export function FeatureCard({
             className={[
                 "overflow-hidden rounded-[20px] transition",
                 open
-                    ? "bg-finn-pale-blue shadow-[0_0_0_2px] shadow-finn-accent-blue"
+                    ? "bg-white shadow-[0_0_0_2px] shadow-finn-accent-blue"
                     : "bg-finn-snow drop-shadow-sm",
             ].join(" ")}
         >
-            <div className="flex w-full items-center gap-3 p-4 text-left">
+            <div
+                className={[
+                    "flex w-full items-center gap-3 p-4 text-left transition-colors",
+                    open ? "bg-finn-pale-blue" : "",
+                ].join(" ")}
+            >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-2xl font-bold text-finn-accent-blue">
                         {icon}

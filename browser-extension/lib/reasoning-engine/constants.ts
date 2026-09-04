@@ -68,6 +68,8 @@ export const FEATURE_IMPORTANCE = {
       "text-finn-influence-red hover:bg-finn-influence-red-pale",
     dotClass: "bg-finn-influence-red",
     selectedCardClass: "bg-finn-influence-red-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-red",
     accentTextClass: "text-finn-influence-red",
     chipClass:
       "bg-finn-influence-red-pale text-finn-influence-red",
@@ -84,6 +86,8 @@ export const FEATURE_IMPORTANCE = {
     idleClass: "text-finn-influence-orange hover:bg-finn-influence-orange-pale",
     dotClass: "bg-finn-influence-orange",
     selectedCardClass: "bg-finn-influence-orange-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-orange",
     accentTextClass: "text-finn-influence-orange",
     chipClass: "bg-finn-influence-orange-pale text-finn-influence-orange",
   },
@@ -100,6 +104,8 @@ export const FEATURE_IMPORTANCE = {
     idleClass: "text-finn-influence-emerald hover:bg-finn-influence-emerald-pale",
     dotClass: "bg-finn-influence-emerald",
     selectedCardClass: "bg-finn-influence-emerald-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-emerald",
     accentTextClass: "text-finn-influence-emerald",
     chipClass: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
   },
@@ -115,6 +121,7 @@ export const FEATURE_IMPORTANCE = {
     idleClass: string;
     dotClass: string;
     selectedCardClass: string;
+    borderClass: string;
     accentTextClass: string;
     chipClass: string;
   }
