@@ -26,6 +26,8 @@ interface FeatureEditorProps {
         feature: FeatureId,
         importance: FeatureImportance,
     ) => void;
+    /** Put this category back to standard, without touching the others. */
+    onResetAll: () => void;
 }
 
 /**
@@ -44,6 +46,7 @@ export function FeatureEditor({
     pickedElsewhere,
     onToggleFeature,
     onImportanceChange,
+    onResetAll,
 }: FeatureEditorProps) {
     const category = CATEGORIES[categoryId];
 
@@ -65,6 +68,14 @@ export function FeatureEditor({
                 pickedElsewhere={pickedElsewhere}
                 onToggleFeature={onToggleFeature}
                 onImportanceChange={onImportanceChange}
+                /*
+                 * No "reset to defaults" here. This step is a run rather than
+                 * a setting, and the reader's own saved picks — not Lens's
+                 * shipped ones — are what they mean by going back; the step's
+                 * own "Use my saved picks" does that for every category at
+                 * once.
+                 */
+                onResetAll={onResetAll}
             />
         </div>
     );

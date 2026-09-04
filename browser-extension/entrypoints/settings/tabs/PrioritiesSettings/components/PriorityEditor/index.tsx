@@ -26,6 +26,8 @@ interface PriorityEditorProps {
     /** Every edit, as it happens. There is nothing to commit here. */
     onChange: (features: FeatureSelection) => void;
     onClose: () => void;
+    /** What Lens ships for this priority, for "reset to defaults". */
+    defaults: FeatureSelection;
 }
 
 /**
@@ -57,6 +59,7 @@ export function PriorityEditor({
     pickedElsewhere,
     onChange,
     onClose,
+    defaults,
 }: PriorityEditorProps) {
     if (isNumericOnlyPriority(priority.id)) {
         return <CalculatedPriorityInfo priority={priority} onClose={onClose} />;
@@ -98,6 +101,10 @@ export function PriorityEditor({
                 pickedElsewhere={pickedElsewhere}
                 onToggleFeature={toggleFeature}
                 onImportanceChange={updateImportance}
+                onResetAll={() => onChange([])}
+                onResetToDefaults={() =>
+                    onChange(defaults.map((pick) => ({ ...pick })))
+                }
             />
         </div>
     );

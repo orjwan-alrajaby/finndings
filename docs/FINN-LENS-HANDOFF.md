@@ -201,6 +201,36 @@ bottom of the window, which is a thing readers stop seeing. Below the content, a
 the settings are local to this browser and that changes affect future recommendations; it is
 the one question a settings page raises and rarely answers.
 
+**Inside a priority (`components/FeatureInfluencePicker.tsx` + `FeatureOption.tsx`).** Every
+feature in the category is a row on the same four-step scale — Standard, Somewhat,
+Moderately, Highly — resting on Standard until raised. Naming the resting state is the point:
+"nothing selected" is an absence, and an absence is what a reader reads as "doesn't count".
+
+The explanation used to sit above the list as three paragraphs, a pull-quote, a legend and an
+arithmetic note. All still true, all still there, now behind one disclosure ("How influence
+works") with the four-dot scale visible in its header. Nothing was deleted; it stopped being
+a wall between the reader and the control.
+
+**A feature can be raised in one priority only.** Rows already raised elsewhere sort to the
+bottom, lose their control, and say which category holds them ("Raised under Climate
+Suitability") — named rather than merely refused, because the fix is in that other category
+and "not available" would leave the reader hunting. Two kinds of unavailable are kept
+distinct: at the cap is this category's own doing and the fix is here; raised elsewhere is
+another category's and the fix is there.
+
+This forced `DEFAULT_CATEGORY_FEATURES` to be de-duplicated — nine of twenty raised features
+lived in two or three categories, which under the new rule would have shipped a state the
+reader could see but never recreate. Each shared feature went to the category with the
+strongest claim on it and the losers backfilled from their own catalogue; a test asserts no
+feature has two homes. Note that **existing saved settings with duplicates keep working**:
+the lock is computed per row from the *other* categories, and a feature raised here is never
+locked against itself, so nothing a reader already saved is silently removed.
+
+Each category also gets **Reset all** (everything back to standard) and **Reset to defaults**
+(back to what Lens ships). The compare step gets only the first — there, "defaults" would
+mean the reader's saved picks rather than Lens's, and the step already has "Use my saved
+picks" for every category at once.
+
 **One save, and only one.** The page has a single act that writes anything: the Save button
 in the sticky tab row. A priority editor used to keep its own draft behind its own "Save
 changes" — the same words as the page's, a few hundred pixels away, and only one of them

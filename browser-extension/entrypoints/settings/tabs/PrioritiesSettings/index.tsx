@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
     AVAILABLE_CATEGORY_FEATURES,
+    DEFAULT_CATEGORY_FEATURES,
 } from "@/lib/reasoning-engine/constants";
 import {
     type CategoryId,
@@ -122,6 +123,11 @@ export function PrioritiesSettings({
                                         }
                                         onClose={() =>
                                             setOpenId(null)
+                                        }
+                                        defaults={
+                                            DEFAULT_CATEGORY_FEATURES[
+                                            priority.id
+                                            ] ?? []
                                         }
                                     />
                                 )}

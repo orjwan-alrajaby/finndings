@@ -67,8 +67,7 @@ export const FEATURE_IMPORTANCE = {
     idleClass:
       "text-finn-influence-red hover:bg-finn-influence-red-pale",
     dotClass: "bg-finn-influence-red",
-    selectedCardClass:
-      "bg-finn-influence-red-pale ring-2 ring-finn-influence-red",
+    selectedCardClass: "bg-finn-influence-red-pale",
     accentTextClass: "text-finn-influence-red",
     chipClass:
       "bg-finn-influence-red-pale text-finn-influence-red",
@@ -84,8 +83,7 @@ export const FEATURE_IMPORTANCE = {
       "bg-finn-influence-orange text-white ring-1 ring-finn-influence-orange",
     idleClass: "text-finn-influence-orange hover:bg-finn-influence-orange-pale",
     dotClass: "bg-finn-influence-orange",
-    selectedCardClass:
-      "bg-finn-influence-orange-pale ring-2 ring-finn-influence-orange",
+    selectedCardClass: "bg-finn-influence-orange-pale",
     accentTextClass: "text-finn-influence-orange",
     chipClass: "bg-finn-influence-orange-pale text-finn-influence-orange",
   },
@@ -101,8 +99,7 @@ export const FEATURE_IMPORTANCE = {
       "bg-finn-influence-emerald text-white ring-1 ring-finn-influence-emerald",
     idleClass: "text-finn-influence-emerald hover:bg-finn-influence-emerald-pale",
     dotClass: "bg-finn-influence-emerald",
-    selectedCardClass:
-      "bg-finn-influence-emerald-pale ring-2 ring-finn-influence-emerald",
+    selectedCardClass: "bg-finn-influence-emerald-pale",
     accentTextClass: "text-finn-influence-emerald",
     chipClass: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
   },
@@ -900,6 +897,18 @@ export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
  * - Long-distance advice names adaptive cruise and adjustable lumbar support
  *   ahead of everything else, both as fatigue rather than luxury.
  *
+ * **No feature is raised in more than one category**, and that is a rule the
+ * product now enforces rather than a coincidence: a reader who has already
+ * said heated seats matter under Climate Suitability is not asked the same
+ * question again under Comfort. It cost this list something real — heated
+ * seats genuinely bear on both — so each shared feature went to the category
+ * that makes the strongest claim on it, and the categories that lost one
+ * backfilled from their own catalogue. Adaptive cruise sits under safety
+ * rather than long distance because every safety survey leads with it;
+ * heated seats under climate rather than comfort because winter is the
+ * question they answer; the seats and the phone kit under comfort because
+ * that is the everyday-pleasure end of the same catalogue.
+ *
  * Two deliberate departures from "the obvious five", both for the same
  * reason — a feature every car has separates no cars:
  *
@@ -916,37 +925,36 @@ export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> = {
     /* The one system that acts to prevent the collision rather than warn about it. */
     { key: "hasEmergencyBrakingAssist", importance: "high" },
     { key: "hasBlindSpotAssist", importance: "high" },
-    { key: "hasLaneKeepingAssist", importance: "medium" },
     { key: "hasAdaptiveCruiseControl", importance: "medium" },
-    /* The closest thing FINN lists to the rear visibility buyers rank top. */
-    { key: "hasOneEightyDegreesReversingCamera", importance: "medium" },
+    { key: "hasLaneKeepingAssist", importance: "medium" },
+    { key: "hasParkingSensors", importance: "medium" },
   ],
 
   familyFriendly: [
     { key: "hasIsofix", importance: "high" },
-    /* A pram and the luggage, without choosing between them. */
-    { key: "hasSplitFoldingRearSeats", importance: "high" },
-    { key: "hasOneEightyDegreesReversingCamera", importance: "medium" },
-    { key: "hasParkingSensors", importance: "medium" },
-    /* Real, but a convenience rather than a reason to rule a car out. */
-    { key: "hasElectricTailgate", importance: "low" },
+    /* Rearward visibility, which parent guidance names as often as the seats. */
+    { key: "hasOneEightyDegreesReversingCamera", importance: "high" },
+    /* Hands full of child; the boot still has to open. */
+    { key: "hasElectricTailgate", importance: "medium" },
+    { key: "hasThreeZoneAutomaticClimateControls", importance: "medium" },
+    { key: "hasRearCrosswalkWarning", importance: "low" },
   ],
 
   practicality: [
+    /* A pram and the luggage, without choosing between them. */
     { key: "hasSplitFoldingRearSeats", importance: "high" },
     { key: "hasRoofRails", importance: "medium" },
-    { key: "hasElectricTailgate", importance: "medium" },
-    { key: "hasParkingSensors", importance: "medium" },
-    /* A minority need, and decisive for the minority that has it. */
-    { key: "hasTowbar", importance: "low" },
+    { key: "hasTowbar", importance: "medium" },
+    { key: "hasSpareWheel", importance: "low" },
+    { key: "hasKeylessEntryAndStart", importance: "low" },
   ],
 
   longDistance: [
-    { key: "hasAdaptiveCruiseControl", importance: "high" },
     /* Named as fatigue rather than luxury wherever long drives are discussed. */
     { key: "hasLumbarSupport", importance: "high" },
-    { key: "hasElectricFrontSeatAdjustment", importance: "medium" },
-    { key: "hasHeatedSeats", importance: "medium" },
+    { key: "hasHeadUpDisplay", importance: "medium" },
+    { key: "hasMatrixLedHeadlights", importance: "medium" },
+    { key: "hasCruiseControl", importance: "medium" },
     /* Phone mirroring has largely taken this over, so it counts least. */
     { key: "hasIntegratedNavigationSystem", importance: "low" },
   ],
@@ -961,11 +969,11 @@ export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> = {
   ],
 
   comfort: [
-    { key: "hasHeatedSeats", importance: "high" },
     { key: "hasAppleCarPlaySlashAndroidAuto", importance: "high" },
-    { key: "hasElectricFrontSeatAdjustment", importance: "medium" },
-    { key: "hasLumbarSupport", importance: "medium" },
-    { key: "hasSeatCooling", importance: "low" },
+    { key: "hasElectricFrontSeatAdjustment", importance: "high" },
+    { key: "hasWirelessChargingStation", importance: "medium" },
+    { key: "hasPremiumSoundSystem", importance: "medium" },
+    { key: "hasAmbientInteriorLightning", importance: "low" },
   ],
 
   /*

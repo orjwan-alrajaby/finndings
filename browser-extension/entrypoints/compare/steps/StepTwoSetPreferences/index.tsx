@@ -162,6 +162,14 @@ export function StepTwoSetPreferences() {
                                             importance,
                                         )
                                     }
+                                    onResetAll={() => {
+                                        for (const pick of categoryFeatures) {
+                                            toggleFeature(
+                                                categoryId,
+                                                pick.key,
+                                            );
+                                        }
+                                    }}
                                 />
                             )}
                         </FeatureCard>

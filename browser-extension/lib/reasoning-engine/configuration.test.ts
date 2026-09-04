@@ -135,6 +135,32 @@ describe("feature selection", () => {
     }
   });
 
+  /*
+   * The rule the picker now enforces: a feature counts extra in one priority
+   * only. Shipping defaults that broke it would put the product in a state
+   * the reader could see but never recreate — every duplicate would show as
+   * locked, under a category they never chose.
+   *
+   * It cost this list something real. Heated seats genuinely bear on both
+   * climate and comfort, and each shared feature had to go to the category
+   * with the strongest claim on it while the others backfilled.
+   */
+  it("never raises the same feature in two categories", () => {
+    const homes = new Map<string, CategoryId[]>();
+
+    for (const id of CATEGORY_IDS) {
+      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
+        homes.set(pick.key, [...(homes.get(pick.key) ?? []), id]);
+      }
+    }
+
+    const shared = [...homes.entries()].filter(
+      ([, categories]) => categories.length > 1,
+    );
+
+    expect(shared).toEqual([]);
+  });
+
   it("gives every pick a real level", () => {
     for (const id of CATEGORY_IDS) {
       for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
