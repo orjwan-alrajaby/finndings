@@ -5,16 +5,18 @@ interface PriorityEditorActionsProps {
 }
 
 /**
- * Closing an editor, not saving a file.
+ * Closing an editor, not writing a file.
  *
- * This button used to say "Save changes", which is what the page's own save
- * button said — and only one of them wrote anything. A reader who pressed
- * this one and closed the tab lost work having pressed something labelled
- * Save. The page saves on its own now, so what is left for this to do is
- * take the reader out of the editor with their edits kept, and the word for
- * that is Done.
+ * This said "Save changes", which is also what the page's own save button
+ * says — and only one of them writes anything. Two identical labels a few
+ * hundred pixels apart, one of which commits a draft to the page and one of
+ * which commits the page to disk, is the whole of why a reader saves a
+ * priority and then wonders why nothing was saved.
+ *
+ * "Keep" is what this does: the draft joins the page, and the page still
+ * needs saving. The button that does that says so, and now says something
+ * different.
  */
-
 export function PriorityEditorActions({
     disabled,
     onCancel,
@@ -36,7 +38,7 @@ export function PriorityEditorActions({
                 onClick={onSave}
                 className="h-10 flex-1 rounded-full bg-finn-highlight-navy text-xs font-bold text-white shadow-sm disabled:opacity-40"
             >
-                Done
+                Keep
             </button>
         </div>
     );

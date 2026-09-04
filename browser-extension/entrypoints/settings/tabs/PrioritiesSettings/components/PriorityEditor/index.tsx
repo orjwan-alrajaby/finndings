@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
+    CategoryId,
     FeatureId,
     FeatureImportance,
     FeatureSelection,
@@ -18,6 +19,7 @@ import {
     FeatureInfluencePicker,
     type PickedElsewhere,
 } from "@/components/FeatureInfluencePicker";
+import { sameFeatureSelection } from "@/lib/feature-selection-diff";
 import { CalculatedPriorityInfo } from "./components/CalculatedPriorityInfo";
 import { PriorityEditorActions } from "./components/PriorityEditorActions";
 
@@ -35,6 +37,15 @@ interface PriorityEditorProps {
     ) => void;
     onCancel: () => void;
     isOpen: boolean;
+    /**
+     * Told whenever the editor starts or stops holding work.
+     *
+     * The page's Save button writes what the *page* holds, and an open
+     * editor's draft is not that yet — so the page has to know this editor
+     * has something outstanding, or pressing Save would quietly write around
+     * it and the reader would lose the edit they were in the middle of.
+     */
+    onDirtyChange?: (id: CategoryId, dirty: boolean) => void;
 }
 
 /**
@@ -53,11 +64,25 @@ export function PriorityEditor({
     pickedElsewhere,
     onSave,
     onCancel,
+    onDirtyChange,
 }: PriorityEditorProps) {
     const numericOnly = isNumericOnlyPriority(priority.id);
 
     const [draftFeatures, setDraftFeatures] =
         useState<FeatureSelection>(features);
+
+    const dirty = !sameFeatureSelection(draftFeatures, features);
+
+    /*
+     * Reported up rather than asked for, and cleared on the way out — an
+     * editor that closed while still claiming to hold work would leave the
+     * page permanently unable to save.
+     */
+    useEffect(() => {
+        onDirtyChange?.(priority.id, dirty);
+
+        return () => onDirtyChange?.(priority.id, false);
+    }, [priority.id, dirty, onDirtyChange]);
 
     const toggleFeature = (feature: FeatureId) => {
         setDraftFeatures((current) => {
