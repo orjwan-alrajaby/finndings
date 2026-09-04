@@ -260,7 +260,7 @@ async function render(
       into.append(
         message(
           "We couldn't load this car",
-          "FINN hasn't sent us its data for this one. Opening the car on finn.com usually settles it.",
+          "FINN hasn't sent us its data for this one. Opening the car on FINN's own page usually settles it.",
           {
             label: "Try again",
             onClick: retry,

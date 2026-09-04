@@ -5,6 +5,9 @@ import {
     ChatBubbleBottomCenterTextIcon,
     QueueListIcon,
 } from "@heroicons/react/24/outline";
+import type { ReactNode } from "react";
+
+import { withFinnLinks } from "@/components/FinnLink";
 
 /**
  * The mental model, in three parts, before anything is asked of the reader.
@@ -46,7 +49,9 @@ export function HowItWorks({
                     index={1}
                     icon={<BookmarkIcon className="h-5 w-5" />}
                     title="Pin, while you browse"
-                    body="Lens adds a pin button to every car on finn.com. Pin the ones you're weighing up — as many as you like, over as many visits as you like."
+                    body={withFinnLinks(
+                        "Lens adds a pin button to every car on finn.com. Pin the ones you're weighing up — as many as you like, over as many visits as you like.",
+                    )}
                     aside="Nothing is compared until you have at least two."
                 />
 
@@ -111,9 +116,9 @@ function Step({
     highlight,
 }: {
     index: number;
-    icon: React.ReactNode;
+    icon: ReactNode;
     title: string;
-    body: string;
+    body: ReactNode;
     aside: string;
     /** Marks the one part the reader is about to supply. */
     highlight?: boolean;

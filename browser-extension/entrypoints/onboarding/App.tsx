@@ -22,6 +22,7 @@ import {
     markOnboardingSkipped,
 } from "@/lib/onboarding";
 import { FINN_BASE_URL } from "@/lib/constants";
+import { FinnLink } from "@/components/FinnLink";
 
 import { SCREEN_ORDER, type OnboardingScreen } from "./types";
 import { ProgressRail } from "./components/ProgressRail";
@@ -243,7 +244,8 @@ export default function OnboardingPage() {
                 </div>
 
                 <footer className="pb-10 text-center text-[11px] leading-4 text-finn-iron">
-                    FINN Lens is unofficial and not affiliated with finn.com.
+                    FINN Lens is unofficial and not affiliated with{" "}
+                    <FinnLink />.
                 </footer>
             </main>
         </Tooltip.Provider>

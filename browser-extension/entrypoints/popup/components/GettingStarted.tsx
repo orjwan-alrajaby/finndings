@@ -9,6 +9,7 @@ import {
     type OnboardingState,
 } from "@/lib/onboarding";
 import { hasSavedLensSettings } from "@/lib/reasoning-engine";
+import { withFinnLinks } from "@/components/FinnLink";
 import { openBrowserTab } from "../utils";
 
 /**
@@ -79,7 +80,9 @@ export function GettingStarted({ pinnedCount }: { pinnedCount: number }) {
             todo:
                 pinnedCount === 1
                     ? "One pinned. Lens needs two to have something to compare."
-                    : "Lens adds a pin button to every car on finn.com.",
+                    : withFinnLinks(
+                          "Lens adds a pin button to every car on finn.com.",
+                      ),
             doneNote: `${pinnedCount} cars pinned and ready.`,
             action: "Open finn.com",
             onClick: () => window.open(FINN_BASE_URL, "_blank", "noopener"),
@@ -165,7 +168,7 @@ interface Task {
     done: boolean;
     label: string;
     /** What to say while it is still outstanding. */
-    todo: string;
+    todo: React.ReactNode;
     /** What to say once it is done — a fact, not a congratulation. */
     doneNote: string;
     action: string;

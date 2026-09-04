@@ -4,6 +4,9 @@ import {
     ClockIcon,
     ScaleIcon,
 } from "@heroicons/react/24/outline";
+import type { ReactNode } from "react";
+
+import { withFinnLinks } from "@/components/FinnLink";
 import Logo from "/icon/128.png";
 
 /**
@@ -60,7 +63,9 @@ export function Welcome({ onNext }: { onNext: () => void }) {
                 <Point
                     icon={<ScaleIcon className="h-5 w-5" />}
                     title="Unofficial"
-                    body="Lens is not affiliated with FINN. It reads what finn.com already shows you and reasons about it."
+                    body={withFinnLinks(
+                        "Lens is not affiliated with FINN. It reads what finn.com already shows you and reasons about it.",
+                    )}
                 />
             </div>
 
@@ -81,9 +86,9 @@ function Point({
     title,
     body,
 }: {
-    icon: React.ReactNode;
+    icon: ReactNode;
     title: string;
-    body: string;
+    body: ReactNode;
 }) {
     return (
         <div className="rounded-[22px] bg-white p-5 shadow-sm">

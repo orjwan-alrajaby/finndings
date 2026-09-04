@@ -2,6 +2,7 @@ import "@/assets/tailwind.css";
 import { useEffect, useMemo } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
+import { FinnLink } from "@/components/FinnLink";
 import {
     alternativeOptions,
     buildAdviceNarrative,
@@ -111,7 +112,7 @@ export function StepFourGenerateAdvice({
                     </h1>
 
                     <p className="mt-2 text-sm leading-6 text-finn-iron">
-                        Pin a few cars on finn.com and FINN Lens will compare
+                        Pin a few cars on <FinnLink /> and FINN Lens will compare
                         them here.
                     </p>
                 </div>

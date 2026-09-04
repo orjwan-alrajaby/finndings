@@ -3,6 +3,7 @@ import {
     ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import { FINN_BASE_URL } from "@/lib/constants";
+import { FinnLink } from "@/components/FinnLink";
 
 export function GoToFinnSection() {
     return (
@@ -13,7 +14,7 @@ export function GoToFinnSection() {
                 </div>
 
                 <p className="mt-4 text-sm font-bold text-finn-black">
-                    Head to finn.com to get started
+                    Head to <FinnLink /> to get started
                 </p>
 
                 <p className="mt-1.5 max-w-60 text-xs leading-5 text-finn-iron">

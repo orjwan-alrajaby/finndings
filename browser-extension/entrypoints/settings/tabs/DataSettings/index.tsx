@@ -14,6 +14,7 @@ import {
     type StoredDataGroupId,
 } from "@/lib/stored-data";
 
+import { withFinnLinks } from "@/components/FinnLink";
 import { Section } from "../../components/primitives";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 
@@ -203,13 +204,17 @@ export function DataSettings({
                                             </span>
 
                                             <span className="mt-1 block text-[11px] leading-4 text-finn-iron">
-                                                {group.description}
+                                                {withFinnLinks(
+                                                    group.description,
+                                                )}
                                             </span>
 
                                             {checked && (
                                                 <span className="mt-2 flex items-start gap-1.5 text-[11px] font-bold leading-4 text-finn-error">
                                                     <ExclamationTriangleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
-                                                    {group.consequence}
+                                                    {withFinnLinks(
+                                                        group.consequence,
+                                                    )}
                                                 </span>
                                             )}
                                         </span>

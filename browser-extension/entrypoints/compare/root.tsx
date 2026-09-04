@@ -7,6 +7,7 @@ import {
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
+import { FinnLink } from "@/components/FinnLink";
 
 import { Launch } from "./components/Launch";
 import { Stepper } from "./components/Stepper";
@@ -67,7 +68,7 @@ export default function CompareTab({
           </h1>
 
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
-            Pin a few cars on finn.com first. FINN Lens will
+            Pin a few cars on <FinnLink /> first. FINN Lens will
             automatically include every pinned car here.
           </p>
         </div>

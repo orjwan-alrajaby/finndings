@@ -104,8 +104,10 @@ other way — two bullet reasons and one tradeoff, recognisable and saying nothi
 
 Where it settles: the real page's sections, in the real page's order, under the real page's
 own eyebrows — **Your recommendation**, **Why it wins**, **The other side of it**,
-**Priority by priority**, **Cost analysis**, **Behind the recommendation** — the middle four
-laid out two across, each carrying enough to argue rather than label. Recognition comes from
+**Priority by priority**, **Cost analysis** — the middle four laid out two across, each
+carrying enough to argue rather than label. The ranking panel came out: the line-up above
+already names all three cars and rings the winner, so bars repeating that was a section
+spending height on something the reader had. Recognition comes from
 the shape and the wording; the restraint is in the *depth* of each panel, not in which of
 them survive.
 
@@ -115,7 +117,7 @@ made the third attempt hollow — without it the screen is a ranking with a capt
 product's whole claim is that it is not that.
 
 `MoreOnTheRealPage` names what is genuinely absent — the equipment chips under each verdict,
-the hot seat, the weight table, the assumptions panel. **If you add a section to the advice
+the hot seat, the full ranking with raw totals, the weight table, the assumptions panel. **If you add a section to the advice
 page, this screen owes it either a panel or a line in that list.**
 
 Above the reading, a **line-up** of the three cars — configuration, boot, CO₂, range or
@@ -148,6 +150,16 @@ on every screen, saves nothing, and is recorded separately from finishing.
 `skippedAt`, `seenAdvice`, `checklistDismissed`). `needsOnboarding()` is false if any of
 finished, skipped, or `hasSavedLensSettings()` — that last conjunct is what stops the flow
 appearing for anyone who configured Lens before it existed.
+
+**finn.com is always a link.** `components/FinnLink.tsx` renders the domain as an anchor to
+`FINN_BASE_URL` with `target="_blank"`, and `withFinnLinks(text)` does the same for copy that
+arrives as a plain string — a checklist item, a stored-data description, a card body — so
+those modules keep their strings instead of widening to `ReactNode` to carry one link.
+
+`FINN_BASE_URL` lost its `/de-DE`. It was doing two wrong things: sending every reader to the
+German site whatever their own is, and making the popup's `tab.url.includes(FINN_BASE_URL)`
+answer "no" for anyone browsing finn.com in another language — so the extension told them
+they were not on finn.com while they were looking at it.
 
 **Popup.** Shows whether you're on finn.com, pinned-car metrics, the three most recent
 pinned cars, and action buttons (Compare, Settings). Compare opens `compare.html` in a tab.

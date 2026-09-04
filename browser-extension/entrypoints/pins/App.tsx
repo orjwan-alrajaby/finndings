@@ -12,6 +12,7 @@ import {
 import { FitAnalysisView } from "@/components/FitAnalysisView";
 import { UsingDefaultsNotice } from "@/components/UsingDefaultsNotice";
 import { FINN_BASE_URL } from "@/lib/constants";
+import { FinnLink, withFinnLinks } from "@/components/FinnLink";
 import {
     hasSavedLensSettings,
     loadLensSettings,
@@ -324,7 +325,7 @@ export default function PinsPage() {
                             </p>
 
                             <p className="mt-2">
-                                Nothing happens on finn.com — you can pin{" "}
+                                Nothing happens on <FinnLink /> — you can pin{" "}
                                 {confirming && confirming.length > 1
                                     ? "them"
                                     : "it"}{" "}
@@ -480,7 +481,7 @@ function EmptyState() {
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
-                Lens adds a pin button to every car on finn.com. Pin the ones
+                Lens adds a pin button to every car on <FinnLink />. Pin the ones
                 you're weighing up and they collect here, ready to compare.
             </p>
 
@@ -506,8 +507,12 @@ function NothingOpen({ configured }: { configured: boolean }) {
 
             <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-finn-iron">
                 {configured
-                    ? "You'll get the same reading the side panel gives you on finn.com — how it does on each of your priorities, which of your picks it has, what it costs you a month, and what you'd be accepting."
-                    : "You'll get the same reading the side panel gives you on finn.com — each priority in turn, the features behind the verdict, what it costs you a month, and what you'd be accepting. On Lens's own assumptions until you give it yours."}
+                    ? withFinnLinks(
+                          "You'll get the same reading the side panel gives you on finn.com — how it does on each of your priorities, which of your picks it has, what it costs you a month, and what you'd be accepting.",
+                      )
+                    : withFinnLinks(
+                          "You'll get the same reading the side panel gives you on finn.com — each priority in turn, the features behind the verdict, what it costs you a month, and what you'd be accepting. On Lens's own assumptions until you give it yours.",
+                      )}
             </p>
         </div>
     );

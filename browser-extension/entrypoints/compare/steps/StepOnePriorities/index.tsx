@@ -13,6 +13,7 @@ import {
     ProfilePresets,
 } from "@/components/PriorityOrder";
 import { MAX_PRIORITIES, MIN_PRIORITIES, useCompareStore } from "../../store";
+import { FinnLink } from "@/components/FinnLink";
 
 /**
  * What matters to you, and in what order — one question, one screen.
@@ -241,7 +242,7 @@ function WhatThisDoes() {
                         <span>
                             Your order is saved. Unlike the next two steps,
                             what you set here is kept for next time and used
-                            on finn.com as you browse.
+                            on <FinnLink /> as you browse.
                         </span>
                     </li>
                 </ul>

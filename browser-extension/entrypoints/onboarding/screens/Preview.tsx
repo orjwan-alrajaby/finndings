@@ -23,7 +23,7 @@ import type { AdviceNarrative } from "@/lib/reasoning-engine/narrative/types";
 import type { PinnedFinnCar } from "@/lib/types";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
 import { demoCars, demoCarSummary } from "@/lib/demo-cars";
-import { FINN_BASE_URL } from "@/lib/constants";
+import { FinnLink } from "@/components/FinnLink";
 
 /**
  * The last screen: the advice page in miniature.
@@ -50,9 +50,8 @@ import { FINN_BASE_URL } from "@/lib/constants";
  *
  * Where it landed: the real page's sections, in the real page's order, under
  * the real page's own eyebrows — "Why it wins", "The other side of it",
- * "Priority by priority", "Cost analysis", "Behind the recommendation" — laid
- * out two across, each carrying enough of its content to argue rather than
- * label. Recognition comes from the shape and the wording; the restraint is
+ * "Priority by priority" and "Cost analysis" — laid out two across, each
+ * carrying enough of its content to argue rather than label. Recognition comes from the shape and the wording; the restraint is
  * in the depth of each panel, not in which of them survive. What is genuinely
  * not here — the equipment chips under each priority, the hot seat, the
  * weight table — is named at the end, so the preview reads as a subset and
@@ -205,12 +204,8 @@ export function Preview({
                 </div>
 
                 <p className="max-w-md text-center text-[11px] leading-4 text-finn-iron">
-                    Pin two or more cars on{" "}
-                    <span className="font-bold text-finn-black">
-                        {FINN_BASE_URL.replace("https://www.", "")}
-                    </span>{" "}
-                    and you'll get this page about them. It won't ask you any
-                    of this again.
+                    Pin two or more cars on <FinnLink /> and you'll get this
+                    page about them. It won't ask you any of this again.
                 </p>
             </div>
         </div>
@@ -447,10 +442,6 @@ function MiniAdvice({
                 </Block>
             </div>
 
-            <Block eyebrow="Behind the recommendation" tone="muted">
-                <Ranking recommendation={recommendation} />
-            </Block>
-
             <MoreOnTheRealPage
                 alternatives={recommendation.alternatives}
                 onEditPriorities={onEditPriorities}
@@ -512,76 +503,6 @@ function CostLine({
 }
 
 /**
- * Where the other cars came out, and by how much.
- *
- * The thing a headline cannot show: that this was a comparison rather than a
- * pick. Bars are relative to the leader, so a close call reads as close and a
- * rout reads as a rout — the number alone reads the same either way.
- */
-function Ranking({ recommendation }: { recommendation: Recommendation }) {
-    const rows = recommendation.ranked.map((car) => ({
-        car,
-        score:
-            recommendation.scores.find((item) => item.vehicleId === car.id)
-                ?.total ?? 0,
-        cost: recommendation.context.costs[car.id]?.totalMonthly ?? null,
-    }));
-
-    const best = Math.max(...rows.map((row) => row.score), 1);
-
-    return (
-        <ol className="space-y-2.5">
-            {rows.map((row, index) => {
-                const winner = row.car.id === recommendation.winner.id;
-
-                return (
-                    <li key={row.car.id} className="flex items-center gap-3">
-                        <span
-                            className={[
-                                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black",
-                                winner
-                                    ? "bg-finn-accent-blue text-white"
-                                    : "bg-finn-snow text-finn-iron",
-                            ].join(" ")}
-                        >
-                            {index + 1}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                                <span className="truncate text-xs font-bold text-finn-black">
-                                    {row.car.name}
-                                </span>
-
-                                <span className="shrink-0 text-[11px] font-bold text-finn-iron">
-                                    {row.cost != null
-                                        ? `${formatEUR(Math.round(row.cost))}/mo`
-                                        : "cost unknown"}
-                                </span>
-                            </span>
-
-                            <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-finn-snow">
-                                <span
-                                    className={[
-                                        "block h-full rounded-full",
-                                        winner
-                                            ? "bg-finn-accent-blue"
-                                            : "bg-finn-iron/30",
-                                    ].join(" ")}
-                                    style={{
-                                        width: `${Math.round((row.score / best) * 100)}%`,
-                                    }}
-                                />
-                            </span>
-                        </span>
-                    </li>
-                );
-            })}
-        </ol>
-    );
-}
-
-/**
  * What this preview left out, named rather than silently missing.
  *
  * A preview that quietly shows less than the thing teaches the reader the
@@ -605,7 +526,7 @@ function MoreOnTheRealPage({
         alternatives.length > 0
             ? `A hot seat — put ${alternatives[0]!.name} up against the winner and Lens argues it again from that side`
             : "A hot seat for the closest alternatives",
-        "The weight table, so you can check the arithmetic yourself",
+        "The full ranking with raw totals, and the weight table, so you can check the arithmetic yourself",
         "Your driving assumptions, beside the answer they produced, and a way to change them",
     ];
 
