@@ -32,7 +32,14 @@ import {
   DEFAULTS_TITLE,
 } from "@/lib/personalisation";
 
-import { el, fragment, icon, INFORMATION_CIRCLE } from "./dom";
+import {
+  CHEVRON_DOWN,
+  el,
+  empty,
+  fragment,
+  icon,
+  INFORMATION_CIRCLE,
+} from "./dom";
 import { pinControl } from "./pin-control";
 
 /**
@@ -418,90 +425,142 @@ export function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * One priority, open.
+ * One priority, open, and closable.
  *
- * These used to be rows that opened. Closed, each answered the only question a
- * reader scanning has — how does this car do on the thing I put third? — and
- * hid the evidence behind a click. But a reader who has opened this panel has
- * already asked the question, and the answer to "how does it fit me" is
- * precisely the evidence: which features, which figures. Charging a click for
- * each of five priorities to read the thing they came for is a toll, not a
- * simplification, and the panel is a scroll either way.
+ * These were once rows that opened, and that was wrong: a reader who has
+ * opened this panel has already asked "how does it fit me", and the answer is
+ * precisely the evidence — which features, which figures. Charging a click for
+ * each of five priorities to read the thing they came for is a toll.
  *
- * So each priority is a section like any other, headed the way the Advice page
- * heads the same thing — the reader's own rank, the name, the band — and the
- * evidence follows underneath it.
+ * So every priority starts open, and the disclosure runs the other way: the
+ * header is a button that folds the evidence away once it has been read. Five
+ * priorities of features is a long scroll, and a reader comparing the third
+ * against the fourth should be able to shorten it without losing the header
+ * that carries the rank, the name and the band.
  */
+let sectionIds = 0;
+
 function prioritySection(priority: FitPriority): HTMLElement {
-  return el("section", { class: "border-t border-finn-cotton px-5 py-4" }, [
-    el("div", { class: "flex items-start gap-2.5" }, [
+  const id = `finn-lens-priority-${(sectionIds += 1)}`;
+
+  const sentences = priority.impact
+    ? [describeEnvironment(priority.impact)]
+    : priority.sentences;
+
+  const body = el(
+    "div",
+    { class: "flex flex-col gap-3 px-5 pb-4", attrs: { id } },
+    [
+      sentences.length
+        ? el(
+            "div",
+            { class: "flex flex-col gap-1.5" },
+            sentences.map((line) =>
+              el("p", {
+                class: "text-[12px] leading-[18px] text-finn-iron",
+                text: line,
+              }),
+            ),
+          )
+        : null,
+
+      priority.impact ? impactBreakdown(priority.impact) : null,
+
+      featureGroups(priority),
+
+      priority.measurements.length && !priority.impact
+        ? el(
+            "dl",
+            { class: "flex flex-wrap gap-x-4 gap-y-1" },
+            priority.measurements.flatMap((fact) => [
+              el("dt", {
+                class: "text-[11px] text-finn-iron",
+                text: `${fact.label}:`,
+              }),
+              el("dd", {
+                class: "text-[11px] font-bold text-finn-black",
+                text: fact.display,
+              }),
+            ]),
+          )
+        : null,
+
+      !priority.hasEvidence
+        ? el("p", {
+            class: "text-[12px] leading-[18px] text-finn-iron",
+            text: "FINN's data doesn't carry anything we can judge this priority on for this car.",
+          })
+        : null,
+    ],
+  );
+
+  const chevron = icon(
+    CHEVRON_DOWN,
+    "mt-1 h-4 w-4 shrink-0 rotate-180 text-finn-iron transition-transform",
+  );
+
+  const header = el(
+    "button",
+    {
+      class: [
+        "flex w-full items-start gap-2.5 px-5 py-4 text-left",
+        "transition-colors hover:bg-finn-snow",
+      ].join(" "),
+      attrs: {
+        type: "button",
+        "aria-expanded": "true",
+        "aria-controls": id,
+      },
+      on: {
+        click: () => {
+          const closed = body.classList.toggle("hidden");
+
+          body.classList.toggle("flex", !closed);
+          header.setAttribute("aria-expanded", String(!closed));
+          chevron.classList.toggle("rotate-180", !closed);
+        },
+      },
+    },
+    [
       el("span", {
         class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-sm",
         attrs: { "aria-hidden": "true" },
         text: priority.icon,
       }),
 
-      el("div", { class: "min-w-0 flex-1" }, [
-        el("p", {
-          class: "text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue",
+      el("span", { class: "min-w-0 flex-1" }, [
+        el("span", {
+          class: "block text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue",
           text: `Your priority #${priority.rank}`,
         }),
 
-        el("h3", {
-          class: "mt-0.5 text-[15px] font-black leading-5 text-finn-black",
+        el("span", {
+          class: "mt-0.5 block text-[15px] font-black leading-5 text-finn-black",
+          /* A button may not contain an h3, so the heading is a role. */
+          attrs: { role: "heading", "aria-level": "3" },
           text: priority.label,
         }),
 
-        el("p", {
-          class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+        el("span", {
+          class: "mt-0.5 block text-[11px] leading-4 text-finn-iron",
           text: describeCoverage(priority),
         }),
       ]),
 
-      bandChip(priority.band.level, priority.band.label),
-    ]),
+      /*
+       * The band and the chevron travel together, tight, so the header's
+       * text column keeps as much of a 26rem panel as it can.
+       */
+      el("span", { class: "flex shrink-0 items-start gap-1" }, [
+        bandChip(priority.band.level, priority.band.label),
+        chevron,
+      ]),
+    ],
+  );
 
-    ...(priority.impact
-      ? [
-          el("p", {
-            class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
-            text: describeEnvironment(priority.impact),
-          }),
-        ]
-      : priority.sentences.map((line) =>
-          el("p", {
-            class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
-            text: line,
-          }),
-        )),
-
-    priority.impact ? impactBreakdown(priority.impact) : null,
-
-    ...featureGroups(priority),
-
-    priority.measurements.length && !priority.impact
-      ? el(
-          "dl",
-          { class: "mt-3 flex flex-wrap gap-x-4 gap-y-1" },
-          priority.measurements.flatMap((fact) => [
-            el("dt", {
-              class: "text-[11px] text-finn-iron",
-              text: `${fact.label}:`,
-            }),
-            el("dd", {
-              class: "text-[11px] font-bold text-finn-black",
-              text: fact.display,
-            }),
-          ]),
-        )
-      : null,
-
-    !priority.hasEvidence
-      ? el("p", {
-          class: "mt-2 text-[12px] leading-[18px] text-finn-iron",
-          text: "FINN's data doesn't carry anything we can judge this priority on for this car.",
-        })
-      : null,
+  return el("section", { class: "border-t border-finn-cotton" }, [
+    header,
+    body,
   ]);
 }
 
@@ -580,7 +639,7 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
     },
   });
 
-  return el("div", { class: "mt-3 rounded-xl bg-finn-snow p-3" }, [
+  return el("div", { class: "rounded-xl bg-finn-snow p-3" }, [
     el("div", { class: "flex flex-col gap-2.5" }, [
       impact.co2
         ? readout(
@@ -646,8 +705,14 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
  * — they wrote them — and everything else follows under a heading that says it
  * counted too, because a reader who singled out three features has to be able
  * to see that Lens looked at more than three.
+ *
+ * Each group is its own block rather than a heading over a list. Four labels
+ * of the same size, a line apart, in a column 26rem wide, are read as one
+ * long list with words in it: the distinction the grouping exists to make was
+ * being lost in the layout that carried it. A tinted card and a coloured mark
+ * on the label say "different answer" before either is read.
  */
-function featureGroups(priority: FitPriority): (HTMLElement | null)[] {
+function featureGroups(priority: FitPriority): HTMLElement | null {
   const has = (feature: FitFeature) => feature.state === "present";
   const hasnt = (feature: FitFeature) => feature.state === "absent";
   const unknown = (feature: FitFeature) => feature.state === "unknown";
@@ -655,63 +720,133 @@ function featureGroups(priority: FitPriority): (HTMLElement | null)[] {
   const asked = priority.picked;
   const rest = priority.alsoCounted;
 
-  return [
-    featureGroup("You gave extra influence, and it has", asked.filter(has)),
+  const groups = [
+    featureGroup("You gave extra influence, and it has", asked.filter(has), {
+      mark: "present",
+      picked: true,
+    }),
     featureGroup(
       "You gave extra influence, but it doesn't have",
       asked.filter(hasnt),
+      { mark: "absent", picked: true },
     ),
     featureGroup(
       asked.length ? "Also counted here, and it has" : "It has",
       rest.filter(has),
+      { mark: "present", picked: false },
     ),
     featureGroup(
-      asked.length ? "Also counted here, but it doesn't have" : "It doesn't have",
+      asked.length
+        ? "Also counted here, but it doesn't have"
+        : "It doesn't have",
       rest.filter(hasnt),
+      { mark: "absent", picked: false },
     ),
     featureGroup(
       "FINN didn't say either way",
       [...asked, ...rest].filter(unknown),
+      { mark: "unknown", picked: false },
     ),
-  ];
+  ].filter((group): group is HTMLElement => group !== null);
+
+  if (!groups.length) return null;
+
+  return el("div", { class: "flex flex-col gap-2.5" }, groups);
 }
+
+/** The mark on a group's label, in the colour its answer already uses. */
+const GROUP_MARK: Record<FitFeature["state"], string> = {
+  present: "bg-finn-influence-emerald",
+  absent: "bg-finn-warning",
+  unknown: "bg-finn-iron",
+};
 
 function featureGroup(
   label: string,
   features: FitFeature[],
+  tone: { mark: FitFeature["state"]; picked: boolean },
 ): HTMLElement | null {
   if (!features.length) return null;
 
-  return el("div", { class: "mt-3" }, [
-    el("p", {
-      class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
-      text: `${label} (${features.length})`,
-    }),
+  /*
+   * One explanation at a time, under the whole group rather than under one
+   * chip. Chips wrap, so there is no "under this one" to open into — and a
+   * floating layer would need positioning, portalling and a pointer inside a
+   * 26rem shadow root that doesn't own the page.
+   */
+  const slot = el("div", {
+    class: "mt-2 hidden rounded-lg bg-white px-2.5 py-2",
+    attrs: { id: `finn-lens-explains-${(infoIds += 1)}` },
+  });
+
+  let openFor: HTMLElement | null = null;
+
+  const close = () => {
+    slot.classList.add("hidden");
+
+    openFor?.setAttribute("aria-expanded", "false");
+    openFor?.classList.remove("text-finn-accent-blue");
+    openFor = null;
+  };
+
+  const explain = (button: HTMLElement, feature: FitFeature) => {
+    if (openFor === button) {
+      close();
+      return;
+    }
+
+    close();
+    empty(slot);
+
+    slot.append(
+      el("p", {
+        class: "text-[11px] font-black text-finn-black",
+        text: feature.label,
+      }),
+      el("p", {
+        class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+        text: feature.explanation ?? "",
+      }),
+    );
+
+    slot.classList.remove("hidden");
+    button.setAttribute("aria-expanded", "true");
+    button.classList.add("text-finn-accent-blue");
+    openFor = button;
+  };
+
+  return el("div", { class: "rounded-xl bg-finn-snow px-3 py-2.5" }, [
+    el(
+      "p",
+      {
+        class: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+      },
+      [
+        el("span", {
+          class: `h-1.5 w-1.5 shrink-0 rounded-full ${GROUP_MARK[tone.mark]}`,
+          attrs: { "aria-hidden": "true" },
+        }),
+        el("span", { text: `${label} (${features.length})` }),
+      ],
+    ),
 
     el(
       "ul",
-      { class: "mt-1.5 flex flex-col gap-1.5" },
-      features.map(featureRow),
+      { class: "mt-2 flex flex-wrap gap-1.5" },
+      features.map((feature) =>
+        el("li", {}, [
+          featureChip(feature, tone.picked, slot.id, explain),
+        ]),
+      ),
     ),
+
+    slot,
   ]);
 }
 
-/** The count behind the band, which is the part a reader can check. */
 /* -------------------------------------------------------------------------- */
-/* Feature rows                                                               */
+/* Feature chips                                                              */
 /* -------------------------------------------------------------------------- */
-
-const STATE_MARK: Record<FitFeature["state"], string> = {
-  present: "✓",
-  absent: "✕",
-  unknown: "–",
-};
-
-const STATE_CLASS: Record<FitFeature["state"], string> = {
-  present: "text-finn-influence-emerald",
-  absent: "text-finn-iron",
-  unknown: "text-finn-iron",
-};
 
 const STATE_LABEL: Record<FitFeature["state"], string> = {
   present: "has it",
@@ -719,63 +854,124 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
   unknown: "not available",
 };
 
-function featureRow(feature: FitFeature): HTMLElement {
-  const info = feature.explanation
-    ? explains(feature.label, feature.explanation)
+/**
+ * The chip's colour: what the car does about this, and whether the reader
+ * asked for it.
+ *
+ * Two axes rather than one. A pick the car is missing is the loudest thing in
+ * the group and gets the warning tint; the same gap in equipment nobody asked
+ * about is a fact, not a problem, and stays quiet. The reader's own picks
+ * carry the accent either way, because those are the ones they wrote.
+ */
+function chipClass(feature: FitFeature, picked: boolean): string {
+  if (feature.state === "present") {
+    return picked
+      ? "bg-finn-pale-blue text-finn-highlight-navy"
+      : "bg-white text-finn-iron";
+  }
+
+  if (feature.state === "absent" && picked) {
+    return "bg-finn-warning/10 text-finn-warning";
+  }
+
+  return "bg-white text-finn-iron";
+}
+
+/**
+ * One feature, as the Advice page draws it.
+ *
+ * This was a list of ticks and crosses with the level bolted on the end. The
+ * Advice page had already settled the same problem better: a chip carrying
+ * the name, a dot in the colour of the level the reader gave it, and its own
+ * "i" — read as one object rather than as a row of columns, and small enough
+ * that a dozen of them fit a 26rem column. The two surfaces describe the same
+ * analysis, so they now describe it in the same shapes.
+ *
+ * What is missing is struck through rather than crossed off in a column of
+ * its own, and the group's label and colour say which of the four answers
+ * this is.
+ */
+function featureChip(
+  feature: FitFeature,
+  picked: boolean,
+  slotId: string,
+  onExplain: (button: HTMLElement, feature: FitFeature) => void,
+): HTMLElement {
+  const level = feature.importance
+    ? FEATURE_IMPORTANCE[feature.importance]
     : null;
 
-  const row = el("div", { class: "flex items-start gap-2" }, [
-    el("span", {
-      class: `w-3 shrink-0 text-[12px] font-black leading-[18px] ${STATE_CLASS[feature.state]}`,
-      attrs: { "aria-hidden": "true" },
-      text: STATE_MARK[feature.state],
-    }),
+  const info = feature.explanation
+    ? el(
+        "button",
+        {
+          class: [
+            "-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center",
+            "rounded-full align-middle opacity-70 transition-colors",
+            "hover:opacity-100",
+          ].join(" "),
+          attrs: {
+            type: "button",
+            "aria-label": `What is ${feature.label}?`,
+            "aria-expanded": "false",
+            "aria-controls": slotId,
+          },
+        },
+        [icon(INFORMATION_CIRCLE, "h-4 w-4")],
+      )
+    : null;
 
-    el("span", { class: "min-w-0 flex-1" }, [
+  if (info) {
+    info.addEventListener("click", (event) => {
+      event.stopPropagation();
+      onExplain(info, feature);
+    });
+  }
+
+  return el(
+    "span",
+    {
+      class: [
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
+        "text-[11px] font-bold",
+        chipClass(feature, picked),
+      ].join(" "),
+    },
+    [
+      level
+        ? el("span", {
+            class: `h-2 w-2 shrink-0 rounded-full ${level.dotClass}`,
+            attrs: {
+              title: `You said this should count ${level.inSentence}`,
+            },
+          })
+        : null,
+
       el("span", {
-        class: [
-          "text-[12px] leading-[18px]",
-          feature.state === "present"
-            ? "text-finn-black"
-            : "text-finn-iron",
-        ].join(" "),
+        class: feature.state === "absent" ? "line-through" : "",
         text: feature.label,
       }),
 
-      info?.button ?? null,
-
-      feature.state === "unknown"
-        ? el("span", {
-            class: "ml-1.5 text-[11px] text-finn-iron",
-            text: "· not available",
-          })
-        : null,
-
       /*
-       * Every pick carries the level the reader gave it, present or absent.
-       * Which of the three they chose is the whole of what they said about a
-       * feature, and a row that shows the tick without it has dropped half
-       * the answer. The colours are the influence scale's own, so the level
-       * reads the same here as it does where it was set.
+       * Only the top level is spelled out. Which of the three a reader chose
+       * matters most at the top, and writing the level on every chip is the
+       * noise the row layout was already making.
        */
-      feature.importance
+      feature.importance === "high"
         ? el("span", {
-            class: [
-              "ml-1.5 shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold",
-              FEATURE_IMPORTANCE[feature.importance].chipClass,
-            ].join(" "),
-            text: FEATURE_IMPORTANCE[feature.importance].badgeLabel,
+            class: "text-[9px] font-black uppercase tracking-wide opacity-70",
+            attrs: {
+              title: "You said this should have the most influence",
+            },
+            text: FEATURE_IMPORTANCE.high.badgeLabel,
           })
         : null,
-    ]),
 
-    el("span", {
-      class: "sr-only",
-      text: STATE_LABEL[feature.state],
-    }),
-  ]);
+      info,
 
-  return el("li", {}, [row, info?.panel ?? null]);
+      el("span", { class: "sr-only", text: STATE_LABEL[feature.state] }),
+    ],
+  );
 }
 
 /* -------------------------------------------------------------------------- */

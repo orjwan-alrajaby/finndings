@@ -28,7 +28,15 @@ export function configurationName(car: FinnCar): string {
 }
 
 /** The figures a reader tells configurations apart by. */
-export function configurationDetail(car: FinnCar): string {
+export function configurationDetail(
+    car: FinnCar,
+    /**
+     * Drop the price where the surface already shows it. The pinned list
+     * gives every car its price in its own column, and repeating it inside
+     * the spec line spends the row's remaining width saying it twice.
+     */
+    { withPrice = true }: { withPrice?: boolean } = {},
+): string {
     const range =
         car.electric?.range != null && car.electric.range !== "Unknown"
             ? `${formatNumber(Number(car.electric.range))} km range`
@@ -40,7 +48,7 @@ export function configurationDetail(car: FinnCar): string {
         car.power?.inHp ? `${car.power.inHp} PS` : null,
         car.fuelType,
         range,
-        price ? `from ${formatEUR(price)}/mo` : null,
+        withPrice && price ? `from ${formatEUR(price)}/mo` : null,
     ]
         .filter(Boolean)
         .join(" · ");

@@ -33,8 +33,9 @@ interface PriorityEditorProps {
 /**
  * Choosing what a priority pays extra attention to.
  *
- * The same two questions step 3 asks, drawn by the same component, so the
- * model is explained identically in both places. Five is a ceiling on how
+ * The same two questions the compare drawer asks, drawn by the same
+ * component, so the model is explained identically in both places. Five is
+ * a ceiling on how
  * many things the reader can single out, not a quota to fill. Picking none is
  * a real answer — the category is then judged on its whole catalogue — so
  * nothing here blocks an empty selection.

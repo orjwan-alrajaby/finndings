@@ -13,11 +13,7 @@ import {
     MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
 
-import {
-    hasSavedLensSettings,
-    loadLensSettings,
-    saveLensSettings,
-} from "@/lib/reasoning-engine";
+import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
 
 import type {
     CategoryId,
@@ -29,49 +25,20 @@ import type {
     Profile,
 } from "@/lib/reasoning-engine/types";
 
-import type { CompareStep } from "./types";
-
 /* Where the compare flow's own callers already look for them. */
 export { MAX_PRIORITIES, MIN_PRIORITIES };
 
-/** The steps, in the order the stepper walks them. */
-export const STEP_ORDER: CompareStep[] = [
-    "priorities",
-    "preferences",
-    "assumptions",
-    "advice",
-];
-
+/**
+ * The answers behind one comparison, and nothing about where the reader is.
+ *
+ * There used to be a four-step wizard in front of the advice, and this store
+ * carried its position, its history and the rules for walking it. All of that
+ * is gone: the page opens on the answer, and the questions live in a drawer
+ * beside it. Every field below is an input to the recommendation, so anything
+ * that changes one changes the page under the reader's hands — which is the
+ * whole point of moving them there.
+ */
 interface CompareState {
-    /* ---------------------------------------------------------------- */
-    /* Where the reader is                                              */
-    /* ---------------------------------------------------------------- */
-
-    step: CompareStep;
-
-    /**
-     * Whether the reader has answered the setup questions before — in the
-     * setup flow, in Settings, or in an earlier run.
-     */
-    hasSavedSetup: boolean;
-
-    /**
-     * Whether they have chosen how to start this run.
-     *
-     * False only for the launch screen, and the launch screen only exists
-     * for a reader who has answered before. Someone who hasn't is walked
-     * through the steps, because for them there is nothing to launch from.
-     */
-    started: boolean;
-
-    /**
-     * Every step the reader has opened, so the stepper stays walkable in
-     * both directions once they've been somewhere. Going back is not
-     * undoing: a reader who returns to step 1 to swap a priority can still
-     * jump straight back to their advice.
-     */
-    visited: CompareStep[];
-
     /* ---------------------------------------------------------------- */
     /* The saved settings                                               */
     /* ---------------------------------------------------------------- */
@@ -86,8 +53,8 @@ interface CompareState {
 
     /**
      * The label, icon and on/off state of every priority, as Settings has
-     * them. Step 1 draws its list from these, so a priority switched off
-     * there is not offered here.
+     * them. The drawer draws its list from these, so a priority switched
+     * off there is not offered here.
      */
     priorityDefinitions: PriorityDefinition[];
 
@@ -103,9 +70,9 @@ interface CompareState {
     priorities: CategoryId[];
 
     /*
-     * This run's copy of the saved values. Every step after the first reads
-     * these and never the saved ones. What a reader does on the way to one
-     * recommendation is a question about these cars today — "what if I only
+     * This run's copy of the saved values. The advice reads these and never
+     * the saved ones. What a reader does on the way to one recommendation
+     * is a question about these cars today — "what if I only
      * had 800 a month", "what if I stopped caring about the boot" — and
      * answering it must not quietly rewrite what they'll be asked next time.
      * Making any of it permanent is a deliberate act, and it lives in
@@ -115,19 +82,19 @@ interface CompareState {
 
     /**
      * This run's feature picks, for every category rather than only the
-     * chosen priorities — so a priority dropped in step 1 and picked up
-     * again still carries the picks the reader made for it.
+     * chosen priorities — so a priority dropped from the order and picked
+     * up again still carries the picks the reader made for it.
      */
     features: Record<CategoryId, FeatureSelection>;
 
     /* ---------------------------------------------------------------- */
-    /* What each step was left looking at                               */
+    /* What the reader is looking at                                    */
     /* ---------------------------------------------------------------- */
 
-    /** Step 2: the priority whose feature editor is open. */
+    /** In the drawer: the priority whose feature editor is open. */
     expandedPriority: CategoryId | null;
 
-    /** Step 4: the car in the hot seat. Null means the recommendation. */
+    /** On the page: the car in the hot seat. Null means the winner. */
     challengerId: number | null;
 
     /* ---------------------------------------------------------------- */
@@ -135,15 +102,6 @@ interface CompareState {
     /* ---------------------------------------------------------------- */
 
     loadSettings: () => Promise<void>;
-
-    goTo: (step: CompareStep) => void;
-    next: () => void;
-    back: () => void;
-
-    /** Take the saved answers as they are and go straight to the advice. */
-    startFromSaved: () => void;
-    /** Walk the steps, starting at the priority order. */
-    startFromStepOne: () => void;
 
     setPriorities: (priorities: CategoryId[]) => void;
 
@@ -179,6 +137,11 @@ function copyFeatures(
  * and saving it is what stops a profile reasserting itself over a
  * customised order on the next run. Preferences and feature picks made here
  * are deliberately not written back — those belong to Settings.
+ *
+ * Written on every change now that the order is edited in a drawer rather
+ * than committed by leaving a step. There is no longer a moment that means
+ * "done with this question", and a storage write per drag is cheaper than an
+ * order the reader can watch working and then lose.
  */
 function persistPriorities(priorities: CategoryId[]) {
     void saveLensSettings({ priorities }).catch((error: unknown) => {
@@ -186,39 +149,7 @@ function persistPriorities(priorities: CategoryId[]) {
     });
 }
 
-/**
- * Whether a step has enough to work with. Only the first one always does —
- * the rest need a set of priorities to rank cars on.
- */
-export function canEnterStep(
-    priorities: CategoryId[],
-    step: CompareStep,
-): boolean {
-    return step === "priorities" || priorities.length >= MIN_PRIORITIES;
-}
-
-/**
- * Somewhere the reader has already been, or the step straight after it.
- * The stepper offers exactly these.
- */
-export function isStepReachable(
-    state: Pick<CompareState, "visited" | "priorities">,
-    step: CompareStep,
-): boolean {
-    if (!canEnterStep(state.priorities, step)) return false;
-    if (state.visited.includes(step)) return true;
-
-    const previous = STEP_ORDER[STEP_ORDER.indexOf(step) - 1];
-
-    return previous !== undefined && state.visited.includes(previous);
-}
-
 export const useCompareStore = create<CompareState>((set, get) => ({
-    step: "priorities",
-    hasSavedSetup: false,
-    started: false,
-    visited: ["priorities"],
-
     settingsLoaded: false,
     savedPreferences: DEFAULT_PREFERENCES,
     savedCategoryFeatures: DEFAULT_CATEGORY_FEATURES,
@@ -241,14 +172,10 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     async loadSettings() {
         if (get().settingsLoaded) return;
 
-        const [settings, hasSavedSetup] = await Promise.all([
-            loadLensSettings(),
-            hasSavedLensSettings().catch(() => false),
-        ]);
+        const settings = await loadLensSettings();
 
         set({
             settingsLoaded: true,
-            hasSavedSetup,
             savedPreferences: settings.preferences,
             savedCategoryFeatures: settings.categoryFeatures,
             priorityDefinitions: settings.priorityDefinitions,
@@ -257,70 +184,27 @@ export const useCompareStore = create<CompareState>((set, get) => ({
             priorities: settings.priorities,
             preferences: settings.preferences,
             features: copyFeatures(settings.categoryFeatures),
-            expandedPriority: settings.priorities[0] ?? null,
         });
-    },
-
-    goTo(step) {
-        const { step: current, visited, priorities } = get();
-
-        if (step === current || !canEnterStep(priorities, step)) return;
-
-        /* Leaving the step that decides the order commits it. */
-        if (current === "priorities") {
-            persistPriorities(priorities);
-        }
-
-        set({
-            step,
-            visited: visited.includes(step) ? visited : [...visited, step],
-        });
-    },
-
-    next() {
-        const nextStep = STEP_ORDER[STEP_ORDER.indexOf(get().step) + 1];
-
-        if (nextStep) get().goTo(nextStep);
-    },
-
-    back() {
-        const previousStep = STEP_ORDER[STEP_ORDER.indexOf(get().step) - 1];
-
-        if (previousStep) get().goTo(previousStep);
     },
 
     /**
      * The whole order at once — adding, removing and reordering all arrive
-     * here, because the list in step 1 hands back the array it wants rather
-     * than describing the edit it made.
+     * here, because the list hands back the array it wants rather than
+     * describing the edit it made.
      */
-    /**
-     * Everything is already answered, so go and answer the actual question.
-     *
-     * Every step is marked visited rather than only the advice, because the
-     * reader really has been through all of them — in an earlier run or in
-     * Settings — and the stepper above must stay walkable so that "actually,
-     * change the budget" is one click rather than a restart.
-     */
-    startFromSaved() {
-        set({ started: true, step: "advice", visited: [...STEP_ORDER] });
-    },
-
-    startFromStepOne() {
-        set({ started: true, step: "priorities" });
-    },
-
     setPriorities(priorities) {
         const { expandedPriority } = get();
+
+        persistPriorities(priorities);
 
         set({
             priorities,
             challengerId: null,
 
             /*
-             * Step 2 opens on a priority the reader still has. Keeping a
-             * card open for a category they just dropped would leave that
-             * step showing nothing at all.
+             * The feature editor opens on a priority the reader still has.
+             * Keeping a card open for a category they just dropped would
+             * leave that part of the drawer showing nothing at all.
              */
             expandedPriority:
                 expandedPriority && priorities.includes(expandedPriority)

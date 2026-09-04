@@ -18,6 +18,38 @@
   --color-finn-error: #e71d3f;
   --color-finn-pale-blue: #eaf4ff;
 
+  /* -- Over budget --
+     For the one case where the whole recommendation carries a caveat: the
+     best match costs more than the reader said they wanted to spend. The
+     hero is drawn in these instead of navy there, because a verdict that
+     doesn't fit the budget should not look identical to one that does — and
+     a small amber note under a confident blue card is the easiest thing on
+     the page to miss.
+
+     What the navy card actually gets right is not its hue but its *values*:
+     a settled ground, a distinctly lighter panel beside it, and white
+     layered over both. Copying the hue at full chroma instead gave a card
+     that glared and whose two halves sat 1.36:1 apart — the seam between
+     them disappeared. These two are 1.6:1 apart, a shade wider than the blue
+     card's own 1.5:1, so the split reads at a glance.
+
+     Chroma is what makes a large warm block tiring, not warmth. The ground
+     is therefore a muted gold rather than the brand's signal amber:
+     unmistakably the warning hue, without the glow of a colour meant for
+     11px of text and a 16px icon.
+
+     The rule this hue forces: amber is a *light* colour, so white text on it
+     fails (2.3:1) where white on navy sails through. Every warm surface here
+     carries dark ink instead — 8.2:1 for the headline, 6.2:1 for the
+     secondary text, ~12:1 on the white-tinted chips.
+
+     `-deep` is the strong one, for amber text that has to sit on a pale
+     ground, where the brand amber itself manages only 1.9:1. */
+  --color-finn-warning-ground: #e0a63f;
+  --color-finn-warning-lift: #f8e3b6;
+  --color-finn-warning-ink: #4a2600;
+  --color-finn-warning-deep: #9a4a00;
+
   /* -- Influence scale --
      How much a feature the user picked out should count. Three separate
      hues rather than three tints of the accent blue, so "important" and

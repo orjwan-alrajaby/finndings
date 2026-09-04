@@ -2,13 +2,25 @@ import type { FeatureFact } from "@/lib/reasoning-engine/narrative";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { InfoTip } from "./InfoTip";
 
-/** What the chip is saying about this feature. */
-export type FeatureChipTone = "present" | "missing" | "rivalOnly";
+/**
+ * What the chip is saying about this feature.
+ *
+ * `rivalOnly` and `quiet` say the same thing — this counted, but the reader
+ * never singled it out — and differ only in what they are drawn on. Cotton
+ * disappears on the tinted group cards the fit panel uses, so that surface
+ * gets the white one. Same meaning, same weight, legible on both grounds.
+ */
+export type FeatureChipTone =
+    | "present"
+    | "missing"
+    | "rivalOnly"
+    | "quiet";
 
 const TONE_CLASS: Record<FeatureChipTone, string> = {
     present: "bg-finn-pale-blue text-finn-highlight-navy",
     missing: "bg-finn-warning/10 text-finn-warning",
     rivalOnly: "bg-finn-cotton text-finn-iron",
+    quiet: "bg-white text-finn-iron",
 };
 
 /**
@@ -28,11 +40,19 @@ const TONE_CLASS: Record<FeatureChipTone, string> = {
 export function FeatureChip({
     fact,
     tone,
+    struck,
 }: {
     fact: FeatureFact;
     tone: FeatureChipTone;
+    /**
+     * Whether the car lacks this. Defaults to the `missing` tone, which is
+     * what a missing pick is — but a gap in something nobody asked for is
+     * struck through without being coloured like a problem.
+     */
+    struck?: boolean;
 }) {
     const level = fact.importance ? FEATURE_IMPORTANCE[fact.importance] : null;
+    const lineThrough = struck ?? tone === "missing";
 
     return (
         <span
@@ -51,7 +71,7 @@ export function FeatureChip({
                 />
             )}
 
-            <span className={tone === "missing" ? "line-through" : ""}>
+            <span className={lineThrough ? "line-through" : ""}>
                 {fact.label}
             </span>
 

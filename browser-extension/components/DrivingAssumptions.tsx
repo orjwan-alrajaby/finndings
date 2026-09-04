@@ -16,7 +16,7 @@ type NumericField = Exclude<keyof LensPreferences, "contractType">;
  * says so, and it is called out again when it is still sitting on the
  * placeholder Lens ships with.
  *
- * Shared by compare step 3 and the setup flow, which ask for exactly the
+ * Shared by the compare drawer and the setup flow, which ask for exactly the
  * same six figures. The caller carries the heading, so this says only what
  * the surrounding page cannot: which of these values are the reader's own
  * and how to get them back. `onUseSaved` is omitted where there is nothing

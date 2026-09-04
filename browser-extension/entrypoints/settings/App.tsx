@@ -1,7 +1,15 @@
 import "@/assets/tailwind.css";
 import { useCallback, useEffect, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { AcademicCapIcon, ArrowLeftIcon, ArrowPathIcon, CheckIcon } from "@heroicons/react/24/outline";
+import {
+  AcademicCapIcon,
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  BookmarkIcon,
+  CheckIcon,
+  ScaleIcon,
+} from "@heroicons/react/24/outline";
+import { NavButton, PageHeader } from "@/components/PageHeader";
 import {
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
@@ -246,20 +254,40 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   return (
     <Tooltip.Provider delayDuration={250}>
     <main className="min-h-screen bg-finn-snow text-finn-black">
+      {/*
+        * Not sticky here, unlike everywhere else: this page's sticky slot is
+        * already spoken for by the tabs and the Save button, and two bars
+        * competing for the top of the window would cost more than the
+        * consistency is worth.
+        */}
+      <PageHeader sticky={false}>
+        {onBack && (
+          <NavButton
+            icon={<ArrowLeftIcon className="h-4 w-4" />}
+            label="Back"
+            onClick={onBack}
+          />
+        )}
+
+        <NavButton
+          icon={<ScaleIcon className="h-4 w-4" />}
+          label="See my recommendation"
+          onClick={() => void openBrowserTab("OPEN_COMPARE_PAGE")}
+        />
+
+        <NavButton
+          icon={<BookmarkIcon className="h-4 w-4" />}
+          label="Pinned cars"
+          onClick={() => void openBrowserTab("OPEN_PINS_PAGE")}
+        />
+      </PageHeader>
+
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-        <header className="mb-7 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">FINN Lens</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight">Settings</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-finn-iron">
-              Change the priorities, profiles, and driving assumptions FINN Lens uses when explaining your pinned cars.
-            </p>
-          </div>
-          {onBack && (
-            <button type="button" onClick={onBack} className="rounded-full bg-white p-3 text-finn-iron shadow-sm hover:text-finn-black">
-              <ArrowLeftIcon className="h-5 w-5" />
-            </button>
-          )}
+        <header className="mb-7">
+          <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-finn-iron">
+            Change the priorities, profiles, and driving assumptions FINN Lens uses when explaining your pinned cars.
+          </p>
         </header>
 
         {/*

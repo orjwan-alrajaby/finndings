@@ -112,12 +112,26 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
             </RadixTabs.Content>
             <RadixTabs.Content value="actions" className="p-4 focus-visible:outline-none sm:p-5">
                 <div className="space-y-2 sm:grid sm:grid-cols-1 sm:gap-2 sm:space-y-0">
+                    {/*
+                      * Named for what the page now does rather than for the
+                      * work it used to ask for. There is no comparison to
+                      * walk through any more: with two cars pinned Lens has
+                      * everything it needs, so the button offers the answer.
+                      *
+                      * Two, not one, because that is the point at which the
+                      * label stops being a promise — a single pinned car
+                      * lands on "pin another one", which is not a
+                      * recommendation.
+                      */}
                     <ActionButton
-                        title="Compare Pinned Cars"
-                        description="Rank your pinned cars against your priorities and budget."
+                        title="See my recommendation"
+                        description={
+                            pinnedCount === 1
+                                ? "Pin one more car and Lens can rank them for you."
+                                : "One car, the reasons for it, and what it really costs."
+                        }
                         icon={<ScaleIcon className="h-5 w-5" />}
-                        /* Genuinely nothing to compare until something is pinned. */
-                        disabled={!pinnedCount}
+                        disabled={pinnedCount < 2}
                         onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                         accent={accent}
                     />

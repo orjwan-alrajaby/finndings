@@ -1,4 +1,6 @@
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import type { ReactNode } from "react";
+
+import { AdjustmentsHorizontalIcon } from "@heroicons/react/24/outline";
 import type {
     LensPreferences,
     PriorityWeight,
@@ -9,7 +11,14 @@ import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 interface AdviceSidebarProps {
     weights: PriorityWeight[];
     preferences: LensPreferences;
-    onAdjustSettings: () => void;
+    /** Opens the drawer holding these same inputs, editable. */
+    onAdjust: () => void;
+    /**
+     * A caveat about one of the inputs above — in practice the budget notice,
+     * shown when nothing the reader pinned fits what they said they'd spend.
+     * Slotted straight after the assumptions it is about.
+     */
+    notice?: ReactNode;
 }
 
 /**
@@ -23,7 +32,8 @@ interface AdviceSidebarProps {
 export function AdviceSidebar({
     weights,
     preferences,
-    onAdjustSettings,
+    onAdjust,
+    notice,
 }: AdviceSidebarProps) {
     const assumptions: [string, string][] = [
         /*
@@ -100,24 +110,37 @@ export function AdviceSidebar({
                 </p>
             </div>
 
+            {/*
+              * Directly under the budget it contradicts. A warning about a
+              * figure is easiest to act on next to the figure.
+              */}
+            {notice}
+
+            {/*
+              * The way back into everything above. It opens beside the page
+              * rather than replacing it, because "does this order actually
+              * give me a better answer" is a question you can only settle by
+              * watching the answer change.
+              */}
             <div className="rounded-[24px] bg-finn-black p-5 text-white">
                 <p className="text-sm font-black">
                     Something doesn't look right?
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-white/75">
-                    Your results are based on the driving habits and
-                    assumptions you gave us. Change your mileage, energy prices
-                    or other driving settings and we'll run the numbers again.
+                    Everything on this page comes from the answers listed
+                    above. Open them here and the recommendation re-runs as
+                    you change them — nothing is submitted, and nothing is
+                    lost.
                 </p>
 
                 <button
                     type="button"
-                    onClick={onAdjustSettings}
+                    onClick={onAdjust}
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-black text-finn-black transition hover:bg-finn-snow"
                 >
-                    <Cog6ToothIcon className="h-4 w-4" />
-                    Adjust my settings
+                    <AdjustmentsHorizontalIcon className="h-4 w-4" />
+                    Adjust my answers
                 </button>
             </div>
         </aside>

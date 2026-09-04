@@ -35,8 +35,9 @@ import type {
  * out, so no label may sound like it does.
  *
  * The colour fields live here rather than in the components so that the
- * scale looks the same everywhere it is shown — the picker in step 3, the
- * priority editor in settings, and the chips in the advice. Three distinct
+ * scale looks the same everywhere it is shown — the picker in the compare
+ * drawer, the priority editor in settings, and the chips in the advice.
+ * Three distinct
  * hues, not three tints of one, because tints of one colour say "more of the
  * same" where these have to say "a different level".
  *

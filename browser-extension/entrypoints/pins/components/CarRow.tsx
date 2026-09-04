@@ -18,23 +18,39 @@ import type { PinnedFinnCar } from "@/lib/types";
  * offers the two actions the page exists for: open it, or unpin it. Its band
  * comes from the same analysis the detail panel shows, so the chip in the
  * list and the chip on the reading can never disagree.
+ *
+ * Laid out in three columns rather than as one paragraph of details, because
+ * a list is read down its columns: picture, identity, then verdict and price
+ * flush right where the eye can run a finger down them. The price appears
+ * only there — the spec line drops it — so the row says each thing once.
+ *
+ * The row's own controls — unpin, open on finn.com — stay out of that scan
+ * until the pointer arrives, since they are per-car housekeeping and not what anyone is
+ * comparing. They come back for the keyboard the moment focus lands inside.
  */
 export function CarRow({
     car,
     band,
     selected,
     checked,
+    selecting,
     onOpen,
     onToggleChecked,
     onUnpin,
 }: {
     car: PinnedFinnCar;
-    /** Null while the analysis is still being worked out, or ungated. */
+    /** Null while the analysis is still being worked out. */
     band: FitBand | null;
     /** True when this is the car whose analysis is open. */
     selected: boolean;
     /** True when it is ticked for a bulk unpin. */
     checked: boolean;
+    /**
+     * Whether the reader is picking cars off for a bulk unpin. The tick boxes
+     * are a mode, not furniture: a set of five cars does not need five
+     * checkboxes on screen to be read.
+     */
+    selecting: boolean;
     onOpen: () => void;
     onToggleChecked: () => void;
     onUnpin: () => void;
@@ -44,19 +60,24 @@ export function CarRow({
     return (
         <li
             className={[
-                "flex items-start gap-3 rounded-[22px] p-3 transition",
+                "group relative flex items-stretch gap-1 rounded-[22px] bg-white",
+                "transition-shadow",
                 selected
-                    ? "bg-white shadow-[0_0_0_2px] shadow-finn-accent-blue"
-                    : "bg-white shadow-sm hover:shadow-md",
+                    ? "shadow-[0_0_0_2px] shadow-finn-accent-blue"
+                    : "shadow-sm hover:shadow-md",
             ].join(" ")}
         >
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={onToggleChecked}
-                aria-label={`Select ${car.name}`}
-                className="mt-8 h-4 w-4 shrink-0 accent-finn-accent-blue"
-            />
+            {selecting && (
+                <label className="flex shrink-0 cursor-pointer items-center pl-3.5">
+                    <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={onToggleChecked}
+                        aria-label={`Select ${car.name}`}
+                        className="h-4 w-4 accent-finn-accent-blue"
+                    />
+                </label>
+            )}
 
             {/*
               * The whole card opens the analysis, because "tell me about this
@@ -67,16 +88,16 @@ export function CarRow({
                 type="button"
                 onClick={onOpen}
                 aria-current={selected ? "true" : undefined}
-                className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[22px] p-3 text-left"
             >
                 {car.images?.thumbnail ? (
                     <img
                         src={car.images.thumbnail}
                         alt=""
-                        className="h-16 w-24 shrink-0 rounded-2xl bg-finn-snow object-cover"
+                        className="h-18 w-26 shrink-0 rounded-2xl bg-finn-snow object-cover"
                     />
                 ) : (
-                    <span className="flex h-16 w-24 shrink-0 items-center justify-center rounded-2xl bg-finn-snow text-finn-iron/40">
+                    <span className="flex h-18 w-26 shrink-0 items-center justify-center rounded-2xl bg-finn-snow text-finn-iron/40">
                         <PhotoIcon className="h-6 w-6" />
                     </span>
                 )}
@@ -90,29 +111,43 @@ export function CarRow({
                         {configurationName(car)}
                     </span>
 
-                    <span className="mt-0.5 block truncate text-[11px] text-finn-iron">
-                        {configurationDetail(car)}
+                    <span className="mt-0.5 block truncate text-[11px] leading-4 text-finn-iron">
+                        {configurationDetail(car, { withPrice: false })}
                     </span>
+                </span>
 
-                    <span className="mt-1.5 flex flex-wrap items-center gap-2">
-                        {band ? (
-                            <BandChip
-                                level={band.level}
-                                label={band.label}
-                                compact
-                            />
-                        ) : null}
+                {/* The two comparable facts, flush right, one under the other. */}
+                <span className="flex shrink-0 flex-col items-end gap-1.5 pl-2">
+                    {band && (
+                        <BandChip
+                            level={band.level}
+                            label={band.label}
+                            compact
+                        />
+                    )}
 
-                        {price ? (
-                            <span className="text-[11px] font-bold text-finn-black">
-                                {formatEUR(price)}/mo
+                    {price ? (
+                        <span className="text-sm font-black text-finn-black">
+                            {formatEUR(price)}
+                            <span className="text-[11px] font-bold text-finn-iron">
+                                /mo
                             </span>
-                        ) : null}
-                    </span>
+                        </span>
+                    ) : (
+                        <span className="text-[11px] font-bold text-finn-iron">
+                            Price not published
+                        </span>
+                    )}
                 </span>
             </button>
 
-            <span className="flex shrink-0 flex-col items-center gap-1">
+            <span
+                className={[
+                    "flex shrink-0 flex-col items-center justify-center gap-1 pr-2",
+                    "opacity-0 transition-opacity",
+                    "group-hover:opacity-100 group-focus-within:opacity-100",
+                ].join(" ")}
+            >
                 <button
                     type="button"
                     onClick={onUnpin}

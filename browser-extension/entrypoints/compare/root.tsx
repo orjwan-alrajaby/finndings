@@ -1,6 +1,8 @@
 import "@/assets/tailwind.css";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
+  AdjustmentsHorizontalIcon,
+  BookmarkIcon,
   Cog6ToothIcon,
   SparklesIcon,
 } from "@heroicons/react/24/outline";
@@ -8,24 +10,28 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
 import { FinnLink } from "@/components/FinnLink";
+import { NavButton, PageHeader } from "@/components/PageHeader";
 
-import { Launch } from "./components/Launch";
-import { Stepper } from "./components/Stepper";
-import { StepOnePrioritiesStep } from "./steps/StepOnePriorities";
-import { StepTwoSetPreferences } from "./steps/StepTwoSetPreferences";
-import { StepThreeSetAssumptions } from "./steps/StepThreeSetAssumptions";
-import { StepFourGenerateAdvice } from "./steps/StepFourGenerateAdvice";
+import { AdjustDrawer } from "./components/AdjustDrawer";
+import { Advice } from "./advice";
 import { useCompareStore } from "./store";
 
 /**
- * The compare flow.
+ * The compare page: the answer, and a drawer to argue with it.
  *
- * Every answer the reader gives lives in the compare store rather than in
- * the step that asks for it, so the four steps are a view onto one set of
- * answers instead of a form that has to be filled in front to back. That is
- * what lets the stepper walk backwards and forwards freely: a step that is
- * re-entered redraws what the reader left there, down to which card was
- * open and which car was in the hot seat.
+ * This was a four-step wizard — priorities, feature picks, driving
+ * assumptions, and only then a recommendation. Two things were wrong with
+ * that. The product already has an onboarding flow that asks those same
+ * questions once, so the wizard re-asked what the reader had answered; and
+ * the questions are unanswerable in the abstract anyway. Nobody knows
+ * whether their order is right until they have seen what it recommends.
+ *
+ * So the page opens on the recommendation, built from the reader's saved
+ * answers, and "something doesn't look right?" opens those answers beside it.
+ * Every control in there writes to the same store this page renders from, so
+ * changing one re-reasons the page immediately — on a wide screen the layout
+ * makes room for the drawer rather than hiding behind it, so the reader can
+ * watch their own change land.
  */
 export default function CompareTab({
   cars,
@@ -36,24 +42,14 @@ export default function CompareTab({
   onSettings: () => void;
   onManagePins: () => void;
 }) {
-  const step = useCompareStore((state) => state.step);
   const loadSettings = useCompareStore((state) => state.loadSettings);
-
   const settingsLoaded = useCompareStore((state) => state.settingsLoaded);
-  const hasSavedSetup = useCompareStore((state) => state.hasSavedSetup);
-  const started = useCompareStore((state) => state.started);
+
+  const [adjusting, setAdjusting] = useState(false);
 
   useEffect(() => {
     void loadSettings();
   }, [loadSettings]);
-
-  /*
-   * A reader with saved answers is offered them rather than asked for them
-   * again. Held until the settings have actually been read, so the launch
-   * screen never shows an order that is about to be replaced by the stored
-   * one a tick later.
-   */
-  const showLaunch = settingsLoaded && hasSavedSetup && !started;
 
   if (cars.length === 0) {
     return (
@@ -114,57 +110,67 @@ export default function CompareTab({
     );
   }
 
+  /*
+   * Held until the saved answers have actually been read. A recommendation
+   * built from the defaults, replaced a tick later by one built from the
+   * reader's own settings, is a wrong answer shown confidently.
+   */
+  if (!settingsLoaded) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-finn-snow">
+        <span className="text-sm text-finn-iron">
+          Reading your settings…
+        </span>
+      </div>
+    );
+  }
+
   return (
     <Tooltip.Provider delayDuration={350}>
       <main className="min-h-screen bg-finn-snow text-finn-black">
-        <div className="mx-auto w-full max-w-370">
-          <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-finn-cotton/70 bg-finn-snow/90 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-10">
-            <div />
+        {/*
+          * The page makes room for the drawer where there is room to make.
+          * Below that it stays put and the drawer comes over it, which is
+          * why the drawer carries a scrim at those widths and not at these.
+          */}
+        <div
+          className={[
+            "transition-[padding] duration-300 ease-out",
+            adjusting ? "lg:pr-108" : "",
+          ].join(" ")}
+        >
+          <PageHeader>
+            <NavButton
+              icon={<AdjustmentsHorizontalIcon className="h-4 w-4" />}
+              label="Adjust my answers"
+              onClick={() => setAdjusting((was) => !was)}
+              active={adjusting}
+              expanded={adjusting}
+            />
 
-            {showLaunch ? <div /> : <Stepper />}
+            <NavButton
+              icon={<BookmarkIcon className="h-4 w-4" />}
+              label="Pinned cars"
+              onClick={onManagePins}
+            />
 
-            <button
-              type="button"
+            <NavButton
+              icon={<Cog6ToothIcon className="h-4 w-4" />}
+              label="Settings"
               onClick={onSettings}
-              className="flex items-center gap-2 rounded-full bg-white p-2.5 font-semibold text-finn-iron shadow-sm transition-colors hover:text-finn-black"
-              aria-label="Settings"
-            >
-              <Cog6ToothIcon className="h-4 w-4" />
-              <span>Settings</span>
-            </button>
-          </header>
+            />
+          </PageHeader>
 
-          <div className="px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
-            <div className="mx-auto flex max-w-6xl items-center justify-center">
-              {showLaunch && (
-                <Launch
-                  carCount={cars.length}
-                  onSettings={onSettings}
-                  onManagePins={onManagePins}
-                />
-              )}
-
-              {!showLaunch && step === "priorities" && (
-                <StepOnePrioritiesStep onSettings={onSettings} />
-              )}
-
-              {!showLaunch && step === "preferences" && (
-                <StepTwoSetPreferences />
-              )}
-
-              {!showLaunch && step === "assumptions" && (
-                <StepThreeSetAssumptions />
-              )}
-
-              {!showLaunch && step === "advice" && (
-                <StepFourGenerateAdvice
-                  cars={cars}
-                  onSettings={onSettings}
-                />
-              )}
-            </div>
+          <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+            <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
           </div>
         </div>
+
+        <AdjustDrawer
+          open={adjusting}
+          onClose={() => setAdjusting(false)}
+          onSettings={onSettings}
+        />
       </main>
     </Tooltip.Provider>
   );

@@ -72,7 +72,7 @@ interface FeatureInfluencePickerProps {
  * line and a disclosure, where a reader who wants it can have it and a reader
  * who already knows it is not made to scroll past it every time.
  *
- * Shared by compare step 2 and the settings priority editor so the two never
+ * Shared by the compare drawer and the settings priority editor so the two never
  * drift into explaining the same model two different ways.
  */
 export function FeatureInfluencePicker({
