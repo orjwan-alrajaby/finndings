@@ -93,9 +93,26 @@ does with your data; how it works in three parts; your priorities (the shared
 `PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
 a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
-just set, so the reader sees the actual output before pinning anything — the cars are
-labelled on screen as fictional and their ids are negative so they can never collide with a
-FINN vehicle id.
+just set, so the reader sees the actual output before pinning anything.
+
+It renders six things, all off the same `AdviceNarrative` the real advice page uses and none
+written for the demo: the verdict with the winner's configuration and all-in monthly cost,
+why it won, the compromise named against the car that avoids it, the reader's priorities
+walked in their own order with what the winner does about each, the cost split into
+subscription + energy + excess mileage, and where all three placed with bars relative to the
+leader. It previously showed a headline, two reasons and one number — a summary of the
+thing rather than the thing, which summarised away what separates this from a filter with a
+sort order.
+
+The cars carry a marque, model, trim, equipment line, engine and year, because those are
+what `configurationName` and `configurationDetail` draw and a preview that leaves them empty
+previews a page nobody will see. **Aveline, Norvane and Halden are invented and must stay
+invented** — a test holds the brand and model against a list of real manufacturers, the ids
+are negative so they can never collide with a FINN vehicle, and the screen says unmissably
+that they do not exist. Each car must also win at least one of the six profile orders, which
+is asserted per car rather than by counting distinct winners: that contract broke silently
+once when the de-duplicated defaults left the electric car losing even to an emissions-led
+order.
 
 Nothing is written until the reader finishes, and only `priorities` and `preferences` are
 written — feature picks, profile toggles and the default profile are left alone so a

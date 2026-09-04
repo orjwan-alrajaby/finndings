@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { demoCars, demoCarSummary, isDemoCar } from "./demo-cars";
 import { shortName } from "./reasoning-engine/narrative/phrase";
+import { configurationDetail, configurationName } from "./car-labels";
 import {
     buildAdviceNarrative,
     buildRecommendation,
@@ -77,21 +78,44 @@ describe("the example cars", () => {
     });
 
     /*
-     * The narrative layer reads the first word of a name as the manufacturer
-     * and drops it, so what the reader is shown is everything after it. That
-     * shortened form is where the word "Example" has to survive — it is the
-     * name in the headline, and the headline is the sentence most likely to
-     * be read on its own.
+     * The one rule the marques have to obey. These are shown beside real
+     * prices and real reasoning, so a name that happened to be a real
+     * manufacturer would be exactly the thing the disclaimer cannot undo.
      */
-    it("still says Example after the narrative shortens the name", () => {
+    it("is named after no real manufacturer", () => {
+        const real = [
+            "audi", "bmw", "byd", "citroen", "cupra", "dacia", "fiat", "ford",
+            "honda", "hyundai", "jaguar", "jeep", "kia", "lexus", "mazda",
+            "mercedes", "mg", "mini", "nissan", "opel", "peugeot", "polestar",
+            "porsche", "renault", "seat", "skoda", "smart", "subaru", "suzuki",
+            "tesla", "toyota", "volkswagen", "volvo", "vw",
+        ];
+
         for (const car of demoCars()) {
-            expect(shortName(car.name).startsWith("Example ")).toBe(true);
+            expect(real).not.toContain(car.brand.toLowerCase());
+            expect(real).not.toContain(car.model.toLowerCase());
         }
     });
 
-    it("names nothing after a real manufacturer or model", () => {
+    /*
+     * The fields `configurationName` and `configurationDetail` draw. A
+     * preview that leaves them empty previews a page nobody will see: the
+     * panel would read "Configuration -2" where a real car reads "Style Plus
+     * · 150 PS · Petrol".
+     */
+    it("carries the configuration fields a real listing has", () => {
         for (const car of demoCars()) {
-            expect(car.brand).toBe("Demo");
+            expect(configurationName(car)).not.toMatch(/^Configuration /);
+            expect(configurationDetail(car)).toContain("PS");
+            expect(car.engine.length).toBeGreaterThan(0);
+            expect(car.year.length).toBeGreaterThan(0);
+        }
+    });
+
+    it("gives each car a name a reader would recognise as one", () => {
+        for (const car of demoCars()) {
+            expect(shortName(car.name).length).toBeGreaterThan(0);
+            expect(car.name).toBe(`${car.brand} ${car.model}`);
         }
     });
 });
@@ -132,6 +156,39 @@ describe("the worked example the setup flow shows", () => {
      * The whole point of the screen. If every order picked the same car the
      * demonstration would quietly argue that the priorities don't matter.
      */
+    /*
+     * The contract in the file's own doc comment: each car is strongest
+     * somewhere different. It is worth asserting per car rather than only
+     * counting distinct winners, because a car that never wins is a car in
+     * the demonstration for nothing — and this broke silently once already,
+     * when the shipped defaults changed underneath it and left the electric
+     * car losing even to an emissions-led order.
+     */
+    it("gives every example car an order it wins", () => {
+        const winners = new Set(
+            ORDERS.map(
+                ({ priorities }) => adviseOn(priorities)?.recommendation.winner.id,
+            ),
+        );
+
+        for (const car of demoCars()) {
+            expect(winners).toContain(car.id);
+        }
+    });
+
+    /* And the one a reader would check first: emissions-led picks the EV. */
+    it("names the electric car when emissions lead", () => {
+        const result = adviseOn([
+            "environmental",
+            "safetyAssistance",
+            "practicality",
+            "longDistance",
+            "comfort",
+        ]);
+
+        expect(result?.recommendation.winner.fuelType).toBe("Electric");
+    });
+
     it("does not always name the same winner", () => {
         const winners = new Set(
             ORDERS.map(
@@ -150,9 +207,7 @@ describe("the worked example the setup flow shows", () => {
             "familyFriendly",
         ]);
 
-        expect(result?.recommendation.winner.name).toBe(
-            "Demo Example Compact Electric",
-        );
+        expect(result?.recommendation.winner.name).toBe("Aveline Lumo");
         expect(result?.narrative.tradeoffs.length).toBeGreaterThan(0);
     });
 
