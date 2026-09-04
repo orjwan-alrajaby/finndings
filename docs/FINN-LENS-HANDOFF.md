@@ -193,8 +193,32 @@ several configurations it lists all of them and lets you switch.
 
 **Settings page.** Four tabs: Priorities (order + per-category feature picks), Profiles
 (enable/disable, choose the default), Driving (the same assumptions as step 3), and Data
-(what is stored, and deleting it). Explicit
-Save button; a dirty indicator compares against a snapshot of what's on disk.
+(what is stored, and deleting it).
+
+**It autosaves.** There is no Save button, and that is a fix rather than a convenience: the
+page used to have two things labelled "Save changes" — a priority editor's, which committed
+to React state, and a bar fixed to the bottom of the window, which committed to disk — so a
+reader who pressed the first and closed the tab lost work having pressed Save. Edits are now
+written 600ms after the reader stops making them (debounced, because a drag along the
+priority list is one intention and many state updates). The editor's button says "Done",
+because that is what it does.
+
+In its place, `components/SaveStatus.tsx` in the sticky tab row: the save state, and a count
+of what has changed since the page opened. Opening it lists every change in the reader's own
+terms — "Priority order: removed Comfort — now Practicality → …", "Nervous Driver: switched
+off" — each with its own Undo, plus Undo all.
+
+`lib/settings-changes.ts` does the describing and the reverting, and two properties matter.
+Changes are **fields, not edits**, measured against `baseline` (what was on disk when the
+page opened, deliberately *not* `persisted`, which moves on every autosave) — so moving a
+priority and moving it back is no change and the list says so by not mentioning it. And each
+change names a **disjoint slice**, which is what makes per-item undo a copy from the baseline
+rather than a replay of history: undoing the third thing you did cannot disturb the fourth.
+
+Deleting settings from the Data tab moves the baseline to the defaults. Without that, the
+change list would offer to undo the deletion by writing the deleted settings back.
+
+Restore defaults sits beside the status and is still an explicit, confirmed act.
 
 ---
 

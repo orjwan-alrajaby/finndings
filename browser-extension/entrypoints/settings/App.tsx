@@ -1,7 +1,7 @@
 import "@/assets/tailwind.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { AcademicCapIcon, ArrowLeftIcon, ArrowPathIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { AcademicCapIcon, ArrowLeftIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import {
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
@@ -33,6 +33,11 @@ import { DataSettings } from "./tabs/DataSettings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { getProfileIssues } from "./utils/PriorityValidation";
 import { snapshot } from "./utils/snapshot";
+import { SaveStatus, type SaveState } from "./components/SaveStatus";
+import {
+  describeSettingsChanges,
+  revertChange,
+} from "@/lib/settings-changes";
 import type { StoredDataGroupId } from "@/lib/stored-data";
 import { openBrowserTab } from "../popup/utils";
 
@@ -59,17 +64,27 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [profiles, setProfiles] = useState<Profile[]>(DEFAULT_PROFILES);
   const [defaultProfileId, setDefaultProfileId] = useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
 
-  const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
   /*
-   * What is on disk, as text, so the bar can tell the reader whether what
-   * they are looking at is what Lens will actually use. Nothing on this page
-   * takes effect until it is saved, and the priority order in particular is
-   * now something a reader arrives here specifically to set — leaving them
-   * unsure whether they did is the one thing this page must not do.
+   * What is on disk, as text. Nothing on this page waits for a button any
+   * more, so this is what the status reads to say "saved" rather than what a
+   * Save button reads to decide whether it is allowed to be pressed.
    */
   const [persisted, setPersisted] = useState<string | null>(null);
+
+  /**
+   * What was on disk when the page opened.
+   *
+   * The reference for the change list, and deliberately not `persisted`:
+   * every edit is written immediately, so measuring against what is on disk
+   * *now* would empty the list a moment after filling it. Measuring against
+   * where the reader started is what makes "3 changes" a description of
+   * their visit rather than of the last half-second.
+   */
+  const [baseline, setBaseline] = useState<LensSettings | null>(null);
+
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   useEffect(() => {
     loadLensSettings().then((settings) => {
@@ -80,11 +95,10 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       setProfiles(settings.profiles);
       setDefaultProfileId(settings.defaultProfileId);
       setPersisted(snapshot(settings));
+      setBaseline(settings);
       setLoading(false);
     });
   }, []);
-
-  const flashSaved = () => { setSaved(true); window.setTimeout(() => setSaved(false), 1800); };
 
   // `priorities` is saved from here now, and that is a change worth naming.
   //
@@ -103,14 +117,34 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     defaultProfileId: defaultProfileId as ProfileId,
   });
 
-  const save = async () => {
-    const settings = currentSettings();
+  /**
+   * Write what is on screen, and say so.
+   *
+   * Called by the autosave effect rather than by a button: this page used to
+   * have two things labelled "Save changes", one of which committed to React
+   * state and one of which committed to disk, and a reader who pressed the
+   * first and closed the tab lost work having pressed Save. There is now one
+   * kind of save and nobody presses it.
+   */
+  const save = useCallback(async (settings: LensSettings) => {
+    setSaveState("saving");
 
-    await saveLensSettings(settings);
+    try {
+      await saveLensSettings(settings);
 
-    setPersisted(snapshot(settings));
-    flashSaved();
-  };
+      setPersisted(snapshot(settings));
+      setSaveState("saved");
+    } catch (error) {
+      console.error("FINN Lens: could not save your settings", error);
+
+      /*
+       * Left as failed until the next successful write. A page that quietly
+       * went back to saying "Saved" would be telling the reader their work
+       * is safe when it is only in a tab.
+       */
+      setSaveState("failed");
+    }
+  }, []);
 
   // ── Priorities ──────────────────────────────────────────────────────────
 
@@ -175,16 +209,26 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
      * reads as the defaults. Saving is left disabled until the reader
      * changes something, so a deletion is not silently written back.
      */
-    setPersisted(
-      snapshot({
-        preferences: DEFAULT_PREFERENCES,
-        priorities: DEFAULT_PRIORITIES,
-        priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
-        categoryFeatures: DEFAULT_CATEGORY_FEATURES,
-        profiles: DEFAULT_PROFILES,
-        defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
-      }),
-    );
+    /*
+     * The baseline moves with it, and that is the point rather than an
+     * oversight. Everything the reader had is gone from storage, so a change
+     * list still measuring against it would be offering to "undo" the
+     * deletion by writing the deleted settings back — which is the one thing
+     * a deletion has to mean it cannot do. After this, the defaults are where
+     * they started.
+     */
+    const defaults: LensSettings = {
+      preferences: DEFAULT_PREFERENCES,
+      priorities: DEFAULT_PRIORITIES,
+      priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
+      categoryFeatures: DEFAULT_CATEGORY_FEATURES,
+      profiles: DEFAULT_PROFILES,
+      defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+    };
+
+    setPersisted(snapshot(defaults));
+    setBaseline(defaults);
+    setSaveState("idle");
   };
 
   // ── Restore defaults ────────────────────────────────────────────────────
@@ -218,7 +262,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       }),
     );
     setRestoreOpen(false);
-    flashSaved();
+    setSaveState("saved");
   };
 
   /*
@@ -227,6 +271,73 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * the same shape to keep in step with the first.
    */
   const dirty = persisted !== null && snapshot(currentSettings()) !== persisted;
+
+  /**
+   * Write anything unwritten, shortly after the reader stops changing it.
+   *
+   * Debounced rather than immediate because a drag along the priority list
+   * and a held-down arrow on a number field are each one intention and many
+   * state updates, and storage should see the intention. Long enough to
+   * coalesce a gesture, short enough that a reader who closes the tab
+   * straight after a click has already been saved.
+   */
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (loading || !dirty) return;
+
+    const settings = currentSettings();
+
+    if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      void save(settings);
+    }, 600);
+
+    return () => {
+      if (saveTimer.current !== null) clearTimeout(saveTimer.current);
+    };
+  });
+
+  /**
+   * Everything different from where the reader started, in their terms.
+   *
+   * Derived rather than accumulated, so undoing a change by hand removes it
+   * from the list on its own — an edit and its reversal are not two entries,
+   * they are no entry.
+   */
+  const changes = useMemo(
+    () => (baseline ? describeSettingsChanges(baseline, currentSettings()) : []),
+    [
+      baseline,
+      preferences,
+      priorities,
+      priorityDefinitions,
+      categoryFeatures,
+      profiles,
+      defaultProfileId,
+    ],
+  );
+
+  const applySettings = (next: LensSettings) => {
+    setPreferences(next.preferences);
+    setPriorities(next.priorities);
+    setPriorityDefinitions(next.priorityDefinitions);
+    setCategoryFeatures(next.categoryFeatures);
+    setProfiles(next.profiles);
+    setDefaultProfileId(next.defaultProfileId);
+  };
+
+  const handleRevert = (id: string) => {
+    if (!baseline) return;
+
+    applySettings(revertChange(baseline, currentSettings(), id));
+  };
+
+  const handleRevertAll = () => {
+    if (baseline) applySettings(baseline);
+  };
 
   const profilesNeedingAttention = profiles.filter((p) => getProfileIssues(p, priorityDefinitions).length > 0).length;
 
@@ -257,9 +368,23 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
           )}
         </header>
 
-        <div className="mb-5 flex flex-col-reverse xs:flex-row items-center justify-between gap-3">
+        {/*
+          * Sticky, because the thing it replaced was fixed to the bottom of
+          * the window and a reader stops seeing that on the second day. Here
+          * it stays beside the tabs — where they already look to move around
+          * the page — instead of hovering over the content it describes.
+          */}
+        <div className="sticky top-0 z-30 -mx-4 mb-5 flex flex-col-reverse items-center justify-between gap-3 bg-finn-snow/90 px-4 py-3 backdrop-blur-md xs:flex-row sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
           <SettingsTabs active={tab} onChange={setTab} badges={{ profiles: profilesNeedingAttention }} />
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <SaveStatus
+              state={saveState}
+              changes={changes}
+              onRevert={handleRevert}
+              onRevertAll={handleRevertAll}
+              onRetry={() => void save(currentSettings())}
+            />
+
             {/*
               * The setup flow opens itself once, on install. Anyone who
               * skipped it, or who wants the explanation back, has no other
@@ -275,7 +400,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
           </div>
         </div>
 
-        <div className="space-y-4 pb-24">
+        <div className="space-y-4 pb-12">
           {tab === "priorities" && (
             <PrioritiesSettings
               priorities={priorities}
@@ -299,31 +424,6 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
           {tab === "data" && <DataSettings onCleared={handleDataCleared} />}
         </div>
 
-        <div className="fixed inset-x-4 bottom-4 z-30 mx-auto flex flex-col 2xs:flex-row max-w-5xl items-center justify-between gap-4 rounded-3xl bg-finn-black p-3 pl-5 text-white shadow-xl sm:inset-x-6 lg:inset-x-10">
-          <div>
-            <p className="text-sm font-black">
-              {saved
-                ? "Saved."
-                : dirty
-                  ? "You have unsaved changes."
-                  : "Settings are local to this extension."}
-            </p>
-            <p className="text-[10px] text-white/55">
-              {dirty
-                ? "Nothing here reaches FINN Lens until you save."
-                : "Changes affect future recommendations."}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={save}
-            disabled={!dirty}
-            className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black text-white transition-colors ${dirty ? "bg-finn-accent-blue hover:bg-finn-highlight-navy" : "cursor-default bg-white/15 text-white/50"}`}
-          >
-            <CheckIcon className="h-4 w-4" />
-            {dirty ? "Save changes" : "Saved"}
-          </button>
-        </div>
       </div>
 
       <ConfirmDialog
