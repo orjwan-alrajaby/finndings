@@ -2,6 +2,7 @@ import type { FinnApiConfig, FinnCar, FuelType, Transmission } from "@/lib/types
 import {
   getFeature,
   extractFeatures,
+  hasSuppliedEquipment,
   extractAvailability,
   extractPricing,
   extractDriveType,
@@ -81,6 +82,7 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
     },
 
     features: extractFeatures(config),
+    featuresSupplied: hasSuppliedEquipment(config),
 
     dimensions: {
       length: config.vehicle_size.length_mm,

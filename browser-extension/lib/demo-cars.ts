@@ -309,6 +309,8 @@ function build(spec: DemoSpec): PinnedFinnCar {
         images: { thumbnail: "", gallery: [] },
 
         features,
+        /* Written out in full above, so FINN "answered" for all three. */
+        featuresSupplied: true,
 
         dimensions: { length: 4500, width: 1820, height: 1550, unit: "mm" },
 

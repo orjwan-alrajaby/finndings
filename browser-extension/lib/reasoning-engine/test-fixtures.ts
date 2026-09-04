@@ -27,6 +27,19 @@ export interface CarOverrides {
   co2Class?: string;
   range?: number | null;
   features?: FeatureId[];
+  /**
+   * Whether FINN supplied an equipment list at all.
+   *
+   * Left unset by default on purpose, so a fixture that says nothing about it
+   * falls through to the same heuristic a car pinned by an older build gets:
+   * features present means supplied, none means not. That keeps every
+   * existing fixture meaning exactly what it meant before this field existed.
+   *
+   * Say it out loud for the case the distinction is for — `features: []` with
+   * `featuresSupplied: true`, a car FINN answered about which has none of
+   * them.
+   */
+  featuresSupplied?: boolean;
 }
 
 export function makeCar(overrides: CarOverrides): PinnedFinnCar {
@@ -44,6 +57,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     co2Class = "C",
     range = null,
     features = [],
+    featuresSupplied,
   } = overrides;
 
   const featureMap: Record<string, boolean> = {};
@@ -112,6 +126,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     images: { thumbnail: "", gallery: [] },
 
     features: featureMap,
+    ...(featuresSupplied === undefined ? {} : { featuresSupplied }),
 
     dimensions: { length: 4500, width: 1800, height: 1500, unit: "mm" },
 

@@ -184,20 +184,34 @@ export function classifyFit(score: number, hasEvidence = true): FitBand {
 /**
  * Whether FINN told us what this car is equipped with.
  *
- * `extractFeatures` reads a German equipment list and turns every entry it
- * can't find into `false`, so a car whose list was never supplied is
- * indistinguishable, field by field, from a car that genuinely has nothing.
- * The difference is visible only in aggregate: no real car on FINN has none of
- * the fifty-odd features in the catalogue, so an all-false record means the
- * list is missing.
+ * Two different states used to collapse into one here, and getting them
+ * confused is the difference between a fact and an invention:
  *
- * It is a heuristic and it is here rather than at the call site because
- * everything that reads feature evidence needs the same answer.
+ * - **FINN said nothing.** No equipment list at all. The honest answer is
+ *   that we don't know, and every surface says so rather than scoring it.
+ * - **FINN said no.** A list arrived and every entry in it is false. That is
+ *   a bare car, and it is a real answer — worth scoring, and worth saying
+ *   out loud as "it doesn't have these" rather than "we can't tell".
+ *
+ * This used to guess between them by asking whether *any* feature was true,
+ * on the reasoning that no real car has none of fifty-odd features. That was
+ * a fair heuristic and it was wrong about exactly the cars it mattered most
+ * for: a stripped-out car answered honestly by FINN was reported as a car
+ * Lens knew nothing about, so it got no band, no badge on its card, and a
+ * shrug in the panel — while the data to judge it was sitting right there.
+ *
+ * The answer is now taken where the raw response is, by
+ * `hasSuppliedEquipment`, and carried on the car as `featuresSupplied`. The
+ * heuristic survives only for cars pinned before that field existed, where a
+ * guess really is all there is.
  */
 export function hasEquipmentData(vehicle: FinnCar): boolean {
-  const features = vehicle.features ?? {};
+  if (typeof vehicle.featuresSupplied === "boolean") {
+    return vehicle.featuresSupplied;
+  }
 
-  return Object.values(features).some(Boolean);
+  /* Stored by an older build: the flag was never written, so guess as before. */
+  return Object.values(vehicle.features ?? {}).some(Boolean);
 }
 
 /* -------------------------------------------------------------------------- */

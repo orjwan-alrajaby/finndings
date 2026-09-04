@@ -47,15 +47,117 @@ describe("classifyFit", () => {
   });
 });
 
+/**
+ * The difference between a fact and a gap.
+ *
+ * "This car doesn't have adaptive cruise control" and "we don't know what
+ * this car has" arrive from FINN looking identical once `extractFeatures` has
+ * turned both into a map of falses. Telling them apart is what stops the
+ * product inventing an absence — and, in the other direction, what stops it
+ * shrugging at a bare car it has been given every fact about.
+ */
 describe("hasEquipmentData", () => {
-  it("is false for a car FINN supplied no equipment list for", () => {
-    expect(hasEquipmentData(makeCar({ id: 1, features: [] }))).toBe(false);
-  });
-
   it("is true as soon as anything is known", () => {
     expect(
       hasEquipmentData(makeCar({ id: 1, features: ["hasIsofix"] })),
     ).toBe(true);
+  });
+
+  /*
+   * The case this exists for. FINN answered about this car and the answer was
+   * no, to all of it. That is a bare car, not an unknown one — it gets a real
+   * band, a badge on its card, and "it doesn't have these" rather than a
+   * shrug.
+   */
+  it("is true for a car FINN answered about that has nothing", () => {
+    expect(
+      hasEquipmentData(
+        makeCar({ id: 1, features: [], featuresSupplied: true }),
+      ),
+    ).toBe(true);
+  });
+
+  it("is false when FINN supplied no equipment list", () => {
+    expect(
+      hasEquipmentData(
+        makeCar({ id: 1, features: [], featuresSupplied: false }),
+      ),
+    ).toBe(false);
+  });
+
+  /* The recorded answer wins over anything inferred from the map. */
+  it("believes the flag over the features", () => {
+    expect(
+      hasEquipmentData(
+        makeCar({
+          id: 1,
+          features: ["hasIsofix"],
+          featuresSupplied: false,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  /*
+   * Cars pinned before the flag existed have no recorded answer, so the old
+   * heuristic is all there is for them — and it has to keep working, because
+   * those cars are sitting in readers' storage right now.
+   */
+  describe("cars stored before the flag existed", () => {
+    const legacy = (features: string[]) => {
+      const car = makeCar({ id: 1, features: features as never });
+
+      delete (car as { featuresSupplied?: boolean }).featuresSupplied;
+
+      return car;
+    };
+
+    it("guesses no data from an all-false record", () => {
+      expect(hasEquipmentData(legacy([]))).toBe(false);
+    });
+
+    it("guesses data from anything true", () => {
+      expect(hasEquipmentData(legacy(["hasIsofix"]))).toBe(true);
+    });
+  });
+});
+
+describe("a car FINN says has nothing", () => {
+  const bare = makeCar({ id: 1, features: [], featuresSupplied: true });
+
+  it("gets a real verdict rather than a shrug", () => {
+    const analysis = buildFitAnalysis(bare, ["safetyAssistance"], prefs());
+
+    expect(analysis.equipmentKnown).toBe(true);
+    expect(analysis.overall.level).not.toBe("unknown");
+  });
+
+  /* Said as an absence, because that is what FINN reported. */
+  it("reports its features as missing rather than unknown", () => {
+    const analysis = buildFitAnalysis(bare, ["safetyAssistance"], prefs());
+
+    const states = new Set(
+      analysis.priorities[0]?.alsoCounted.map((item) => item.state),
+    );
+
+    expect(states.has("absent")).toBe(true);
+    expect(states.has("unknown")).toBe(false);
+  });
+
+  /* And it is genuinely worse than a car that has some of them. */
+  it("scores below a car that has some of the same catalogue", () => {
+    const equipped = makeCar({ id: 2, features: SAFETY.slice(0, 6) });
+
+    const bareAnalysis = buildFitAnalysis(bare, ["safetyAssistance"], prefs());
+
+    const equippedAnalysis = buildFitAnalysis(
+      equipped,
+      ["safetyAssistance"],
+      prefs(),
+    );
+
+    expect(bareAnalysis.priorities[0]?.covered).toBe(0);
+    expect(equippedAnalysis.priorities[0]?.covered).toBeGreaterThan(0);
   });
 });
 

@@ -502,7 +502,19 @@ stated as such in the source.
   `hasEvidence: false`; prose says "FINN's data doesn't tell us enough" rather than dressing
   the 50 up. Cost components go unavailable rather than zero. No equipment list at all →
   `hasEquipmentData` returns false → no verdict on the pill (it keeps its neutral label),
-  panel says so.
+  panel says so. **That is now a recorded fact rather than a guess.** FINN's
+  `closed_features_list` being absent and it being present-but-all-false are completely
+  different claims — "we don't know what it has" versus "it has none of them" — and
+  `extractFeatures` collapses both into a map of falses, so the answer is taken at mapping
+  time by `hasSuppliedEquipment` and carried on the car as `featuresSupplied`.
+
+  `hasEquipmentData` used to guess between them by asking whether *any* feature was true, on
+  the reasoning that no real car has none of fifty-odd features. It was wrong about exactly
+  the cars it mattered most for: a stripped-out car FINN answered honestly about got no band,
+  no badge and a shrug in the panel, while the data to judge it was sitting right there. The
+  heuristic survives only for cars pinned before the field existed, where a guess really is
+  all there is — `makeCar` leaves `featuresSupplied` unset by default so fixtures keep
+  exercising that path, and says it out loud for the bare-car case.
 
 ---
 

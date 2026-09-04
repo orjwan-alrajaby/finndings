@@ -169,6 +169,16 @@ export interface FinnCar {
 
   features: ReturnType<typeof extractFeatures>;
 
+  /**
+   * Whether FINN supplied an equipment list for this car, as distinct from
+   * having supplied one that says no to everything.
+   *
+   * Optional because cars pinned by earlier builds were stored without it —
+   * `hasEquipmentData` falls back to a heuristic for those. Everything mapped
+   * from FINN's API since carries the real answer.
+   */
+  featuresSupplied?: boolean;
+
   dimensions: {
     length: number;
     width: number;

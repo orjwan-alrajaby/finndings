@@ -74,6 +74,33 @@ const FEATURE_KEYS = {
   hasSpareWheel: "Ersatzrad",
 } as const;
 
+/**
+ * Whether FINN supplied an equipment list for this car at all.
+ *
+ * The one question `extractFeatures` cannot answer afterwards. It reads a
+ * German equipment list and turns everything it can't find into `false`, so
+ * by the time anyone downstream sees the result, a car FINN told us nothing
+ * about looks exactly like a car FINN told us has nothing — every key false,
+ * in both cases.
+ *
+ * Those are completely different claims. "It doesn't have adaptive cruise
+ * control" is a fact worth scoring and worth saying out loud; "we don't know
+ * what it has" is a gap, and reporting it as the first is the product
+ * inventing an absence. So the answer is taken here, where the raw response
+ * is still in hand, and carried on the car.
+ *
+ * Presence of the list is the whole test, not what is in it. A list that says
+ * false to all fifty features is FINN answering the question — that is a bare
+ * car, and it is exactly the case that used to be mistaken for missing data.
+ */
+export function hasSuppliedEquipment(config: FinnApiConfig): boolean {
+  const list = config.closed_features_list;
+
+  if (!list || typeof list !== "object") return false;
+
+  return Object.keys(list).length > 0;
+}
+
 export function extractFeatures(config: FinnApiConfig): Record<string, boolean> {
   const features = Object.fromEntries(
     Object.entries(FEATURE_KEYS).map(([key, germanName]) => [
