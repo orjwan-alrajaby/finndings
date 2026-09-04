@@ -153,3 +153,28 @@
     font-family: monospace;
   }
 }
+
+/* ========================================
+   ATTENTION PULSE
+   For the settings Save button, the moment there is something to save.
+   Two beats and then still: a control that pulsed forever would be nagging,
+   and the ring is drawn with box-shadow so it costs the page no layout and
+   cannot nudge anything beside it.
+======================================== */
+
+@keyframes finn-lens-attention {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 114, 234, 0.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(0, 114, 234, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 114, 234, 0); }
+}
+
+.finn-lens-attention {
+  animation: finn-lens-attention 1.4s ease-out 2;
+}
+
+/* Honour a reader who has asked the system for less movement. */
+@media (prefers-reduced-motion: reduce) {
+  .finn-lens-attention {
+    animation: none;
+  }
+}

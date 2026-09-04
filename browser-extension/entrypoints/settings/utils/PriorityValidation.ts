@@ -47,11 +47,19 @@ export function getAffectedProfiles(priorityId: CategoryId, profiles: Profile[])
 }
 
 /**
- * The feature-selection rule, in one place.
+ * The feature-selection rule, written down.
  *
  * There is only one: a cap on how many features the user may single out.
  * Picking none is deliberately valid — the category is then judged on its
  * whole catalogue rather than abstaining — so there is no floor to enforce.
+ *
+ * Nothing calls this in the UI any more, and that is not an oversight. The
+ * cap used to be checked after the fact and reported as an error under the
+ * editor; it is now enforced where the selection is made — the picker greys
+ * out the sixth and `PriorityEditor` refuses it — because a control that
+ * allows a choice it will then reject is worse than one that never offers
+ * it. This stays as the single statement of the rule, and its test is what
+ * keeps the two enforcement points honest about what the rule is.
  */
 export function validatePriorityDraft(features: FeatureSelection, id: CategoryId): string | null {
   if (isNumericOnlyPriority(id)) return null;

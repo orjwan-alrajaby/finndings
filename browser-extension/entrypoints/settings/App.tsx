@@ -63,26 +63,6 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
 
-  /**
-   * A priority editor that is open and holding work, if there is one.
-   *
-   * The Save button writes what this page holds, and an open editor's draft
-   * isn't that yet — it becomes so on Done. Pressing Save with one open used
-   * to write around it, so the reader lost the edit they were in the middle
-   * of, having pressed Save. This is what lets the page notice instead.
-   */
-  const [pendingEdit, setPendingEdit] =
-    useState<{ id: CategoryId; label: string } | null>(null);
-
-  /** Bumped to ask the priorities tab to put that editor in front of them. */
-  const [revealPending, setRevealPending] = useState(0);
-
-  /* Stable, so the effect reporting it upward doesn't fire on every render. */
-  const handlePendingEditChange = useCallback(
-    (pending: { id: CategoryId; label: string } | null) =>
-      setPendingEdit(pending),
-    [],
-  );
 
   /*
    * What is on disk, as text, so the bar can tell the reader whether what
@@ -126,19 +106,6 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   });
 
   const save = async () => {
-    /*
-     * Point at the unfinished edit rather than saving without it. Refusing
-     * with a message somewhere else on the page would leave the reader
-     * hunting for what it meant; the two buttons that resolve this are in
-     * the editor, so the editor is where they are taken.
-     */
-    if (pendingEdit) {
-      setTab("priorities");
-      setRevealPending((count) => count + 1);
-
-      return;
-    }
-
     const settings = currentSettings();
 
     await saveLensSettings(settings);
@@ -149,10 +116,13 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
   // ── Priorities ──────────────────────────────────────────────────────────
 
-  const handleSavePriority = (priority: PriorityDefinition, features: FeatureSelection, isNew: boolean) => {
-    setPriorityDefinitions((cur) => (isNew ? [...cur, priority] : cur.map((p) => (p.id === priority.id ? priority : p))));
-    setCategoryFeatures((cur) => ({ ...cur, [priority.id]: features }));
-    if (priority.isCustom) registerCustomMeta(priority);
+  /*
+   * Edits from a priority editor land here as they are made — there is no
+   * draft between the picker and this page any more, and so no second Save
+   * for a reader to press and be misled by.
+   */
+  const handleChangeFeatures = (priorityId: CategoryId, features: FeatureSelection) => {
+    setCategoryFeatures((cur) => ({ ...cur, [priorityId]: features }));
   };
 
   // ── Profiles ────────────────────────────────────────────────────────────
@@ -303,12 +273,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         <div className="sticky top-0 z-30 -mx-4 mb-5 flex flex-col-reverse items-center justify-between gap-3 bg-finn-snow/90 px-4 py-3 backdrop-blur-md xs:flex-row sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
           <SettingsTabs active={tab} onChange={setTab} badges={{ profiles: profilesNeedingAttention }} />
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <SaveControl
-              dirty={dirty}
-              saved={saved}
-              pendingLabel={pendingEdit?.label ?? null}
-              onSave={save}
-            />
+            <SaveControl dirty={dirty} saved={saved} onSave={save} />
 
             {/*
               * The setup flow opens itself once, on install. Anyone who
@@ -333,9 +298,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
               categoryFeatures={categoryFeatures}
               profiles={profiles}
               onChangePriorities={setPriorities}
-              onSavePriority={handleSavePriority}
-              onPendingEditChange={handlePendingEditChange}
-              revealPendingSignal={revealPending}
+              onChangeFeatures={handleChangeFeatures}
             />
           )}
           {tab === "profiles" && (

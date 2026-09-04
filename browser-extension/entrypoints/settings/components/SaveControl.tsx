@@ -1,62 +1,43 @@
-import {
-    ArrowDownCircleIcon,
-    CheckIcon,
-} from "@heroicons/react/24/outline";
+import { CheckIcon } from "@heroicons/react/24/outline";
 
 /**
- * Saving, and the one thing that can stop it.
+ * The only thing on this page that keeps anything.
  *
- * This page has two levels of keeping: a priority editor's Done, which puts a
- * draft into the page, and this, which puts the page onto disk. That is a
- * reasonable shape — an editor you can abandon is worth having — and a bad
- * one to leave unexplained, because a reader who edits a priority and comes
- * straight here would have their draft written around and lost, having
- * pressed Save.
+ * There used to be two. A priority editor had its own Save a few hundred
+ * pixels from this one, and only this one wrote to disk — so a reader could
+ * press Save, press Save again, and lose the edit. The editor no longer holds
+ * a draft at all: its changes land in the page as they are made, and this is
+ * the single act that commits them.
  *
- * So when an editor is still open with work in it, this stops looking like a
- * save button and starts looking like a signpost. Pressing it doesn't refuse
- * with a message; it takes the reader to the editor and flashes it, because
- * the two buttons that resolve this are already there and no wording here
- * could beat showing them.
+ * Which puts the whole burden on this button being *noticed*. It was in a bar
+ * fixed to the bottom of the window, which is furniture a reader stops seeing
+ * on the second day; it now sits in the sticky tab row, and when there is
+ * something to save it says so and pulses — twice, gently, and then stops.
+ * A control that pulsed forever would be nagging, and a reader who has read
+ * it once does not need telling again.
  */
 export function SaveControl({
     dirty,
     saved,
-    pendingLabel,
     onSave,
 }: {
     dirty: boolean;
     /** True for a moment after a successful write. */
     saved: boolean;
-    /** The priority still being edited, when one is. */
-    pendingLabel: string | null;
     onSave: () => void;
 }) {
-    if (pendingLabel) {
-        return (
-            <button
-                type="button"
-                onClick={onSave}
-                className="inline-flex items-center gap-2 rounded-full bg-finn-warning px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:brightness-105"
-            >
-                <ArrowDownCircleIcon className="h-4 w-4" />
-                Finish editing {pendingLabel}
-            </button>
-        );
-    }
-
     return (
         <span className="flex items-center gap-2.5">
             <span
                 className={[
-                    "text-xs font-bold",
-                    dirty ? "text-finn-black" : "text-finn-iron",
+                    "text-xs font-bold transition-colors",
+                    dirty ? "text-finn-warning" : "text-finn-iron",
                 ].join(" ")}
             >
                 {saved
                     ? "Saved."
                     : dirty
-                        ? "Not saved yet"
+                        ? "Unsaved changes"
                         : "All changes saved"}
             </span>
 
@@ -64,11 +45,18 @@ export function SaveControl({
                 type="button"
                 onClick={onSave}
                 disabled={!dirty}
+                /*
+                 * Keyed on the state so the animation restarts each time the
+                 * page goes from clean to dirty. Without it a reader who
+                 * saves and then changes something else gets no second
+                 * prompt, having been given one for the first change.
+                 */
+                key={dirty ? "dirty" : "clean"}
                 className={[
                     "inline-flex items-center gap-2 rounded-full px-5 py-2.5",
                     "text-xs font-black shadow-sm transition-colors",
                     dirty
-                        ? "bg-finn-accent-blue text-white hover:bg-finn-highlight-navy"
+                        ? "finn-lens-attention bg-finn-accent-blue text-white hover:bg-finn-highlight-navy"
                         : "cursor-default bg-white text-finn-iron",
                 ].join(" ")}
             >

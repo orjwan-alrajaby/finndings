@@ -201,25 +201,25 @@ bottom of the window, which is a thing readers stop seeing. Below the content, a
 the settings are local to this browser and that changes affect future recommendations; it is
 the one question a settings page raises and rarely answers.
 
-**Two levels of keeping, and the trap that comes with them.** A priority editor's button
-commits a draft to the page; the page's Save commits the page to disk. Both used to say
-"Save changes", so a reader who edited a priority, pressed it, and then pressed the page's
-Save had their draft written *around* — lost, having pressed Save twice. The editor's button
-now says "Keep" (and "Discard"), and more importantly the page notices: `PriorityEditor`
-reports whether its draft differs from what the page holds (`sameFeatureSelection` in
-`lib/feature-selection-diff.ts` — order-sensitive, because the list renders as written), and
-`PrioritiesSettings` passes the open-and-dirty priority up to `App`.
+**One save, and only one.** The page has a single act that writes anything: the Save button
+in the sticky tab row. A priority editor used to keep its own draft behind its own "Save
+changes" — the same words as the page's, a few hundred pixels away, and only one of them
+wrote to disk, so a reader could press Save, press Save again, and lose the edit.
 
-With one outstanding, the Save button becomes "Finish editing <priority>" and pressing it
-does not save: it switches to the Priorities tab, scrolls the card into view and flashes it
-for 1.8s. Refusing with a message elsewhere would leave the reader hunting; the two buttons
-that resolve it are in the editor, so that is where they are taken. The signal is a bumped
-counter (`revealPendingSignal`) rather than an imperative handle, so nothing needs a ref into
-the child.
+`PriorityEditor` now holds no state at all. Every toggle and every importance change goes
+straight into what the page holds, through `onChangeFeatures`, and the Save button commits
+it. There is nothing to keep, nothing to discard, and no second button to mistake for this
+one. The five-feature cap moved with it: it is enforced where the selection is made — the
+picker greys out the sixth — rather than validated afterwards and reported as an error.
+`validatePriorityDraft` survives as the written statement of that rule and says in its own
+doc comment that nothing calls it.
 
-**Not autosave.** That was tried and reverted: it removed the trap but took the explicit save
-and the sense of a page you commit with it, and a change history nobody asked for. The trap
-is fixed without it.
+Which puts the whole burden on the Save button being noticed, so it says so and pulses. When
+the page goes from clean to dirty the label beside it turns amber and reads "Unsaved
+changes", and the button runs `.finn-lens-attention` — a box-shadow ring, two beats, then
+still, and nothing at all under `prefers-reduced-motion`. It is keyed on the dirty state so
+the animation restarts on each fresh change rather than firing once per page load.
+
 
 ---
 

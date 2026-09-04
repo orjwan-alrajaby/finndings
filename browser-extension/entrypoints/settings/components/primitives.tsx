@@ -71,10 +71,6 @@ export function IssuesNotice({ issues }: { issues: string[] }) {
   );
 }
 
-export function InlineError({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return <p className="mt-1.5 text-[11px] font-semibold text-finn-error">{children}</p>;
-}
 
 export function CustomBadge() {
   return <span className="rounded-full bg-finn-cotton px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-finn-iron">Custom</span>;
