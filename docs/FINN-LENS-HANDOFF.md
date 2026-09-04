@@ -95,25 +95,28 @@ a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
 just set, so the reader sees the actual output before pinning anything.
 
-**A preview, and the line was found by overshooting it twice.** First it was a summary in a
-shape of its own — the same facts, differently arranged, so a reader met one layout here and
-another on their first real comparison and recognised nothing. Then it imported the advice
-page's components wholesale, which made it *the advice page*: full hero with photo panel,
-every priority expanded with equipment chips, sidebar of assumptions. Recognisable, and far
-too much to meet before pinning anything.
+**A preview, and the line was found by overshooting it three times.** First a summary in a
+shape of its own — same facts, different arrangement, so nothing on the real page was
+recognisable. Then the advice page's components imported wholesale, which made it *the
+advice page*: full hero with photo panel, every priority expanded with equipment chips, a
+sidebar of assumptions, all before the reader has pinned anything. Then cut far too hard the
+other way — two bullet reasons and one tradeoff, recognisable and saying nothing.
 
-What it settles on: the real page's sections, in the real page's order, under the real
-page's own eyebrows — **Your recommendation**, **Why it wins**, **The other side of it**,
-**Cost analysis**, **Behind the recommendation** — each showing the top of its content and
-stopping. Two verdict reasons rather than every priority expanded; one tradeoff rather than
-all; the three cost lines; the ranking bars. Recognition comes from the shape and the
-wording; the restraint comes from truncating each section rather than dropping any.
+Where it settles: the real page's sections, in the real page's order, under the real page's
+own eyebrows — **Your recommendation**, **Why it wins**, **The other side of it**,
+**Priority by priority**, **Cost analysis**, **Behind the recommendation** — the middle four
+laid out two across, each carrying enough to argue rather than label. Recognition comes from
+the shape and the wording; the restraint is in the *depth* of each panel, not in which of
+them survive.
 
-`MoreOnTheRealPage` then names what was left out — per-priority equipment, the hot seat, the
-weight table, the assumptions panel — so the preview reads as a subset rather than as
-something quietly smaller, and the real page still has somewhere to go. **If you add a
-section to the advice page, this screen owes it either a truncated block or a line in that
-list.**
+The panel that matters most is priority-by-priority: the reader's own order taken apart item
+by item, with weight percentages and the engine's own sentence for each. Cutting it was what
+made the third attempt hollow — without it the screen is a ranking with a caption, and the
+product's whole claim is that it is not that.
+
+`MoreOnTheRealPage` names what is genuinely absent — the equipment chips under each verdict,
+the hot seat, the weight table, the assumptions panel. **If you add a section to the advice
+page, this screen owes it either a panel or a line in that list.**
 
 Above the reading, a **line-up** of the three cars — configuration, boot, CO₂, range or
 consumption, and subscription price, with the winner ringed. The reading names cars

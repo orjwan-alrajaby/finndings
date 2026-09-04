@@ -42,14 +42,21 @@ import { FINN_BASE_URL } from "@/lib/constants";
  * assumptions. Correct, recognisable, and far too much to meet before you
  * have pinned anything.
  *
- * So: the real page's sections, in the real page's order, under the real
- * page's own headings — "Why it wins", "The other side of it", "Cost
- * analysis", "Behind the recommendation" — each showing one or two lines of
- * genuine output rather than all of it. Recognition comes from the shape and
- * the words; the restraint comes from taking the top of each section and
- * stopping. What is not shown is named at the end rather than silently
- * absent, so the preview reads as a subset and the real thing still has
- * somewhere to go.
+ * Then it was cut too hard the other way — two bullet reasons and one
+ * tradeoff — which is recognisable and says nothing. The panel it lost was
+ * the priority-by-priority walk, and that is the one the whole product turns
+ * on: a reader who cannot see Lens take their order apart, item by item, has
+ * been shown a ranking with a caption.
+ *
+ * Where it landed: the real page's sections, in the real page's order, under
+ * the real page's own eyebrows — "Why it wins", "The other side of it",
+ * "Priority by priority", "Cost analysis", "Behind the recommendation" — laid
+ * out two across, each carrying enough of its content to argue rather than
+ * label. Recognition comes from the shape and the wording; the restraint is
+ * in the depth of each panel, not in which of them survive. What is genuinely
+ * not here — the equipment chips under each priority, the hot seat, the
+ * weight table — is named at the end, so the preview reads as a subset and
+ * the real page still has somewhere to go.
  *
  * Every sentence is `AdviceNarrative`. Nothing here is written for the demo.
  */
@@ -124,8 +131,8 @@ export function Preview({
                     {topPriority
                         ? ` — led by ${CATEGORIES[topPriority]?.label ?? topPriority}`
                         : ""}
-                    . The real page says all of this at length; here is the
-                    top of each part of it.
+                    . This is the shape of the page you'll get — the real one
+                    goes deeper on every part of it.
                 </p>
             </div>
 
@@ -260,6 +267,30 @@ function MiniAdvice({
                         <p className="mt-2.5 max-w-lg text-[13px] font-bold leading-5 text-white/90">
                             {narrative.verdict.headline}
                         </p>
+
+                        <p className="mt-1.5 max-w-lg text-[11px] leading-4 text-white/55">
+                            {demoCarSummary(winner.id)}
+                        </p>
+
+                        {/*
+                          * The order it was judged on, said on the answer
+                          * rather than only above it — the real hero does the
+                          * same, and it is what stops "strongest match"
+                          * reading as an opinion about the car.
+                          */}
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            {recommendation.context.priorities.map(
+                                (id, index) => (
+                                    <span
+                                        key={id}
+                                        className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/80"
+                                    >
+                                        #{index + 1}{" "}
+                                        {CATEGORIES[id]?.label ?? id}
+                                    </span>
+                                ),
+                            )}
+                        </div>
                     </div>
 
                     <div className="shrink-0">
@@ -274,79 +305,147 @@ function MiniAdvice({
                 </div>
             </section>
 
-            <Block eyebrow="Why it wins" tone="accent">
-                <ul className="space-y-2">
-                    {narrative.verdict.reasons.slice(0, 2).map((reason) => (
-                        <li
-                            key={reason}
-                            className="flex gap-2 text-xs leading-5 text-finn-black"
-                        >
-                            <span
-                                aria-hidden="true"
-                                className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-finn-accent-blue"
-                            />
-                            {reason}
-                        </li>
-                    ))}
+            <div className="grid gap-3 md:grid-cols-2">
+                <Block eyebrow="Why it wins" tone="accent">
+                    <ul className="space-y-2.5">
+                        {narrative.verdict.reasons.slice(0, 3).map((reason) => (
+                            <li
+                                key={reason}
+                                className="flex gap-2 text-xs leading-5 text-finn-black"
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-finn-accent-blue"
+                                />
+                                {reason}
+                            </li>
+                        ))}
 
-                    {narrative.verdict.reasons.length === 0 && (
-                        <li className="text-xs leading-5 text-finn-iron">
-                            On this order the three are close enough that
-                            nothing separates them worth stating — which Lens
-                            says rather than inventing a reason.
-                        </li>
+                        {narrative.verdict.reasons.length === 0 && (
+                            <li className="text-xs leading-5 text-finn-iron">
+                                On this order the three are close enough that
+                                nothing separates them worth stating — which
+                                Lens says rather than inventing a reason.
+                            </li>
+                        )}
+                    </ul>
+                </Block>
+
+                <Block
+                    eyebrow="The other side of it"
+                    tone="warning"
+                    icon={<ScaleIcon className="h-3 w-3" />}
+                >
+                    {narrative.tradeoffs.length > 0 ? (
+                        <div className="space-y-2.5">
+                            {narrative.tradeoffs
+                                .slice(0, 2)
+                                .map((tradeoff) => (
+                                    <div
+                                        key={tradeoff.headline}
+                                        className="rounded-2xl bg-finn-snow px-3.5 py-2.5"
+                                    >
+                                        <p className="text-xs font-black text-finn-black">
+                                            {tradeoff.headline}
+                                        </p>
+
+                                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                                            {tradeoff.evidence}
+                                        </p>
+
+                                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                                            {tradeoff.relevance}
+                                        </p>
+                                    </div>
+                                ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs leading-5 text-finn-iron">
+                            Nothing worth naming — on this order the winner
+                            gives up nothing the others offer.
+                        </p>
                     )}
-                </ul>
-            </Block>
+                </Block>
 
-            <Block
-                eyebrow="The other side of it"
-                tone="warning"
-                icon={<ScaleIcon className="h-3 w-3" />}
-            >
-                {narrative.tradeoffs.length > 0 ? (
-                    <div className="rounded-2xl bg-finn-snow px-3.5 py-2.5">
-                        <p className="text-xs font-black text-finn-black">
-                            {narrative.tradeoffs[0]!.headline}
-                        </p>
+                {/*
+                  * The panel the product turns on. Everything else here could
+                  * be a ranking with a caption; this is Lens taking the
+                  * reader's own order apart and answering it item by item,
+                  * and a preview without it is previewing a sort.
+                  */}
+                <Block eyebrow="Priority by priority" tone="accent">
+                    <ol className="space-y-2.5">
+                        {narrative.priorities.slice(0, 5).map((priority) => (
+                            <li
+                                key={priority.priority}
+                                className="flex items-start gap-2.5"
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-xs"
+                                >
+                                    {priority.icon}
+                                </span>
 
-                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                            {narrative.tradeoffs[0]!.evidence}
-                        </p>
-                    </div>
-                ) : (
-                    <p className="text-xs leading-5 text-finn-iron">
-                        Nothing worth naming — on this order the winner gives
-                        up nothing the others offer.
+                                <span className="min-w-0 flex-1">
+                                    <span className="flex flex-wrap items-baseline gap-x-2">
+                                        <span className="text-xs font-black text-finn-black">
+                                            #{priority.rank} {priority.label}
+                                        </span>
+
+                                        <span className="text-[10px] font-bold text-finn-iron">
+                                            {priority.weightPercent}% of the
+                                            result
+                                        </span>
+                                    </span>
+
+                                    <span className="mt-0.5 block text-[11px] leading-4 text-finn-iron">
+                                        {priority.sentences[0] ??
+                                            "FINN's data doesn't say enough about this one to judge it."}
+                                    </span>
+                                </span>
+                            </li>
+                        ))}
+                    </ol>
+                </Block>
+
+                <Block eyebrow="Cost analysis" tone="accent">
+                    <p className="mb-3 text-xs font-black leading-5 text-finn-black">
+                        {narrative.cost.sentences[0]}
                     </p>
-                )}
-            </Block>
 
-            <Block eyebrow="Cost analysis" tone="accent">
-                <div className="space-y-1.5">
-                    <CostLine
-                        label="FINN subscription"
-                        amount={narrative.cost.subject.subscription}
-                    />
-                    <CostLine
-                        label="Estimated energy"
-                        amount={narrative.cost.subject.energy}
-                    />
-                    <CostLine
-                        label="Estimated extra mileage"
-                        amount={narrative.cost.subject.excessMileage}
-                    />
+                    <div className="space-y-1.5">
+                        <CostLine
+                            label="FINN subscription"
+                            amount={narrative.cost.subject.subscription}
+                        />
+                        <CostLine
+                            label="Estimated energy"
+                            amount={narrative.cost.subject.energy}
+                        />
+                        <CostLine
+                            label="Estimated extra mileage"
+                            amount={narrative.cost.subject.excessMileage}
+                        />
 
-                    <div className="flex items-baseline justify-between border-t border-finn-cotton pt-2">
-                        <span className="text-xs font-black text-finn-black">
-                            Per month
-                        </span>
-                        <span className="text-xs font-black text-finn-black">
-                            {formatEUR(Math.round(narrative.cost.subject.total))}
-                        </span>
+                        <div className="flex items-baseline justify-between border-t border-finn-cotton pt-2">
+                            <span className="text-xs font-black text-finn-black">
+                                Per month
+                            </span>
+                            <span className="text-xs font-black text-finn-black">
+                                {formatEUR(
+                                    Math.round(narrative.cost.subject.total),
+                                )}
+                            </span>
+                        </div>
                     </div>
-                </div>
-            </Block>
+
+                    <p className="mt-2 text-[11px] leading-4 text-finn-iron">
+                        At {narrative.cost.monthlyKm} km a month, on the fuel
+                        and electricity prices you gave.
+                    </p>
+                </Block>
+            </div>
 
             <Block eyebrow="Behind the recommendation" tone="muted">
                 <Ranking recommendation={recommendation} />
@@ -497,12 +596,17 @@ function MoreOnTheRealPage({
     onEditPriorities: () => void;
 }) {
     const items = [
-        "Every priority in turn, with the equipment behind each verdict named",
+        /*
+         * Not "every priority" — those are all here. What the real page adds
+         * under each is the equipment itself, chip by chip, with what the
+         * reader raised marked and what the car is missing marked against it.
+         */
+        "The equipment behind every verdict, named feature by feature, with your raised picks marked",
         alternatives.length > 0
             ? `A hot seat — put ${alternatives[0]!.name} up against the winner and Lens argues it again from that side`
             : "A hot seat for the closest alternatives",
         "The weight table, so you can check the arithmetic yourself",
-        "Your driving assumptions, beside the answer they produced",
+        "Your driving assumptions, beside the answer they produced, and a way to change them",
     ];
 
     return (
