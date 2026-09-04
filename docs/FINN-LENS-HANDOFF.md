@@ -160,7 +160,16 @@ with two faces. The **order** leads, because it is the answer; underneath it a f
 row offers the presets — the six fixed profiles, Nervous Driver through Balanced — and
 taking it swaps the panel rather than scrolling to a section. The presets face carries its
 own back button, and applying one swaps straight back to the order, so the result lands
-exactly where the offer was. This was previously stacked: six profile cards each listing
+exactly where the offer was.
+
+Applying a preset rewrites five rows at once while the reader's attention is on the cards,
+so it is announced rather than left to be noticed: a banner names the profile and carries an
+**Undo** that restores the exact order it replaced, and a chip beside "Your priorities" says
+which profile the order currently *is*. The two differ on purpose — the banner is about an
+action a moment ago and clears on the reader's next edit; the chip is about state and comes
+from `matchingProfile`, so it survives a scroll and disappears only when the order stops
+being that profile's. **Start over from Lens's order** resets to `DEFAULT_PRIORITIES` and is
+hidden when the order already is it. This was previously stacked: six profile cards each listing
 five priorities, *then* the list they fill in, which meant meeting a screenful of
 alternatives before the question and scrolling back up to see what an applied one did.
 

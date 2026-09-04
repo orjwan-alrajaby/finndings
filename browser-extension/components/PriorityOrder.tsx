@@ -73,6 +73,35 @@ export function applicableProfiles(
 }
 
 /**
+ * The profile whose order is exactly the one in front of the reader, if any.
+ *
+ * Exported because more than one surface needs to say "you are on this
+ * profile" and they must agree about when that is true — a chip in a panel
+ * header claiming Family First while the preset card below says nothing is
+ * worse than neither saying it.
+ *
+ * Exact and ordered: a profile's claim is its five priorities *in its order*,
+ * so moving two of them means the reader is no longer on it. That is the
+ * honest reading, and it is what makes the chip disappear the moment they
+ * make the order their own.
+ */
+export function matchingProfile(
+    profiles: Profile[],
+    priorityDefinitions: PriorityDefinition[],
+    priorities: CategoryId[],
+): Profile | null {
+    return (
+        applicableProfiles(profiles, priorityDefinitions).find(
+            (profile) =>
+                profile.priorities.length === priorities.length &&
+                profile.priorities.every(
+                    (id, index) => priorities[index] === id,
+                ),
+        ) ?? null
+    );
+}
+
+/**
  * The profiles offered as a starting point.
  *
  * `chips` is the compact form for a reader who already knows what a profile
@@ -101,10 +130,10 @@ export function ProfilePresets({
 
     if (applicable.length === 0) return null;
 
-    const activeProfile = applicable.find(
-        (profile) =>
-            profile.priorities.length === priorities.length &&
-            profile.priorities.every((id, index) => priorities[index] === id),
+    const activeProfile = matchingProfile(
+        profiles,
+        priorityDefinitions,
+        priorities,
     );
 
     if (layout === "chips") {

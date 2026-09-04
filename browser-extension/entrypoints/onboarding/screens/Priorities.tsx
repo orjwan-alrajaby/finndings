@@ -2,15 +2,19 @@ import { useEffect, useState } from "react";
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
+    ArrowUturnLeftIcon,
+    CheckCircleIcon,
     SparklesIcon,
 } from "@heroicons/react/24/outline";
 
 import {
     applicableProfiles,
+    matchingProfile,
     PriorityOrderList,
     ProfilePresets,
 } from "@/components/PriorityOrder";
 import {
+    DEFAULT_PRIORITIES,
     MAX_PRIORITIES,
     MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
@@ -60,8 +64,35 @@ export function Priorities({
 }) {
     const [view, setView] = useState<View>("order");
 
+    /**
+     * The preset just applied, and the order it replaced.
+     *
+     * Swapping the panel back put the result where the offer was, which is
+     * the right place — but a list quietly rewritten underneath a reader who
+     * was looking at the presets a second ago is a change only an observant
+     * one notices. So the panel says which preset did it, and keeps what was
+     * there before so undoing is one press rather than five drags.
+     */
+    const [applied, setApplied] = useState<{
+        label: string;
+        icon: string;
+        previous: CategoryId[];
+    } | null>(null);
+
     const hasProfiles =
         applicableProfiles(profiles, priorityDefinitions).length > 0;
+
+    /** The preset the current order *is*, whether or not it was just applied. */
+    const inUse = matchingProfile(profiles, priorityDefinitions, priorities);
+
+    /*
+     * An edit of their own ends the announcement: it was about one action, and
+     * the reader has since taken another.
+     */
+    const handleListChange = (next: CategoryId[]) => {
+        setApplied(null);
+        onChange(next);
+    };
 
     /*
      * A swapped panel starts at its own top. The two faces are different
@@ -104,7 +135,23 @@ export function Priorities({
                         priorities={priorities}
                         priorityDefinitions={priorityDefinitions}
                         categoryFeatures={categoryFeatures}
-                        onChange={onChange}
+                        inUse={inUse}
+                        applied={applied}
+                        onChange={handleListChange}
+                        onUndo={() => {
+                            if (!applied) return;
+
+                            onChange([...applied.previous]);
+                            setApplied(null);
+                        }}
+                        onReset={
+                            sameOrder(priorities, DEFAULT_PRIORITIES)
+                                ? undefined
+                                : () => {
+                                      setApplied(null);
+                                      onChange([...DEFAULT_PRIORITIES]);
+                                  }
+                        }
                         onOpenPresets={
                             hasProfiles ? () => setView("presets") : undefined
                         }
@@ -114,8 +161,14 @@ export function Priorities({
                         priorities={priorities}
                         priorityDefinitions={priorityDefinitions}
                         profiles={profiles}
-                        onApply={(next) => {
-                            onChange(next);
+                        onApply={(profile) => {
+                            setApplied({
+                                label: profile.label,
+                                icon: profile.icon,
+                                previous: [...priorities],
+                            });
+
+                            onChange([...profile.priorities]);
 
                             /*
                              * Straight back to the list. A profile is a
@@ -153,33 +206,113 @@ export function Priorities({
     );
 }
 
+/** Whether two orders are the same list in the same order. */
+function sameOrder(a: CategoryId[], b: CategoryId[]): boolean {
+    return a.length === b.length && a.every((id, index) => b[index] === id);
+}
+
+/**
+ * What just happened, said plainly.
+ *
+ * Applying a preset rewrites five rows at once and swaps the panel back to
+ * them — a large change, arriving while the reader's attention is on the
+ * cards they were choosing between. Without this the only evidence is the
+ * list itself being different from a list they had barely looked at. It
+ * pulses once, borrowing the same attention animation the Save button uses,
+ * and carries the way back out.
+ */
+function AppliedBanner({
+    applied,
+    onUndo,
+}: {
+    applied: { label: string; icon: string; previous: CategoryId[] };
+    onUndo: () => void;
+}) {
+    return (
+        <div className="finn-lens-attention mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-finn-pale-blue px-4 py-3">
+            <CheckCircleIcon className="h-5 w-5 shrink-0 text-finn-accent-blue" />
+
+            <p className="min-w-0 flex-1 text-xs leading-5 text-finn-highlight-navy">
+                <strong className="font-black">
+                    <span aria-hidden className="mr-1">
+                        {applied.icon}
+                    </span>
+                    {applied.label} applied.
+                </strong>{" "}
+                Your order below is now its priorities, in its order — change
+                anything you disagree with.
+            </p>
+
+            <button
+                type="button"
+                onClick={onUndo}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-finn-accent-blue shadow-sm transition hover:bg-finn-accent-blue hover:text-white"
+            >
+                <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
+                Undo
+            </button>
+        </div>
+    );
+}
+
 /** The answer: the order itself, with a way out to the presets under it. */
 function OrderView({
     priorities,
     priorityDefinitions,
     categoryFeatures,
+    inUse,
+    applied,
     onChange,
+    onUndo,
+    onReset,
     onOpenPresets,
 }: {
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     categoryFeatures: Record<CategoryId, FeatureSelection>;
+    /** The preset this order matches exactly, if any. */
+    inUse: Profile | null;
+    /** The preset just applied, when one was. */
+    applied: { label: string; icon: string; previous: CategoryId[] } | null;
     onChange: (next: CategoryId[]) => void;
+    onUndo: () => void;
+    /** Omitted when the order already is the default — nothing to reset to. */
+    onReset?: () => void;
     /** Omitted when every profile is switched off — then there is no offer. */
     onOpenPresets?: () => void;
 }) {
     return (
         <>
             <div className="p-5 sm:p-7">
-                <h2 className="text-lg font-black text-finn-black">
-                    Your priorities
-                </h2>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h2 className="text-lg font-black text-finn-black">
+                        Your priorities
+                    </h2>
 
-                <p className="mt-1 mb-5 max-w-3xl text-xs leading-5 text-finn-iron">
+                    {/*
+                      * Persistent, unlike the banner below it. The banner is
+                      * about an action a moment ago; this is about the state,
+                      * and it survives a scroll, a page turn and a return.
+                      * It disappears the moment the reader moves anything,
+                      * because then the order is theirs and not the profile's.
+                      */}
+                    {inUse && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-black text-finn-accent-blue">
+                            <span aria-hidden>{inUse.icon}</span>
+                            {inUse.label}
+                        </span>
+                    )}
+                </div>
+
+                <p className="mt-1 mb-4 max-w-3xl text-xs leading-5 text-finn-iron">
                     Drag a row, or use the arrows, to change what counts for
                     more. You can come back and change this whenever you like —
                     it lives in Settings, and in the compare flow.
                 </p>
+
+                {applied && (
+                    <AppliedBanner applied={applied} onUndo={onUndo} />
+                )}
 
                 <PriorityOrderList
                     priorities={priorities}
@@ -187,6 +320,19 @@ function OrderView({
                     categoryFeatures={categoryFeatures}
                     onChange={onChange}
                 />
+
+                {onReset && (
+                    <div className="mt-5 border-t border-finn-cotton pt-4">
+                        <button
+                            type="button"
+                            onClick={onReset}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-finn-snow px-3.5 py-2 text-[11px] font-bold text-finn-iron transition hover:bg-finn-cotton hover:text-finn-black"
+                        >
+                            <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
+                            Start over from Lens's order
+                        </button>
+                    </div>
+                )}
             </div>
 
             {onOpenPresets && (
@@ -228,7 +374,8 @@ function PresetsView({
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     profiles: Profile[];
-    onApply: (next: CategoryId[]) => void;
+    /** The whole profile, not just its order — the caller has to name it. */
+    onApply: (profile: Profile) => void;
     onBack: () => void;
 }) {
     return (
@@ -271,7 +418,17 @@ function PresetsView({
                     profiles={profiles}
                     priorityDefinitions={priorityDefinitions}
                     priorities={priorities}
-                    onApply={onApply}
+                    onApply={(next) => {
+                        const chosen = profiles.find(
+                            (profile) =>
+                                profile.priorities.length === next.length &&
+                                profile.priorities.every(
+                                    (id, index) => next[index] === id,
+                                ),
+                        );
+
+                        if (chosen) onApply(chosen);
+                    }}
                 />
             </div>
         </div>
