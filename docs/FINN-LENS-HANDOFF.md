@@ -75,8 +75,21 @@ button into every `product-card` and onto detail pages, and a Lens control onto 
 photo. The control is drawn in the same synchronous pass as the pin button and needs nothing
 but the card; the verdict on it — "Strong match / Good match / …" — is filled in separately
 once the settings and the car's data are both in hand, and until then the pill reads "How
-does it fit?". Clicking it works throughout: the panel names the car and waits for its data
-(`resolveCar(id, { waitMs })`, which wakes on the storage write rather than polling).
+does it fit?". Clicking it works throughout, and `resolveCar` answers in three steps because there are
+three different reasons the car might not be in hand. **We have it** — usually true, the
+interceptor keeps a copy of every car FINN's pages fetch. **It is arriving** — the control is
+drawn with the card, before the interceptor's copy reaches storage, so a short wait
+(`waitMs`, woken by the storage event rather than polled) covers that gap. **FINN never sent
+it** — a card drawn from markup, a cleared cache, a page fetched before the interceptor was
+installed: `fetchIfMissing` then asks FINN outright through the same `loadCarsFromFinnApi`
+the pin button uses, taking its API branch from the clicked card's own `getPageContext`, and
+merges the answer into the cache so nobody asks twice.
+
+That third step was missing and it was a real bug: the pin button has always fetched in
+exactly that situation, so a reader could pin a car the panel beside it claimed not to know
+about. **Badges still never fetch** — forty cards are not forty requests; `fetchIfMissing`
+defaults to false and only the panel passes it, which makes the request one deliberate act
+by the reader.
 
 That split is deliberate and is the fix for a real defect. The control used to be drawn only
 where a verdict could already be worked out, and a verdict needs the car's data, which does

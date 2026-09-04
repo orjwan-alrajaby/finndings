@@ -12,6 +12,7 @@ import {
   buildCarUrl,
   extractConfigId,
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
+import { getPageContext } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/page-context";
 
 /**
  * Which car the reader is actually looking at, and what we know about it.
@@ -271,36 +272,96 @@ export async function resolvePageCars(
 }
 
 /**
- * One car by id, from what we already have.
+ * One car by id: from what we have, then from what is arriving, then by
+ * asking FINN.
  *
- * Deliberately no network: everything this can answer for is a car FINN's own
- * page has already fetched, and the interceptor keeps a copy of every one of
- * those. A request here would be asking FINN twice for something it has
- * already sent us.
+ * Three steps because there are three genuinely different reasons the car
+ * might not be in hand, and only the last of them is a dead end.
  *
- * What it will do is wait. The button that leads here is now drawn the moment
- * the card exists — the same moment the pin button appears — while the car's
- * data arrives separately, when the interceptor's copy of FINN's response
- * reaches storage. So a miss is usually not "we don't have this car"; it is
- * "we don't have it *yet*", and the gap is the few hundred milliseconds
- * between finn.com drawing a card and finishing the request that drew it.
- * Failing instantly in that window would tell the reader something untrue.
+ * **We already have it.** Usually true. The interceptor keeps a copy of every
+ * car FINN's own pages fetch, so the car the reader clicked was very likely
+ * kept when the page that drew it loaded.
+ *
+ * **It is on its way.** The button that leads here is drawn the moment the
+ * card exists — the same moment the pin button appears — while the data
+ * arrives separately, when the interceptor's copy reaches storage. A miss in
+ * that window is not "we don't have this car", it is "not yet", and the gap
+ * is a few hundred milliseconds. Waiting costs nothing and asks FINN nothing.
+ *
+ * **FINN never sent it.** Which happens: a card drawn from markup rather than
+ * from a response we saw, a cache cleared underneath us, a page that fetched
+ * before the interceptor was installed. This used to give up here, on the
+ * reasoning that a request would be asking FINN twice for something it had
+ * already sent — true of the first two cases and false of this one. The pin
+ * button has always fetched in exactly this situation, using exactly this
+ * helper, so a reader could pin a car that Lens then claimed not to know
+ * about. Now both ask.
+ *
+ * The badges still never fetch. Forty cards on a listing are not forty
+ * reasons to call FINN's API — the request happens when a reader asks about
+ * one car, which is one request for one deliberate act.
  */
 export async function resolveCar(
   id: number,
-  { waitMs = 0 }: { waitMs?: number } = {},
+  {
+    waitMs = 0,
+    fetchIfMissing = false,
+  }: { waitMs?: number; fetchIfMissing?: boolean } = {},
 ): Promise<PinnedFinnCar | null> {
   try {
     const found = await readCar(id);
 
-    if (found || waitMs <= 0) return found;
+    if (found) return found;
 
-    return await waitForCar(id, waitMs);
+    if (waitMs > 0) {
+      const arrived = await waitForCar(id, waitMs);
+
+      if (arrived) return arrived;
+    }
+
+    return fetchIfMissing ? await fetchCar(id) : null;
   } catch (error) {
     console.error("[FinnLens] couldn't read what we know about a car", error);
 
     return null;
   }
+}
+
+/**
+ * Ask FINN for one car, the way the pin button does.
+ *
+ * The context comes from the card the reader clicked, so this takes whichever
+ * of `loadCarsFromFinnApi`'s branches the pin button would have taken from
+ * the same element — the listing fetch, the `swap_config_id` fetch, or the
+ * whole-model fetch off a configuration card. Falling back to the details
+ * page root covers a card that has since been redrawn out from under us: that
+ * anchor resolves to the `swap_config_id` branch, which names this car
+ * exactly.
+ *
+ * Whatever comes back is merged into the cache, so the next reader of this
+ * car — a badge pass, another panel, the pin button — finds it without
+ * asking again.
+ */
+async function fetchCar(id: number): Promise<PinnedFinnCar | null> {
+  const anchor = cardForCar(id) ?? detailsPageRoot();
+
+  if (!anchor) return null;
+
+  const response = await loadCarsFromFinnApi({
+    ...getPageContext(anchor),
+    anchorElement: anchor,
+    carConfigId: id,
+  });
+
+  const mapped = mapFinnConfigToAll(response.results);
+
+  await mergeLoadedCars(mapped);
+
+  /* Keyed lookup first, then by id — the same belt and braces the pin button uses. */
+  const car =
+    mapped[id] ?? Object.values(mapped).find((item) => item.id === id);
+
+  return car ? asEvaluatable(car) : null;
 }
 
 /** What storage holds for one car right now. */

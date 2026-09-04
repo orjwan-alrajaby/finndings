@@ -36,14 +36,16 @@ const HOST_ID = "finn-lens-analysis-root";
 const PANEL_WIDTH = 416;
 
 /**
- * How long the panel will wait for a car FINN has not finished sending.
+ * How long the panel waits for a car that is already on its way.
  *
- * Long enough to cover the gap between a card being drawn and the request
- * that drew it completing, which is where nearly every wait falls; short
- * enough that a car FINN never sends does not leave the panel spinning while
- * the reader wonders whether it is broken.
+ * Much shorter than it was, because giving up is no longer the next step —
+ * asking FINN is. This only has to cover the gap between a card being drawn
+ * and the interceptor's copy of the request that drew it reaching storage,
+ * which is a few hundred milliseconds. Past that the car probably is not
+ * coming on its own, and waiting longer only delays the request that will
+ * actually answer.
  */
-const CAR_WAIT_MS = 6000;
+const CAR_WAIT_MS = 1500;
 
 /** The stored settings that change what an analysis says. */
 const WATCHED_KEYS = [
@@ -248,19 +250,24 @@ async function render(
    */
   if (request.carId != null) {
     /*
-     * Waited for rather than demanded. The badge is drawn as soon as the card
-     * is, which is before the interceptor's copy of FINN's response has
-     * reached storage — so on a listing the reader can very reasonably click
-     * a car we are about to know about. See `resolveCar`.
+     * Waited for, then asked for. The badge is drawn as soon as the card is,
+     * which is before the interceptor's copy of FINN's response has reached
+     * storage — so on a listing the reader can very reasonably click a car we
+     * are about to know about, and a moment's wait answers that. A car FINN
+     * never sent us is fetched outright, the way the pin button has always
+     * fetched it. See `resolveCar`.
      */
-    const car = await resolveCar(request.carId, { waitMs: CAR_WAIT_MS });
+    const car = await resolveCar(request.carId, {
+      waitMs: CAR_WAIT_MS,
+      fetchIfMissing: true,
+    });
 
     if (!car) {
       empty(into);
       into.append(
         message(
           "We couldn't load this car",
-          "FINN hasn't sent us its data for this one. Opening the car on FINN's own page usually settles it.",
+          "Lens asked FINN for it and didn't get an answer it could use. That is usually the connection rather than the car — try again in a moment.",
           {
             label: "Try again",
             onClick: retry,
