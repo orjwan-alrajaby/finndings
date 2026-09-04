@@ -114,6 +114,13 @@ export function AdviceHero({
                     </div>
 
                     <div className="mt-7 flex flex-wrap items-center gap-3">
+                        {/*
+                          * Only when there is somewhere to go. FINN does not
+                          * supply a URL for every car — and a button reading
+                          * "View this car on FINN" that reloads the page is
+                          * worse than one that isn't there.
+                          */}
+                        {winner.url && (
                         <a
                             href={winner.url}
                             target="_blank"
@@ -123,6 +130,7 @@ export function AdviceHero({
                             View this car on FINN
                             <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                         </a>
+                        )}
 
                         <button
                             type="button"
@@ -135,11 +143,14 @@ export function AdviceHero({
                 </div>
 
                 <div className="relative min-h-64 bg-finn-accent-blue/40 lg:min-h-full">
-                    <img
-                        src={winner.images.thumbnail}
-                        alt={winner.name}
-                        className="absolute inset-0 h-full w-full object-cover"
-                    />
+                    {/* Same reason: a broken image is louder than no image. */}
+                    {winner.images?.thumbnail && (
+                        <img
+                            src={winner.images.thumbnail}
+                            alt={winner.name}
+                            className="absolute inset-0 h-full w-full object-cover"
+                        />
+                    )}
 
                     <div className="absolute inset-0 bg-linear-to-t from-finn-highlight-navy via-finn-highlight-navy/20 to-transparent" />
 

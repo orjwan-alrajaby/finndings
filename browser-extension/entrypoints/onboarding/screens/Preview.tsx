@@ -1,10 +1,9 @@
 import { useMemo } from "react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import {
     ArrowLeftIcon,
     ArrowTopRightOnSquareIcon,
     BeakerIcon,
-    CheckBadgeIcon,
-    ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
 import {
@@ -17,37 +16,45 @@ import type {
     CategoryId,
     FeatureSelection,
     LensPreferences,
-    Recommendation,
 } from "@/lib/reasoning-engine/types";
-import type { AdviceNarrative } from "@/lib/reasoning-engine/narrative/types";
+import type { PinnedFinnCar } from "@/lib/types";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
 import { demoCars, demoCarSummary } from "@/lib/demo-cars";
 import { FINN_BASE_URL } from "@/lib/constants";
+
+import { AdviceHero } from "../../compare/steps/StepFourGenerateAdvice/components/AdviceHero";
+import { AdviceSidebar } from "../../compare/steps/StepFourGenerateAdvice/components/AdviceSidebar";
+import { BehindTheRecommendation } from "../../compare/steps/StepFourGenerateAdvice/components/BehindTheRecommendation";
+import { CostAnalysis } from "../../compare/steps/StepFourGenerateAdvice/components/CostAnalysis";
+import { Tradeoffs } from "../../compare/steps/StepFourGenerateAdvice/components/Tradeoffs";
+import { WhyItWins } from "../../compare/steps/StepFourGenerateAdvice/components/WhyItWins";
 
 /**
  * The last screen, where the reader sees the product rather than a
  * description of it.
  *
- * Everything above this is a claim: Lens will rank your cars and explain the
- * result. This runs the actual engine — the same `buildRecommendation` and
- * the same narrative layer the advice page uses — over three example cars,
- * against the order the reader set two screens ago, and shows what it says.
- * No mock copy, no screenshot: change the priorities and this changes.
+ * **This is the advice page, not a picture of it.** It imports the same
+ * `AdviceHero`, `WhyItWins`, `Tradeoffs`, `CostAnalysis`,
+ * `BehindTheRecommendation` and `AdviceSidebar` the real page renders, in the
+ * same order, fed by the same `buildRecommendation` and `buildAdviceNarrative`
+ * — over three example cars, against the order the reader set two screens
+ * ago. Change a priority and this changes.
  *
- * **It shows the working, not just the answer.** It used to show a headline,
- * two reasons and a cost — which is a summary of the thing rather than the
- * thing, and summarises away exactly what makes this product different from
- * a filter with a sort order. The reader now sees the ranking it produced,
- * the priorities it walked in their own order with what the winner does about
- * each, the compromise named against the car that would have avoided it, and
- * the cost taken apart into the three numbers it is made of. Every one of
- * those comes off the same `AdviceNarrative` the real page renders; nothing
- * here is written for the demo.
+ * That reuse is the whole design and it replaced a hand-built summary. The
+ * summary showed the same *facts* in a different shape, which is the one
+ * thing a preview must not do: a reader who is shown one layout here and
+ * meets another on their first real comparison has been taught nothing, and
+ * the moment that should feel like recognition feels like a second product.
+ * Everything here is a component they will meet again.
  *
- * The cars are invented and labelled as such on the screen. That is the one
- * thing here that must not be quiet, because everything around it is real
- * output and the reader has no way to tell which parts are which unless we
- * say so.
+ * Short rather than different. The hot seat is the one thing left out — it is
+ * an interaction rather than a reading, and it needs cars the reader chose —
+ * and the page says so where it would have been.
+ *
+ * The cars are invented and labelled as such twice: once above the reading,
+ * and once on each card in the line-up. That is the one thing here that must
+ * not be quiet, because everything around it is real output and the reader
+ * has no way to tell which parts are which unless we say so.
  */
 export function Preview({
     priorities,
@@ -56,6 +63,7 @@ export function Preview({
     saving,
     saveError,
     onBack,
+    onEditPriorities,
     onFinish,
     onOpenCompare,
 }: {
@@ -67,10 +75,21 @@ export function Preview({
     /** Set when that write failed, so the screen can stop claiming it worked. */
     saveError: boolean;
     onBack: () => void;
+    /**
+     * Back to the priority screen.
+     *
+     * The hero's own button says "Change priorities", so it has to go to the
+     * priorities — `onBack` is one screen back, which is the driving
+     * assumptions, and a button that goes somewhere other than its label is
+     * worse than no button.
+     */
+    onEditPriorities: () => void;
     /** Finishes setup and sends the reader to finn.com to pin real cars. */
     onFinish: () => void;
     onOpenCompare: () => void;
 }) {
+    const cars = useMemo(() => demoCars(), []);
+
     /*
      * Rebuilt whenever the answers change rather than once, so a reader who
      * steps back to swap their top priority and returns sees a different
@@ -78,7 +97,7 @@ export function Preview({
      */
     const result = useMemo(() => {
         const recommendation = buildRecommendation(
-            demoCars(),
+            cars,
             priorities,
             preferences,
             categoryFeatures,
@@ -94,443 +113,339 @@ export function Preview({
                 recommendation.alternatives,
             ),
         };
-    }, [priorities, preferences, categoryFeatures]);
+    }, [cars, priorities, preferences, categoryFeatures]);
 
     const topPriority = priorities[0];
 
     return (
-        <div>
-            <div className="text-center">
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue">
-                    You're set up
-                </p>
+        <Tooltip.Provider delayDuration={350}>
+            <div>
+                <div className="text-center">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue">
+                        You're set up
+                    </p>
 
-                <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-black leading-tight tracking-tight text-finn-black sm:text-4xl">
-                    This is what Lens will do with real cars
-                </h1>
+                    <h1 className="mx-auto mt-3 max-w-2xl text-3xl font-black leading-tight tracking-tight text-finn-black sm:text-4xl">
+                        This is your advice page, with example cars
+                    </h1>
 
-                <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-finn-iron">
-                    Everything below was produced by the real engine, against
-                    the order you just set
-                    {topPriority
-                        ? ` — led by ${CATEGORIES[topPriority]?.label ?? topPriority}`
-                        : ""}
-                    . Only the three cars are made up.
-                </p>
-            </div>
-
-            <div className="mt-6 flex items-start gap-2 rounded-[20px] bg-finn-warning/10 px-4 py-3 text-left">
-                <BeakerIcon className="mt-0.5 h-4 w-4 shrink-0 text-finn-warning" />
-
-                <p className="text-xs leading-5 text-finn-black">
-                    <strong className="font-black">
-                        Aveline, Norvane and Halden are not real manufacturers.
-                    </strong>{" "}
-                    These three cars are examples: their prices, emissions and
-                    equipment were written to demonstrate the reasoning, and
-                    they are not FINN listings or offers. Nothing here is
-                    pinned and nothing is saved to your comparisons.
-                </p>
-            </div>
-
-            {result ? (
-                <Advice
-                    recommendation={result.recommendation}
-                    narrative={result.narrative}
-                />
-            ) : (
-                <p className="mt-4 rounded-[28px] bg-white p-6 text-center text-sm text-finn-iron shadow-sm">
-                    Choose at least one priority and Lens can show you a
-                    worked example here.
-                </p>
-            )}
-
-            {saveError && (
-                <p className="mt-4 rounded-2xl bg-finn-error/10 px-4 py-3 text-center text-xs font-bold text-finn-error">
-                    Your answers couldn't be saved to browser storage. Lens
-                    will fall back to its defaults — try setting your
-                    priorities again from Settings.
-                </p>
-            )}
-
-            <div className="mt-8 flex flex-col items-center gap-3">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
-                        aria-label="Back to your driving assumptions"
-                    >
-                        <ArrowLeftIcon className="h-5 w-5" />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onFinish}
-                        disabled={saving}
-                        className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-wait disabled:bg-finn-cotton disabled:text-finn-iron"
-                    >
-                        {saving ? "Saving…" : "Go pin some real cars"}
-                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onOpenCompare}
-                        disabled={saving}
-                        className="inline-flex h-13 items-center justify-center rounded-full px-5 text-xs font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline disabled:cursor-wait"
-                    >
-                        Open FINN Lens instead
-                    </button>
+                    <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-finn-iron">
+                        Not a mock-up — the page below is the one you'll get
+                        after pinning real cars, drawn by the same code and
+                        judged against the order you just set
+                        {topPriority
+                            ? ` — led by ${CATEGORIES[topPriority]?.label ?? topPriority}`
+                            : ""}
+                        .
+                    </p>
                 </div>
 
-                <p className="max-w-md text-center text-[11px] leading-4 text-finn-iron">
-                    Pin two or more cars on{" "}
-                    <span className="font-bold text-finn-black">
-                        {FINN_BASE_URL.replace("https://www.", "")}
-                    </span>{" "}
-                    and Lens will rank them the moment you open it. It won't
-                    ask you any of this again.
-                </p>
-            </div>
-        </div>
-    );
-}
+                <div className="mt-6 flex items-start gap-2 rounded-[20px] bg-finn-warning/10 px-4 py-3 text-left">
+                    <BeakerIcon className="mt-0.5 h-4 w-4 shrink-0 text-finn-warning" />
 
-/* -------------------------------------------------------------------------- */
-/* The advice, in miniature                                                   */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The same six questions the real advice page answers, in the same order.
- *
- * Which car, why, how it does on each thing you said mattered, what you give
- * up, what it costs, and how the rest placed. Shorter than the real page and
- * not different from it.
- */
-function Advice({
-    recommendation,
-    narrative,
-}: {
-    recommendation: Recommendation;
-    narrative: AdviceNarrative;
-}) {
-    const { winner } = recommendation;
-
-    return (
-        <section className="mt-4 overflow-hidden rounded-[28px] bg-white shadow-sm">
-            <header className="bg-finn-black px-6 py-5 text-white">
-                <p className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-white/60">
-                    <CheckBadgeIcon className="h-4 w-4" />
-                    The recommendation
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-                    <div className="min-w-0">
-                        <h2 className="text-xl font-black leading-snug sm:text-2xl">
-                            {narrative.verdict.headline}
-                        </h2>
-
-                        <p className="mt-1.5 text-xs font-bold text-white/70">
-                            {winner.name} · {configurationName(winner)}
-                        </p>
-
-                        <p className="mt-0.5 text-[11px] text-white/50">
-                            {configurationDetail(winner)}
-                        </p>
-
-                        <p className="mt-2 text-[11px] leading-4 text-white/60">
-                            {demoCarSummary(winner.id)}
-                        </p>
-                    </div>
-
-                    <div className="shrink-0 text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/50">
-                            All in, per month
-                        </p>
-
-                        <p className="text-2xl font-black leading-tight">
-                            {formatEUR(Math.round(narrative.cost.subject.total))}
-                        </p>
-                    </div>
+                    <p className="text-xs leading-5 text-finn-black">
+                        <strong className="font-black">
+                            Aveline, Norvane and Halden are not real
+                            manufacturers.
+                        </strong>{" "}
+                        These three cars are examples: their prices, emissions
+                        and equipment were written to demonstrate the
+                        reasoning, and they are not FINN listings or offers.
+                        Nothing here is pinned and nothing is saved to your
+                        comparisons.
+                    </p>
                 </div>
 
-                {narrative.verdict.marginNote && (
-                    <p className="mt-3 border-t border-white/15 pt-3 text-[11px] leading-4 text-white/60">
-                        {narrative.verdict.marginNote}
+                <LineUp cars={cars} winnerId={result?.recommendation.winner.id} />
+
+                {result ? (
+                    <>
+                        {/*
+                          * From here down, every component is imported from the
+                          * advice page. Nothing is re-implemented, so nothing
+                          * can drift into showing the reader a page that does
+                          * not exist.
+                          */}
+                        <div className="mt-6">
+                            <AdviceHero
+                                evaluation={result.recommendation.evaluation}
+                                narrative={result.narrative}
+                                cost={
+                                    result.recommendation.context.costs[
+                                        result.recommendation.winner.id
+                                    ]!
+                                }
+                                priorities={
+                                    result.recommendation.context.priorities
+                                }
+                                isFallback={result.recommendation.isFallback}
+                                onBack={onEditPriorities}
+                            />
+                        </div>
+
+                        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                            <div className="space-y-6">
+                                <WhyItWins
+                                    narrative={result.narrative}
+                                    subjectName={
+                                        result.recommendation.winner.name
+                                    }
+                                />
+
+                                <Tradeoffs
+                                    tradeoffs={result.narrative.tradeoffs}
+                                    isRecommendation
+                                    subjectName={
+                                        result.recommendation.winner.name
+                                    }
+                                />
+
+                                <HotSeatPlaceholder
+                                    alternatives={
+                                        result.recommendation.alternatives
+                                    }
+                                />
+
+                                <CostAnalysis
+                                    analysis={
+                                        result.recommendation.evaluation.cost
+                                    }
+                                    reasoning={result.narrative.cost}
+                                />
+
+                                <BehindTheRecommendation
+                                    context={result.recommendation.context}
+                                    recommendedId={
+                                        result.recommendation.winner.id
+                                    }
+                                    selectedId={
+                                        result.recommendation.winner.id
+                                    }
+                                    margin={result.narrative.verdict.margin}
+                                    comparison={null}
+                                    weights={
+                                        result.recommendation.context.weights
+                                    }
+                                />
+                            </div>
+
+                            <AdviceSidebar
+                                weights={result.recommendation.context.weights}
+                                preferences={preferences}
+                                onAdjustSettings={onBack}
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <p className="mt-4 rounded-[28px] bg-white p-6 text-center text-sm text-finn-iron shadow-sm">
+                        Choose at least one priority and Lens can show you a
+                        worked example here.
                     </p>
                 )}
-            </header>
 
-            <div className="grid gap-px bg-finn-cotton md:grid-cols-2">
-                <Panel title="Why this one">
-                    {narrative.verdict.reasons.length > 0 ? (
-                        <ul className="space-y-2.5">
-                            {narrative.verdict.reasons
-                                .slice(0, 3)
-                                .map((reason) => (
-                                    <li
-                                        key={reason}
-                                        className="flex gap-2 text-xs leading-5 text-finn-black"
-                                    >
-                                        <span
-                                            aria-hidden="true"
-                                            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-finn-accent-blue"
-                                        />
-                                        {reason}
-                                    </li>
-                                ))}
-                        </ul>
-                    ) : (
-                        <p className="text-xs leading-5 text-finn-iron">
-                            On this order the three cars are close enough that
-                            nothing separates them worth stating — which Lens
-                            says rather than inventing a reason.
-                        </p>
-                    )}
-                </Panel>
+                {saveError && (
+                    <p className="mt-6 rounded-2xl bg-finn-error/10 px-4 py-3 text-center text-xs font-bold text-finn-error">
+                        Your answers couldn't be saved to browser storage. Lens
+                        will fall back to its defaults — try setting your
+                        priorities again from Settings.
+                    </p>
+                )}
 
-                <Panel
-                    title="What you'd give up"
-                    icon={
-                        <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                    }
-                >
-                    {narrative.tradeoffs.length > 0 ? (
-                        <div className="space-y-2.5">
-                            {narrative.tradeoffs
-                                .slice(0, 2)
-                                .map((tradeoff) => (
-                                    <div
-                                        key={tradeoff.headline}
-                                        className="rounded-2xl bg-finn-snow px-3.5 py-2.5"
-                                    >
-                                        <p className="text-xs font-black text-finn-black">
-                                            {tradeoff.headline}
-                                        </p>
+                <div className="mt-8 flex flex-col items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
+                            aria-label="Back to your driving assumptions"
+                        >
+                            <ArrowLeftIcon className="h-5 w-5" />
+                        </button>
 
-                                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                                            {tradeoff.evidence}
-                                        </p>
+                        <button
+                            type="button"
+                            onClick={onFinish}
+                            disabled={saving}
+                            className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-wait disabled:bg-finn-cotton disabled:text-finn-iron"
+                        >
+                            {saving ? "Saving…" : "Go pin some real cars"}
+                            <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                        </button>
 
-                                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                                            {tradeoff.relevance}
-                                        </p>
-                                    </div>
-                                ))}
-                        </div>
-                    ) : (
-                        <p className="text-xs leading-5 text-finn-iron">
-                            Nothing worth naming — on this order the winner
-                            gives up nothing the others offer.
-                        </p>
-                    )}
-                </Panel>
-
-                <Panel title="Priority by priority, in your order">
-                    <ol className="space-y-2">
-                        {narrative.priorities.slice(0, 4).map((priority) => (
-                            <li
-                                key={priority.priority}
-                                className="flex items-start gap-2.5"
-                            >
-                                <span
-                                    aria-hidden="true"
-                                    className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-xs"
-                                >
-                                    {priority.icon}
-                                </span>
-
-                                <span className="min-w-0 flex-1">
-                                    <span className="flex flex-wrap items-baseline gap-x-2">
-                                        <span className="text-xs font-black text-finn-black">
-                                            #{priority.rank} {priority.label}
-                                        </span>
-
-                                        <span className="text-[10px] font-bold text-finn-iron">
-                                            {priority.weightPercent}% of the
-                                            result
-                                        </span>
-                                    </span>
-
-                                    <span className="mt-0.5 block text-[11px] leading-4 text-finn-iron">
-                                        {priority.sentences[0] ??
-                                            "FINN's data doesn't say enough about this one to judge it."}
-                                    </span>
-                                </span>
-                            </li>
-                        ))}
-                    </ol>
-                </Panel>
-
-                <Panel title="What it actually costs">
-                    <div className="space-y-1.5">
-                        {narrative.cost.subject.subscription != null && (
-                            <CostLine
-                                label="FINN subscription"
-                                amount={narrative.cost.subject.subscription}
-                            />
-                        )}
-
-                        {narrative.cost.subject.energy != null && (
-                            <CostLine
-                                label="Estimated energy"
-                                amount={narrative.cost.subject.energy}
-                            />
-                        )}
-
-                        {narrative.cost.subject.excessMileage != null && (
-                            <CostLine
-                                label="Estimated extra mileage"
-                                amount={narrative.cost.subject.excessMileage}
-                            />
-                        )}
-
-                        <div className="flex items-baseline justify-between border-t border-finn-cotton pt-2">
-                            <span className="text-xs font-black text-finn-black">
-                                Per month
-                            </span>
-
-                            <span className="text-xs font-black text-finn-black">
-                                {formatEUR(
-                                    Math.round(narrative.cost.subject.total),
-                                )}
-                            </span>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={onOpenCompare}
+                            disabled={saving}
+                            className="inline-flex h-13 items-center justify-center rounded-full px-5 text-xs font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline disabled:cursor-wait"
+                        >
+                            Open FINN Lens instead
+                        </button>
                     </div>
 
-                    <p className="mt-2 text-[11px] leading-4 text-finn-iron">
-                        At {narrative.cost.monthlyKm} km a month, on the fuel
-                        and electricity prices you gave.
+                    <p className="max-w-md text-center text-[11px] leading-4 text-finn-iron">
+                        Pin two or more cars on{" "}
+                        <span className="font-bold text-finn-black">
+                            {FINN_BASE_URL.replace("https://www.", "")}
+                        </span>{" "}
+                        and you'll get this page about them. It won't ask you
+                        any of this again.
                     </p>
-                </Panel>
+                </div>
             </div>
-
-            <Ranking recommendation={recommendation} />
-
-            <p className="border-t border-finn-cotton px-6 py-4 text-center text-[11px] leading-4 text-finn-iron">
-                The real advice page says more again — every priority in full,
-                the equipment behind each verdict, and four close alternatives
-                you can put in a hot seat against the winner.
-            </p>
-        </section>
+        </Tooltip.Provider>
     );
 }
 
-function Panel({
-    title,
-    icon,
-    children,
+/* -------------------------------------------------------------------------- */
+/* The cars being reasoned about                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The three cars, before the page starts arguing about them.
+ *
+ * The reading below names cars constantly — "€282/month more than Lumo", "the
+ * Estate has it" — and without having met them, the reader is following an
+ * argument about strangers. This is the line-up they would otherwise have
+ * built themselves by pinning: what each one is, what it costs, and the one
+ * figure that makes it different from the other two.
+ */
+function LineUp({
+    cars,
+    winnerId,
 }: {
-    title: string;
-    icon?: React.ReactNode;
-    children: React.ReactNode;
+    cars: PinnedFinnCar[];
+    /** Marked, so the argument that follows starts from a known place. */
+    winnerId?: number;
 }) {
     return (
-        <div className="bg-white p-5">
-            <p className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
-                {icon}
-                {title}
+        <div className="mt-4">
+            <p className="mb-2 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
+                The three cars being compared
             </p>
 
-            {children}
+            <div className="grid gap-3 sm:grid-cols-3">
+                {cars.map((car) => {
+                    const winner = car.id === winnerId;
+
+                    return (
+                        <div
+                            key={car.id}
+                            className={[
+                                "rounded-[22px] bg-white p-4",
+                                winner
+                                    ? "shadow-[0_0_0_2px] shadow-finn-accent-blue"
+                                    : "shadow-sm",
+                            ].join(" ")}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <p className="min-w-0 text-sm font-black text-finn-black">
+                                    {car.name}
+                                </p>
+
+                                <span className="shrink-0 rounded-full bg-finn-cotton px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-finn-iron">
+                                    Example
+                                </span>
+                            </div>
+
+                            <p className="mt-0.5 text-[11px] font-bold text-finn-accent-blue">
+                                {configurationName(car)}
+                            </p>
+
+                            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
+                                {configurationDetail(car)}
+                            </p>
+
+                            <p className="mt-2 text-[11px] leading-4 text-finn-iron">
+                                {demoCarSummary(car.id)}
+                            </p>
+
+                            <dl className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-finn-cotton pt-2.5">
+                                <Spec label="Boot" value={`${car.capacity.trunk} L`} />
+
+                                <Spec
+                                    label="CO₂"
+                                    value={`${car.co2.value} g/km`}
+                                />
+
+                                {car.electric?.range !== undefined &&
+                                car.electric?.range !== "Unknown" ? (
+                                    <Spec
+                                        label="Range"
+                                        value={`${car.electric.range} km`}
+                                    />
+                                ) : (
+                                    <Spec
+                                        label="Uses"
+                                        value={`${car.consumption.combined} ${
+                                            car.consumption.unit ===
+                                            "kWh/100Km"
+                                                ? "kWh"
+                                                : "L"
+                                        }/100km`}
+                                    />
+                                )}
+                            </dl>
+
+                            <p className="mt-2.5 text-xs font-black text-finn-black">
+                                {formatEUR(
+                                    car.pricing.customerMonthly.price,
+                                )}
+                                <span className="font-bold text-finn-iron">
+                                    /mo subscription
+                                </span>
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
 
-function CostLine({ label, amount }: { label: string; amount: number }) {
+function Spec({ label, value }: { label: string; value: string }) {
     return (
-        <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[11px] text-finn-iron">{label}</span>
-
-            <span className="shrink-0 text-[11px] font-bold text-finn-black">
-                {formatEUR(Math.round(amount))}
-            </span>
+        <div className="min-w-0">
+            <dt className="text-[9px] font-black uppercase tracking-wide text-finn-iron">
+                {label}
+            </dt>
+            <dd className="text-[11px] font-bold text-finn-black">{value}</dd>
         </div>
     );
 }
 
 /**
- * Where the other cars came out, and by how much.
+ * Where the hot seat would be, said rather than drawn.
  *
- * The thing a headline cannot show: that this was a comparison rather than a
- * pick. Bars are relative to the leader, so the reader sees a close call as
- * close and a rout as a rout — the number alone reads the same either way.
+ * The real page offers the four closest alternatives and will re-argue the
+ * whole comparison against whichever the reader picks. Leaving it out
+ * silently would make the preview quietly smaller than the thing; drawing a
+ * picker that does nothing would be worse. So the section keeps its place in
+ * the order and says what belongs there.
  */
-function Ranking({ recommendation }: { recommendation: Recommendation }) {
-    const rows = recommendation.ranked.map((car) => {
-        const score =
-            recommendation.scores.find((item) => item.vehicleId === car.id)
-                ?.total ?? 0;
-
-        return {
-            car,
-            score,
-            cost: recommendation.context.costs[car.id]?.totalMonthly ?? null,
-        };
-    });
-
-    const best = Math.max(...rows.map((row) => row.score), 1);
+function HotSeatPlaceholder({
+    alternatives,
+}: {
+    alternatives: PinnedFinnCar[];
+}) {
+    if (alternatives.length === 0) return null;
 
     return (
-        <div className="border-t border-finn-cotton p-5">
-            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
-                How all three placed
+        <section className="rounded-[28px] border border-dashed border-finn-cotton bg-white/60 p-6 sm:p-8">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-iron">
+                Not shown here
             </p>
 
-            <ol className="space-y-2.5">
-                {rows.map((row, index) => {
-                    const winner = row.car.id === recommendation.winner.id;
+            <h2 className="mt-2 text-xl font-black text-finn-black">
+                Challenge the recommendation
+            </h2>
 
-                    return (
-                        <li key={row.car.id} className="flex items-center gap-3">
-                            <span
-                                className={[
-                                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black",
-                                    winner
-                                        ? "bg-finn-accent-blue text-white"
-                                        : "bg-finn-snow text-finn-iron",
-                                ].join(" ")}
-                            >
-                                {index + 1}
-                            </span>
-
-                            <span className="min-w-0 flex-1">
-                                <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                                    <span className="truncate text-xs font-bold text-finn-black">
-                                        {row.car.name}
-
-                                        <span className="ml-1.5 rounded-full bg-finn-cotton px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-finn-iron">
-                                            Example
-                                        </span>
-                                    </span>
-
-                                    <span className="shrink-0 text-[11px] font-bold text-finn-iron">
-                                        {row.cost != null
-                                            ? `${formatEUR(Math.round(row.cost))}/mo`
-                                            : "cost unknown"}
-                                    </span>
-                                </span>
-
-                                <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-finn-snow">
-                                    <span
-                                        className={[
-                                            "block h-full rounded-full",
-                                            winner
-                                                ? "bg-finn-accent-blue"
-                                                : "bg-finn-iron/30",
-                                        ].join(" ")}
-                                        style={{
-                                            width: `${Math.round((row.score / best) * 100)}%`,
-                                        }}
-                                    />
-                                </span>
-                            </span>
-                        </li>
-                    );
-                })}
-            </ol>
-
-        </div>
+            <p className="mt-2 max-w-xl text-xs leading-5 text-finn-iron">
+                On the real page this is where the closest alternatives sit —{" "}
+                {alternatives.map((car) => car.name).join(" and ")} here. Put
+                one in the hot seat and Lens argues the whole comparison again
+                from its side, head to head. It changes what is{" "}
+                <em>examined</em>, never what is recommended.
+            </p>
+        </section>
     );
 }

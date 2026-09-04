@@ -95,21 +95,36 @@ a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
 just set, so the reader sees the actual output before pinning anything.
 
-It renders six things, all off the same `AdviceNarrative` the real advice page uses and none
-written for the demo: the verdict with the winner's configuration and all-in monthly cost,
-why it won, the compromise named against the car that avoids it, the reader's priorities
-walked in their own order with what the winner does about each, the cost split into
-subscription + energy + excess mileage, and where all three placed with bars relative to the
-leader. It previously showed a headline, two reasons and one number — a summary of the
-thing rather than the thing, which summarised away what separates this from a filter with a
-sort order.
+**It is the advice page, not a rendering of one.** It imports `AdviceHero`, `WhyItWins`,
+`Tradeoffs`, `CostAnalysis`, `BehindTheRecommendation` and `AdviceSidebar` straight from
+`StepFourGenerateAdvice/components/` and lays them out in the same order with the same
+`lg:grid-cols-[minmax(0,1fr)_320px]` grid — which is why the onboarding container widens to
+`max-w-[1240px]` on this screen alone. All six are pure (no store access), so this needed no
+refactor.
+
+That reuse is the design. Two earlier attempts hand-built a summary, and both showed the
+same *facts* in a different shape, which is the one thing a preview must not do: a reader
+shown one layout here and a different one on their first real comparison has been taught
+nothing. Short rather than different — the hot seat is the only omission, since it is an
+interaction over cars the reader chose, and `HotSeatPlaceholder` keeps its place in the
+order and names what belongs there.
+
+Above the reading, a **line-up** of the three cars — configuration, boot, CO₂, range or
+consumption, and subscription price, with the winner ringed. The reading names cars
+constantly ("€282/month more than Lumo"), and without having met them the reader is
+following an argument about strangers.
 
 The cars carry a marque, model, trim, equipment line, engine and year, because those are
 what `configurationName` and `configurationDetail` draw and a preview that leaves them empty
 previews a page nobody will see. **Aveline, Norvane and Halden are invented and must stay
 invented** — a test holds the brand and model against a list of real manufacturers, the ids
-are negative so they can never collide with a FINN vehicle, and the screen says unmissably
-that they do not exist. Each car must also win at least one of the six profile orders, which
+are negative so they can never collide with a FINN vehicle, and the screen says so above the
+reading and again on every card in the line-up.
+
+Two guards were added to `AdviceHero` for this and are correctness fixes for the real page
+too: the "View this car on FINN" link renders only when the car has a URL, and the photo
+only when FINN supplied one. A button that reloads the page, or a broken image, is louder
+than its absence — and FINN does not supply either for every car. Each car must also win at least one of the six profile orders, which
 is asserted per car rather than by counting distinct winners: that contract broke silently
 once when the de-duplicated defaults left the electric car losing even to an emissions-led
 order.
