@@ -155,10 +155,16 @@ step and the stepper hides while it shows. A reader with nothing saved never see
 gets step 1 as before.
 
 **Step 1 — Your priorities.** One screen that both chooses and orders. It opens with an
-explanation of what a priority is and does (it weighs, it does not filter), then offers the
-six fixed profiles as presets — Nervous Driver, City Commuter, Family First, Road Tripper,
-Eco-Conscious, Balanced — as cards naming who each is for and the five priorities it would
-apply, then the order itself: a draggable list of 3–5 of the seven categories with
+explanation of what a priority is and does (it weighs, it does not filter), then one panel
+with two faces. The **order** leads, because it is the answer; underneath it a full-width
+row offers the presets — the six fixed profiles, Nervous Driver through Balanced — and
+taking it swaps the panel rather than scrolling to a section. The presets face carries its
+own back button, and applying one swaps straight back to the order, so the result lands
+exactly where the offer was. This was previously stacked: six profile cards each listing
+five priorities, *then* the list they fill in, which meant meeting a screenful of
+alternatives before the question and scrolling back up to see what an applied one did.
+
+The order itself is: a draggable list of 3–5 of the seven categories with
 arrow-key equivalents and an "add a priority" row. The list is
 `components/PriorityOrder.tsx`, shared verbatim with Settings > Priorities; only the framing
 around it differs. Collected: an ordered array. This array — and only this array — is
