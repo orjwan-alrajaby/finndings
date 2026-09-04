@@ -173,14 +173,7 @@ export default function OnboardingPage() {
         <Tooltip.Provider delayDuration={250}>
             <main className="min-h-screen bg-finn-snow text-finn-black">
                 <header className="sticky top-0 z-20 border-b border-finn-cotton/70 bg-finn-snow/90 backdrop-blur-md">
-                    <div
-                        className={[
-                            "mx-auto flex items-center gap-4 px-4 py-4 sm:px-6 lg:px-10",
-                            screen === "preview"
-                                ? "max-w-[1240px]"
-                                : "max-w-5xl",
-                        ].join(" ")}
-                    >
+                    <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-4 sm:px-6 lg:px-10">
                         <ProgressRail current={screen} onGoTo={go} />
 
                         <button
@@ -193,21 +186,7 @@ export default function OnboardingPage() {
                     </div>
                 </header>
 
-                {/*
-                  * The last screen is the advice page, drawn by the advice
-                  * page's own components — including a 320px sidebar that has
-                  * nowhere to go at the width the teaching screens want. So
-                  * that one screen gets the width the real page has, and the
-                  * rest keep the narrower measure that makes prose readable.
-                  */}
-                <div
-                    className={[
-                        "mx-auto px-4 py-10 sm:px-6 sm:py-14 lg:px-10",
-                        screen === "preview"
-                            ? "max-w-[1240px]"
-                            : "max-w-5xl",
-                    ].join(" ")}
-                >
+                <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-10">
                     {screen === "welcome" && (
                         <Welcome onNext={() => step(1)} />
                     )}

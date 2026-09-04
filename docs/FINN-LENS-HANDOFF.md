@@ -95,19 +95,25 @@ a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
 just set, so the reader sees the actual output before pinning anything.
 
-**It is the advice page, not a rendering of one.** It imports `AdviceHero`, `WhyItWins`,
-`Tradeoffs`, `CostAnalysis`, `BehindTheRecommendation` and `AdviceSidebar` straight from
-`StepFourGenerateAdvice/components/` and lays them out in the same order with the same
-`lg:grid-cols-[minmax(0,1fr)_320px]` grid — which is why the onboarding container widens to
-`max-w-[1240px]` on this screen alone. All six are pure (no store access), so this needed no
-refactor.
+**A preview, and the line was found by overshooting it twice.** First it was a summary in a
+shape of its own — the same facts, differently arranged, so a reader met one layout here and
+another on their first real comparison and recognised nothing. Then it imported the advice
+page's components wholesale, which made it *the advice page*: full hero with photo panel,
+every priority expanded with equipment chips, sidebar of assumptions. Recognisable, and far
+too much to meet before pinning anything.
 
-That reuse is the design. Two earlier attempts hand-built a summary, and both showed the
-same *facts* in a different shape, which is the one thing a preview must not do: a reader
-shown one layout here and a different one on their first real comparison has been taught
-nothing. Short rather than different — the hot seat is the only omission, since it is an
-interaction over cars the reader chose, and `HotSeatPlaceholder` keeps its place in the
-order and names what belongs there.
+What it settles on: the real page's sections, in the real page's order, under the real
+page's own eyebrows — **Your recommendation**, **Why it wins**, **The other side of it**,
+**Cost analysis**, **Behind the recommendation** — each showing the top of its content and
+stopping. Two verdict reasons rather than every priority expanded; one tradeoff rather than
+all; the three cost lines; the ranking bars. Recognition comes from the shape and the
+wording; the restraint comes from truncating each section rather than dropping any.
+
+`MoreOnTheRealPage` then names what was left out — per-priority equipment, the hot seat, the
+weight table, the assumptions panel — so the preview reads as a subset rather than as
+something quietly smaller, and the real page still has somewhere to go. **If you add a
+section to the advice page, this screen owes it either a truncated block or a line in that
+list.**
 
 Above the reading, a **line-up** of the three cars — configuration, boot, CO₂, range or
 consumption, and subscription price, with the winner ringed. The reading names cars
@@ -121,10 +127,11 @@ invented** — a test holds the brand and model against a list of real manufactu
 are negative so they can never collide with a FINN vehicle, and the screen says so above the
 reading and again on every card in the line-up.
 
-Two guards were added to `AdviceHero` for this and are correctness fixes for the real page
-too: the "View this car on FINN" link renders only when the car has a URL, and the photo
-only when FINN supplied one. A button that reloads the page, or a broken image, is louder
-than its absence — and FINN does not supply either for every car. Each car must also win at least one of the six profile orders, which
+Two guards live in `AdviceHero` from when the preview briefly rendered it, and they stay
+because they are correctness fixes for the real page: the "View this car on FINN" link
+renders only when the car has a URL, and the photo only when FINN supplied one. A button
+that reloads the page, or a broken image, is louder than its absence — and FINN does not
+supply either for every car. Each car must also win at least one of the six profile orders, which
 is asserted per car rather than by counting distinct winners: that contract broke silently
 once when the de-duplicated defaults left the electric car losing even to an emissions-led
 order.
