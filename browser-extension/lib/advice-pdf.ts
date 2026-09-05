@@ -17,7 +17,132 @@ import type { Options } from "react-to-pdf";
  * assets/tailwind.css. Whichever rival was in the hot seat when the reader
  * pressed the button is kept, because that comparison is part of what they
  * are taking away; when nothing is in it, nothing is added.
+ *
+ * What it must carry is the links. The capture is a photograph, so every
+ * anchor in it — "View this car on FINN", first among them — arrives as
+ * pixels of a button that cannot be pressed. A file whose whole purpose is
+ * to be sent to somebody else should not be the one copy of this argument
+ * with no way back to the cars. So the anchors are measured on the page and
+ * re-added to the document as link annotations, which is a thing PDF has
+ * and an image does not.
  */
+
+/** px per mm at 96dpi, which is the number react-to-pdf lays pages out with. */
+const MM_TO_PX = 3.77952755906;
+
+/** The margin the capture is placed inside, in mm, on every edge. */
+export const PDF_MARGIN_MM = 8;
+
+/** One anchor, measured against the top-left of the captured element. */
+export interface LinkRect {
+  url: string;
+  /** CSS pixels. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Where that anchor lands once the capture has been cut into pages. */
+export interface LinkPlacement {
+  /** 1-based, the way jsPDF counts. */
+  page: number;
+  /** Millimetres, from the top-left of the sheet. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  url: string;
+}
+
+export interface CaptureGeometry {
+  /** The captured element's own width, in CSS pixels. */
+  elementWidth: number;
+  /** The sheet, in mm. */
+  pageWidth: number;
+  pageHeight: number;
+  margin: number;
+}
+
+/**
+ * Only what a PDF reader can actually follow.
+ *
+ * In-page anchors and `javascript:` are meaningless in a file, and an empty
+ * href resolves to the document it came from — which in a PDF is nowhere at
+ * all. A zero-sized rect is an anchor that was hidden for the capture, so
+ * there is nothing on the sheet to put a hotspot over.
+ */
+function worthLinking(link: LinkRect): boolean {
+  return (
+    link.width > 0 &&
+    link.height > 0 &&
+    /^https?:\/\//i.test(link.url)
+  );
+}
+
+/**
+ * Turning positions on a long page into positions on numbered sheets.
+ *
+ * This mirrors the arithmetic react-to-pdf does to place the image, and has
+ * to keep mirroring it: the capture is scaled to fit the page width, and the
+ * scaling decides both how many pixels of the page fit on a sheet and how
+ * many millimetres a pixel is worth. Getting it wrong doesn't fail loudly —
+ * it puts an invisible hotspot slightly to the left of a button.
+ *
+ * A link that lies across a page break is placed twice, once on each sheet,
+ * clipped to it. The alternative is choosing a sheet for it and leaving half
+ * the button dead, which is the kind of thing nobody reports and everybody
+ * notices.
+ */
+export function placeLinks(
+  links: LinkRect[],
+  geometry: CaptureGeometry,
+): LinkPlacement[] {
+  const { elementWidth, pageWidth, pageHeight, margin } = geometry;
+
+  const availableWidth = (pageWidth - margin * 2) * MM_TO_PX;
+  const availableHeight = (pageHeight - margin * 2) * MM_TO_PX;
+
+  if (availableWidth <= 0 || availableHeight <= 0) return [];
+
+  /*
+   * Wider than the sheet, so everything is scaled down to fit — the same
+   * decision react-to-pdf makes, expressed the same way, because the two
+   * have to agree to the pixel.
+   */
+  const fit =
+    elementWidth > availableWidth ? elementWidth / availableWidth : 1;
+
+  const toMm = (px: number) => px / (MM_TO_PX * fit);
+
+  /** How much of the page, in its own pixels, one sheet holds. */
+  const sheet = availableHeight * fit;
+
+  const placements: LinkPlacement[] = [];
+
+  for (const link of links.filter(worthLinking)) {
+    const first = Math.floor(link.y / sheet) + 1;
+    const last = Math.floor((link.y + link.height - 0.001) / sheet) + 1;
+
+    for (let page = first; page <= last; page += 1) {
+      const top = Math.max(link.y, (page - 1) * sheet);
+      const bottom = Math.min(link.y + link.height, page * sheet);
+
+      if (bottom <= top) continue;
+
+      placements.push({
+        page,
+        x: margin + toMm(link.x),
+        y: margin + toMm(top - (page - 1) * sheet),
+        width: toMm(link.width),
+        height: toMm(bottom - top),
+        url: link.url,
+      });
+    }
+  }
+
+  return placements;
+}
 
 /** Everything a filename may contain, once the car's name has been through it. */
 const UNSAFE = /[^a-z0-9]+/g;
@@ -59,9 +184,18 @@ export function adviceFileName(carName: string, on: Date = new Date()): string {
 export function advicePdfOptions(filename: string): Options {
   return {
     filename,
-    method: "save",
+    /*
+     * Built rather than saved, so the document can be handed back with the
+     * link annotations still to be added to it. Saving is the caller's last
+     * step.
+     */
+    method: "build",
     resolution: 2,
-    page: { format: "a4", orientation: "portrait", margin: 8 },
+    page: {
+      format: "a4",
+      orientation: "portrait",
+      margin: PDF_MARGIN_MM,
+    },
     canvas: { mimeType: "image/jpeg", qualityRatio: 0.92, useCORS: true },
     overrides: {
       canvas: {

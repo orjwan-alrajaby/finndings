@@ -81,15 +81,25 @@ export function HotSeatComparison({
                 </p>
             </div>
 
-            <a
-                href={challenger.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 inline-flex items-center gap-2 rounded-full border-2 border-finn-cotton px-5 py-3 text-xs font-black text-finn-black transition hover:border-finn-iron/40"
-            >
-                View {challengerName} on FINN
-                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-            </a>
+            {/*
+              * Only when there is somewhere to go, the same as the hero.
+              * FINN doesn't supply a URL for every car — a card built from
+              * markup rather than from a response we saw carries an empty
+              * one — and `href=""` resolves to the page it is on, so this
+              * button would silently reload the advice and throw away the
+              * hot seat it belongs to.
+              */}
+            {challenger.url && (
+                <a
+                    href={challenger.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-5 inline-flex items-center gap-2 rounded-full border-2 border-finn-cotton px-5 py-3 text-xs font-black text-finn-black transition hover:border-finn-iron/40"
+                >
+                    View {challengerName} on FINN
+                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                </a>
+            )}
         </section>
     );
 }

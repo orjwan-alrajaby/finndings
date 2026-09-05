@@ -21,7 +21,13 @@ import { CostAnalysis } from "./components/CostAnalysis";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
-import { adviceFileName, advicePdfOptions } from "@/lib/advice-pdf";
+import {
+    adviceFileName,
+    advicePdfOptions,
+    PDF_MARGIN_MM,
+    placeLinks,
+    type LinkRect,
+} from "@/lib/advice-pdf";
 import { markAdviceSeen } from "@/lib/onboarding";
 import { useCompareStore } from "../store";
 
@@ -138,10 +144,17 @@ export function Advice({
             try {
                 const { default: generatePDF } = await import("react-to-pdf");
 
-                await generatePDF(
+                const filename = adviceFileName(winnerName);
+                const pdf = await generatePDF(
                     printable,
-                    advicePdfOptions(adviceFileName(winnerName)),
+                    advicePdfOptions(filename),
                 );
+
+                if (!pdf) return;
+
+                addLinks(pdf, printable.current);
+
+                await pdf.save(filename, { returnPromise: true });
             } catch (error) {
                 console.error("FINN Lens: could not export the PDF", error);
             } finally {
@@ -342,4 +355,67 @@ export function Advice({
         </div>
     </div>
     );
+}
+
+/**
+ * Re-attaching the page's links to the picture of the page.
+ *
+ * html2canvas produces pixels, so every anchor in the capture arrives as a
+ * button that cannot be pressed. PDF carries link annotations separately
+ * from what is drawn, which means the hotspots can simply be laid back over
+ * the image where the anchors were.
+ *
+ * Measured after the capture, while the page is still in its export state:
+ * anything hidden for the file reports a zero-sized rect and is dropped on
+ * that basis rather than by knowing which elements were hidden and why.
+ */
+function addLinks(
+    pdf: { setPage: (page: number) => void; link: LinkTarget; internal: PdfInternals },
+    element: HTMLElement | null,
+): void {
+    if (!element) return;
+
+    const base = element.getBoundingClientRect();
+
+    const links: LinkRect[] = [
+        ...element.querySelectorAll<HTMLAnchorElement>("a[href]"),
+    ].map((anchor) => {
+        const rect = anchor.getBoundingClientRect();
+
+        return {
+            /* `.href` rather than the attribute: already absolute. */
+            url: anchor.href,
+            x: rect.left - base.left,
+            y: rect.top - base.top,
+            width: rect.width,
+            height: rect.height,
+        };
+    });
+
+    const placements = placeLinks(links, {
+        elementWidth: base.width,
+        pageWidth: pdf.internal.pageSize.width,
+        pageHeight: pdf.internal.pageSize.height,
+        margin: PDF_MARGIN_MM,
+    });
+
+    for (const placement of placements) {
+        pdf.setPage(placement.page);
+        pdf.link(placement.x, placement.y, placement.width, placement.height, {
+            url: placement.url,
+        });
+    }
+}
+
+/** Only the parts of jsPDF this file touches. */
+type LinkTarget = (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    options: { url: string },
+) => void;
+
+interface PdfInternals {
+    pageSize: { width: number; height: number };
 }
