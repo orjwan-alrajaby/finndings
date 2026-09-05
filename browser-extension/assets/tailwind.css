@@ -119,6 +119,20 @@
    COMPONENT STYLES
 ======================================== */
 @layer components {
+  /*
+     Parts of a page that only mean something while it is on screen: the
+     controls that change the answers, and any picker whose whole job is to
+     choose what the page shows. They are dropped from a PDF capture, which
+     is a photograph of the page rather than a second rendering of it — see
+     lib/advice-pdf.ts.
+
+     Marked on the element rather than decided by the exporter, because only
+     the thing itself knows whether it is evidence or a control.
+  */
+  [data-exporting] .finn-lens-screen-only {
+    display: none !important;
+  }
+
   .finn-lens-toast {
     @apply rounded-2xl text-sm text-white shadow-lg relative;
     min-width: 320px;

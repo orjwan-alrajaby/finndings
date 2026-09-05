@@ -117,7 +117,7 @@ export function BudgetNotice({
             <button
                 type="button"
                 onClick={onAdjust}
-                className="mt-3 text-[11px] font-black text-finn-black underline underline-offset-2 transition hover:text-finn-warning"
+                className="finn-lens-screen-only mt-3 text-[11px] font-black text-finn-black underline underline-offset-2 transition hover:text-finn-warning"
             >
                 Change my budget
             </button>

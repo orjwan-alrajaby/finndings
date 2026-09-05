@@ -122,7 +122,7 @@ export function AdviceSidebar({
               * give me a better answer" is a question you can only settle by
               * watching the answer change.
               */}
-            <div className="rounded-[24px] bg-finn-black p-5 text-white">
+            <div className="finn-lens-screen-only rounded-[24px] bg-finn-black p-5 text-white">
                 <p className="text-sm font-black">
                     Something doesn't look right?
                 </p>

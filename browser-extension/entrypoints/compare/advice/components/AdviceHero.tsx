@@ -235,7 +235,7 @@ export function AdviceHero({
                         <button
                             type="button"
                             onClick={onAdjust}
-                            className={`rounded-full px-5 py-3 text-xs font-bold ring-1 transition ${palette.secondary}`}
+                            className={`finn-lens-screen-only rounded-full px-5 py-3 text-xs font-bold ring-1 transition ${palette.secondary}`}
                         >
                             Change my answers
                         </button>

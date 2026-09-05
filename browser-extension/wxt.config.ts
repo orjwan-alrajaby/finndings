@@ -3,6 +3,26 @@ import { defineConfig } from 'wxt';
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+
+  /*
+   * react-to-pdf takes its screenshot with html2canvas, which was last
+   * released before CSS Color 4 and cannot parse `color-mix(in oklab, …)`.
+   * Tailwind v4 compiles every opacity utility — `bg-white/45`, `ring-white/60`
+   * — to exactly that, so the PDF export threw on the first colour it met
+   * rather than producing a file.
+   *
+   * html2canvas-pro is the maintained fork of the same library, same API,
+   * with the modern colour functions understood. Aliased rather than adopted
+   * outright because react-to-pdf asks for `html2canvas` by name: this hands
+   * it the fork without forking react-to-pdf itself.
+   */
+  vite: () => ({
+    resolve: {
+      alias: {
+        html2canvas: 'html2canvas-pro',
+      },
+    },
+  }),
   manifest: () => ({
     /*
      * Set here rather than left to package.json, which would install this as

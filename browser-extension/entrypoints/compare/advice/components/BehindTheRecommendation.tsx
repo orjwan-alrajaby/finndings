@@ -26,6 +26,7 @@ export function BehindTheRecommendation({
     margin,
     comparison,
     weights,
+    forceOpen,
 }: {
     context: ReasoningContext;
     recommendedId: number;
@@ -34,8 +35,15 @@ export function BehindTheRecommendation({
     /** Present only while a car is in the hot seat. */
     comparison: HeadToHead | null;
     weights: PriorityWeight[];
+    /**
+     * Opens it regardless, for the PDF export. Folded away is right on a
+     * page nobody has asked the question on yet; in a file it would print
+     * as a heading promising numbers that aren't there.
+     */
+    forceOpen?: boolean;
 }) {
     const [open, setOpen] = useState(false);
+    const showing = open || forceOpen === true;
 
     return (
         <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
@@ -60,13 +68,13 @@ export function BehindTheRecommendation({
                 </div>
 
                 {open ? (
-                    <ChevronUpIcon className="h-6 w-6 shrink-0 text-finn-iron" />
+                    <ChevronUpIcon className="finn-lens-screen-only h-6 w-6 shrink-0 text-finn-iron" />
                 ) : (
-                    <ChevronDownIcon className="h-6 w-6 shrink-0 text-finn-iron" />
+                    <ChevronDownIcon className="finn-lens-screen-only h-6 w-6 shrink-0 text-finn-iron" />
                 )}
             </button>
 
-            {open && (
+            {showing && (
                 <div className="mt-6 space-y-8">
                     <Weighting weights={weights} />
 

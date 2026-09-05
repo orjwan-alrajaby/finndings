@@ -1,4 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    ArrowDownTrayIcon,
+    ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 import type { PinnedFinnCar } from "@/lib/types";
 import { FinnLink } from "@/components/FinnLink";
 import {
@@ -17,6 +21,7 @@ import { CostAnalysis } from "./components/CostAnalysis";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
+import { adviceFileName, advicePdfOptions } from "@/lib/advice-pdf";
 import { markAdviceSeen } from "@/lib/onboarding";
 import { useCompareStore } from "../store";
 
@@ -69,6 +74,23 @@ export function Advice({
     const preferences = useCompareStore((state) => state.preferences);
     const categoryFeatures = useCompareStore((state) => state.features);
 
+    /*
+     * Saving the page as a file.
+     *
+     * The work is done in an effect rather than in the click handler,
+     * because the capture has to happen *after* React has drawn the export
+     * version of the page — the controls hidden, the picker gone. Setting
+     * the flag and reading the DOM in the same tick would photograph the
+     * screen version and put a row of dead buttons in the PDF.
+     *
+     * The library is imported at that moment too. It brings html2canvas and
+     * jsPDF with it, which together are larger than the rest of this page;
+     * loading them when a reader actually asks for a file keeps them out of
+     * the cost of opening it.
+     */
+    const printable = useRef<HTMLDivElement>(null);
+    const [exporting, setExporting] = useState(false);
+
     /**
      * The challenger under examination. Null means the recommendation
      * itself. It lives in the store so that it survives a re-render;
@@ -104,6 +126,33 @@ export function Advice({
             setChallengerId(null);
         }
     }, [recommendation, challengerId, setChallengerId]);
+
+    const winnerName = recommendation?.winner.name;
+
+    useEffect(() => {
+        if (!exporting || !winnerName) return;
+
+        let alive = true;
+
+        void (async () => {
+            try {
+                const { default: generatePDF } = await import("react-to-pdf");
+
+                await generatePDF(
+                    printable,
+                    advicePdfOptions(adviceFileName(winnerName)),
+                );
+            } catch (error) {
+                console.error("FINN Lens: could not export the PDF", error);
+            } finally {
+                if (alive) setExporting(false);
+            }
+        })();
+
+        return () => {
+            alive = false;
+        };
+    }, [exporting, winnerName]);
 
     if (!recommendation) {
         return (
@@ -170,21 +219,46 @@ export function Advice({
     const winnerCost = context.costs[winner.id];
 
     return (
-        <div className="w-full">
-        <header className="mb-6">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
-                FINN Lens · Advice
-            </p>
+        <div
+            ref={printable}
+            data-exporting={exporting || undefined}
+            className="w-full"
+        >
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
+                    FINN Lens · Advice
+                </p>
 
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                Here's the car that fits you best.
-            </h1>
+                <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                    Here's the car that fits you best.
+                </h1>
 
-            <p className="mt-2 text-sm text-finn-iron">
-                Judged on your priorities, your driving assumptions
-                and your budget, across all {cars.length} cars you
-                pinned.
-            </p>
+                <p className="mt-2 text-sm text-finn-iron">
+                    Judged on your priorities, your driving assumptions
+                    and your budget, across all {cars.length} cars you
+                    pinned.
+                </p>
+            </div>
+
+            <button
+                type="button"
+                onClick={() => setExporting(true)}
+                disabled={exporting}
+                className="finn-lens-screen-only inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-xs font-black text-finn-black shadow-sm transition-colors hover:bg-finn-pale-blue disabled:cursor-wait disabled:text-finn-iron"
+            >
+                {exporting ? (
+                    <>
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                        Building your PDF…
+                    </>
+                ) : (
+                    <>
+                        <ArrowDownTrayIcon className="h-4 w-4" />
+                        Save as PDF
+                    </>
+                )}
+            </button>
         </header>
 
         {winnerCost && (
@@ -211,12 +285,21 @@ export function Advice({
                     subjectName={winner.name}
                 />
 
-                <ChallengePicker
-                    options={options}
-                    winnerName={winner.name}
-                    selectedId={challengerId}
-                    onSelect={setChallengerId}
-                />
+                {/*
+                  * Screen only: it is the control that chooses what the hot
+                  * seat holds, and a page of buttons in a PDF is furniture.
+                  * Whatever it was pointing at when the reader pressed save
+                  * is kept, though — that comparison is below, and it is
+                  * part of what they are taking away.
+                  */}
+                <div className="finn-lens-screen-only">
+                    <ChallengePicker
+                        options={options}
+                        winnerName={winner.name}
+                        selectedId={challengerId}
+                        onSelect={setChallengerId}
+                    />
+                </div>
 
                 {challengeReasoning && challenger && (
                     <HotSeatComparison
@@ -237,6 +320,7 @@ export function Advice({
                     margin={winnerNarrative.verdict.margin}
                     comparison={subject.comparison}
                     weights={context.weights}
+                    forceOpen={exporting}
                 />
             </div>
 
