@@ -136,8 +136,8 @@ export function AdviceHero({
                 palette.ground,
             ].join(" ")}
         >
-            <div className="grid lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,.9fr)]">
-                <div className="p-6 sm:p-8 lg:p-10">
+            <div className="flex flex-col-reverse lg:flex-row">
+                <div className="p-6 sm:p-8 lg:flex-1/2">
                     <div
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${palette.eyebrow}`}
                     >
@@ -242,57 +242,72 @@ export function AdviceHero({
                     </div>
                 </div>
 
+                {/*
+                  * Two stacked containers rather than a photo with a panel
+                  * floating on it: the car above, what it costs below.
+                  *
+                  * The car used to be the background of this half, bled to
+                  * its edges and cropped by whatever height the column
+                  * happened to be. Given a container of its own it gets a
+                  * fixed frame to sit in, and the cost box stops being an
+                  * overlay that has to out-shout an unknown photo — it is
+                  * simply the thing underneath.
+                  */}
                 <div
                     className={[
-                        "relative min-h-64 lg:min-h-full",
+                        "relative flex min-h-64 flex-col lg:min-h-full lg:flex-1/2",
                         palette.photo,
                     ].join(" ")}
                 >
                     {/* Same reason: a broken image is louder than no image. */}
                     {winner.images?.thumbnail && (
-                        <img
-                            src={winner.images.thumbnail}
-                            alt={winner.name}
-                            className="absolute inset-0 h-full w-full object-cover"
-                        />
+                        <div className="relative overflow-hidden aspect-video">
+                            <img
+                                src={winner.images.thumbnail}
+                                alt={winner.name}
+                                className="w-full object-cover scale-125"
+                            />
+                        </div>
                     )}
 
-                    <div
-                        className={`absolute bottom-5 left-5 right-5 rounded-2xl p-4 ring-1 backdrop-blur-md ${palette.panel}`}
-                    >
-                        <p
-                            className={`text-[10px] font-bold uppercase tracking-widest ${palette.panelLabel}`}
+                    <div className="p-5">
+                        <div
+                            className={`relative rounded-2xl p-4 ring-1 backdrop-blur-md ${palette.panel}`}
                         >
-                            {cost.complete
-                                ? "Estimated total per month"
-                                : "Estimated per month (partial)"}
-                        </p>
-
-                        <p
-                            className={`mt-1 text-3xl font-black ${palette.panelFigure}`}
-                        >
-                            {formatEUR(cost.totalMonthly)}
-                        </p>
-
-                        {budgetLabel && (
                             <p
-                                className={[
-                                    "mt-1 text-[11px] font-bold",
-                                    cost.budgetStatus !== "over"
-                                        ? palette.panelLabel
-                                        : "font-black text-finn-warning-ink",
-                                ].join(" ")}
+                                className={`text-[10px] font-bold uppercase tracking-widest ${palette.panelLabel}`}
                             >
-                                {budgetLabel}
+                                {cost.complete
+                                    ? "Estimated total per month"
+                                    : "Estimated per month (partial)"}
                             </p>
-                        )}
 
-                        <p
-                            className={`mt-2 text-[11px] leading-4 ${palette.panelNote}`}
-                        >
-                            Subscription plus estimated energy and extra
-                            mileage. The full breakdown is further down.
-                        </p>
+                            <p
+                                className={`mt-1 text-3xl font-black ${palette.panelFigure}`}
+                            >
+                                {formatEUR(cost.totalMonthly)}
+                            </p>
+
+                            {budgetLabel && (
+                                <p
+                                    className={[
+                                        "mt-1 text-[11px] font-bold",
+                                        cost.budgetStatus !== "over"
+                                            ? palette.panelLabel
+                                            : "font-black text-finn-warning-ink",
+                                    ].join(" ")}
+                                >
+                                    {budgetLabel}
+                                </p>
+                            )}
+
+                            <p
+                                className={`mt-2 text-[11px] leading-4 ${palette.panelNote}`}
+                            >
+                                Subscription plus estimated energy and extra
+                                mileage. The full breakdown is further down.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
