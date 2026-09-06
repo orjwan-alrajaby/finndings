@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, CircleCheck, Menu, Plus, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
+import { InfoButton } from "@/components/PriorityInfo";
 
 import {
     MAX_PRIORITIES,
@@ -137,37 +138,55 @@ export function ProfilePresets({
                 {applicable.map((profile) => {
                     const active = profile.id === activeProfile?.id;
 
+                    /*
+                     * The pill is two controls, so the ground moves to a
+                     * wrapper: applying a profile and asking what it is are
+                     * different decisions, and a button cannot contain
+                     * another one.
+                     */
                     return (
-                        <button
+                        <span
                             key={profile.id}
-                            type="button"
-                            onClick={() => onApply([...profile.priorities])}
-                            aria-pressed={active}
                             className={[
-                                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5",
+                                "inline-flex items-center gap-1 rounded-full pr-1.5",
                                 "text-[11px] font-bold transition-colors",
                                 active
                                     ? "bg-finn-accent-blue text-white"
                                     : "bg-finn-snow text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
                             ].join(" ")}
                         >
-                            {/*
-                              * Untinted while selected: the chip goes solid
-                              * blue behind it, and a blue mark on blue is
-                              * not a mark.
-                              */}
-                            <PriorityIcon
-                                name={profile.icon}
-                                className="h-3.5 w-3.5"
-                                tinted={!active}
+                            <button
+                                type="button"
+                                onClick={() => onApply([...profile.priorities])}
+                                aria-pressed={active}
+                                className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3"
+                            >
+                                {/*
+                                  * Untinted while selected: the chip goes
+                                  * solid blue behind it, and a blue mark on
+                                  * blue is not a mark.
+                                  */}
+                                <PriorityIcon
+                                    name={profile.icon}
+                                    className="h-3.5 w-3.5"
+                                    tinted={!active}
+                                />
+                                {profile.label}
+                                {active && (
+                                    <span className="text-[10px] font-black opacity-80">
+                                        · in use
+                                    </span>
+                                )}
+                            </button>
+
+                            <InfoButton
+                                subject={{ kind: "profile", id: profile.id }}
+                                label={profile.label}
+                                profiles={profiles}
+                                priorityDefinitions={priorityDefinitions}
+                                tone={active ? "onDark" : "quiet"}
                             />
-                            {profile.label}
-                            {active && (
-                                <span className="text-[10px] font-black opacity-80">
-                                    · in use
-                                </span>
-                            )}
-                        </button>
+                        </span>
                     );
                 })}
             </div>
@@ -180,13 +199,28 @@ export function ProfilePresets({
                 const active = profile.id === activeProfile?.id;
 
                 return (
+                    /*
+                     * The card is one big target, so the "i" cannot live
+                     * inside it. It sits over the corner instead, on the
+                     * wrapper, where it is reachable without standing between
+                     * the reader and the thing they came to click.
+                     */
+                    <div key={profile.id} className="relative">
+                        <span className="absolute right-3 top-3 z-10">
+                            <InfoButton
+                                subject={{ kind: "profile", id: profile.id }}
+                                label={profile.label}
+                                profiles={profiles}
+                                priorityDefinitions={priorityDefinitions}
+                            />
+                        </span>
+
                     <button
-                        key={profile.id}
                         type="button"
                         onClick={() => onApply([...profile.priorities])}
                         aria-pressed={active}
                         className={[
-                            "flex flex-col rounded-[22px] p-4 text-left transition-all",
+                            "flex w-full flex-col rounded-[22px] p-4 text-left transition-all",
                             active
                                 ? "bg-finn-pale-blue shadow-[0_0_0_2px] shadow-finn-accent-blue"
                                 : "bg-finn-snow drop-shadow-sm hover:bg-finn-pale-blue/70",
@@ -241,6 +275,7 @@ export function ProfilePresets({
                             ))}
                         </span>
                     </button>
+                    </div>
                 );
             })}
         </div>
@@ -359,10 +394,21 @@ export function PriorityOrderList({
                                 {index + 1}
                             </span>
 
-                            <PriorityIcon
-                                name={definition?.icon ?? "car"}
-                                className="h-4 w-4 shrink-0"
-                            />
+                            {/*
+                              * The same framed mark the feature cards use, at
+                              * the same size. These two lists are the same
+                              * priorities seen from two angles — the order
+                              * they sit in, and what counts inside each one —
+                              * and a mark that changes size between them
+                              * reads as a different kind of thing rather than
+                              * the same one twice.
+                              */}
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white">
+                                <PriorityIcon
+                                    name={definition?.icon ?? "car"}
+                                    className="h-5 w-5"
+                                />
+                            </span>
 
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-bold text-finn-black">
@@ -381,6 +427,12 @@ export function PriorityOrderList({
                               * the same list.
                               */}
                             <span className="flex shrink-0 items-center gap-0.5">
+                                <InfoButton
+                                    subject={{ kind: "priority", id }}
+                                    label={definition?.label ?? id}
+                                    priorityDefinitions={priorityDefinitions}
+                                />
+
                                 <IconButton
                                     label={`Move ${definition?.label ?? id} up`}
                                     disabled={index === 0}
@@ -435,35 +487,58 @@ export function PriorityOrderList({
 
                     <div className="mt-2.5 flex flex-wrap gap-2">
                         {available.map((definition) => (
-                            <button
+                            <span
                                 key={definition.id}
-                                type="button"
-                                disabled={atLimit}
-                                onClick={() =>
-                                    onChange([...priorities, definition.id])
-                                }
                                 className={[
-                                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5",
+                                    "inline-flex items-center gap-1 rounded-full pr-1.5",
                                     "text-[11px] font-bold transition-colors",
                                     atLimit
-                                        ? "cursor-not-allowed bg-finn-snow text-finn-iron/40"
+                                        ? "bg-finn-snow text-finn-iron/40"
                                         : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
                                 ].join(" ")}
                             >
-                                <Plus className="h-3 w-3" />
+                                <button
+                                    type="button"
+                                    disabled={atLimit}
+                                    onClick={() =>
+                                        onChange([...priorities, definition.id])
+                                    }
+                                    className={[
+                                        "inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3",
+                                        atLimit ? "cursor-not-allowed" : "",
+                                    ].join(" ")}
+                                >
+                                    <Plus className="h-3 w-3" />
+                                    {/*
+                                      * Inherits rather than tints: this chip
+                                      * turns solid blue on hover and dims
+                                      * when the limit is reached, and both
+                                      * are states only the cascade knows
+                                      * about.
+                                      */}
+                                    <PriorityIcon
+                                        name={definition.icon}
+                                        className="h-3 w-3"
+                                        tinted={false}
+                                    />
+                                    {definition.label}
+                                </button>
+
                                 {/*
-                                  * Inherits rather than tints: this button
-                                  * turns solid blue on hover and dims when
-                                  * the limit is reached, and both are states
-                                  * only the cascade knows about.
+                                  * Still asks, even at the limit. Finding out
+                                  * what a priority is is exactly what a
+                                  * reader who has to drop one before adding
+                                  * it needs to do first.
                                   */}
-                                <PriorityIcon
-                                    name={definition.icon}
-                                    className="h-3 w-3"
-                                    tinted={false}
+                                <InfoButton
+                                    subject={{
+                                        kind: "priority",
+                                        id: definition.id,
+                                    }}
+                                    label={definition.label}
+                                    priorityDefinitions={priorityDefinitions}
                                 />
-                                {definition.label}
-                            </button>
+                            </span>
                         ))}
                     </div>
                 </div>
