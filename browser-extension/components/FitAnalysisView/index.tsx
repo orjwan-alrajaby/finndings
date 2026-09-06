@@ -1,4 +1,5 @@
-import { ChevronDown } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronDownIcon } from "@hugeicons/core-free-icons";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { useState } from "react";
@@ -266,7 +267,7 @@ function PrioritySection({ priority }: { priority: FitPriority }) {
                         compact
                     />
 
-                    <ChevronDown
+                    <HugeiconsIcon icon={ChevronDownIcon}
                         aria-hidden="true"
                         className={[
                             "mt-1 h-4 w-4 shrink-0 text-finn-iron transition-transform",

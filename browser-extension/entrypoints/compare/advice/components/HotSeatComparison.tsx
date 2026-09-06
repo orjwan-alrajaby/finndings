@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ExternalLinkIcon } from "@hugeicons/core-free-icons";
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
     ChallengeLine,
@@ -140,7 +141,7 @@ export function HotSeatComparison({
                     className="mt-5 inline-flex items-center gap-2 rounded-full border-2 border-finn-cotton px-5 py-3 text-xs font-black text-finn-black transition hover:border-finn-iron/40"
                 >
                     View {challengerName} on FINN
-                    <ExternalLink className="h-4 w-4" />
+                    <HugeiconsIcon icon={ExternalLinkIcon} className="h-4 w-4" />
                 </a>
             )}
         </section>

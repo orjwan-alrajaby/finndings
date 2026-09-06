@@ -1,11 +1,12 @@
 import { useMemo } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    ArrowLeft,
-    ExternalLink,
-    FlaskConical,
-    Scale,
-    Sparkles,
-} from "lucide-react";
+    ArrowLeft01Icon,
+    ExternalLinkIcon,
+    FlaskConicalIcon,
+    ScaleIcon,
+    SparklesIcon,
+} from "@hugeicons/core-free-icons";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 
@@ -138,7 +139,7 @@ export function Preview({
             </div>
 
             <div className="mt-6 flex items-start gap-2 rounded-[20px] bg-finn-warning/10 px-4 py-3 text-left">
-                <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-finn-warning" />
+                <HugeiconsIcon icon={FlaskConicalIcon} className="mt-0.5 h-4 w-4 shrink-0 text-finn-warning" />
 
                 <p className="text-xs leading-5 text-finn-black">
                     <strong className="font-black">
@@ -182,7 +183,7 @@ export function Preview({
                         className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
                         aria-label="Back to your driving assumptions"
                     >
-                        <ArrowLeft className="h-5 w-5" />
+                        <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5" />
                     </button>
 
                     <button
@@ -192,7 +193,7 @@ export function Preview({
                         className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-wait disabled:bg-finn-cotton disabled:text-finn-iron"
                     >
                         {saving ? "Saving…" : "Go pin some real cars"}
-                        <ExternalLink className="h-4 w-4" />
+                        <HugeiconsIcon icon={ExternalLinkIcon} className="h-4 w-4" />
                     </button>
 
                     <button
@@ -249,7 +250,7 @@ function MiniAdvice({
                 <div className="flex flex-wrap items-end justify-between gap-4 p-5 sm:p-6">
                     <div className="min-w-0">
                         <p className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/80">
-                            <Sparkles className="h-3 w-3" />
+                            <HugeiconsIcon icon={SparklesIcon} className="h-3 w-3" />
                             Your recommendation
                         </p>
 
@@ -331,7 +332,7 @@ function MiniAdvice({
                 <Block
                     eyebrow="The other side of it"
                     tone="warning"
-                    icon={<Scale className="h-3 w-3" />}
+                    icon={<HugeiconsIcon icon={ScaleIcon} className="h-3 w-3" />}
                 >
                     {narrative.tradeoffs.length > 0 ? (
                         <div className="space-y-2.5">

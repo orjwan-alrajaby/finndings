@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ChevronDownIcon } from "@hugeicons/core-free-icons";
 
 import {
     describeEmissionsVersusEfficiency,
@@ -199,7 +200,7 @@ function MethodDisclosure() {
             >
                 How FINN Lens works this out
 
-                <ChevronDown
+                <HugeiconsIcon icon={ChevronDownIcon}
                     aria-hidden="true"
                     className={[
                         "h-3.5 w-3.5 transition-transform",

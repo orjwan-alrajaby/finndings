@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, RotateCw, Settings, X } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    Cancel01Icon,
+    ChevronDownIcon,
+    Refresh01Icon,
+    Settings02Icon,
+} from "@hugeicons/core-free-icons";
 
 import type {
     CategoryId,
@@ -149,7 +155,7 @@ function Header({ onClose }: { onClose: () => void }) {
                 aria-label="Close"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
             >
-                <X className="h-5 w-5" />
+                <HugeiconsIcon icon={Cancel01Icon} className="h-5 w-5" />
             </button>
         </header>
     );
@@ -166,7 +172,7 @@ function Footer({ onSettings }: { onSettings: () => void }) {
                     onClick={onSettings}
                     className="inline-flex items-center gap-1 font-bold text-finn-accent-blue underline-offset-2 transition hover:underline"
                 >
-                    <Settings className="h-3 w-3" />
+                    <HugeiconsIcon icon={Settings02Icon} className="h-3 w-3" />
                     make it permanent in Settings
                 </button>
                 .
@@ -220,7 +226,7 @@ function Section({
                     </span>
                 </span>
 
-                <ChevronDown
+                <HugeiconsIcon icon={ChevronDownIcon}
                     aria-hidden="true"
                     className={[
                         "mt-0.5 h-4 w-4 shrink-0 text-finn-iron transition-transform",
@@ -417,7 +423,7 @@ function FeatureSection() {
                     onClick={resetFeaturesToSaved}
                     className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline"
                 >
-                    <RotateCw className="h-3.5 w-3.5" />
+                    <HugeiconsIcon icon={Refresh01Icon} className="h-3.5 w-3.5" />
                     {savedCount > 0 ? "Use my saved picks" : "Clear my picks"}
                 </button>
             )}

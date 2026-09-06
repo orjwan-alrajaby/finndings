@@ -1,10 +1,11 @@
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    ArrowLeft,
-    ArrowRight,
-    Bookmark,
-    ListOrdered,
-    MessageSquareText,
-} from "lucide-react";
+    ArrowLeft01Icon,
+    ArrowRight01Icon,
+    Bookmark01Icon,
+    Comment01Icon,
+    LeftToRightListNumberIcon,
+} from "@hugeicons/core-free-icons";
 import type { ReactNode } from "react";
 
 import { withFinnLinks } from "@/components/FinnLink";
@@ -47,7 +48,7 @@ export function HowItWorks({
             <ol className="mt-9 grid gap-4 md:grid-cols-3">
                 <Step
                     index={1}
-                    icon={<Bookmark className="h-5 w-5" />}
+                    icon={<HugeiconsIcon icon={Bookmark01Icon} className="h-5 w-5" />}
                     title="Pin, while you browse"
                     body={withFinnLinks(
                         "Lens adds a pin button to every car on finn.com. Pin the ones you're weighing up — as many as you like, over as many visits as you like.",
@@ -57,7 +58,7 @@ export function HowItWorks({
 
                 <Step
                     index={2}
-                    icon={<ListOrdered className="h-5 w-5" />}
+                    icon={<HugeiconsIcon icon={LeftToRightListNumberIcon} className="h-5 w-5" />}
                     title="Rank, against your order"
                     body="You tell Lens what matters — safety, space, running costs — and in what order. Every pinned car is scored against that order, and the top one is the recommendation."
                     aside="This is the part you set up next."
@@ -67,7 +68,7 @@ export function HowItWorks({
                 <Step
                     index={3}
                     icon={
-                        <MessageSquareText className="h-5 w-5" />
+                        <HugeiconsIcon icon={Comment01Icon} className="h-5 w-5" />
                     }
                     title="Explain, in your terms"
                     body="You get one recommendation, the reasons for it, what you give up by taking it, and what it really costs a month — subscription plus energy plus excess mileage."
@@ -91,7 +92,7 @@ export function HowItWorks({
                     className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
                     aria-label="Back to the welcome"
                 >
-                    <ArrowLeft className="h-5 w-5" />
+                    <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5" />
                 </button>
 
                 <button
@@ -100,7 +101,7 @@ export function HowItWorks({
                     className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy"
                 >
                     Set up my ranking
-                    <ArrowRight className="h-4 w-4" />
+                    <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
                 </button>
             </div>
         </div>

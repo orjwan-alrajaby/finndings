@@ -1,4 +1,10 @@
-import { ArrowRight, Clock, EyeOff, Scale } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    ArrowRight01Icon,
+    Clock01Icon,
+    EyeOffIcon,
+    ScaleIcon,
+} from "@hugeicons/core-free-icons";
 import type { ReactNode } from "react";
 
 import { withFinnLinks } from "@/components/FinnLink";
@@ -44,19 +50,19 @@ export function Welcome({ onNext }: { onNext: () => void }) {
 
             <div className="mx-auto mt-9 grid max-w-3xl gap-3 text-left sm:grid-cols-3">
                 <Point
-                    icon={<Clock className="h-5 w-5" />}
+                    icon={<HugeiconsIcon icon={Clock01Icon} className="h-5 w-5" />}
                     title="About a minute"
                     body="Two questions, both with sensible answers ready to accept. You only do this once."
                 />
 
                 <Point
-                    icon={<EyeOff className="h-5 w-5" />}
+                    icon={<HugeiconsIcon icon={EyeOffIcon} className="h-5 w-5" />}
                     title="Nothing leaves your browser"
                     body="Your answers and your pinned cars are stored locally. There is no account and no server."
                 />
 
                 <Point
-                    icon={<Scale className="h-5 w-5" />}
+                    icon={<HugeiconsIcon icon={ScaleIcon} className="h-5 w-5" />}
                     title="Unofficial"
                     body={withFinnLinks(
                         "Lens is not affiliated with FINN. It reads what finn.com already shows you and reasons about it.",
@@ -70,7 +76,7 @@ export function Welcome({ onNext }: { onNext: () => void }) {
                 className="mt-10 inline-flex h-14 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-9 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy"
             >
                 Show me how it works
-                <ArrowRight className="h-4 w-4" />
+                <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
             </button>
         </div>
     );

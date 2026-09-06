@@ -22,6 +22,7 @@ import {
   FIT_SEGMENTS,
 } from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
+import { MARK_COLOUR } from "@/lib/priority-marks";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
 
 import {
@@ -527,7 +528,8 @@ function prioritySection(priority: FitPriority): HTMLElement {
     },
     [
       /*
-       * The priority's mark, drawn from the same lucide shapes the React
+       * The priority's mark, drawn from the same shapes and in the same
+       * colour the React
        * surfaces use. It was the emoji held in the priority's `icon`, which
        * is now the *name* of a shape — rendering it as text here would put
        * the word "shield" in the box.
@@ -539,7 +541,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
             "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue",
           attrs: { "aria-hidden": "true" },
         },
-        [icon(priority.icon, "h-4 w-4")],
+        [icon(priority.icon, "h-4 w-4", MARK_COLOUR[priority.icon])],
       ),
 
       el("span", { class: "min-w-0 flex-1" }, [

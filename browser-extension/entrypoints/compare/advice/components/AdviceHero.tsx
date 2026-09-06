@@ -1,4 +1,9 @@
-import { ExternalLink, Sparkles, TriangleAlert } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    Alert02Icon,
+    ExternalLinkIcon,
+    SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import type {
     CategoryId,
     CostBreakdown,
@@ -138,11 +143,11 @@ export function AdviceHero({
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${palette.eyebrow}`}
                     >
                         {isFallback ? (
-                            <TriangleAlert
+                            <HugeiconsIcon icon={Alert02Icon}
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         ) : (
-                            <Sparkles
+                            <HugeiconsIcon icon={SparklesIcon}
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         )}
@@ -233,7 +238,7 @@ export function AdviceHero({
                                 className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black shadow-sm transition ${palette.link}`}
                             >
                                 View this car on FINN
-                                <ExternalLink className="h-4 w-4" />
+                                <HugeiconsIcon icon={ExternalLinkIcon} className="h-4 w-4" />
                             </a>
                         )}
 

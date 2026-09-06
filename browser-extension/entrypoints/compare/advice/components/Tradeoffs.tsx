@@ -1,4 +1,5 @@
-import { Scale } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ScaleIcon } from "@hugeicons/core-free-icons";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative";
 
 /**
@@ -31,7 +32,7 @@ export function Tradeoffs({
           */
         <section className="rounded-[28px] bg-finn-warning/10 p-6 sm:p-8">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-finn-warning-deep">
-                <Scale className="h-3.5 w-3.5" />
+                <HugeiconsIcon icon={ScaleIcon} className="h-3.5 w-3.5" />
                 The other side of it
             </p>
 

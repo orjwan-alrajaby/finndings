@@ -1,16 +1,17 @@
 import "@/assets/tailwind.css";
 import { useEffect, useMemo, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    Bookmark,
-    CircleCheck,
-    ExternalLink,
-    FileSearch,
-    Scale,
-    Settings,
-    Trash2,
-    X,
-} from "lucide-react";
+    Bookmark01Icon,
+    Cancel01Icon,
+    CheckmarkCircle02Icon,
+    Delete02Icon,
+    ExternalLinkIcon,
+    FileSearchIcon,
+    ScaleIcon,
+    Settings02Icon,
+} from "@hugeicons/core-free-icons";
 
 import { NavButton, PageHeader } from "@/components/PageHeader";
 
@@ -176,7 +177,7 @@ export default function PinsPage() {
             <main className="min-h-screen bg-finn-snow text-finn-black">
                 <PageHeader>
                     <NavButton
-                        icon={<Scale className="h-4 w-4" />}
+                        icon={<HugeiconsIcon icon={ScaleIcon} className="h-4 w-4" />}
                         label="See my recommendation"
                         variant="primary"
                         onClick={() =>
@@ -191,7 +192,7 @@ export default function PinsPage() {
                     />
 
                     <NavButton
-                        icon={<Settings className="h-4 w-4" />}
+                        icon={<HugeiconsIcon icon={Settings02Icon} className="h-4 w-4" />}
                         label="Settings"
                         onClick={() =>
                             void openBrowserTab("OPEN_SETTINGS_PAGE")
@@ -463,7 +464,7 @@ function Toolbar({
                         disabled={checked.length === 0}
                         className="inline-flex h-9 items-center gap-1.5 rounded-full bg-finn-error px-3.5 text-[11px] font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/40"
                     >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <HugeiconsIcon icon={Delete02Icon} className="h-3.5 w-3.5" />
                         Unpin
                         {checked.length > 0 ? ` ${checked.length}` : ""}
                     </button>
@@ -474,7 +475,7 @@ function Toolbar({
                         aria-label="Done selecting"
                         className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white"
                     >
-                        <X className="h-4 w-4" />
+                        <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
                     </button>
                 </div>
             </div>
@@ -517,7 +518,7 @@ function Toolbar({
                 onClick={onStartSelecting}
                 className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
             >
-                <CircleCheck className="h-4 w-4" />
+                <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-4 w-4" />
                 Select
             </button>
         </div>
@@ -658,7 +659,7 @@ function EmptyState() {
     return (
         <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 text-center shadow-sm">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-finn-pale-blue text-finn-accent-blue">
-                <Bookmark className="h-7 w-7" />
+                <HugeiconsIcon icon={Bookmark01Icon} className="h-7 w-7" />
             </span>
 
             <h2 className="mt-5 text-2xl font-black text-finn-black">
@@ -677,7 +678,7 @@ function EmptyState() {
                 className="mt-6 inline-flex h-12 items-center gap-2 rounded-full bg-finn-accent-blue px-6 text-sm font-black text-white shadow-sm transition hover:bg-finn-highlight-navy"
             >
                 Open finn.com
-                <ExternalLink className="h-4 w-4" />
+                <HugeiconsIcon icon={ExternalLinkIcon} className="h-4 w-4" />
             </a>
         </div>
     );
@@ -695,7 +696,7 @@ function NothingOpen({ configured }: { configured: boolean }) {
     return (
         <div className="rounded-[28px] border border-dashed border-finn-cotton bg-white/60 p-8">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-finn-pale-blue text-finn-accent-blue">
-                <FileSearch className="h-6 w-6" />
+                <HugeiconsIcon icon={FileSearchIcon} className="h-6 w-6" />
             </span>
 
             <p className="mt-4 text-center text-sm font-black text-finn-black">
@@ -719,7 +720,7 @@ function NothingOpen({ configured }: { configured: boolean }) {
                     "What you'd be accepting by taking it",
                 ].map((line) => (
                     <li key={line} className="flex items-start gap-2">
-                        <CircleCheck
+                        <HugeiconsIcon icon={CheckmarkCircle02Icon}
                             aria-hidden="true"
                             className="mt-px h-4 w-4 shrink-0 text-finn-accent-blue"
                         />

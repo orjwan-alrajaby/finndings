@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Info } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { InformationCircleIcon } from "@hugeicons/core-free-icons";
 
 interface InfoTipProps {
     /** What the reader is asking about — used as the accessible label. */
@@ -41,7 +42,7 @@ export function InfoTip({ subject, children }: InfoTipProps) {
                             : "text-finn-iron hover:text-finn-accent-blue",
                     ].join(" ")}
                 >
-                    <Info className="h-4 w-4" />
+                    <HugeiconsIcon icon={InformationCircleIcon} className="h-4 w-4" />
                 </button>
             </Tooltip.Trigger>
 

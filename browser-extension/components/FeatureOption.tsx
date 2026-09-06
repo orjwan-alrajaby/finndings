@@ -1,4 +1,5 @@
-import { Lock } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { LockIcon } from "@hugeicons/core-free-icons";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 
@@ -108,7 +109,7 @@ export function FeatureOption({
             <div className="flex flex-col items-start gap-1.5 @sm:flex-row @sm:items-center @sm:gap-3">
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
                     {locked && (
-                        <Lock
+                        <HugeiconsIcon icon={LockIcon}
                             aria-hidden
                             className="h-3 w-3 shrink-0 text-finn-iron/50"
                         />

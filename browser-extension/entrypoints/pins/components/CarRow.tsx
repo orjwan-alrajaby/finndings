@@ -1,4 +1,10 @@
-import { ExternalLink, Eye, Image as ImageIcon, Trash2 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    Delete02Icon,
+    ExternalLinkIcon,
+    EyeIcon,
+    Image01Icon,
+} from "@hugeicons/core-free-icons";
 
 import { BandChip } from "@/components/FitAnalysisView";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
@@ -105,7 +111,7 @@ export function CarRow({
                     />
                 ) : (
                     <span className="flex h-18 w-26 shrink-0 items-center justify-center rounded-2xl bg-finn-snow text-finn-iron/40">
-                        <ImageIcon className="h-6 w-6" />
+                        <HugeiconsIcon icon={Image01Icon} className="h-6 w-6" />
                     </span>
                 )}
 
@@ -169,7 +175,7 @@ export function CarRow({
                     title={`View ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
                 >
-                    <Eye className="h-4 w-4" />
+                    <HugeiconsIcon icon={EyeIcon} className="h-4 w-4" />
                 </button>
 
                 {/*
@@ -186,7 +192,7 @@ export function CarRow({
                         title="Open on finn.com"
                         className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-snow hover:text-finn-black"
                     >
-                        <ExternalLink className="h-4 w-4" />
+                        <HugeiconsIcon icon={ExternalLinkIcon} className="h-4 w-4" />
                     </a>
                 ) : null}
 
@@ -197,7 +203,7 @@ export function CarRow({
                     title={`Unpin ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
                 >
-                    <Trash2 className="h-4 w-4" />
+                    <HugeiconsIcon icon={Delete02Icon} className="h-4 w-4" />
                 </button>
             </span>
         </li>

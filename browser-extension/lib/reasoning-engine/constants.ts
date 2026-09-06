@@ -591,7 +591,7 @@ export const CATEGORIES = {
 
   longDistance: {
     label: "Long Distance Travel",
-    icon: "route",
+    icon: "road",
     color: "#D97706",
     question: "How does this feel after three hours on the motorway?",
     description:
@@ -784,7 +784,7 @@ export const PROFILES = {
 
   roadtrip: {
     label: "Road Tripper",
-    icon: "route",
+    icon: "road",
     forWhom:
       "Anyone who regularly spends hours at a stretch behind the wheel.",
     assumes:

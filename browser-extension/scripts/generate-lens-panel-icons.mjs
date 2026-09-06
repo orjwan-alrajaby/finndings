@@ -1,16 +1,16 @@
 /**
- * Regenerates `entrypoints/content/lens-panel/icons.ts` from lucide-react.
+ * Regenerates `entrypoints/content/lens-panel/icons.ts` from hugeicons.
  *
- * The panel injected into finn.com is not React, so it cannot use the icon
- * components the rest of the app does. It needs the raw shapes. Those live in
- * lucide-react's per-icon modules, which are internal to the package and carry
- * no types — importing them at runtime would tie the build to a file layout
- * the package makes no promise about.
+ * The panel injected into finn.com is not React, so it cannot use the
+ * `HugeiconsIcon` component the rest of the app does. It needs the raw shapes.
+ * Those live in @hugeicons/core-free-icons' per-icon modules, which the
+ * package exposes but which carry no runtime guarantee of layout — importing
+ * them directly would tie the build to a file arrangement nobody promised.
  *
  * So the shapes are copied into the repo instead, by this script, and
  * `icons.test.ts` re-runs the same derivation and fails if the committed copy
- * has drifted from the installed lucide. That turns a silent divergence into a
- * red test on the next `npm update`.
+ * has drifted from the installed package. That turns a silent divergence into
+ * a red test on the next `npm update`.
  *
  * Run with: node scripts/generate-lens-panel-icons.mjs
  */
@@ -20,65 +20,89 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** The icons the panel draws, by their lucide name. */
-export const PANEL_ICON_NAMES = [
+/**
+ * The icons the panel draws: the name the data uses, and the hugeicons export
+ * it resolves to. The left side is what `CATEGORIES[id].icon` holds and what
+ * `PriorityIcon` keys on, so the two surfaces stay addressable by one name.
+ */
+export const PANEL_ICONS = {
   /* Priority marks — the seven categories, plus the fallback for a custom one. */
-  "shield",
-  "users",
-  "backpack",
-  "route",
-  "snowflake",
-  "leaf",
-  "sofa",
-  "car",
+  shield: "ShieldCheckIcon",
+  users: "UserGroupIcon",
+  backpack: "Backpack01Icon",
+  road: "CarFrontIcon",
+  snowflake: "SnowflakeIcon",
+  leaf: "Leaf01Icon",
+  sofa: "Sofa01Icon",
+  car: "Car01Icon",
   /* Profile marks that aren't also categories. */
-  "compass",
-  "scale",
+  compass: "CompassIcon",
+  scale: "ScaleIcon",
   /* The panel's own furniture. */
-  "info",
-  "chevron-down",
-  "search",
-  "x",
-  "check",
-  "plus",
-];
+  info: "InformationCircleIcon",
+  "chevron-down": "ChevronDownIcon",
+  search: "Search01Icon",
+  x: "Cancel01Icon",
+  check: "CheckIcon",
+  plus: "PlusSignIcon",
+};
+
+export const PANEL_ICON_NAMES = Object.keys(PANEL_ICONS);
+
+/**
+ * React spells SVG attributes in camelCase; `setAttribute` does not.
+ *
+ * The panel builds these through the DOM, so `strokeLinecap` has to become
+ * `stroke-linecap` on the way in or the browser silently ignores it and the
+ * strokes come out square.
+ */
+function kebab(name) {
+  return name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+}
 
 /** Reads one icon's shapes out of the installed package, dropping React keys. */
-export function readIconNode(name, base = root) {
+export function readIconNode(exportName, base = root) {
   const file = join(
     base,
-    "node_modules/lucide-react/dist/esm/icons",
-    `${name}.mjs`,
+    "node_modules/@hugeicons/core-free-icons/dist/esm",
+    `${exportName}.js`,
   );
   const source = readFileSync(file, "utf8");
-  /* Non-greedy to the first `];`, which is the literal's own end: an inner
-     shape closes with `]` followed by a comma or a newline, never a
-     semicolon. Matches both the one-line and the wrapped module layouts. */
-  const match = source.match(/const __iconNode = (\[[\s\S]*?\]);/);
+  const match = source.match(/^const \w+ = (\[[\s\S]*?\n\]);$/m);
 
-  if (!match) throw new Error(`no __iconNode in ${file}`);
+  if (!match) throw new Error(`no icon literal in ${file}`);
 
   /* The module is a literal, so evaluating it is reading it. */
   const node = new Function(`return ${match[1]}`)();
 
   return node.map(([tag, attrs]) => {
-    const { key, ...rest } = attrs;
-    return [tag, rest];
+    const out = {};
+    for (const [attr, value] of Object.entries(attrs)) {
+      if (attr === "key") continue;
+      out[kebab(attr)] = String(value);
+    }
+    return [tag, out];
   });
 }
 
-export function buildTable(names = PANEL_ICON_NAMES, base = root) {
-  return Object.fromEntries(names.map((n) => [n, readIconNode(n, base)]));
+export function buildTable(icons = PANEL_ICONS, base = root) {
+  return Object.fromEntries(
+    Object.entries(icons).map(([name, exportName]) => [
+      name,
+      readIconNode(exportName, base),
+    ]),
+  );
 }
 
 const HEADER = `/*
  * GENERATED — do not edit by hand.
  *
  * Run \`node scripts/generate-lens-panel-icons.mjs\` to rebuild this from the
- * installed lucide-react, and see that script for why the shapes are copied
- * here rather than imported. \`icons.test.ts\` fails if the two disagree.
+ * installed @hugeicons/core-free-icons, and see that script for why the shapes
+ * are copied here rather than imported. \`icons.test.ts\` fails if the two
+ * disagree.
  *
- * Icons are lucide (ISC). https://lucide.dev
+ * Icons are hugeicons (MIT). https://hugeicons.com
  */
 
 /** One drawn shape: an SVG tag and the attributes that describe it. */
@@ -89,11 +113,10 @@ export type IconNode = IconShape[];
 export const LENS_PANEL_ICONS: Record<string, IconNode> = `;
 
 const table = buildTable();
-const body = JSON.stringify(table, null, 2);
 
 writeFileSync(
   join(root, "entrypoints/content/lens-panel/icons.ts"),
-  `${HEADER}${body};\n`,
+  `${HEADER}${JSON.stringify(table, null, 2)};\n`,
   "utf8",
 );
 

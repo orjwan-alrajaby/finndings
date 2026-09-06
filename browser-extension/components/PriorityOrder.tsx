@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, CircleCheck, Menu, Plus, X } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+    ArrowDown01Icon,
+    ArrowUp01Icon,
+    Cancel01Icon,
+    CheckmarkCircle02Icon,
+    Menu01Icon,
+    PlusSignIcon,
+} from "@hugeicons/core-free-icons";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 
@@ -151,7 +159,16 @@ export function ProfilePresets({
                                     : "bg-finn-snow text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
                             ].join(" ")}
                         >
-                            <PriorityIcon name={profile.icon} className="h-3.5 w-3.5" />
+                            {/*
+                              * Untinted while selected: the chip goes solid
+                              * blue behind it, and a blue mark on blue is
+                              * not a mark.
+                              */}
+                            <PriorityIcon
+                                name={profile.icon}
+                                className="h-3.5 w-3.5"
+                                tinted={!active}
+                            />
                             {profile.label}
                             {active && (
                                 <span className="text-[10px] font-black opacity-80">
@@ -205,7 +222,7 @@ export function ProfilePresets({
                                     </span>
 
                                     {active && (
-                                        <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                                        <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-4 w-4 shrink-0 text-finn-accent-blue" />
                                     )}
                                 </span>
 
@@ -333,7 +350,7 @@ export function PriorityOrderList({
                                 dragging === id ? "opacity-50" : "",
                             ].join(" ")}
                         >
-                            <Menu
+                            <HugeiconsIcon icon={Menu01Icon}
                                 className="h-4 w-4 shrink-0 text-finn-iron/50"
                                 aria-hidden="true"
                             />
@@ -350,12 +367,10 @@ export function PriorityOrderList({
                                 {index + 1}
                             </span>
 
-                            <span className="text-finn-iron" aria-hidden="true">
-                                <PriorityIcon
-                                    name={definition?.icon ?? "car"}
-                                    className="h-4 w-4"
-                                />
-                            </span>
+                            <PriorityIcon
+                                name={definition?.icon ?? "car"}
+                                className="h-4 w-4 shrink-0"
+                            />
 
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-bold text-finn-black">
@@ -379,7 +394,7 @@ export function PriorityOrderList({
                                     disabled={index === 0}
                                     onClick={() => move(index, index - 1)}
                                 >
-                                    <ArrowUp className="h-3.5 w-3.5" />
+                                    <HugeiconsIcon icon={ArrowUp01Icon} className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -387,7 +402,7 @@ export function PriorityOrderList({
                                     disabled={index === priorities.length - 1}
                                     onClick={() => move(index, index + 1)}
                                 >
-                                    <ArrowDown className="h-3.5 w-3.5" />
+                                    <HugeiconsIcon icon={ArrowDown01Icon} className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -406,7 +421,7 @@ export function PriorityOrderList({
                                         )
                                     }
                                 >
-                                    <X className="h-3.5 w-3.5" />
+                                    <HugeiconsIcon icon={Cancel01Icon} className="h-3.5 w-3.5" />
                                 </IconButton>
                             </span>
                         </li>
@@ -443,8 +458,18 @@ export function PriorityOrderList({
                                         : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
                                 ].join(" ")}
                             >
-                                <Plus className="h-3 w-3" />
-                                <PriorityIcon name={definition.icon} className="h-3 w-3" />
+                                <HugeiconsIcon icon={PlusSignIcon} className="h-3 w-3" />
+                                {/*
+                                  * Inherits rather than tints: this button
+                                  * turns solid blue on hover and dims when
+                                  * the limit is reached, and both are states
+                                  * only the cascade knows about.
+                                  */}
+                                <PriorityIcon
+                                    name={definition.icon}
+                                    className="h-3 w-3"
+                                    tinted={false}
+                                />
                                 {definition.label}
                             </button>
                         ))}

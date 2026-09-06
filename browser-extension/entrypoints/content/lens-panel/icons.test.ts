@@ -7,10 +7,11 @@ import {
 } from "../../../scripts/generate-lens-panel-icons.mjs";
 
 /**
- * The committed icon shapes against the installed lucide.
+ * The committed icon shapes against the installed hugeicons.
  *
- * `icons.ts` is a copy, because the panel is not React and lucide-react's raw
- * shape data lives in untyped internal modules. A copy that nothing checks is
+ * `icons.ts` is a copy, because the panel is not React and hugeicons' raw
+ * shape data lives in per-icon modules with no promised layout. A copy that
+ * nothing checks is
  * a copy that quietly goes stale, so this re-runs the same derivation the
  * generator does and compares. An `npm update` that redraws an icon turns into
  * a failure here rather than into a panel that disagrees with the rest of the
@@ -20,7 +21,7 @@ import {
  *   node scripts/generate-lens-panel-icons.mjs
  */
 describe("lens panel icons", () => {
-    it("match the installed lucide-react", () => {
+    it("match the installed hugeicons", () => {
         expect(LENS_PANEL_ICONS).toEqual(buildTable());
     });
 
@@ -34,6 +35,17 @@ describe("lens panel icons", () => {
         for (const shapes of Object.values(LENS_PANEL_ICONS)) {
             for (const [, attrs] of shapes) {
                 expect(attrs).not.toHaveProperty("key");
+            }
+        }
+    });
+    it("spell attributes for setAttribute, not for React", () => {
+        /* `strokeLinecap` is silently ignored by the DOM; the panel builds
+           these with setAttribute, so they have to arrive kebab-cased. */
+        for (const shapes of Object.values(LENS_PANEL_ICONS)) {
+            for (const [, attrs] of shapes) {
+                for (const attr of Object.keys(attrs)) {
+                    expect(attr).not.toMatch(/[A-Z]/);
+                }
             }
         }
     });
