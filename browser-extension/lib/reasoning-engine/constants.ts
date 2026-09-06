@@ -38,30 +38,16 @@ import type {
  * scale looks the same everywhere it is shown — the picker in the compare
  * drawer, the priority editor in settings, and the chips in the advice.
  *
- * One hue, three depths. This used to be emerald → orange → rose, on the
- * reasoning that three tints of one colour would say "more of the same"
- * where the levels have to say "a different level". That had it backwards:
- * more of the same is exactly what these levels are. They are one quantity
- * measured three times, and a reader who sees violet get darker understands
- * the ordering without being told it — where green, orange and red have to
- * be learned before they can be read, because nothing about green says it
- * comes first.
+ * Three distinct hues, not three depths of one. Depth of colour asks the
+ * reader to judge how much of a thing they are looking at, which is a
+ * comparison they can only make with two swatches side by side; three hues
+ * are told apart on sight, one at a time, which is how these are actually
+ * read — one row at a glance in a list of fifteen.
  *
- * The old ramp also spoke a language it did not mean. Green-amber-red is
- * severity, and the top level here is the opposite of a warning: it is the
- * reader saying a feature matters most, on a scale where no level rules a
- * car out. Rows drawn in alert colours made a list of preferences look like
- * a list of problems.
- *
- * Violet because it has to hold its own against `finn-pale-blue`, which is
- * what this control usually sits on, and against the accent blue that every
- * button in the app is already using.
- *
- * Contrast, measured rather than assumed — white on 600/700/800 is
- * 5.9/7.3/9.2:1 and the deep text on its own tint is 8.4:1 or better, so
- * every step clears 4.5:1 at the 10px this control is drawn at. The ramp it
- * replaced did not: white on the old emerald was 3.65:1 and on the old
- * orange 3.60:1.
+ * Emerald and orange are darker than the ones this scale shipped with, and
+ * that is a contrast fix rather than a change of mind: white on the old
+ * #009966 measured 3.65:1 and on #f54900 3.60:1, against the 4.5:1 that the
+ * 10px labels they carry need. See assets/tailwind.css for the full set.
  */
 export const FEATURE_IMPORTANCE = {
   /*
@@ -78,14 +64,16 @@ export const FEATURE_IMPORTANCE = {
     badgeLabel: "Counts highly",
     hint: "As much as anything else in this priority",
     weight: 4,
-    /* The deepest step of the one ramp. */
-    activeClass: "bg-violet-800 text-white",
-    dotClass: "bg-violet-800",
-    selectedCardClass: "bg-violet-200",
-    /** The bar down a raised row's left edge. */
-    borderClass: "border-l-violet-700",
-    accentTextClass: "text-violet-950",
-    chipClass: "bg-violet-200 text-violet-950",
+    /* Rose: the loudest of the three. */
+    activeClass:
+      "bg-finn-influence-red text-white ring-1 ring-finn-influence-red",
+    idleClass: "text-finn-influence-red hover:bg-finn-influence-red-pale",
+    dotClass: "bg-finn-influence-red",
+    selectedCardClass: "bg-finn-influence-red-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-red",
+    accentTextClass: "text-finn-influence-red",
+    chipClass: "bg-finn-influence-red-pale text-finn-influence-red",
   },
   medium: {
     label: "Moderately",
@@ -93,14 +81,16 @@ export const FEATURE_IMPORTANCE = {
     badgeLabel: "Counts moderately",
     hint: "Clearly more than the rest of the category",
     weight: 3,
-    /* The middle step. */
-    activeClass: "bg-violet-700 text-white",
-    dotClass: "bg-violet-600",
-    selectedCardClass: "bg-violet-100",
-    /** The bar down a raised row's left edge. */
-    borderClass: "border-l-violet-500",
-    accentTextClass: "text-violet-900",
-    chipClass: "bg-violet-100 text-violet-900",
+    /* Orange: the middle step, warm rather than louder blue. */
+    activeClass:
+      "bg-finn-influence-orange text-white ring-1 ring-finn-influence-orange",
+    idleClass: "text-finn-influence-orange hover:bg-finn-influence-orange-pale",
+    dotClass: "bg-finn-influence-orange",
+    selectedCardClass: "bg-finn-influence-orange-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-orange",
+    accentTextClass: "text-finn-influence-orange",
+    chipClass: "bg-finn-influence-orange-pale text-finn-influence-orange",
   },
   low: {
     label: "Somewhat",
@@ -108,14 +98,18 @@ export const FEATURE_IMPORTANCE = {
     badgeLabel: "Counts somewhat",
     hint: "A little more than the rest of the category",
     weight: 2,
-    /* The lightest step above standard. */
-    activeClass: "bg-violet-600 text-white",
-    dotClass: "bg-violet-400",
-    selectedCardClass: "bg-violet-50",
-    /** The bar down a raised row's left edge. */
-    borderClass: "border-l-violet-300",
-    accentTextClass: "text-violet-800",
-    chipClass: "bg-violet-50 text-violet-800",
+    /* Emerald: the calmest of the three, so visual weight tracks stated
+       weight. */
+    activeClass:
+      "bg-finn-influence-emerald text-white ring-1 ring-finn-influence-emerald",
+    idleClass:
+      "text-finn-influence-emerald hover:bg-finn-influence-emerald-pale",
+    dotClass: "bg-finn-influence-emerald",
+    selectedCardClass: "bg-finn-influence-emerald-pale",
+    /** The bar down a raised row's left edge, at full strength. */
+    borderClass: "border-l-finn-influence-emerald",
+    accentTextClass: "text-finn-influence-emerald",
+    chipClass: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
   },
 } as const satisfies Record<
   FeatureImportance,
@@ -126,6 +120,7 @@ export const FEATURE_IMPORTANCE = {
     hint: string;
     weight: number;
     activeClass: string;
+    idleClass: string;
     dotClass: string;
     selectedCardClass: string;
     borderClass: string;
@@ -156,12 +151,9 @@ export const STANDARD_INFLUENCE = {
   hint: "Counts like everything else in this category",
   /** Stated for the reader of this file; the scorer uses BASE_FEATURE_WEIGHT. */
   weight: BASE_FEATURE_WEIGHT,
-  /* White on the track, so the resting rung reads as a step on the same
-     control rather than as a fourth colour. The ring is what makes it read
-     at all: white on a near-white track is otherwise no mark, and this is
-     the rung most rows are sitting on. */
-  activeClass: "bg-white text-finn-black shadow-sm ring-1 ring-slate-200",
-  dotClass: "bg-slate-300",
+  activeClass: "bg-finn-iron/20 text-finn-black ring-1 ring-finn-iron/25",
+  idleClass: "text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
+  dotClass: "bg-finn-iron/30",
   accentTextClass: "text-finn-iron",
 } as const;
 

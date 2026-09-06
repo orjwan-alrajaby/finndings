@@ -2,7 +2,6 @@ import { Lock } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 
-import { InfoTip } from "@/components/InfoTip";
 import {
     FEATURE_IMPORTANCE,
     FEATURES,
@@ -39,7 +38,7 @@ interface FeatureOptionProps {
 }
 
 /**
- * One feature, and how much it counts, as a row.
+ * One feature, and how much it counts, as a card.
  *
  * Every feature in the priority gets one, and every one shows the same
  * four-step control — standard, somewhat, moderately, highly. That is the
@@ -52,11 +51,19 @@ interface FeatureOptionProps {
  * because "not raised" is just the first segment. Nothing appears, nothing
  * moves, and there is no default to correct afterwards.
  *
- * Two ways a row can be unavailable, and they are told apart because the
+ * Stacked rather than laid out in a line: the name, then what the thing
+ * actually is, then the question, then the answer. A single row had to put
+ * the explanation behind an "i" for want of anywhere to say it, which asks a
+ * reader to already know what a feature is before they can decide how much
+ * it should count. The question is written above the buttons for the same
+ * reason it was the first time — it is the whole point of the control, and a
+ * row of four words is not self-evidently a scale.
+ *
+ * Two ways a card can be unavailable, and they are told apart because the
  * reader can act on one and not the other. **At the cap** is this category's
  * own doing and the fix is here: put something back to standard. **Raised
  * elsewhere** is a different category's doing and the fix is there, so the
- * row names the category rather than leaving them to hunt.
+ * card names the category rather than leaving them to hunt.
  */
 export function FeatureOption({
     feature,
@@ -73,82 +80,88 @@ export function FeatureOption({
     const blocked = locked || atCap;
 
     /**
-     * How loudly a row states its level.
+     * How loudly a card states its level.
      *
-     * Three signals of one fact — the tint, the bar down the left edge, the
-     * name in the same hue — because the whole reason to raise a feature is
-     * that it should be visible at a glance which ones you did, and a tint
-     * alone made five raised rows in a list of fifteen read as a slightly
-     * different shade of nothing.
-     *
-     * What changed is that the three are now one colour getting deeper rather
-     * than three colours arguing. A raised row is a preference, not an alert,
-     * and it should look like the row above it with more of something rather
-     * than like a different kind of row.
-     *
-     * A standard row keeps its transparent bar so that raising one does not
-     * shift the text four pixels sideways.
+     * The tint carries it, in the hue of the level, because the whole reason
+     * to raise a feature is that it should be visible at a glance which ones
+     * you did — and five pale cards among fifteen white ones is a glance.
+     * The dot and the name repeat it for anyone who cannot use the hue.
      */
-    const rowClass = () => {
-        if (level) {
-            return `${level.selectedCardClass} ${level.borderClass} border-l-4`;
-        }
+    const cardClass = () => {
+        if (level) return level.selectedCardClass;
 
-        return locked
-            ? "bg-white/40 border-l-4 border-l-transparent"
-            : "bg-white shadow-sm border-l-4 border-l-transparent";
+        return locked ? "bg-white/50" : "bg-white shadow-sm";
     };
 
     return (
-        /*
-         * A container query, not a breakpoint. On a wide panel the name and
-         * the control share a line; in the narrow settings editor the control
-         * drops below. A viewport breakpoint can't tell those apart — the
-         * settings page is a wide window with a narrow panel in it.
-         */
-        <div
-            className={[
-                "@container rounded-2xl px-3 py-2.5 transition",
-                rowClass(),
-            ].join(" ")}
-        >
-            <div className="flex flex-col items-start gap-1.5 @sm:flex-row @sm:items-center @sm:gap-3">
-                <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                    {locked && (
-                        <Lock
-                            aria-hidden
-                            className="h-3 w-3 shrink-0 text-finn-iron/50"
-                        />
-                    )}
-
-                    <span
-                        className={[
-                            "min-w-0 truncate text-xs leading-4",
-                            nameClass(level, locked),
-                        ].join(" ")}
-                    >
-                        {label}
-                    </span>
-
-                    {explanation && (
-                        <span className="shrink-0">
-                            <InfoTip subject={label}>{explanation}</InfoTip>
-                        </span>
-                    )}
-                </span>
-
+        <div className={["rounded-2xl p-3 transition", cardClass()].join(" ")}>
+            <div className="flex items-start gap-2.5">
                 {locked ? (
-                    <ElsewhereNote elsewhere={elsewhere} />
+                    <Lock
+                        aria-hidden
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-finn-iron/50"
+                    />
                 ) : (
+                    <span
+                        aria-hidden
+                        className={[
+                            "mt-1 h-2.5 w-2.5 shrink-0 rounded-full transition",
+                            level ? level.dotClass : STANDARD_INFLUENCE.dotClass,
+                        ].join(" ")}
+                    />
+                )}
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                            className={[
+                                "text-sm leading-5",
+                                nameClass(level, locked),
+                            ].join(" ")}
+                        >
+                            {label}
+                        </span>
+
+                        {level && (
+                            <span
+                                className={[
+                                    "rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide",
+                                    level.chipClass,
+                                ].join(" ")}
+                            >
+                                {level.badgeLabel}
+                            </span>
+                        )}
+                    </div>
+
+                    {/*
+                      * Said here rather than hidden behind an "i". A reader
+                      * deciding how much something should count needs to know
+                      * what it is first, and a tooltip makes that a second
+                      * action taken on a hunch.
+                      */}
+                    {explanation && (
+                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                            {explanation}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {locked ? (
+                <div className="mt-2.5">
+                    <ElsewhereNote elsewhere={elsewhere} />
+                </div>
+            ) : (
+                <div className="mt-2.5 rounded-xl bg-white/70 p-2">
+                    <p className="px-0.5 text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                        How much influence does this have?
+                    </p>
+
                     <div
                         role="radiogroup"
-                        aria-label={`How much ${label} should influence your decision`}
-                        className={[
-                            "flex shrink-0 gap-0.5 rounded-lg p-0.5 @sm:ml-auto",
-                            /* On a tinted row the track has to lift off the
-                               tint; on a white one it has to sit into it. */
-                            level ? "bg-white/70" : "bg-finn-snow",
-                        ].join(" ")}
+                        aria-label={`How much influence ${label} has`}
+                        className="mt-1.5 flex gap-1.5"
                     >
                         {/*
                           * Standard first, because that is where every feature
@@ -160,6 +173,11 @@ export function FeatureOption({
                             hint={STANDARD_INFLUENCE.hint}
                             active={importance == null}
                             activeClass={STANDARD_INFLUENCE.activeClass}
+                            idleClass={STANDARD_INFLUENCE.idleClass}
+                            dotClass={STANDARD_INFLUENCE.dotClass}
+                            /* Its active pill is a light grey, not a solid
+                               hue, so a white dot on it would be no dot. */
+                            activeDotClass="bg-finn-iron/60"
                             /* Never blocked: dropping back to standard is how
                                the reader frees a slot at the cap. */
                             disabled={false}
@@ -180,14 +198,16 @@ export function FeatureOption({
                                     }
                                     active={importance === option}
                                     activeClass={meta.activeClass}
+                                    idleClass={meta.idleClass}
+                                    dotClass={meta.dotClass}
                                     disabled={blocked}
                                     onClick={() => onSet(option)}
                                 />
                             );
                         })}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -249,21 +269,39 @@ function segmentClass(
     active: boolean,
     disabled: boolean,
     activeClass: string,
+    idleClass: string,
 ): string {
     if (active) return activeClass;
 
-    if (disabled) return "cursor-not-allowed text-slate-400";
+    if (disabled) return "cursor-not-allowed bg-white/60 text-finn-iron/40";
 
-    /* slate-600 rather than the lighter iron: this track sits on white and on
-       three violet tints, and 600 is the step that clears 4.5:1 on all four. */
-    return "text-slate-600 hover:bg-white hover:text-finn-black";
+    /*
+     * The hairline is what makes a resting rung look pressable. White on the
+     * panel's own near-white left three of the four options reading as
+     * coloured text on every card that hadn't been raised — which is most of
+     * them, and exactly the reader who needs to see there is a choice here.
+     */
+    return `bg-white ring-1 ring-finn-iron/15 ${idleClass}`;
 }
 
+/**
+ * One rung, as a button wide enough to read.
+ *
+ * Four of these share the width, so the labels sit under the question rather
+ * than crammed against the name — which is what let the words shrink to 10px
+ * in the first place.
+ *
+ * The dot carries the colour so the label never has to. Colour is the fast
+ * read; the words are the real one, and they stay on every state.
+ */
 function Segment({
     label,
     hint,
     active,
     activeClass,
+    idleClass,
+    dotClass,
+    activeDotClass = "bg-white",
     disabled,
     onClick,
 }: {
@@ -271,6 +309,10 @@ function Segment({
     hint: string;
     active: boolean;
     activeClass: string;
+    idleClass: string;
+    dotClass: string;
+    /** Overridden where the active pill isn't a solid hue. */
+    activeDotClass?: string;
     disabled: boolean;
     onClick: () => void;
 }) {
@@ -283,11 +325,20 @@ function Segment({
             title={hint}
             onClick={onClick}
             className={[
-                "rounded-md px-2 py-1 text-[10px] font-black transition",
-                segmentClass(active, disabled, activeClass),
+                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5",
+                "text-[10px] font-black leading-3 transition",
+                segmentClass(active, disabled, activeClass, idleClass),
             ].join(" ")}
         >
-            {label}
+            <span
+                aria-hidden
+                className={[
+                    "h-2 w-2 shrink-0 rounded-full",
+                    active ? activeDotClass : dotClass,
+                ].join(" ")}
+            />
+
+            <span className="text-left">{label}</span>
         </button>
     );
 }

@@ -50,21 +50,23 @@
   --color-finn-warning-ink: #4a2600;
   --color-finn-warning-deep: #9a4a00;
 
-  /* -- Present / absent --
-     Named for the influence scale, which is no longer what they are. That
-     scale is now one violet ramp built from Tailwind's own palette, in
-     `FEATURE_IMPORTANCE` — partly because green-amber-red is the language of
-     severity and these levels are preferences, and partly because white on
-     the emerald here measured 3.65:1 and on the orange 3.60:1, neither of
-     which clears 4.5:1 at the size the labels are set.
+  /* -- Influence scale --
+     How much a feature the user picked out should count. Three separate hues
+     rather than three tints of one, so the levels are told apart at a glance
+     instead of asking the reader to judge depth of colour.
 
-     What still reads them is the pair of "has it / doesn't" markers in the
-     fit analysis and the lens panel, where green-for-present is the right
-     language. Worth renaming to say so; left alone here because a rename
-     touches files this change had no other reason to open. */
-  --color-finn-influence-emerald: #009966;
+     Emerald and orange are darker than they were, and that is the fix the
+     previous note here asked for and never got: white on #009966 measured
+     3.65:1 and on #f54900 3.60:1, both short of the 4.5:1 the 10px labels
+     they carry need. At #047857 and #b45309 the ramp is unchanged and the
+     numbers are 5.48:1 and 5.02:1, with rose already fine at 6.03:1. The
+     pale grounds hold their own text too — 5.21, 4.73 and 5.49:1.
+
+     The same tokens double as the has-it/doesn't markers in the fit analysis
+     and the lens panel, where emerald means present. */
+  --color-finn-influence-emerald: #047857;
   --color-finn-influence-emerald-pale: #ecfdf5;
-  --color-finn-influence-orange: #f54900;
+  --color-finn-influence-orange: #b45309;
   --color-finn-influence-orange-pale: #fff7ed;
   --color-finn-influence-red: #c70036;
   --color-finn-influence-red-pale: #fff1f2;
