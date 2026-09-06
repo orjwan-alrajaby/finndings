@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-    ArrowUturnLeftIcon,
-    ChevronDownIcon,
-    SparklesIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronDown, Sparkles, Undo2 } from "lucide-react";
 
 import {
     FEATURE_IMPORTANCE,
@@ -196,7 +192,7 @@ export function FeatureInfluencePicker({
                             onClick={onResetToDefaults}
                             className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-finn-iron shadow-sm transition hover:text-finn-black"
                         >
-                            <SparklesIcon className="h-3.5 w-3.5" />
+                            <Sparkles className="h-3.5 w-3.5" />
                             Reset to defaults
                         </button>
                     )}
@@ -208,7 +204,7 @@ export function FeatureInfluencePicker({
                             disabled={features.length === 0}
                             className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-finn-iron shadow-sm transition hover:text-finn-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-finn-iron"
                         >
-                            <ArrowUturnLeftIcon className="h-3.5 w-3.5" />
+                            <Undo2 className="h-3.5 w-3.5" />
                             Reset all
                         </button>
                     )}
@@ -267,7 +263,7 @@ function Explainer({
                     <Scale />
                 </span>
 
-                <ChevronDownIcon
+                <ChevronDown
                     className={[
                         "h-3.5 w-3.5 shrink-0 text-finn-iron transition-transform",
                         open ? "rotate-180" : "",

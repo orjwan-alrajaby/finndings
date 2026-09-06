@@ -1,8 +1,4 @@
-import {
-    ArrowTopRightOnSquareIcon,
-    ExclamationTriangleIcon,
-    SparklesIcon,
-} from "@heroicons/react/24/outline";
+import { ExternalLink, Sparkles, TriangleAlert } from "lucide-react";
 import type {
     CategoryId,
     CostBreakdown,
@@ -142,11 +138,11 @@ export function AdviceHero({
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${palette.eyebrow}`}
                     >
                         {isFallback ? (
-                            <ExclamationTriangleIcon
+                            <TriangleAlert
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         ) : (
-                            <SparklesIcon
+                            <Sparkles
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         )}
@@ -237,7 +233,7 @@ export function AdviceHero({
                                 className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black shadow-sm transition ${palette.link}`}
                             >
                                 View this car on FINN
-                                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                                <ExternalLink className="h-4 w-4" />
                             </a>
                         )}
 

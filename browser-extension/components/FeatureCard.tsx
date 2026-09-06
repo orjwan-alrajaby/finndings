@@ -1,4 +1,4 @@
-import { PencilSquareIcon } from "@heroicons/react/24/outline";
+import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface FeatureCardProps {
@@ -99,7 +99,7 @@ export function FeatureCard({
                             : `Edit ${label}`
                     }
                 >
-                    <PencilSquareIcon className="h-4 w-4" />
+                    <SquarePen className="h-4 w-4" />
                 </button>
             </div>
 

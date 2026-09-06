@@ -1,6 +1,6 @@
 import "@/assets/tailwind.css";
 import { useState, useEffect } from "react";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
+import { Settings } from "lucide-react";
 import { FINN_BASE_URL } from "@/lib/constants";
 import { GettingStarted } from "./components/GettingStarted";
 import { GoToFinnSection } from "./components/GoToFinnSection";
@@ -173,7 +173,7 @@ function App() {
             aria-label="Settings"
             onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
           >
-            <Cog6ToothIcon className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
           </button>
         </header>
 

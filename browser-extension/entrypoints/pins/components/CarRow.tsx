@@ -1,9 +1,4 @@
-import {
-    ArrowTopRightOnSquareIcon,
-    EyeIcon,
-    PhotoIcon,
-    TrashIcon,
-} from "@heroicons/react/24/outline";
+import { ExternalLink, Eye, Image as ImageIcon, Trash2 } from "lucide-react";
 
 import { BandChip } from "@/components/FitAnalysisView";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
@@ -110,7 +105,7 @@ export function CarRow({
                     />
                 ) : (
                     <span className="flex h-18 w-26 shrink-0 items-center justify-center rounded-2xl bg-finn-snow text-finn-iron/40">
-                        <PhotoIcon className="h-6 w-6" />
+                        <ImageIcon className="h-6 w-6" />
                     </span>
                 )}
 
@@ -174,7 +169,7 @@ export function CarRow({
                     title={`View ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
                 >
-                    <EyeIcon className="h-4 w-4" />
+                    <Eye className="h-4 w-4" />
                 </button>
 
                 {/*
@@ -191,7 +186,7 @@ export function CarRow({
                         title="Open on finn.com"
                         className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-snow hover:text-finn-black"
                     >
-                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                        <ExternalLink className="h-4 w-4" />
                     </a>
                 ) : null}
 
@@ -202,7 +197,7 @@ export function CarRow({
                     title={`Unpin ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
                 >
-                    <TrashIcon className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                 </button>
             </span>
         </li>

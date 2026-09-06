@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import { Info } from "lucide-react";
 
 interface InfoTipProps {
     /** What the reader is asking about — used as the accessible label. */
@@ -41,7 +41,7 @@ export function InfoTip({ subject, children }: InfoTipProps) {
                             : "text-finn-iron hover:text-finn-accent-blue",
                     ].join(" ")}
                 >
-                    <InformationCircleIcon className="h-4 w-4" />
+                    <Info className="h-4 w-4" />
                 </button>
             </Tooltip.Trigger>
 

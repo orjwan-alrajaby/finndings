@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    ArrowPathIcon,
-    ChevronDownIcon,
-    Cog6ToothIcon,
-    XMarkIcon,
-} from "@heroicons/react/24/outline";
+import { ChevronDown, RotateCw, Settings, X } from "lucide-react";
 
 import type {
     CategoryId,
@@ -154,7 +149,7 @@ function Header({ onClose }: { onClose: () => void }) {
                 aria-label="Close"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
             >
-                <XMarkIcon className="h-5 w-5" />
+                <X className="h-5 w-5" />
             </button>
         </header>
     );
@@ -171,7 +166,7 @@ function Footer({ onSettings }: { onSettings: () => void }) {
                     onClick={onSettings}
                     className="inline-flex items-center gap-1 font-bold text-finn-accent-blue underline-offset-2 transition hover:underline"
                 >
-                    <Cog6ToothIcon className="h-3 w-3" />
+                    <Settings className="h-3 w-3" />
                     make it permanent in Settings
                 </button>
                 .
@@ -225,7 +220,7 @@ function Section({
                     </span>
                 </span>
 
-                <ChevronDownIcon
+                <ChevronDown
                     aria-hidden="true"
                     className={[
                         "mt-0.5 h-4 w-4 shrink-0 text-finn-iron transition-transform",
@@ -422,7 +417,7 @@ function FeatureSection() {
                     onClick={resetFeaturesToSaved}
                     className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline"
                 >
-                    <ArrowPathIcon className="h-3.5 w-3.5" />
+                    <RotateCw className="h-3.5 w-3.5" />
                     {savedCount > 0 ? "Use my saved picks" : "Clear my picks"}
                 </button>
             )}

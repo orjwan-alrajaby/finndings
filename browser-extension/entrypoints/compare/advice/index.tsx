@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-    ArrowDownTrayIcon,
-    ArrowPathIcon,
-} from "@heroicons/react/24/outline";
+import { Download, RotateCw } from "lucide-react";
 import type { PinnedFinnCar } from "@/lib/types";
 import { FinnLink } from "@/components/FinnLink";
 import {
@@ -260,12 +257,12 @@ export function Advice({
             >
                 {exporting ? (
                     <>
-                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                        <RotateCw className="h-4 w-4 animate-spin" />
                         Building your PDF…
                     </>
                 ) : (
                     <>
-                        <ArrowDownTrayIcon className="h-4 w-4" />
+                        <Download className="h-4 w-4" />
                         Save as PDF
                     </>
                 )}

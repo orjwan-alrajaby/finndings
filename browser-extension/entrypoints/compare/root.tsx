@@ -1,11 +1,6 @@
 import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
-import {
-  AdjustmentsHorizontalIcon,
-  BookmarkIcon,
-  Cog6ToothIcon,
-  SparklesIcon,
-} from "@heroicons/react/24/outline";
+import { Bookmark, Settings, SlidersHorizontal, Sparkles } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
@@ -56,7 +51,7 @@ export default function CompareTab({
       <div className="min-h-screen bg-white px-4 py-12 text-center">
         <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-finn-accent-blue">
-            <SparklesIcon className="h-7 w-7" />
+            <Sparkles className="h-7 w-7" />
           </div>
 
           <h1 className="mt-5 text-2xl font-black text-finn-black">
@@ -141,7 +136,7 @@ export default function CompareTab({
         >
           <PageHeader>
             <NavButton
-              icon={<AdjustmentsHorizontalIcon className="h-4 w-4" />}
+              icon={<SlidersHorizontal className="h-4 w-4" />}
               label="Adjust my answers"
               onClick={() => setAdjusting((was) => !was)}
               active={adjusting}
@@ -149,13 +144,13 @@ export default function CompareTab({
             />
 
             <NavButton
-              icon={<BookmarkIcon className="h-4 w-4" />}
+              icon={<Bookmark className="h-4 w-4" />}
               label="Pinned cars"
               onClick={onManagePins}
             />
 
             <NavButton
-              icon={<Cog6ToothIcon className="h-4 w-4" />}
+              icon={<Settings className="h-4 w-4" />}
               label="Settings"
               onClick={onSettings}
             />

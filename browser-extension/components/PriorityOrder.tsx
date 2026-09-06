@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-    ArrowDownIcon,
-    ArrowUpIcon,
-    Bars3Icon,
-    CheckCircleIcon,
-    PlusIcon,
-    XMarkIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowDown, ArrowUp, CircleCheck, Menu, Plus, X } from "lucide-react";
 
 import {
     MAX_PRIORITIES,
@@ -207,7 +200,7 @@ export function ProfilePresets({
                                     </span>
 
                                     {active && (
-                                        <CheckCircleIcon className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                                        <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
                                     )}
                                 </span>
 
@@ -335,7 +328,7 @@ export function PriorityOrderList({
                                 dragging === id ? "opacity-50" : "",
                             ].join(" ")}
                         >
-                            <Bars3Icon
+                            <Menu
                                 className="h-4 w-4 shrink-0 text-finn-iron/50"
                                 aria-hidden="true"
                             />
@@ -378,7 +371,7 @@ export function PriorityOrderList({
                                     disabled={index === 0}
                                     onClick={() => move(index, index - 1)}
                                 >
-                                    <ArrowUpIcon className="h-3.5 w-3.5" />
+                                    <ArrowUp className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -386,7 +379,7 @@ export function PriorityOrderList({
                                     disabled={index === priorities.length - 1}
                                     onClick={() => move(index, index + 1)}
                                 >
-                                    <ArrowDownIcon className="h-3.5 w-3.5" />
+                                    <ArrowDown className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -405,7 +398,7 @@ export function PriorityOrderList({
                                         )
                                     }
                                 >
-                                    <XMarkIcon className="h-3.5 w-3.5" />
+                                    <X className="h-3.5 w-3.5" />
                                 </IconButton>
                             </span>
                         </li>
@@ -442,7 +435,7 @@ export function PriorityOrderList({
                                         : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
                                 ].join(" ")}
                             >
-                                <PlusIcon className="h-3 w-3" />
+                                <Plus className="h-3 w-3" />
                                 <span aria-hidden="true">{definition.icon}</span>
                                 {definition.label}
                             </button>

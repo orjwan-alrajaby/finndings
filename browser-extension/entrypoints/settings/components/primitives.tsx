@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { ExclamationTriangleIcon, StarIcon } from "@heroicons/react/24/outline";
-import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { Star, TriangleAlert } from "lucide-react";
 
 // Unchanged from the original settings page — same visual language.
 export function Section({ title, description, children }: {
@@ -46,7 +45,7 @@ export function Toggle({ checked, onChange, disabled, label }: {
 export function DefaultBadge() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-finn-accent-blue/10 px-2.5 py-1 text-[10px] font-bold text-finn-accent-blue">
-      <StarIconSolid className="h-3 w-3" /> Default
+      <Star className="h-3 w-3 fill-current" /> Default
     </span>
   );
 }
@@ -54,7 +53,7 @@ export function DefaultBadge() {
 export function SetDefaultButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="inline-flex items-center gap-1 rounded-full bg-finn-iron/15 px-2.5 py-1 text-[10px] font-bold text-finn-iron hover:text-finn-black">
-      <StarIcon className="h-3 w-3" /> Set as default
+      <Star className="h-3 w-3" /> Set as default
     </button>
   );
 }
@@ -63,7 +62,7 @@ export function IssuesNotice({ issues }: { issues: string[] }) {
   if (issues.length === 0) return null;
   return (
     <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-finn-warning/10 px-3 py-2">
-      <ExclamationTriangleIcon className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-finn-warning" />
+      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-finn-warning" />
       <ul className="space-y-0.5 text-[11px] leading-4 text-finn-warning font-medium">
         {issues.map((issue, i) => <li key={i}>{issue}</li>)}
       </ul>

@@ -1,9 +1,4 @@
-import {
-    ScaleIcon,
-    ArrowTopRightOnSquareIcon,
-    BookmarkIcon,
-    CogIcon,
-} from "@heroicons/react/24/outline";
+import { Bookmark, Cog, ExternalLink, Scale } from "lucide-react";
 import * as RadixTabs from "@radix-ui/react-tabs";
 import { ActionButton } from "./ActionButton";
 import { CarPreviewCard } from "./CarPreviewCard";
@@ -105,7 +100,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                                 }`}
                         >
                             View all {pinnedCount} cars
-                            <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+                            <ExternalLink className="h-3 w-3" />
                         </button>
                     </div>
                 )}
@@ -130,7 +125,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                                 ? "Pin one more car and Lens can rank them for you."
                                 : "One car, the reasons for it, and what it really costs."
                         }
-                        icon={<ScaleIcon className="h-5 w-5" />}
+                        icon={<Scale className="h-5 w-5" />}
                         disabled={pinnedCount < 2}
                         onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                         accent={accent}
@@ -138,7 +133,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     <ActionButton
                         title="Manage Pinned Cars"
                         description="See everything you pinned, read how each one suits you, and unpin what you're done with."
-                        icon={<BookmarkIcon className="h-5 w-5" />}
+                        icon={<Bookmark className="h-5 w-5" />}
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_PINS_PAGE")}
                         accent={accent}
@@ -146,7 +141,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     <ActionButton
                         title="Go To Settings"
                         description="Set your priorities, what counts inside each one, and your driving assumptions."
-                        icon={<CogIcon className="h-5 w-5" />}
+                        icon={<Cog className="h-5 w-5" />}
                         /*
                          * Never gated on pinned cars. Settings is where a reader
                          * tells Lens what they care about, and it is what the
@@ -161,7 +156,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     {/* <ActionButton
                         title="Edit/Add Profiles"
                         description="Export your selected vehicles."
-                        icon={<DocumentArrowDownIcon className="h-5 w-5" />}
+                        icon={<FileDown className="h-5 w-5" />}
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_DOWNLOAD_AS_PDF_PAGE")}
                         accent={accent}

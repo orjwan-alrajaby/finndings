@@ -1,4 +1,4 @@
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { Check } from "lucide-react";
 
 import {
     SCREEN_LABEL,
@@ -61,7 +61,7 @@ export function ProgressRail({
                         >
                             {/* The check is for screen readers; the rail itself carries the state visually. */}
                             {done && (
-                                <CheckIcon className="sr-only h-3 w-3" />
+                                <Check className="sr-only h-3 w-3" />
                             )}
                         </button>
                     );

@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-    ArrowPathIcon,
-    ExclamationTriangleIcon,
-    TrashIcon,
-} from "@heroicons/react/24/outline";
+import { RotateCw, Trash2, TriangleAlert } from "lucide-react";
 
 import {
     ALL_STORED_DATA_GROUPS,
@@ -211,7 +207,7 @@ export function DataSettings({
 
                                             {checked && (
                                                 <span className="mt-2 flex items-start gap-1.5 text-[11px] font-bold leading-4 text-finn-error">
-                                                    <ExclamationTriangleIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                                                    <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
                                                     {withFinnLinks(
                                                         group.consequence,
                                                     )}
@@ -246,7 +242,7 @@ export function DataSettings({
                                 onClick={() => setConfirming(true)}
                                 className="inline-flex h-11 items-center gap-2 rounded-full bg-finn-error px-5 text-xs font-black text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-finn-cotton disabled:text-finn-iron"
                             >
-                                <TrashIcon className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                                 {busy
                                     ? "Deleting…"
                                     : selected.length === 0
@@ -259,7 +255,7 @@ export function DataSettings({
                                 onClick={() => void refresh()}
                                 className="inline-flex items-center gap-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black"
                             >
-                                <ArrowPathIcon className="h-3.5 w-3.5" />
+                                <RotateCw className="h-3.5 w-3.5" />
                                 Recheck
                             </button>
                         </div>

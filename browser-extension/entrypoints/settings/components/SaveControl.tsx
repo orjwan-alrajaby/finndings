@@ -1,4 +1,4 @@
-import { CheckIcon } from "@heroicons/react/24/outline";
+import { Check } from "lucide-react";
 
 /**
  * The only thing on this page that keeps anything.
@@ -60,7 +60,7 @@ export function SaveControl({
                         : "cursor-default bg-white text-finn-iron",
                 ].join(" ")}
             >
-                <CheckIcon className="h-4 w-4" />
+                <Check className="h-4 w-4" />
                 {dirty ? "Save changes" : "Saved"}
             </button>
         </span>

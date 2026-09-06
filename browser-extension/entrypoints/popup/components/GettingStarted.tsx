@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import { CheckCircleIcon } from "@heroicons/react/24/solid";
+import { CircleCheck, X } from "lucide-react";
 
 import { FINN_BASE_URL } from "@/lib/constants";
 import {
@@ -131,7 +130,7 @@ export function GettingStarted({ pinnedCount }: { pinnedCount: number }) {
                     aria-label="Hide getting started"
                     className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
                 >
-                    <XMarkIcon className="h-3.5 w-3.5" />
+                    <X className="h-3.5 w-3.5" />
                 </button>
             </div>
 
@@ -193,7 +192,7 @@ function TaskRow({
             ].join(" ")}
         >
             {task.done ? (
-                <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
+                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 fill-finn-accent-blue text-white" />
             ) : (
                 <span
                     className={[

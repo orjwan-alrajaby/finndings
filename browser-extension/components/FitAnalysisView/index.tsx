@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -264,7 +264,7 @@ function PrioritySection({ priority }: { priority: FitPriority }) {
                         compact
                     />
 
-                    <ChevronDownIcon
+                    <ChevronDown
                         aria-hidden="true"
                         className={[
                             "mt-1 h-4 w-4 shrink-0 text-finn-iron transition-transform",
