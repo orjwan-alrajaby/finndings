@@ -29,6 +29,9 @@ export function Toggle({ checked, onChange, disabled, label }: {
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      /* A switch is two states and no words. The label names the act for a
+         screen reader; the title is the same sentence for everyone else. */
+      title={label}
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       className={`relative h-5 w-10 flex-shrink-0 rounded-full p-1 transition-colors ${checked ? "bg-finn-accent-blue" : "bg-finn-iron/40 border border-finn-iron/15"
@@ -42,17 +45,37 @@ export function Toggle({ checked, onChange, disabled, label }: {
   );
 }
 
+/**
+ * White on the default profile's pale blue, rather than the other way round.
+ *
+ * The badge used to be a 10% blue on a near-white card. That card is now pale
+ * blue itself — which is how a reader finds the default without reading — and
+ * a 10% blue badge on it would be two washes of the same colour with nothing
+ * between them. White is the only ground that still reads as a badge there.
+ */
 export function DefaultBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-finn-accent-blue/10 px-2.5 py-1 text-[10px] font-bold text-finn-accent-blue">
+    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-finn-accent-blue">
       <Star className="h-3 w-3 fill-current" /> Default
     </span>
   );
 }
 
-export function SetDefaultButton({ onClick }: { onClick: () => void }) {
+export function SetDefaultButton({ onClick, label }: {
+  onClick: () => void;
+  /** The profile this acts on, since six identical buttons say nothing alone. */
+  label?: string;
+}) {
+  const said = label ? `Make ${label} the default profile` : "Set as default";
+
   return (
-    <button type="button" onClick={onClick} className="inline-flex items-center gap-1 rounded-full bg-finn-iron/15 px-2.5 py-1 text-[10px] font-bold text-finn-iron hover:text-finn-black">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={said}
+      title={said}
+      className="inline-flex items-center gap-1 rounded-full bg-finn-iron/15 px-2.5 py-1 text-[10px] font-bold text-finn-iron hover:bg-finn-pale-blue hover:text-finn-accent-blue"
+    >
       <Star className="h-3 w-3" /> Set as default
     </button>
   );

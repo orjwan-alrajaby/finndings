@@ -150,9 +150,9 @@ export function Priorities({
                             sameOrder(priorities, DEFAULT_PRIORITIES)
                                 ? undefined
                                 : () => {
-                                      setApplied(null);
-                                      onChange([...DEFAULT_PRIORITIES]);
-                                  }
+                                    setApplied(null);
+                                    onChange([...DEFAULT_PRIORITIES]);
+                                }
                         }
                         onOpenPresets={
                             hasProfiles ? () => setView("presets") : undefined
@@ -234,7 +234,7 @@ function AppliedBanner({
         <div className="finn-lens-attention mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-finn-pale-blue px-4 py-3">
             <CircleCheck className="h-5 w-5 shrink-0 text-finn-accent-blue" />
 
-            <p className="min-w-0 flex-1 text-xs leading-5 text-finn-highlight-navy">
+            <p className="min-w-0 flex-1 flex items-center gap-1 text-xs leading-5 text-finn-highlight-navy">
                 <strong className="inline-flex items-center gap-1 font-black">
                     <PriorityIcon
                         name={applied.icon}
@@ -242,8 +242,10 @@ function AppliedBanner({
                     />
                     {applied.label} applied.
                 </strong>{" "}
-                Your order below is now its priorities, in its order — change
-                anything you disagree with.
+                <span>
+                    Your order below is now its priorities, in its order — change
+                    anything you disagree with.
+                </span>
             </p>
 
             <button

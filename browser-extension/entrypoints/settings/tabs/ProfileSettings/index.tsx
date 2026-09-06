@@ -30,13 +30,28 @@ export function ProfilesSettings({
 }: ProfilesSettingsProps) {
     const enabledCount = profiles.filter((profile) => profile.enabled).length;
 
+    /*
+     * The default first, and everything else in the order it was already in.
+     *
+     * It is the one profile on this page with a claim to a position: it is
+     * what Lens will actually start you on, and looking for it in a list of
+     * six identical cards is a small search a reader should never have to do.
+     * `sort` is stable, so the rest keep the fixed order the product defines
+     * — this moves one card rather than rearranging the page.
+     */
+    const ordered = [...profiles].sort(
+        (a, b) =>
+            Number(b.id === defaultProfileId) -
+            Number(a.id === defaultProfileId),
+    );
+
     return (
         <Section
             title="Profiles"
             description="A profile is a starting philosophy: five priorities in a sensible order. Turn off the ones you'll never use, and pick the one Lens should start you on. If you want a different order, choose your own priorities in the compare flow instead — that always wins over a profile."
         >
             <div className="flex flex-col gap-4">
-                {profiles.map((profile) => (
+                {ordered.map((profile) => (
                     <ProfileCard
                         key={profile.id}
                         profile={profile}

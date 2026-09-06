@@ -27,19 +27,46 @@ export function ProfileCard({
     const isLastEnabled = profile.enabled && enabledCount <= 1;
 
     return (
-        <div className="rounded-[22px] bg-finn-snow drop-shadow-sm">
+        /*
+         * The default wears its state rather than explaining it. It used to
+         * carry a paragraph saying it is the one Lens starts you on; a pale
+         * blue card at the top of the list says the same thing without
+         * spending three lines on it, and says it while the reader is
+         * scanning rather than after they have stopped to read.
+         */
+        <div
+            className={[
+                "rounded-[22px] drop-shadow-sm",
+                isDefault ? "bg-finn-pale-blue" : "bg-finn-snow",
+            ].join(" ")}
+        >
             <div className="flex items-start gap-3 p-4">
                 <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
                     <PriorityIcon name={profile.icon} className="h-5 w-5" />
                 </span>
 
                 <div className="min-w-0 flex-1 space-y-1">
+                    {/*
+                      * The badge and the button occupy the same spot, because
+                      * they answer the same question: this one is the default,
+                      * or this is where you make it one. Below the priority
+                      * list the button was a long way from the name it acts
+                      * on, in a card that is mostly other cards' width of
+                      * text.
+                      */}
                     <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-sm font-black text-finn-black">
                             {profile.label}
                         </span>
 
                         {isDefault && <DefaultBadge />}
+
+                        {!isDefault && profile.enabled && (
+                            <SetDefaultButton
+                                onClick={() => onSetDefault(profile.id)}
+                                label={profile.label}
+                            />
+                        )}
                     </div>
 
                     <p className="mt-0.5 text-xs leading-5 text-finn-iron">
@@ -54,37 +81,26 @@ export function ProfileCard({
                         profile={profile}
                         priorityDefinitions={priorityDefinitions}
                     />
-
-                    {!isDefault && profile.enabled && (
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <SetDefaultButton
-                                onClick={() => onSetDefault(profile.id)}
-                            />
-                        </div>
-                    )}
                 </div>
 
+                {/*
+                  * The reason the last one can't be switched off moved into
+                  * the switch itself. It used to be a panel under the card,
+                  * which is a lot of furniture for a sentence a reader needs
+                  * exactly once — but a disabled control with no explanation
+                  * anywhere is a dead end, so the title carries it.
+                  */}
                 <Toggle
                     checked={profile.enabled}
                     disabled={isLastEnabled}
                     onChange={(next) => onToggleEnabled(profile.id, next)}
-                    label={`${profile.enabled ? "Disable" : "Enable"} ${profile.label}`}
+                    label={
+                        isLastEnabled
+                            ? `Lens needs one profile switched on, so ${profile.label} can't be switched off`
+                            : `${profile.enabled ? "Disable" : "Enable"} profile ${profile.label}`
+                    }
                 />
             </div>
-
-            {isLastEnabled && (
-                <p className="mx-4 mb-3 rounded-xl bg-finn-cotton px-3 py-2 text-[10px] leading-4 text-finn-iron">
-                    This is the only profile still switched on, so it can't be
-                    switched off — Lens always needs one to start you from.
-                </p>
-            )}
-
-            {isDefault && (
-                <p className="mx-4 mb-3 rounded-xl bg-finn-pale-blue px-3 py-2 text-[10px] leading-4 text-finn-highlight-navy">
-                    This profile is selected automatically when you start a new
-                    comparison. Anything you change afterwards is kept.
-                </p>
-            )}
         </div>
     );
 }

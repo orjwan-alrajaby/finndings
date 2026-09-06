@@ -215,66 +215,66 @@ export function ProfilePresets({
                             />
                         </span>
 
-                    <button
-                        type="button"
-                        onClick={() => onApply([...profile.priorities])}
-                        aria-pressed={active}
-                        className={[
-                            "flex w-full flex-col rounded-[22px] p-4 text-left transition-all",
-                            active
-                                ? "bg-finn-pale-blue shadow-[0_0_0_2px] shadow-finn-accent-blue"
-                                : "bg-finn-snow drop-shadow-sm hover:bg-finn-pale-blue/70",
-                        ].join(" ")}
-                    >
-                        <span className="flex items-start gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
-                                <PriorityIcon
-                                    name={profile.icon}
-                                    className="h-5 w-5"
-                                />
-                            </span>
+                        <button
+                            type="button"
+                            onClick={() => onApply([...profile.priorities])}
+                            aria-pressed={active}
+                            className={[
+                                "flex w-full h-full flex-col rounded-[22px] p-4 text-left transition-all",
+                                active
+                                    ? "bg-finn-pale-blue shadow-[0_0_0_2px] shadow-finn-accent-blue"
+                                    : "bg-finn-snow drop-shadow-sm hover:bg-finn-pale-blue/70",
+                            ].join(" ")}
+                        >
+                            <span className="flex items-start gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
+                                    <PriorityIcon
+                                        name={profile.icon}
+                                        className="h-5 w-5"
+                                    />
+                                </span>
 
-                            <span className="min-w-0 flex-1">
-                                <span className="flex items-center gap-1.5">
-                                    <span
-                                        className={[
-                                            "text-sm font-black",
-                                            active
-                                                ? "text-finn-accent-blue"
-                                                : "text-finn-black",
-                                        ].join(" ")}
-                                    >
-                                        {profile.label}
+                                <span className="min-w-0 flex-1">
+                                    <span className="flex items-center gap-1.5">
+                                        <span
+                                            className={[
+                                                "text-sm font-black",
+                                                active
+                                                    ? "text-finn-accent-blue"
+                                                    : "text-finn-black",
+                                            ].join(" ")}
+                                        >
+                                            {profile.label}
+                                        </span>
+
+                                        {active && (
+                                            <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                                        )}
                                     </span>
 
-                                    {active && (
-                                        <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
-                                    )}
-                                </span>
-
-                                <span className="mt-0.5 block text-[11px] font-bold text-finn-iron">
-                                    {active ? "In use" : "Start from this"}
+                                    <span className="mt-0.5 block text-[11px] font-bold text-finn-iron">
+                                        {active ? "In use" : "Start from this"}
+                                    </span>
                                 </span>
                             </span>
-                        </span>
 
-                        <span className="mt-3 block text-xs leading-5 text-finn-iron">
-                            {profile.forWhom}
-                        </span>
+                            <span className="mt-3 block text-xs leading-5 text-finn-iron">
+                                {profile.forWhom}
+                            </span>
 
-                        {/* The order it would put in the list, so the label is never taken on trust. */}
-                        <span className="mt-3 flex flex-wrap gap-1">
-                            {profile.priorities.map((id, index) => (
-                                <span
-                                    key={id}
-                                    className="rounded-full border border-finn-iron/15 bg-white px-2 py-0.5 text-[10px] font-bold text-finn-black"
-                                >
-                                    {index + 1} ·{" "}
-                                    {definitionOf(id)?.label ?? id}
-                                </span>
-                            ))}
-                        </span>
-                    </button>
+                            {/* The order it would put in the list, so the label is never taken on trust. */}
+                            <span className="mt-3 flex flex-wrap gap-1">
+                                {profile.priorities.map((id, index) => (
+                                    <span
+                                        key={id}
+                                        className="rounded-full border border-finn-iron/15 bg-white px-2 py-0.5 text-[10px] font-bold text-finn-black"
+                                    >
+                                        {index + 1} ·{" "}
+                                        {definitionOf(id)?.label ?? id}
+                                    </span>
+                                ))}
+                            </span>
+                        </button>
                     </div>
                 );
             })}
