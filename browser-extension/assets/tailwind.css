@@ -113,7 +113,38 @@
    GLOBAL BASE STYLES
 ======================================== */
 
-@layer base {}
+@layer base {
+  /*
+     What's clickable should look clickable.
+
+     Tailwind v4's preflight sets `cursor: default` on buttons, which is the
+     HTML spec's cursor for them and the wrong one for this app. Every button
+     here is something the reader is meant to press — a tag that opens its
+     footnote, a chip that explains itself, a card that puts a car in the hot
+     seat — and several of them are styled as text or as a panel rather than
+     as anything obviously pressable. Without the hand, finding out what
+     responds means clicking around to see.
+
+     So it goes back, once, for everything that takes a click, rather than as
+     a `cursor-pointer` remembered on each new control. `:disabled` is excluded
+     because a control that will not respond should not invite the press;
+     anything setting its own cursor — the wait cursor on the export button,
+     `cursor-not-allowed` on a blocked action — still wins, since utilities
+     beat the base layer.
+  */
+  button:not(:disabled),
+  summary,
+  label:has(input[type="checkbox"]:not(:disabled)),
+  label:has(input[type="radio"]:not(:disabled)),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  a[href] {
+    cursor: pointer;
+  }
+}
 
 /* ========================================
    COMPONENT STYLES
