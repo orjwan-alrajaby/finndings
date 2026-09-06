@@ -61,8 +61,11 @@ export const FEATURE_IMPORTANCE = {
     /** Completes "you said it should count ___". */
     inSentence: "highly",
     /** Names the level where the control isn't on screen to give it context. */
-    badgeLabel: "Counts highly",
+    badgeLabel: "Highly influential",
     hint: "As much as anything else in this priority",
+    /** What the level actually does, for the badge's tooltip. */
+    meaning:
+      "Counts about four times as much as a feature left on standard — the strongest thing you can say here. Still not a requirement: a car can miss it and still be the recommendation, with the gap named in your advice.",
     weight: 4,
     /* Rose: the loudest of the three. */
     activeClass:
@@ -78,8 +81,10 @@ export const FEATURE_IMPORTANCE = {
   medium: {
     label: "Moderately",
     inSentence: "moderately",
-    badgeLabel: "Counts moderately",
+    badgeLabel: "Moderately influential",
     hint: "Clearly more than the rest of the category",
+    meaning:
+      "Counts about three times as much as a feature left on standard — clearly more than the rest of this priority, without dominating it.",
     weight: 3,
     /* Orange: the middle step, warm rather than louder blue. */
     activeClass:
@@ -95,8 +100,10 @@ export const FEATURE_IMPORTANCE = {
   low: {
     label: "Somewhat",
     inSentence: "somewhat",
-    badgeLabel: "Counts somewhat",
+    badgeLabel: "Somewhat influential",
     hint: "A little more than the rest of the category",
+    meaning:
+      "Counts about twice as much as a feature left on standard — a nudge in its favour rather than a demand.",
     weight: 2,
     /* Emerald: the calmest of the three, so visual weight tracks stated
        weight. */
@@ -118,6 +125,7 @@ export const FEATURE_IMPORTANCE = {
     inSentence: string;
     badgeLabel: string;
     hint: string;
+    meaning: string;
     weight: number;
     activeClass: string;
     idleClass: string;
@@ -149,6 +157,15 @@ export const BASE_FEATURE_WEIGHT = 1;
 export const STANDARD_INFLUENCE = {
   label: "Standard",
   hint: "Counts like everything else in this category",
+  /**
+   * Said as a state rather than as a level, because that is what it is: not
+   * a fourth strength but the absence of a claim. "Standard influence" would
+   * imply the reader chose it; most of the time they simply had no opinion,
+   * and the honest badge says so without suggesting anything was lost.
+   */
+  badgeLabel: "Not singled out",
+  meaning:
+    "Counts once, like every other feature in this priority. Nothing here is ignored — this one just isn't carrying extra weight.",
   /** Stated for the reader of this file; the scorer uses BASE_FEATURE_WEIGHT. */
   weight: BASE_FEATURE_WEIGHT,
   activeClass: "bg-finn-iron/20 text-finn-black ring-1 ring-finn-iron/25",

@@ -1,6 +1,7 @@
 import { Lock } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
+import { Tip } from "@/components/InfoTip";
 
 import {
     FEATURE_IMPORTANCE,
@@ -87,6 +88,10 @@ export function FeatureOption({
      * you did — and five pale cards among fifteen white ones is a glance.
      * The dot and the name repeat it for anyone who cannot use the hue.
      */
+    /* Standard has a badge too: the space is there, and "not singled out" is
+       a real answer to the question above it rather than a blank. */
+    const badge = level ?? STANDARD_INFLUENCE;
+
     const cardClass = () => {
         if (level) return level.selectedCardClass;
 
@@ -112,27 +117,14 @@ export function FeatureOption({
                 )}
 
                 <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span
-                            className={[
-                                "text-sm leading-5",
-                                nameClass(level, locked),
-                            ].join(" ")}
-                        >
-                            {label}
-                        </span>
-
-                        {level && (
-                            <span
-                                className={[
-                                    "rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide",
-                                    level.chipClass,
-                                ].join(" ")}
-                            >
-                                {level.badgeLabel}
-                            </span>
-                        )}
-                    </div>
+                    <span
+                        className={[
+                            "block text-sm leading-5",
+                            nameClass(level, locked),
+                        ].join(" ")}
+                    >
+                        {label}
+                    </span>
 
                     {/*
                       * Said here rather than hidden behind an "i". A reader
@@ -154,9 +146,43 @@ export function FeatureOption({
                 </div>
             ) : (
                 <div className="mt-2.5 rounded-xl bg-white/70 p-2">
-                    <p className="px-0.5 text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                        How much influence does this have?
-                    </p>
+                    {/*
+                      * The question and the current answer on one line. The
+                      * badge used to sit beside the name, where it competed
+                      * with it for the same glance; here it lands at the end
+                      * of the sentence it answers, in space that was empty.
+                      */}
+                    <div className="flex items-center justify-between gap-2 px-0.5">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                            How much influence does this have?
+                        </p>
+
+                        <Tip subject={badge.badgeLabel} trigger={<button
+                            type="button"
+                            aria-label={`${badge.badgeLabel} — what does this mean?`}
+                            className={[
+                                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition",
+                                "data-[state=open]:ring-2",
+                                /*
+                                 * Outlined rather than filled. Every ground
+                                 * this sits on is already near-white — the
+                                 * panel is white over a pale card — so a
+                                 * chip in the level's own pale tint is
+                                 * imperceptible and reads as coloured text
+                                 * that happens to be right-aligned. A
+                                 * hairline in the level's colour gives it an
+                                 * edge on any of them.
+                                 */
+                                level
+                                    ? `bg-white ring-1 ring-current/40 ${level.accentTextClass}`
+                                    : "bg-finn-cotton text-finn-iron ring-1 ring-finn-iron/20",
+                            ].join(" ")}
+                        >
+                            {badge.badgeLabel}
+                        </button>}>
+                            {badge.meaning}
+                        </Tip>
+                    </div>
 
                     <div
                         role="radiogroup"

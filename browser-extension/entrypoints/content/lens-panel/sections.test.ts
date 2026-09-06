@@ -9,6 +9,7 @@ import {
 import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 import type { PinnedFinnCar } from "@/lib/types";
 
+import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { analysisBody } from "./sections";
 
 /**
@@ -148,8 +149,12 @@ describe("feature groups", () => {
       "You said this should count highly",
     );
 
-    expect(root.textContent).toContain("Counts highly");
-    expect(root.textContent).not.toContain("Counts moderately");
+    /* Read from the constant rather than spelled out, so rewording the scale
+       is a rewording rather than a broken test. */
+    expect(root.textContent).toContain(FEATURE_IMPORTANCE.high.badgeLabel);
+    expect(root.textContent).not.toContain(
+      FEATURE_IMPORTANCE.medium.badgeLabel,
+    );
   });
 });
 
