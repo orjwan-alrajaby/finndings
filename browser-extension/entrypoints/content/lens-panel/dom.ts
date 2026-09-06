@@ -56,24 +56,33 @@ const SVG_NS = "http://www.w3.org/2000/svg";
  * could inject markup out of the file entirely.
  *
  * Takes a whole icon node rather than a single path because most of these
- * marks are several shapes. The stroke settings ride on the shapes themselves
- * rather than being imposed here, which is how the package ships them and how
- * `HugeiconsIcon` draws them — so a mark drawn here and the same mark drawn in
- * a React surface are the same picture.
+ * marks are several shapes — twelve strokes for a snowflake — and the two
+ * that aren't were the exception. The stroke settings are lucide's own, so a
+ * mark drawn here and the same mark drawn by `PriorityIcon` in the React
+ * surfaces are the same picture.
  *
- * `color` resolves the `currentColor` the shapes are stroked with, the same
- * way the React component's own `color` prop does. Left out, the mark inherits
- * from whatever it sits in, which is what every control on the panel wants.
+ * `color` resolves the `currentColor` the shapes are drawn with, the same way
+ * the React component's `color` prop does. Left out, the mark inherits from
+ * whatever it sits in, which is what every control on the panel wants.
+ *
+ * `solid` fills the shape as well as stroking it. It is on for the priority
+ * marks and off for the controls, matching `PriorityIcon`: a filled chevron
+ * or close cross would be either meaningless or wrong, and the marks are the
+ * only things here small enough and shaped right to gain from it.
  */
 export function icon(
   name: string,
   className: string,
-  color?: string,
+  { color, solid = false }: { color?: string; solid?: boolean } = {},
 ): SVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
 
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
+  svg.setAttribute("fill", solid ? "currentColor" : "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", className);
 

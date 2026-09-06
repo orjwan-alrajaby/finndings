@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { TriangleAlert } from "lucide-react";
 import type {
     CostAnalysis as CostAnalysisData,
     CostFactSource,
@@ -190,7 +189,7 @@ export function CostAnalysis({
                             key={caveat}
                             className="flex gap-2 rounded-2xl bg-finn-warning-lift p-3"
                         >
-                            <HugeiconsIcon icon={Alert02Icon} className="h-4 w-4 shrink-0 text-finn-warning-deep" />
+                            <TriangleAlert className="h-4 w-4 shrink-0 text-finn-warning-deep" />
                             <span className="text-xs leading-5 text-finn-black">
                                 {caveat}
                             </span>

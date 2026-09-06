@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronRightIcon } from "@hugeicons/core-free-icons";
+import { ChevronRight } from "lucide-react";
 
 export function ActionButton({
     title,
@@ -49,7 +48,7 @@ export function ActionButton({
                 <span className="mt-0.5 block text-xs leading-4 text-finn-iron">{description}</span>
             </span>
 
-            <HugeiconsIcon icon={ChevronRightIcon}
+            <ChevronRight
                 className={[
                     "h-4 w-4 shrink-0 transition-transform",
                     disabled

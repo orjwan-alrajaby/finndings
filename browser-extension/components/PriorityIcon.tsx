@@ -1,19 +1,3 @@
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import {
-    Backpack01Icon,
-    Car01Icon,
-    CarFrontIcon,
-    CompassIcon,
-    Leaf01Icon,
-    ScaleIcon,
-    ShieldCheckIcon,
-    SnowflakeIcon,
-    Sofa01Icon,
-    UserGroupIcon,
-} from "@hugeicons/core-free-icons";
-
-import { MARK_COLOUR } from "@/lib/priority-marks";
-
 /**
  * The mark for one priority or profile.
  *
@@ -31,28 +15,65 @@ import { MARK_COLOUR } from "@/lib/priority-marks";
  * unknown name renders as itself — a reader who upgrades keeps the mark they
  * had rather than losing it to a placeholder.
  */
-const ICONS: Record<string, IconSvgElement> = {
+import {
+    Briefcase,
+    Car,
+    CarFront,
+    Leaf,
+    Navigation,
+    Scale,
+    ShieldCheck,
+    Snowflake,
+    Sofa,
+    Users,
+    type LucideIcon,
+} from "lucide-react";
+
+import { MARK_COLOUR } from "@/lib/priority-marks";
+
+/**
+ * The marks, chosen to survive being filled.
+ *
+ * Lucide has no solid set — every icon in it is line art — so "solid" here
+ * means filling the outline, and whether that works is a property of the
+ * shape. An icon drawn as one closed silhouette fills into a solid version of
+ * itself; one that relies on internal detail loses the detail, and one built
+ * from an outer ring plus something inside becomes a disc.
+ *
+ * Two marks were changed for that reason rather than for meaning. A filled
+ * `Backpack` is a featureless lozenge — the straps and pocket that make it a
+ * backpack are interior lines — where a briefcase reads as a case at 16px.
+ * A filled `Compass` is the worst case of all: the needle is inside the ring,
+ * so it fills to a plain circle and says nothing. `Navigation` is the same
+ * idea drawn as a solid arrow, and it is the one that survives.
+ *
+ * `ShieldCheck` keeps its name though the tick inside it disappears when
+ * filled, because the tick comes back the moment `solid` is off and choosing
+ * the plain `Shield` here would quietly throw that away.
+ */
+const ICONS: Record<string, LucideIcon> = {
     /* Categories. */
-    shield: ShieldCheckIcon,
-    users: UserGroupIcon,
-    backpack: Backpack01Icon,
-    road: CarFrontIcon,
-    snowflake: SnowflakeIcon,
-    leaf: Leaf01Icon,
-    sofa: Sofa01Icon,
+    shield: ShieldCheck,
+    users: Users,
+    backpack: Briefcase,
+    road: CarFront,
+    snowflake: Snowflake,
+    leaf: Leaf,
+    sofa: Sofa,
 
     /* Profiles that aren't also categories. */
-    compass: CompassIcon,
-    scale: ScaleIcon,
+    compass: Navigation,
+    scale: Scale,
 
     /* The fallback for a priority with no mark of its own. */
-    car: Car01Icon,
+    car: Car,
 };
 
 export function PriorityIcon({
     name,
     className = "h-4 w-4",
     tinted = true,
+    solid = true,
 }: {
     name: string;
     /** Sized by the caller, because these sit in boxes from 12px to 28px. */
@@ -67,19 +88,29 @@ export function PriorityIcon({
      * change the icon knows nothing about.
      */
     tinted?: boolean;
+    /**
+     * Whether to fill the mark rather than draw it as an outline.
+     *
+     * On by default. At the sizes these actually appear — mostly 12 to 20
+     * pixels — a filled shape survives the reduction and an outline starts
+     * losing the detail that distinguishes it. `Snowflake` is the exception
+     * and always looks the same, because it is all strokes and encloses
+     * nothing for a fill to reach.
+     */
+    solid?: boolean;
 }) {
-    const icon = ICONS[name];
+    const Icon = ICONS[name];
 
-    if (!icon) {
+    if (!Icon) {
         /* An emoji from a previous version's stored settings. */
         return <span aria-hidden="true">{name}</span>;
     }
 
     return (
-        <HugeiconsIcon
-            icon={icon}
+        <Icon
             className={className}
             color={tinted ? MARK_COLOUR[name] : "currentColor"}
+            fill={solid ? "currentColor" : "none"}
             aria-hidden="true"
         />
     );

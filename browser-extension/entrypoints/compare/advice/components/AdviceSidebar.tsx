@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
-import { HugeiconsIcon } from "@hugeicons/react";
-import { SlidersHorizontalIcon } from "@hugeicons/core-free-icons";
+import { SlidersHorizontal } from "lucide-react";
 import type {
     LensPreferences,
     PriorityWeight,
@@ -149,7 +148,7 @@ export function AdviceSidebar({
                     onClick={onAdjust}
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-black text-finn-black transition hover:bg-finn-snow"
                 >
-                    <HugeiconsIcon icon={SlidersHorizontalIcon} className="h-4 w-4" />
+                    <SlidersHorizontal className="h-4 w-4" />
                     Adjust my answers
                 </button>
             </div>

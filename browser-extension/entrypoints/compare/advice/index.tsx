@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Download01Icon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Download, RotateCw } from "lucide-react";
 import type { PinnedFinnCar } from "@/lib/types";
 import { FinnLink } from "@/components/FinnLink";
 import {
@@ -258,12 +257,12 @@ export function Advice({
             >
                 {exporting ? (
                     <>
-                        <HugeiconsIcon icon={Refresh01Icon} className="h-4 w-4 animate-spin" />
+                        <RotateCw className="h-4 w-4 animate-spin" />
                         Building your PDF…
                     </>
                 ) : (
                     <>
-                        <HugeiconsIcon icon={Download01Icon} className="h-4 w-4" />
+                        <Download className="h-4 w-4" />
                         Save as PDF
                     </>
                 )}

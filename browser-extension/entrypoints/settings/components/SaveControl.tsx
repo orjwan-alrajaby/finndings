@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CheckIcon } from "@hugeicons/core-free-icons";
+import { Check } from "lucide-react";
 
 /**
  * The only thing on this page that keeps anything.
@@ -61,7 +60,7 @@ export function SaveControl({
                         : "cursor-default bg-white text-finn-iron",
                 ].join(" ")}
             >
-                <HugeiconsIcon icon={CheckIcon} className="h-4 w-4" />
+                <Check className="h-4 w-4" />
                 {dirty ? "Save changes" : "Saved"}
             </button>
         </span>

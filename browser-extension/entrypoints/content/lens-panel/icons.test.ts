@@ -7,10 +7,10 @@ import {
 } from "../../../scripts/generate-lens-panel-icons.mjs";
 
 /**
- * The committed icon shapes against the installed hugeicons.
+ * The committed icon shapes against the installed lucide.
  *
- * `icons.ts` is a copy, because the panel is not React and hugeicons' raw
- * shape data lives in per-icon modules with no promised layout. A copy that
+ * `icons.ts` is a copy, because the panel is not React and lucide-react's raw
+ * shape data lives in untyped internal modules. A copy that
  * nothing checks is
  * a copy that quietly goes stale, so this re-runs the same derivation the
  * generator does and compares. An `npm update` that redraws an icon turns into
@@ -21,7 +21,7 @@ import {
  *   node scripts/generate-lens-panel-icons.mjs
  */
 describe("lens panel icons", () => {
-    it("match the installed hugeicons", () => {
+    it("match the installed lucide-react", () => {
         expect(LENS_PANEL_ICONS).toEqual(buildTable());
     });
 

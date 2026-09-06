@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { TriangleAlert } from "lucide-react";
 import type { PinnedFinnCar } from "@/lib/types";
 import type { ReasoningContext } from "@/lib/reasoning-engine/types";
 import { formatEUR } from "@/lib/reasoning-engine";
@@ -42,7 +41,7 @@ export function BudgetNotice({
         <section className="rounded-[24px] bg-finn-warning/15 p-5">
             <div className="flex items-start gap-2.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-finn-warning-deep">
-                    <HugeiconsIcon icon={Alert02Icon} className="h-4 w-4" />
+                    <TriangleAlert className="h-4 w-4" />
                 </span>
 
                 <h2 className="mt-1 text-sm font-black leading-5 text-finn-black">

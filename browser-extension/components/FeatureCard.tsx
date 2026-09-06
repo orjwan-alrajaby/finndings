@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Edit02Icon } from "@hugeicons/core-free-icons";
+import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
@@ -103,7 +102,7 @@ export function FeatureCard({
                             : `Edit ${label}`
                     }
                 >
-                    <HugeiconsIcon icon={Edit02Icon} className="h-4 w-4" />
+                    <SquarePen className="h-4 w-4" />
                 </button>
             </div>
 

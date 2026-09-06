@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ChevronRightIcon } from "@hugeicons/core-free-icons";
+import { ChevronRight } from "lucide-react";
 
 /**
  * One pinned car, in the popup's list.
@@ -76,7 +75,7 @@ export function CarPreviewCard({
             </div>
 
             {url && (
-                <HugeiconsIcon icon={ChevronRightIcon}
+                <ChevronRight
                     className={`h-4 w-4 shrink-0 text-finn-cotton transition-transform group-hover:translate-x-0.5 ${
                         accent
                             ? "group-hover:text-finn-accent-blue"

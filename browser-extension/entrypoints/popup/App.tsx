@@ -1,7 +1,6 @@
 import "@/assets/tailwind.css";
 import { useState, useEffect } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Settings02Icon } from "@hugeicons/core-free-icons";
+import { Settings } from "lucide-react";
 import { FINN_BASE_URL } from "@/lib/constants";
 import { GettingStarted } from "./components/GettingStarted";
 import { GoToFinnSection } from "./components/GoToFinnSection";
@@ -174,7 +173,7 @@ function App() {
             aria-label="Settings"
             onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
           >
-            <HugeiconsIcon icon={Settings02Icon} className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
           </button>
         </header>
 

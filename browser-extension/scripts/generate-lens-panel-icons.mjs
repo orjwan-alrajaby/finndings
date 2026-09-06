@@ -1,11 +1,11 @@
 /**
- * Regenerates `entrypoints/content/lens-panel/icons.ts` from hugeicons.
+ * Regenerates `entrypoints/content/lens-panel/icons.ts` from lucide-react.
  *
- * The panel injected into finn.com is not React, so it cannot use the
- * `HugeiconsIcon` component the rest of the app does. It needs the raw shapes.
- * Those live in @hugeicons/core-free-icons' per-icon modules, which the
- * package exposes but which carry no runtime guarantee of layout — importing
- * them directly would tie the build to a file arrangement nobody promised.
+ * The panel injected into finn.com is not React, so it cannot use the icon
+ * components the rest of the app does. It needs the raw shapes. Those live in
+ * lucide-react's per-icon modules, which are internal to the package and carry
+ * no types — importing them at runtime would tie the build to a file layout
+ * the package makes no promise about.
  *
  * So the shapes are copied into the repo instead, by this script, and
  * `icons.test.ts` re-runs the same derivation and fails if the committed copy
@@ -21,30 +21,33 @@ import { dirname, join } from "node:path";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
- * The icons the panel draws: the name the data uses, and the hugeicons export
+ * The icons the panel draws: the name the data uses, and the lucide module
  * it resolves to. The left side is what `CATEGORIES[id].icon` holds and what
  * `PriorityIcon` keys on, so the two surfaces stay addressable by one name.
  */
 export const PANEL_ICONS = {
-  /* Priority marks — the seven categories, plus the fallback for a custom one. */
-  shield: "ShieldCheckIcon",
-  users: "UserGroupIcon",
-  backpack: "Backpack01Icon",
-  road: "CarFrontIcon",
-  snowflake: "SnowflakeIcon",
-  leaf: "Leaf01Icon",
-  sofa: "Sofa01Icon",
-  car: "Car01Icon",
+  /* Priority marks — the seven categories, plus the fallback for a custom one.
+     These are filled in the panel, so they are the shapes that survive a fill;
+     see `components/PriorityIcon` for why briefcase and navigation stand in
+     for backpack and compass. */
+  shield: "shield-check",
+  users: "users",
+  backpack: "briefcase",
+  road: "car-front",
+  snowflake: "snowflake",
+  leaf: "leaf",
+  sofa: "sofa",
+  car: "car",
   /* Profile marks that aren't also categories. */
-  compass: "CompassIcon",
-  scale: "ScaleIcon",
-  /* The panel's own furniture. */
-  info: "InformationCircleIcon",
-  "chevron-down": "ChevronDownIcon",
-  search: "Search01Icon",
-  x: "Cancel01Icon",
-  check: "CheckIcon",
-  plus: "PlusSignIcon",
+  compass: "navigation",
+  scale: "scale",
+  /* The panel's own furniture. Drawn as outlines, like every other control. */
+  info: "info",
+  "chevron-down": "chevron-down",
+  search: "search",
+  x: "x",
+  check: "check",
+  plus: "plus",
 };
 
 export const PANEL_ICON_NAMES = Object.keys(PANEL_ICONS);
@@ -61,14 +64,17 @@ function kebab(name) {
 }
 
 /** Reads one icon's shapes out of the installed package, dropping React keys. */
-export function readIconNode(exportName, base = root) {
+export function readIconNode(fileName, base = root) {
   const file = join(
     base,
-    "node_modules/@hugeicons/core-free-icons/dist/esm",
-    `${exportName}.js`,
+    "node_modules/lucide-react/dist/esm/icons",
+    `${fileName}.mjs`,
   );
   const source = readFileSync(file, "utf8");
-  const match = source.match(/^const \w+ = (\[[\s\S]*?\n\]);$/m);
+  /* Non-greedy to the first `];`, which is the literal's own end: an inner
+     shape closes with `]` followed by a comma or a newline, never a
+     semicolon. Matches both the one-line and the wrapped module layouts. */
+  const match = source.match(/const __iconNode = (\[[\s\S]*?\]);/);
 
   if (!match) throw new Error(`no icon literal in ${file}`);
 
@@ -98,11 +104,10 @@ const HEADER = `/*
  * GENERATED — do not edit by hand.
  *
  * Run \`node scripts/generate-lens-panel-icons.mjs\` to rebuild this from the
- * installed @hugeicons/core-free-icons, and see that script for why the shapes
- * are copied here rather than imported. \`icons.test.ts\` fails if the two
- * disagree.
+ * installed lucide-react, and see that script for why the shapes are copied
+ * here rather than imported. \`icons.test.ts\` fails if the two disagree.
  *
- * Icons are hugeicons (MIT). https://hugeicons.com
+ * Icons are lucide (ISC). https://lucide.dev
  */
 
 /** One drawn shape: an SVG tag and the attributes that describe it. */

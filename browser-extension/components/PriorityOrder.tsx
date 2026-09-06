@@ -1,13 +1,5 @@
 import { useState } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-    ArrowDown01Icon,
-    ArrowUp01Icon,
-    Cancel01Icon,
-    CheckmarkCircle02Icon,
-    Menu01Icon,
-    PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown, ArrowUp, CircleCheck, Menu, Plus, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 
@@ -222,7 +214,7 @@ export function ProfilePresets({
                                     </span>
 
                                     {active && (
-                                        <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                                        <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
                                     )}
                                 </span>
 
@@ -350,7 +342,7 @@ export function PriorityOrderList({
                                 dragging === id ? "opacity-50" : "",
                             ].join(" ")}
                         >
-                            <HugeiconsIcon icon={Menu01Icon}
+                            <Menu
                                 className="h-4 w-4 shrink-0 text-finn-iron/50"
                                 aria-hidden="true"
                             />
@@ -394,7 +386,7 @@ export function PriorityOrderList({
                                     disabled={index === 0}
                                     onClick={() => move(index, index - 1)}
                                 >
-                                    <HugeiconsIcon icon={ArrowUp01Icon} className="h-3.5 w-3.5" />
+                                    <ArrowUp className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -402,7 +394,7 @@ export function PriorityOrderList({
                                     disabled={index === priorities.length - 1}
                                     onClick={() => move(index, index + 1)}
                                 >
-                                    <HugeiconsIcon icon={ArrowDown01Icon} className="h-3.5 w-3.5" />
+                                    <ArrowDown className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -421,7 +413,7 @@ export function PriorityOrderList({
                                         )
                                     }
                                 >
-                                    <HugeiconsIcon icon={Cancel01Icon} className="h-3.5 w-3.5" />
+                                    <X className="h-3.5 w-3.5" />
                                 </IconButton>
                             </span>
                         </li>
@@ -458,7 +450,7 @@ export function PriorityOrderList({
                                         : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
                                 ].join(" ")}
                             >
-                                <HugeiconsIcon icon={PlusSignIcon} className="h-3 w-3" />
+                                <Plus className="h-3 w-3" />
                                 {/*
                                   * Inherits rather than tints: this button
                                   * turns solid blue on hover and dims when

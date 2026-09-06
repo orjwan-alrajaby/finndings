@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import { DrivingAssumptions } from "@/components/DrivingAssumptions";
 import type { LensPreferences } from "@/lib/reasoning-engine/types";
@@ -63,7 +62,7 @@ export function Driving({
                         className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
                         aria-label="Back to your priorities"
                     >
-                        <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5" />
+                        <ArrowLeft className="h-5 w-5" />
                     </button>
 
                     <button
@@ -74,7 +73,7 @@ export function Driving({
                         {untouched
                             ? "These look right — show me Lens working"
                             : "Show me Lens working"}
-                        <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
+                        <ArrowRight className="h-4 w-4" />
                     </button>
                 </div>
 

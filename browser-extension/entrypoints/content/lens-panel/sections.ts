@@ -541,7 +541,12 @@ function prioritySection(priority: FitPriority): HTMLElement {
             "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue",
           attrs: { "aria-hidden": "true" },
         },
-        [icon(priority.icon, "h-4 w-4", MARK_COLOUR[priority.icon])],
+        [
+          icon(priority.icon, "h-4 w-4", {
+            color: MARK_COLOUR[priority.icon],
+            solid: true,
+          }),
+        ],
       ),
 
       el("span", { class: "min-w-0 flex-1" }, [

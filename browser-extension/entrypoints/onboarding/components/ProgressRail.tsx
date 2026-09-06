@@ -1,5 +1,4 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CheckIcon } from "@hugeicons/core-free-icons";
+import { Check } from "lucide-react";
 
 import {
     SCREEN_LABEL,
@@ -62,7 +61,7 @@ export function ProgressRail({
                         >
                             {/* The check is for screen readers; the rail itself carries the state visually. */}
                             {done && (
-                                <HugeiconsIcon icon={CheckIcon} className="sr-only h-3 w-3" />
+                                <Check className="sr-only h-3 w-3" />
                             )}
                         </button>
                     );
