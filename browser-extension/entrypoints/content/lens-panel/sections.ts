@@ -22,8 +22,22 @@ import {
   FIT_SEGMENTS,
 } from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
-import { MARK_COLOUR } from "@/lib/priority-marks";
+import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
 import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
+
+/**
+ * The two tone classes for one mark, in the order the stylesheet expects.
+ *
+ * The panel draws its priority marks exactly as `PriorityIcon` does — a dark
+ * line and a pale inside of the same hue — because they are the same marks and
+ * a reader moving between the panel and the compare page should not have to
+ * notice they have crossed a boundary.
+ */
+function toneClasses(mark: string): string {
+  const tone = MARK_TONES[mark] ?? NEUTRAL_TONE;
+
+  return `${tone.line} ${tone.fill}`;
+}
 
 import {
   configurationDetail,
@@ -541,12 +555,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
             "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue",
           attrs: { "aria-hidden": "true" },
         },
-        [
-          icon(priority.icon, "h-4 w-4", {
-            color: MARK_COLOUR[priority.icon],
-            solid: true,
-          }),
-        ],
+        [icon(priority.icon, `h-4 w-4 ${toneClasses(priority.icon)}`)],
       ),
 
       el("span", { class: "min-w-0 flex-1" }, [

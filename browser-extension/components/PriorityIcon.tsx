@@ -29,7 +29,7 @@ import {
     type LucideIcon,
 } from "lucide-react";
 
-import { MARK_COLOUR } from "@/lib/priority-marks";
+import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
 
 /**
  * The marks, chosen to survive being filled.
@@ -89,13 +89,13 @@ export function PriorityIcon({
      */
     tinted?: boolean;
     /**
-     * Whether to fill the mark rather than draw it as an outline.
+     * Whether the mark has an inside at all.
      *
      * On by default. At the sizes these actually appear — mostly 12 to 20
-     * pixels — a filled shape survives the reduction and an outline starts
-     * losing the detail that distinguishes it. `Snowflake` is the exception
-     * and always looks the same, because it is all strokes and encloses
-     * nothing for a fill to reach.
+     * pixels — a shape with a filled interior survives the reduction, where a
+     * bare outline starts shedding the detail that distinguishes it.
+     * `Snowflake` is the exception and always looks the same, because it is
+     * all strokes and encloses nothing for a fill to reach.
      */
     solid?: boolean;
 }) {
@@ -106,11 +106,27 @@ export function PriorityIcon({
         return <span aria-hidden="true">{name}</span>;
     }
 
+    const tone = MARK_TONES[name] ?? NEUTRAL_TONE;
+
+    /*
+     * Exactly one fill utility is ever emitted. Two of them — `fill-blue-200`
+     * beside `fill-none` — would be settled by the order Tailwind wrote them
+     * into the stylesheet rather than the order they appear here, which is
+     * not something this component should be betting on.
+     *
+     * Untinted means the mark is on a ground that has already claimed a
+     * colour, and there is no pale companion to a hue we don't know: it
+     * inherits, whole, and the two tones collapse into one. That is the right
+     * answer for a selected chip, where a solid mark in the chip's own
+     * foreground is exactly what's wanted.
+     */
+    const fill = !solid ? "fill-none" : tinted ? tone.fill : "fill-current";
+
     return (
         <Icon
-            className={className}
-            color={tinted ? MARK_COLOUR[name] : "currentColor"}
-            fill={solid ? "currentColor" : "none"}
+            className={[className, tinted ? tone.line : "", fill]
+                .filter(Boolean)
+                .join(" ")}
             aria-hidden="true"
         />
     );

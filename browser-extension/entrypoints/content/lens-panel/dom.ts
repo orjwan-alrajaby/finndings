@@ -61,32 +61,24 @@ const SVG_NS = "http://www.w3.org/2000/svg";
  * mark drawn here and the same mark drawn by `PriorityIcon` in the React
  * surfaces are the same picture.
  *
- * `color` resolves the `currentColor` the shapes are drawn with, the same way
- * the React component's `color` prop does. Left out, the mark inherits from
- * whatever it sits in, which is what every control on the panel wants.
- *
- * `solid` fills the shape as well as stroking it. It is on for the priority
- * marks and off for the controls, matching `PriorityIcon`: a filled chevron
- * or close cross would be either meaningless or wrong, and the marks are the
- * only things here small enough and shaped right to gain from it.
+ * Colour is left to the class, which is why there is no parameter for it. The
+ * priority marks come in on a `text-*`/`fill-*` pair out of `MARK_TONES`, and
+ * the controls come in with neither and inherit — the `fill="none"` set here
+ * is what they keep, and a `fill-*` utility is what overrides it when a mark
+ * wants an inside. A filled chevron or close cross would be meaningless or
+ * wrong, so no control asks for one.
  */
-export function icon(
-  name: string,
-  className: string,
-  { color, solid = false }: { color?: string; solid?: boolean } = {},
-): SVGElement {
+export function icon(name: string, className: string): SVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
 
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", solid ? "currentColor" : "none");
+  svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
   svg.setAttribute("stroke-width", "2");
   svg.setAttribute("stroke-linecap", "round");
   svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", className);
-
-  if (color) svg.setAttribute("color", color);
 
   /* An unknown name draws nothing rather than throwing: a missing mark should
      cost the reader an empty box, not the panel. */
