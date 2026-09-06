@@ -1,5 +1,6 @@
 import {
     ArrowTopRightOnSquareIcon,
+    EyeIcon,
     PhotoIcon,
     TrashIcon,
 } from "@heroicons/react/24/outline";
@@ -15,7 +16,8 @@ import type { PinnedFinnCar } from "@/lib/types";
  *
  * The row answers the three questions a reader scanning their pinned set
  * has — which car is this, how does it suit me, and what does it cost — and
- * offers the two actions the page exists for: open it, or unpin it. Its band
+ * offers the actions the page exists for: read it, open it on finn.com, or
+ * unpin it. Its band
  * comes from the same analysis the detail panel shows, so the chip in the
  * list and the chip on the reading can never disagree.
  *
@@ -24,9 +26,19 @@ import type { PinnedFinnCar } from "@/lib/types";
  * flush right where the eye can run a finger down them. The price appears
  * only there — the spec line drops it — so the row says each thing once.
  *
- * The row's own controls — unpin, open on finn.com — stay out of that scan
- * until the pointer arrives, since they are per-car housekeeping and not what anyone is
- * comparing. They come back for the keyboard the moment focus lands inside.
+ * The row's own controls — view, open on finn.com, unpin — sit in a rail down
+ * the right edge and are always on show. They used to fade in on hover, which
+ * kept the scan clean and cost more than it saved: a control that only exists
+ * once the pointer is already on it can't be found by looking, so the reader
+ * had to sweep the list to learn the row did anything. On a touch screen
+ * there is no hover to arrive at all.
+ *
+ * They stay out of the way by being quiet rather than by being absent —
+ * drawn in a light grey that takes their weight below the name, the band and
+ * the price, and coming up to full contrast under the pointer. The order is
+ * the order they'd be reached for — read it, go to the source, remove it —
+ * which puts the destructive one last, where a slip is least likely to land
+ * on it.
  */
 export function CarRow({
     car,
@@ -60,7 +72,7 @@ export function CarRow({
     return (
         <li
             className={[
-                "group relative flex items-stretch gap-1 rounded-[22px] bg-white",
+                "flex items-stretch gap-1 rounded-[22px] bg-white",
                 "transition-shadow",
                 selected
                     ? "shadow-[0_0_0_2px] shadow-finn-accent-blue"
@@ -141,21 +153,28 @@ export function CarRow({
                 </span>
             </button>
 
-            <span
-                className={[
-                    "flex shrink-0 flex-col items-center justify-center gap-1 pr-2",
-                    "opacity-0 transition-opacity",
-                    "group-hover:opacity-100 group-focus-within:opacity-100",
-                ].join(" ")}
-            >
+            {/*
+              * Three controls stacked in the row's height, which is why they
+              * are 28px rather than the 36px they were: at the old size the
+              * third one made the rail taller than the card it sits in. The
+              * label each carries is what makes them reachable without sight,
+              * and the title is what makes them readable without one.
+              */}
+            <span className="flex shrink-0 flex-col items-center justify-center gap-0.5 pr-2">
+                {/*
+                  * The same action as clicking the card, said out loud.
+                  * Tapping anywhere on a row to open it is the quickest way
+                  * in and the least discoverable — nothing about a card
+                  * announces that it is a button — so the rail states it.
+                  */}
                 <button
                     type="button"
-                    onClick={onUnpin}
-                    aria-label={`Unpin ${car.name}`}
-                    title={`Unpin ${car.name}`}
-                    className="rounded-full p-2 text-finn-iron transition hover:bg-finn-error/10 hover:text-finn-error"
+                    onClick={onOpen}
+                    aria-label={`View ${car.name}`}
+                    title={`View ${car.name}`}
+                    className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
                 >
-                    <TrashIcon className="h-4 w-4" />
+                    <EyeIcon className="h-4 w-4" />
                 </button>
 
                 {/*
@@ -170,11 +189,21 @@ export function CarRow({
                         rel="noopener noreferrer"
                         aria-label={`Open ${car.name} on finn.com`}
                         title="Open on finn.com"
-                        className="rounded-full p-2 text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
+                        className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-snow hover:text-finn-black"
                     >
                         <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                     </a>
                 ) : null}
+
+                <button
+                    type="button"
+                    onClick={onUnpin}
+                    aria-label={`Unpin ${car.name}`}
+                    title={`Unpin ${car.name}`}
+                    className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
+                >
+                    <TrashIcon className="h-4 w-4" />
+                </button>
             </span>
         </li>
     );
