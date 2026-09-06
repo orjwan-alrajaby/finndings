@@ -75,13 +75,19 @@ export function FeatureOption({
     /**
      * How loudly a row states its level.
      *
-     * The tint alone was too quiet: five pale rows in a list of fifteen read
-     * as a slightly different shade of nothing, and the whole reason to raise
-     * a feature is that it should be visible at a glance which ones you did.
-     * The bar down the left edge is what carries it — full-strength colour in
-     * a shape nothing else on the row uses — with the tint behind it and the
-     * name in the same colour. Three signals of one fact, which is right for
-     * a fact this list exists to show.
+     * Three signals of one fact — the tint, the bar down the left edge, the
+     * name in the same hue — because the whole reason to raise a feature is
+     * that it should be visible at a glance which ones you did, and a tint
+     * alone made five raised rows in a list of fifteen read as a slightly
+     * different shade of nothing.
+     *
+     * What changed is that the three are now one colour getting deeper rather
+     * than three colours arguing. A raised row is a preference, not an alert,
+     * and it should look like the row above it with more of something rather
+     * than like a different kind of row.
+     *
+     * A standard row keeps its transparent bar so that raising one does not
+     * shift the text four pixels sideways.
      */
     const rowClass = () => {
         if (level) {
@@ -90,7 +96,7 @@ export function FeatureOption({
 
         return locked
             ? "bg-white/40 border-l-4 border-l-transparent"
-            : "bg-white shadow-sm border-l-4 border-l-finn-cotton";
+            : "bg-white shadow-sm border-l-4 border-l-transparent";
     };
 
     return (
@@ -101,9 +107,10 @@ export function FeatureOption({
          * settings page is a wide window with a narrow panel in it.
          */
         <div
-            className={["@container rounded-xl px-2.5 py-2 transition", rowClass()].join(
-                " ",
-            )}
+            className={[
+                "@container rounded-2xl px-3 py-2.5 transition",
+                rowClass(),
+            ].join(" ")}
         >
             <div className="flex flex-col items-start gap-1.5 @sm:flex-row @sm:items-center @sm:gap-3">
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -136,7 +143,12 @@ export function FeatureOption({
                     <div
                         role="radiogroup"
                         aria-label={`How much ${label} should influence your decision`}
-                        className="flex shrink-0 gap-0.5 rounded-lg bg-finn-snow p-0.5 @sm:ml-auto"
+                        className={[
+                            "flex shrink-0 gap-0.5 rounded-lg p-0.5 @sm:ml-auto",
+                            /* On a tinted row the track has to lift off the
+                               tint; on a white one it has to sit into it. */
+                            level ? "bg-white/70" : "bg-finn-snow",
+                        ].join(" ")}
                     >
                         {/*
                           * Standard first, because that is where every feature
@@ -238,11 +250,13 @@ function segmentClass(
     disabled: boolean,
     activeClass: string,
 ): string {
-    if (active) return `${activeClass} shadow-sm`;
+    if (active) return activeClass;
 
-    if (disabled) return "cursor-not-allowed text-finn-iron/40";
+    if (disabled) return "cursor-not-allowed text-slate-400";
 
-    return "text-finn-iron hover:bg-white hover:text-finn-black";
+    /* slate-600 rather than the lighter iron: this track sits on white and on
+       three violet tints, and 600 is the step that clears 4.5:1 on all four. */
+    return "text-slate-600 hover:bg-white hover:text-finn-black";
 }
 
 function Segment({

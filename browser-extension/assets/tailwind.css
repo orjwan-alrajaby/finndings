@@ -50,16 +50,18 @@
   --color-finn-warning-ink: #4a2600;
   --color-finn-warning-deep: #9a4a00;
 
-  /* -- Influence scale --
-     How much a feature the user picked out should count. Three separate
-     hues rather than three tints of the accent blue, so "important" and
-     "extremely important" are told apart at a glance instead of read as
-     the same colour twice.
+  /* -- Present / absent --
+     Named for the influence scale, which is no longer what they are. That
+     scale is now one violet ramp built from Tailwind's own palette, in
+     `FEATURE_IMPORTANCE` — partly because green-amber-red is the language of
+     severity and these levels are preferences, and partly because white on
+     the emerald here measured 3.65:1 and on the orange 3.60:1, neither of
+     which clears 4.5:1 at the size the labels are set.
 
-     Note for whoever touches these next: emerald (3.7:1) and orange (3.6:1)
-     do not clear 4.5:1 against the white label they carry when a level is
-     chosen; rose does (6.0:1). Darkening the first two — around #047857 and
-     #b45309 — keeps the ramp and fixes the contrast. */
+     What still reads them is the pair of "has it / doesn't" markers in the
+     fit analysis and the lens panel, where green-for-present is the right
+     language. Worth renaming to say so; left alone here because a rename
+     touches files this change had no other reason to open. */
   --color-finn-influence-emerald: #009966;
   --color-finn-influence-emerald-pale: #ecfdf5;
   --color-finn-influence-orange: #f54900;
