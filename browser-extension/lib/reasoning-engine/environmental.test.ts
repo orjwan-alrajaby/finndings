@@ -4,7 +4,9 @@ import {
   assessEfficiency,
   assessEnvironment,
   co2ClassFor,
+  describeEmissionsVersusEfficiency,
   describeEnvironment,
+  environmentalTags,
   ENVIRONMENTAL_METHOD,
   positionForCo2,
 } from "./environmental";
@@ -135,8 +137,16 @@ describe("efficiency", () => {
   });
 
   it("says what it is relative to, in the reader's terms", () => {
+    /*
+     * "the average new car that burns fuel", not "a typical petrol car".
+     * No petrol-only or diesel-only WLTP average is published, and the
+     * benchmark this is actually read against is the combustion fleet's.
+     */
     expect(assessEfficiency(petrol(117, 4.5))?.explanation).toMatch(
-      /less fuel than a typical new petrol car/,
+      /less fuel than the average new car that burns fuel/,
+    );
+    expect(assessEfficiency(petrol(117, 4.5))?.explanation).not.toMatch(
+      /typical (new )?petrol car/,
     );
     expect(assessEfficiency(electric(14))?.explanation).toMatch(
       /less electricity than a typical new electric car/,
@@ -201,8 +211,19 @@ describe("the assessment as a whole", () => {
   it("won't claim an electric car has no environmental impact", () => {
     const ev = assessEnvironment(electric(16));
 
-    expect(ev?.caveats.join(" ")).toMatch(/zero at the tailpipe/i);
-    expect(ev?.caveats.join(" ")).toMatch(/aren't estimated here/i);
+    /* The distinction a zero invites somebody to miss, said on the car. */
+    expect(ev?.caveats.join(" ")).toMatch(/zero from the car/i);
+    expect(ev?.caveats.join(" ")).toMatch(/isn't free of emissions/i);
+
+    /*
+     * The lifecycle limit is stated in the method notes rather than on every
+     * car. It is true of all of them equally, so as a per-car line it told
+     * the reader nothing about the car in front of them — and a line readers
+     * learn to skip costs the caveats beside it their credibility.
+     */
+    expect(ENVIRONMENTAL_METHOD.map((n) => n.body).join(" ")).toMatch(
+      /Building it, making its battery/,
+    );
   });
 
   it("keeps a frugal petrol car ahead of a thirsty one", () => {
@@ -251,9 +272,11 @@ describe("plug-in hybrids", () => {
   });
 
   it("says what the figure actually assumes", () => {
-    expect(assessEnvironment(phev(30, 1.4))?.caveats.join(" ")).toMatch(
-      /charged less often than the test assumes/i,
-    );
+    const caveats = assessEnvironment(phev(30, 1.4))?.caveats.join(" ") ?? "";
+
+    /* Said as a condition the reader controls, not as a property of the car. */
+    expect(caveats).toMatch(/assumes the car gets charged/i);
+    expect(caveats).toMatch(/several times higher/i);
   });
 
   it("leaves a high-emitting one where its emissions put it", () => {
@@ -310,7 +333,12 @@ describe("missing data", () => {
     const assessment = assessEnvironment(electric(null));
 
     expect(assessment?.efficiency).toBeNull();
-    expect(describeEnvironment(assessment as never)).toMatch(/unknown/i);
+
+    /* Named as absent, rather than passed over as if it were fine. */
+    const line = describeEnvironment(assessment as never);
+
+    expect(line).toMatch(/doesn't publish what it consumes/i);
+    expect(line).not.toMatch(/relatively low|around typical|Highly efficient/i);
   });
 
   it("says nothing at all when there is nothing to say", () => {
@@ -328,15 +356,23 @@ describe("what the reader is told", () => {
   it("gives a frugal petrol car both halves of the truth", () => {
     const line = describeEnvironment(assessEnvironment(petrol(117, 4.6)) as never);
 
-    expect(line).toMatch(/Highly efficient for a petrol car/);
-    expect(line).toMatch(/an electric car emits none at the tailpipe/);
+    /*
+     * Emissions lead, because emissions are what the result is. Efficiency
+     * follows as a separate observation. The old copy opened on "Highly
+     * efficient for a petrol car", which put the flattering half of a
+     * two-part answer where the reader's eye lands first.
+     */
+    expect(line.indexOf("CO₂")).toBeLessThan(line.indexOf("L/100km"));
+    expect(line).toMatch(/close to the 136 g\/km average/);
+    expect(line).toMatch(/relatively low for a car that burns fuel/);
   });
 
   it("doesn't tell an electric car's owner about fuel", () => {
     const line = describeEnvironment(assessEnvironment(electric(15)) as never);
 
-    expect(line).toMatch(/No CO₂ at the tailpipe/);
-    expect(line).not.toMatch(/petrol|diesel/i);
+    expect(line).toMatch(/emits no CO₂ while you drive it/i);
+    expect(line).toMatch(/for an electric car/);
+    expect(line).not.toMatch(/petrol|diesel|fuel/i);
   });
 
   it("never claims a percentage improvement it can't support", () => {
@@ -352,8 +388,13 @@ describe("what the reader is told", () => {
       (note) => `${note.heading} ${note.body}`,
     ).join(" ");
 
-    expect(method).toMatch(/shown|not counted/i);
-    expect(method).toMatch(/not a lifecycle assessment/i);
+    expect(method).toMatch(/don't change it|isn't scored on its own/i);
+
+    /*
+     * The lifecycle limit is still stated — in words a reader who has never
+     * met the phrase "lifecycle assessment" can act on.
+     */
+    expect(method).toMatch(/Building it, making its battery/);
     expect(method).not.toMatch(/count equally/i);
   });
 });
@@ -391,5 +432,259 @@ describe("the priority as the panel sees it", () => {
     expect(cityCar?.impact?.score).toBeGreaterThan(
       largeSuv?.impact?.score as number,
     );
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the reader meets, and in what order.
+ *
+ * These pin the information hierarchy rather than the wording. The failure
+ * they exist to catch is the one this layer actually had: a correct model
+ * explaining itself before it answered, and figures put on the screen with
+ * nothing attached to say what they meant.
+ */
+describe("the shape of the explanation", () => {
+  const everyKind = [
+    petrol(117, 4.6),
+    petrol(185, 8.0),
+    diesel(140, 5.4),
+    electric(15),
+    electric(24),
+    phev(30, 1.4),
+  ];
+
+  it("never puts a figure on the screen without saying what it means", () => {
+    for (const vehicle of everyKind) {
+      const assessment = assessEnvironment(vehicle);
+
+      /* The emissions figure carries a plain-language reading of itself. */
+      expect(assessment?.co2?.label).toBeTruthy();
+      expect(assessment?.co2?.explanation.length ?? 0).toBeGreaterThan(30);
+
+      /* So does the consumption figure, where there is one. */
+      if (assessment?.efficiency) {
+        expect(assessment.efficiency.label).toBeTruthy();
+        expect(assessment.efficiency.typical).toMatch(/typical/);
+      }
+    }
+  });
+
+  it("leads with the emissions result, not with the efficiency one", () => {
+    /*
+     * The regression: "Moderately efficient for a diesel car at 5,4 L/100km,
+     * but at 140 g/km…" opened on the supporting metric and buried the
+     * result. Emissions decide the score, so emissions go first.
+     */
+    for (const vehicle of [petrol(117, 4.6), diesel(140, 5.4), electric(15)]) {
+      const line = describeEnvironment(assessEnvironment(vehicle) as never);
+
+      expect(line.indexOf("CO₂")).toBeGreaterThanOrEqual(0);
+      expect(line.indexOf("CO₂")).toBeLessThan(line.indexOf("It uses"));
+    }
+  });
+
+  it("keeps every caveat, but short enough to be read", () => {
+    for (const vehicle of everyKind) {
+      const caveats = assessEnvironment(vehicle)?.caveats ?? [];
+
+      /*
+       * Compressed, not deleted. The old plug-in hybrid caveat ran to 300
+       * characters of methodology and was the first thing under the heading;
+       * shortening it is what let it move below the answer without the
+       * answer being swallowed.
+       */
+      for (const caveat of caveats) {
+        expect(caveat.length).toBeLessThan(200);
+      }
+    }
+  });
+
+  it("puts the most car-specific caveat first", () => {
+    /* Only one survives on the surfaces that have room for one. */
+    expect(assessEnvironment(electric(15))?.caveats[0]).toMatch(
+      /zero from the car/i,
+    );
+    expect(assessEnvironment(phev(30, 1.4))?.caveats[0]).toMatch(
+      /charged/i,
+    );
+    /*
+     * A petrol car needs no caveat: nothing about reading "117 g/km" is
+     * counter-intuitive the way a zero or a plug-in hybrid's figure is.
+     */
+    expect(assessEnvironment(petrol(117, 4.6))?.caveats).toEqual([]);
+  });
+
+  it("explains the tradeoff only where there is one to explain", () => {
+    /* Both figures point the same middling way: nothing worth a paragraph. */
+    expect(
+      describeEmissionsVersusEfficiency(
+        assessEnvironment(petrol(130, 5.7)) as never,
+      ),
+    ).toBeNull();
+
+    /* One figure only: there is no "together" to describe. */
+    expect(
+      describeEmissionsVersusEfficiency(
+        assessEnvironment(electric(null)) as never,
+      ),
+    ).toBeNull();
+
+    /* Emits nothing, drinks electricity — the case a single score hides. */
+    const thirstyEv = describeEmissionsVersusEfficiency(
+      assessEnvironment(electric(24)) as never,
+    );
+
+    expect(thirstyEv?.heading).toMatch(/energy use/i);
+    expect(thirstyEv?.body).toMatch(/running costs/i);
+  });
+
+  it("describes measurements, never the car's character", () => {
+    /*
+     * Words that make a claim about the car rather than about its figures.
+     * None of them are supported by a tailpipe measurement, and one of them
+     * ("zero-impact") is contradicted by our own caveats.
+     */
+    const banned =
+      /planet-friendly|green choice|eco.warrior|good for the planet|clean car|sustainable|zero.impact|environmentally friendly/i;
+
+    const copy = [
+      ...everyKind.flatMap((vehicle) => {
+        const assessment = assessEnvironment(vehicle);
+        const tradeoff = describeEmissionsVersusEfficiency(
+          assessment as never,
+        );
+
+        return [
+          describeEnvironment(assessment as never),
+          assessment?.co2?.label ?? "",
+          assessment?.co2?.explanation ?? "",
+          assessment?.efficiency?.explanation ?? "",
+          ...(assessment?.caveats ?? []),
+          tradeoff?.heading ?? "",
+          tradeoff?.body ?? "",
+        ];
+      }),
+      ...ENVIRONMENTAL_METHOD.flatMap((note) => [note.heading, note.body]),
+    ].join(" ");
+
+    expect(copy).not.toMatch(banned);
+  });
+
+  it("opens the method on what it measures, not on what it excludes", () => {
+    const [first] = ENVIRONMENTAL_METHOD;
+    const last = ENVIRONMENTAL_METHOD[ENVIRONMENTAL_METHOD.length - 1];
+
+    expect(first?.heading).toMatch(/CO₂ per kilometre/);
+    expect(last?.heading).toMatch(/isn't the car's full footprint/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * "Says who?"
+ *
+ * Every label in this priority is measured against something, and the
+ * somethings are different kinds of thing: the class letter is set in law, the
+ * emissions average is an observation with no legal force, and the consumption
+ * benchmark is derived here because nobody publishes one. A reader who can't
+ * tell those apart reads "above average" as "over a limit", which is the
+ * failure these pin.
+ */
+describe("where each number comes from", () => {
+  const tagsFor = (vehicle: ReturnType<typeof car>) =>
+    Object.fromEntries(
+      environmentalTags(assessEnvironment(vehicle) as never).map((tag) => [
+        tag.id,
+        tag,
+      ]),
+    );
+
+  it("never leaves a label without its provenance", () => {
+    for (const vehicle of [
+      petrol(117, 4.6),
+      diesel(140, 5.4),
+      electric(15),
+      phev(30, 1.4),
+    ]) {
+      const tags = environmentalTags(assessEnvironment(vehicle) as never);
+
+      expect(tags.length).toBeGreaterThan(0);
+
+      for (const tag of tags) {
+        expect(tag.label).toBeTruthy();
+        expect(tag.title).toBeTruthy();
+        expect(tag.body.length).toBeGreaterThan(60);
+      }
+    }
+  });
+
+  it("says the class letter is the one thing here set in law", () => {
+    const { class: tag } = tagsFor(diesel(140, 5.4));
+
+    expect(tag?.label).toBe("Class E");
+    expect(`${tag?.title} ${tag?.body}`).toMatch(/law/i);
+    expect(tag?.body).toMatch(/Pkw-EnVKV/);
+  });
+
+  it("says the emissions average is an observation, not a limit", () => {
+    const { emissions: tag } = tagsFor(diesel(140, 5.4));
+
+    /*
+     * The distinction the label alone can't carry. EU CO₂ targets exist, but
+     * they bind a manufacturer's whole range over a year — no single car is
+     * ever over or under one, and "above average" must not be read that way.
+     */
+    expect(tag?.body).toMatch(/136 g of CO₂/);
+    expect(tag?.body).toMatch(/not set by anyone as a target/i);
+    expect(tag?.body).toMatch(/manufacturer's whole range/i);
+  });
+
+  it("admits the consumption benchmark is derived, not published", () => {
+    const combustion = tagsFor(diesel(140, 5.4)).efficiency;
+    const battery = tagsFor(electric(15)).efficiency;
+
+    expect(combustion?.title).toMatch(/No official figure/i);
+    expect(combustion?.body).toMatch(/worked back from the 136 g\/km/);
+    expect(combustion?.body).toMatch(/typical diesel car at 5,2 L\/100km/);
+    expect(combustion?.body).toMatch(/diesel carries more carbon/i);
+
+    /* The electric benchmark is measured rather than derived — say so. */
+    expect(battery?.body).toMatch(/what new electric cars average/i);
+    expect(battery?.body).not.toMatch(/worked back/);
+  });
+
+  it("uses the powertrain to explain the other two, not to score", () => {
+    expect(tagsFor(diesel(140, 5.4)).powertrain?.body).toMatch(
+      /consumption multiplied by a constant/i,
+    );
+    expect(tagsFor(electric(15)).powertrain?.body).toMatch(
+      /no tailpipe emissions to measure/i,
+    );
+    expect(tagsFor(phev(30, 1.4)).powertrain?.body).toMatch(
+      /depends on a habit/i,
+    );
+  });
+
+  it("doesn't answer a plug-in hybrid with the fleet average", () => {
+    /*
+     * Its own figure is the thing in question, so pointing at what other
+     * cars emit answers a question nobody asked.
+     */
+    const { emissions: tag } = tagsFor(phev(30, 1.4));
+
+    expect(tag?.body).not.toMatch(/136/);
+    expect(tag?.body).toMatch(/share of its kilometres running on the battery/i);
+    expect(tag?.body).toMatch(/won't rank it at the top/i);
+  });
+
+  it("never draws an electric car a comparison it doesn't have", () => {
+    const { emissions: tag } = tagsFor(electric(15));
+
+    expect(tag?.tone).toBe("positive");
+    expect(tag?.body).toMatch(/no comparison to make/i);
+    expect(tag?.body).not.toMatch(/136/);
   });
 });

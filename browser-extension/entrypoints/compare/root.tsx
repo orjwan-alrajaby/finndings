@@ -53,9 +53,9 @@ export default function CompareTab({
 
   if (cars.length === 0) {
     return (
-      <div className="min-h-screen bg-finn-snow px-4 py-12 text-center">
-        <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-finn-pale-blue text-finn-accent-blue">
+      <div className="min-h-screen bg-white px-4 py-12 text-center">
+        <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-finn-accent-blue">
             <SparklesIcon className="h-7 w-7" />
           </div>
 
@@ -76,8 +76,8 @@ export default function CompareTab({
 
   if (cars.length === 1 && onlyCar) {
     return (
-      <div className="min-h-screen bg-finn-snow px-4 py-12 text-center">
-        <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 shadow-sm">
+      <div className="min-h-screen bg-white px-4 py-12 text-center">
+        <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
           <img
             src={onlyCar.images.thumbnail}
             alt={onlyCar.name}
@@ -117,7 +117,7 @@ export default function CompareTab({
    */
   if (!settingsLoaded) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-finn-snow">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <span className="text-sm text-finn-iron">
           Reading your settings…
         </span>
@@ -127,7 +127,7 @@ export default function CompareTab({
 
   return (
     <Tooltip.Provider delayDuration={350}>
-      <main className="min-h-screen bg-finn-snow text-finn-black">
+      <main className="min-h-screen bg-white text-finn-black">
         {/*
           * The page makes room for the drawer where there is room to make.
           * Below that it stays put and the drawer comes over it, which is

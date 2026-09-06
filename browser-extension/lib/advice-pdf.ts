@@ -201,7 +201,7 @@ export function advicePdfOptions(filename: string): Options {
       canvas: {
         useCORS: true,
         /* The page's own ground, so margins don't come out black. */
-        backgroundColor: "#f8f8f8",
+        backgroundColor: "#ffffff",
         /* Long enough for a CDN image, short enough not to hang the button. */
         imageTimeout: 6000,
         logging: false,

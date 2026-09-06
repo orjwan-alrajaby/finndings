@@ -72,10 +72,15 @@ describe("advicePdfOptions", () => {
     expect(options.overrides?.canvas?.useCORS).toBe(true);
   });
 
-  /* Margins would otherwise come out black, which reads as a printing fault. */
+  /*
+   * Margins would otherwise come out black, which reads as a printing fault.
+   * White because the page's own ground is white — the sections are the
+   * coloured things on it, not the field behind them. If that inverts again,
+   * this has to move with it.
+   */
   it("paints the sheet in the page's own ground", () => {
     expect(advicePdfOptions("x.pdf").overrides?.canvas?.backgroundColor).toBe(
-      "#f8f8f8",
+      "#ffffff",
     );
   });
 });

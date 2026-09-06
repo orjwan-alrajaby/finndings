@@ -14,7 +14,6 @@ import {
   paragraph,
   phraseLabel,
   sentence,
-  shortName,
 } from "./phrase";
 
 /**
@@ -34,10 +33,28 @@ export interface ChallengeLine {
   priority: CategoryId;
   label: string;
   rank: number;
+  /**
+   * Which car this priority favours.
+   *
+   * The gains and losses arrays already say this by which one a line is in,
+   * and carrying it on the line as well is what lets a reader see the two
+   * merged into one ranked list without the caller having to remember where
+   * each came from.
+   */
+  favours: "challenger" | "winner";
+  /** The name of the car it favours, ready to print. */
+  favoursName: string;
   /** The concrete difference: named equipment, or both figures. */
   evidence: string;
   /** Why it matters to this reader, from where they ranked it. */
   relevance: string;
+}
+
+/** A ranked priority that produced no line, and what it is called. */
+export interface UnseparatedPriority {
+  priority: CategoryId;
+  label: string;
+  rank: number;
 }
 
 export interface ChallengeReasoning {
@@ -47,6 +64,16 @@ export interface ChallengeReasoning {
   gains: ChallengeLine[];
   /** Where the recommendation is genuinely better. */
   losses: ChallengeLine[];
+  /**
+   * The ranked priorities that separated the two cars by nothing worth
+   * reporting — either the gap was too small to be real, or the data
+   * supported no claim more specific than the score.
+   *
+   * Carried so the reader can be told which of their priorities are missing
+   * from the comparison and why. A list that jumps from #1 to #4 otherwise
+   * reads as an omission rather than as a finding.
+   */
+  unseparated: UnseparatedPriority[];
   /** What swapping would do to the monthly cost. Null when we can't say. */
   cost: string | null;
   /** Whether the challenger fits the budget. Null when none is set. */
@@ -151,6 +178,8 @@ function lineFor(
     priority: breakdown.priority,
     label: breakdown.label,
     rank: breakdown.rank,
+    favours: favoursChallenger ? "challenger" : "winner",
+    favoursName: favoursChallenger ? challengerName : winnerName,
     evidence,
     relevance: relevanceOf(
       breakdown,
@@ -326,8 +355,8 @@ export function reasonAboutChallenge(
   const comparison = evaluation.comparison;
   if (!comparison) return null;
 
-  const challengerName = shortName(evaluation.vehicle.name);
-  const winnerName = shortName(comparison.other.name);
+  const challengerName = evaluation.vehicle.name;
+  const winnerName = comparison.other.name;
 
   const noticeable = (item: PriorityBreakdown): boolean =>
     item.hasEvidence &&
@@ -347,11 +376,25 @@ export function reasonAboutChallenge(
       .filter((line): line is ChallengeLine => line != null),
   );
 
+  const reported = new Set(
+    [...gains, ...losses].map((line) => line.priority),
+  );
+
+  const unseparated: UnseparatedPriority[] = evaluation.priorities
+    .filter((item) => !reported.has(item.priority))
+    .map((item) => ({
+      priority: item.priority,
+      label: item.label,
+      rank: item.rank,
+    }))
+    .sort((a, b) => a.rank - b.rank);
+
   return {
     challengerName,
     winnerName,
     gains,
     losses,
+    unseparated,
     cost: describeCost(
       evaluation,
       comparison.other.vehicleId,
@@ -369,6 +412,26 @@ export function reasonAboutChallenge(
       gains,
     ),
   };
+}
+
+/**
+ * Both sides merged into the reader's own priority order.
+ *
+ * The gains and losses are each ordered by how much they moved the result,
+ * which is the right order for two separate lists and the wrong one for a
+ * table: a table with a rank column has to run down the ranks, or the column
+ * is noise. Merging them is also the point of the table — the decision is
+ * "are the things I'd give up ranked above the things I'd gain?", and that
+ * question is unanswerable while the two sit in unrelated columns.
+ *
+ * A priority lands on exactly one side, so no rank can appear twice.
+ */
+export function challengeRows(
+  reasoning: ChallengeReasoning,
+): ChallengeLine[] {
+  return [...reasoning.gains, ...reasoning.losses].sort(
+    (a, b) => a.rank - b.rank,
+  );
 }
 
 /** Kept so callers can build a compact list without re-deriving it. */

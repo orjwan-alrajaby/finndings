@@ -245,7 +245,7 @@ export const FEATURES = {
       "Sensors that start the wipers when the windscreen gets wet and switch the headlights on when it gets dark, without you touching either stalk.",
   },
   hasHeadlightCleaningSystem: {
-    article: "a",
+    /* Plural: "it has headlight washers", never "a headlight washers". */
     label: "Headlight washers",
     explanation:
       "Small jets that spray the headlight lenses clean. Road salt and winter grime dim a headlight quickly.",
@@ -315,7 +315,7 @@ export const FEATURES = {
       "Puts your phone's maps, music and messages on the car's own screen, so you use apps you already know instead of the car's built-in ones.",
   },
   hasWirelessChargingStation: {
-    article: "a",
+    /* A gerund, so it takes no article: "it has wireless phone charging". */
     label: "Wireless phone charging",
     explanation:
       "A pad you rest a compatible phone on to charge it without plugging in a cable.",

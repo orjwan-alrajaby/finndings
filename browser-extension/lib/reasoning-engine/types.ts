@@ -461,9 +461,17 @@ export interface PriorityComparison {
   onlyOtherHas: FeatureId[];
 }
 
+/** One car's overall standing, as a comparison refers to it. */
+export interface ScoreSummary {
+  vehicleId: number;
+  name: string;
+  /** The overall match, 0–100. */
+  total: number;
+}
+
 export interface HeadToHead {
-  subject: { vehicleId: number; name: string; total: number };
-  other: { vehicleId: number; name: string; total: number };
+  subject: ScoreSummary;
+  other: ScoreSummary;
   /** subject.total − other.total. */
   totalDifference: number;
   /** Every priority, ordered by how much it moved the result. */

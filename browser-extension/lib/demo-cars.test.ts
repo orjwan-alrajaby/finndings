@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { demoCars, demoCarSummary, isDemoCar } from "./demo-cars";
-import { shortName } from "./reasoning-engine/narrative/phrase";
 import { configurationDetail, configurationName } from "./car-labels";
 import {
     buildAdviceNarrative,
@@ -114,8 +113,8 @@ describe("the example cars", () => {
 
     it("gives each car a name a reader would recognise as one", () => {
         for (const car of demoCars()) {
-            expect(shortName(car.name).length).toBeGreaterThan(0);
             expect(car.name).toBe(`${car.brand} ${car.model}`);
+            expect(car.name.trim().length).toBeGreaterThan(0);
         }
     });
 });

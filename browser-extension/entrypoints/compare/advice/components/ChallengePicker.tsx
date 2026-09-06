@@ -16,7 +16,8 @@ import { formatEUR } from "@/lib/reasoning-engine";
 
 const BUDGET_CLASS: Record<BudgetStatus, string> = {
     within: "text-finn-iron",
-    over: "text-finn-warning",
+    /* Deep amber: the signal hue does not carry at 11px on a pale ground. */
+    over: "text-finn-warning-deep",
     unknown: "text-finn-iron",
 };
 
@@ -35,7 +36,14 @@ export function ChallengePicker({
     if (!options.length) return null;
 
     return (
-        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
+        /*
+          * The one section on the page that is a control rather than a
+          * finding, and the only one that never reaches the PDF. So it is
+          * drawn the way this page draws controls — white, outlined, no
+          * tint of its own — which keeps the coloured cards meaning
+          * "evidence" and stops a row of buttons from looking like one.
+          */
+        <section className="rounded-[28px] bg-white p-6 ring-2 ring-finn-cotton sm:p-8">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
@@ -79,7 +87,7 @@ export function ChallengePicker({
                             "rounded-[20px] border-2 p-3 text-left transition",
                             option.isSelected
                                 ? "border-finn-accent-blue bg-finn-pale-blue"
-                                : "border-finn-cotton bg-finn-snow hover:border-finn-iron/30",
+                                : "border-finn-cotton bg-finn-cotton/60 hover:border-finn-iron/30 hover:bg-finn-cotton",
                         ].join(" ")}
                     >
                         <img
@@ -101,6 +109,9 @@ export function ChallengePicker({
                           */}
                         <p className="mt-0.5 text-[10px] font-bold text-finn-iron">
                             #{option.rank} of your pinned cars
+                            {option.vehicle.fuelType
+                                ? ` · ${option.vehicle.fuelType}`
+                                : ""}
                         </p>
 
                         <p

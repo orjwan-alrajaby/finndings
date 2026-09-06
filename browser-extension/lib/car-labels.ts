@@ -62,7 +62,19 @@ export function configurationDetail(
  * what they asked for and the second is what the score counted.
  */
 export function describeCoverage(priority: FitPriority): string {
-    if (priority.impact) return "Judged on emissions, not on equipment";
+    /*
+     * The environmental line carries the car's own figure rather than a note
+     * about how the priority works. Every other priority's subtitle says
+     * something about this car — "3 of your 5 picks" — and "judged on
+     * emissions, not on equipment" said something about FINN Lens instead,
+     * in the one place a reader is scanning for the car.
+     */
+    if (priority.impact) {
+        return (
+            priority.impact.co2?.display ??
+            "FINN doesn't publish a CO₂ figure for this one"
+        );
+    }
 
     if (priority.band.level === "unknown") {
         return "Equipment not listed by FINN";

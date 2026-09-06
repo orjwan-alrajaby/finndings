@@ -14,7 +14,6 @@ import {
 } from "@/lib/reasoning-engine";
 import { AdviceHero } from "./components/AdviceHero";
 import { AdviceSidebar } from "./components/AdviceSidebar";
-import { BehindTheRecommendation } from "./components/BehindTheRecommendation";
 import { BudgetNotice } from "./components/BudgetNotice";
 import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
@@ -48,7 +47,6 @@ import { useCompareStore } from "../store";
  *   3. What am I giving up?          — the tradeoffs
  *   4. What else could I have had?   — the four closest alternatives
  *   5. What does it cost, exactly?   — the cost breakdown
- *   6. Can I check the maths?        — behind the recommendation
  *
  * The recommendation is fixed. Putting a car in the hot seat changes what is
  * *examined* and never what is recommended.
@@ -170,7 +168,7 @@ export function Advice({
     if (!recommendation) {
         return (
             <div className="px-4 py-12 text-center text-finn-black">
-                <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 shadow-sm">
+                <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
                     <h1 className="text-2xl font-black">
                         Nothing to evaluate yet
                     </h1>
@@ -258,7 +256,7 @@ export function Advice({
                 type="button"
                 onClick={() => setExporting(true)}
                 disabled={exporting}
-                className="finn-lens-screen-only inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-xs font-black text-finn-black shadow-sm transition-colors hover:bg-finn-pale-blue disabled:cursor-wait disabled:text-finn-iron"
+                className="finn-lens-screen-only inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-finn-cotton px-4 text-xs font-black text-finn-black transition-colors hover:bg-finn-pale-blue hover:text-finn-accent-blue disabled:cursor-wait disabled:text-finn-iron"
             >
                 {exporting ? (
                     <>
@@ -324,16 +322,6 @@ export function Advice({
                 <CostAnalysis
                     analysis={subject.cost}
                     reasoning={subjectNarrative.cost}
-                />
-
-                <BehindTheRecommendation
-                    context={context}
-                    recommendedId={winner.id}
-                    selectedId={subject.vehicle.id}
-                    margin={winnerNarrative.verdict.margin}
-                    comparison={subject.comparison}
-                    weights={context.weights}
-                    forceOpen={exporting}
                 />
             </div>
 

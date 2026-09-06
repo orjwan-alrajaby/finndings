@@ -38,9 +38,9 @@ export function BudgetNotice({
     const difference = cost.budgetDifference ?? 0;
 
     return (
-        <section className="rounded-[24px] bg-finn-warning/10 p-5">
+        <section className="rounded-[24px] bg-finn-warning/15 p-5">
             <div className="flex items-start gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-finn-warning/20 text-finn-warning">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-finn-warning-deep">
                     <ExclamationTriangleIcon className="h-4 w-4" />
                 </span>
 
@@ -81,7 +81,7 @@ export function BudgetNotice({
                     return (
                         <li
                             key={car.id}
-                            className="rounded-xl bg-white/70 px-3 py-2"
+                            className="rounded-xl bg-white px-3 py-2"
                         >
                             <p className="truncate text-[11px] font-bold text-finn-black">
                                 {car.name}
@@ -95,7 +95,7 @@ export function BudgetNotice({
                                 <span
                                     className={
                                         over
-                                            ? "font-bold text-finn-warning"
+                                            ? "font-bold text-finn-warning-deep"
                                             : "text-finn-iron"
                                     }
                                 >
@@ -117,7 +117,7 @@ export function BudgetNotice({
             <button
                 type="button"
                 onClick={onAdjust}
-                className="finn-lens-screen-only mt-3 text-[11px] font-black text-finn-black underline underline-offset-2 transition hover:text-finn-warning"
+                className="finn-lens-screen-only mt-3 text-[11px] font-black text-finn-black underline underline-offset-2 transition hover:text-finn-warning-deep"
             >
                 Change my budget
             </button>

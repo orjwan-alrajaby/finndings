@@ -20,16 +20,9 @@ export function CalculatedPriorityDetails({
             </p>
 
             {categoryId === "environmental" ? (
-                <>
-                    <p className="mt-2 mb-3 text-xs leading-5 text-finn-iron">
-                        Not from equipment, like your other priorities — from
-                        what the car emits and uses. Four figures, each read
-                        against a fixed scale rather than against the other
-                        cars:
-                    </p>
-
+                <div className="mt-2">
                     <EnvironmentalMethod tone="snow" />
-                </>
+                </div>
             ) : (
                 <p className="mt-2 text-xs leading-5 text-finn-iron">
                     Lens calculates {category.label} automatically from the

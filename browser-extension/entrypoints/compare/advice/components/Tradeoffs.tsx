@@ -23,8 +23,14 @@ export function Tradeoffs({
     subjectName: string;
 }) {
     return (
-        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-finn-warning">
+        /*
+          * Amber, the hue this section's own label already carries, so "the
+          * other side of it" is told apart from the case for it before a
+          * word is read. The deep shade for the label: the brand's signal
+          * amber manages 1.9:1 on its own tint.
+          */
+        <section className="rounded-[28px] bg-finn-warning/10 p-6 sm:p-8">
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-finn-warning-deep">
                 <ScaleIcon className="h-3.5 w-3.5" />
                 The other side of it
             </p>
@@ -58,9 +64,17 @@ export function Tradeoffs({
                                 key={`${tradeoff.kind}-${tradeoff.priority ?? "budget"}`}
                                 className={[
                                     "rounded-[22px] p-5",
+                                    /*
+                                      * On an amber field the severe ones are
+                                      * the coloured ones: gold sits heavier
+                                      * than the ground, white lifts off it.
+                                      * Before the inversion this was the
+                                      * other way round and both read as
+                                      * panels.
+                                      */
                                     tradeoff.severity === "high"
-                                        ? "bg-finn-warning/10"
-                                        : "bg-finn-snow",
+                                        ? "bg-finn-warning-lift/70"
+                                        : "bg-white",
                                 ].join(" ")}
                             >
                                 <div className="flex flex-wrap items-baseline justify-between gap-2">

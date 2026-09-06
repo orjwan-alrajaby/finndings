@@ -8,8 +8,11 @@ import type { CostLine } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
 import type { EnvironmentalAssessment } from "@/lib/reasoning-engine/environmental";
 import {
+  describeEmissionsVersusEfficiency,
   describeEnvironment,
+  environmentalTags,
   ENVIRONMENTAL_METHOD,
+  type EnvironmentalTag,
 } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
@@ -443,9 +446,12 @@ let sectionIds = 0;
 function prioritySection(priority: FitPriority): HTMLElement {
   const id = `finn-lens-priority-${(sectionIds += 1)}`;
 
-  const sentences = priority.impact
-    ? [describeEnvironment(priority.impact)]
-    : priority.sentences;
+  /*
+   * Environmental impact writes its own block, prose included, so that the
+   * result, the figures, the caveats and the method stay in one order that
+   * one piece of code controls. Everything else takes the generic path.
+   */
+  const sentences = priority.impact ? [] : priority.sentences;
 
   const body = el(
     "div",
@@ -591,18 +597,18 @@ function readout(
 }
 
 /**
- * The emissions reading: three plain figures, and the method folded away.
+ * The emissions reading, in the order a reader needs it.
  *
- * This used to be four scored components with a mark out of a hundred beside
- * each and an average underneath. Those numbers are gone because three of the
- * four were the same measurement — see `assessEnvironment` — and because a
- * figure a reader can't explain to themselves is worse than no figure. What is
- * left is what the car actually is: what it emits, how frugally it uses what
- * it burns, and what it burns.
+ * This block used to open with "How this is judged" sitting above a table of
+ * bare figures, which put the defence of the model in front of the answer
+ * about the car. It now runs result → figures → what they mean together →
+ * limits → method, and the method is folded away. Nothing was dropped to make
+ * room: the caveats are all still here, shortened, below the answer they
+ * qualify rather than above it.
  *
- * The CO₂ class sits with the CO₂ figure rather than on a line of its own,
- * because it is that figure written in the form FINN's own page uses and not a
- * second fact about the car.
+ * The React panel renders the same reading in the same order — see
+ * `components/EnvironmentalResult`. This one exists because the in-page panel
+ * lives in a shadow root and builds its DOM by hand.
  */
 function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
   const method = el(
@@ -624,11 +630,11 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
 
   const toggle = el("button", {
     class: [
-      "mt-3 text-[11px] font-bold text-finn-iron underline-offset-2",
-      "transition-colors hover:text-finn-black hover:underline",
+      "mt-3 text-[11px] font-bold text-finn-accent-blue underline-offset-2",
+      "transition-colors hover:underline",
     ].join(" "),
     attrs: { type: "button", "aria-expanded": "false" },
-    text: "How this is judged",
+    text: "How FINN Lens works this out",
     on: {
       click: () => {
         const open = method.classList.toggle("hidden");
@@ -639,22 +645,33 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
     },
   });
 
+  const interpretation = describeEmissionsVersusEfficiency(impact);
+
   return el("div", { class: "rounded-xl bg-finn-snow p-3" }, [
-    el("div", { class: "flex flex-col gap-2.5" }, [
+    /* 1. What this car is. */
+    el("p", {
+      class: "text-[12px] leading-[18px] text-finn-black",
+      text: describeEnvironment(impact),
+    }),
+
+    /* 2. What it's tagged with, and where each tag comes from. */
+    tagRow(environmentalTags(impact)),
+
+    /* 3. The figures the tags are read off. */
+    el("div", { class: "mt-3 flex flex-col gap-2.5" }, [
       impact.co2
         ? readout(
-            "CO₂ emissions",
-            `${impact.co2.display} · Class ${impact.co2.className}`,
+            "CO₂ while driving",
+            `${formatNumber(impact.co2.gPerKm)} g/km`,
+            "Measured under the EU's official test",
           )
-        : readout("CO₂ emissions", "Not published by FINN"),
+        : readout("CO₂ while driving", "Not published by FINN"),
 
       impact.efficiency
         ? readout(
-            impact.powertrain === "Electric"
-              ? "Energy efficiency"
-              : "Fuel efficiency",
-            `${impact.efficiency.label} · ${impact.efficiency.display}`,
-            impact.efficiency.explanation,
+            "Energy it uses",
+            impact.efficiency.display,
+            `${impact.efficiency.typical} for this kind of car`,
           )
         : null,
 
@@ -665,17 +682,28 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
        */
       !impact.efficiency && impact.powertrain === "Plug-in Hybrid"
         ? readout(
-            "Consumption",
+            "Energy it uses",
             "One combined figure",
-            "FINN publishes a single weighted figure for plug-in hybrids, which can't be compared with either petrol or electric cars on its own.",
+            "FINN publishes a single blended figure for plug-in hybrids, which can't be compared with either petrol or electric cars on its own.",
           )
-        : null,
-
-      impact.powertrain
-        ? readout("Powertrain", impact.powertrain)
         : null,
     ]),
 
+    /* 4. What the two figures mean when read together. */
+    interpretation
+      ? el("div", { class: "mt-3 rounded-lg bg-white px-2.5 py-2" }, [
+          el("p", {
+            class: "text-[11px] font-black text-finn-black",
+            text: interpretation.heading,
+          }),
+          el("p", {
+            class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+            text: interpretation.body,
+          }),
+        ])
+      : null,
+
+    /* 5. What it doesn't cover — after the answer, not before it. */
     ...impact.caveats.map((caveat) =>
       el("p", {
         class: "mt-2.5 text-[11px] leading-4 text-finn-iron",
@@ -686,14 +714,109 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
     impact.missing.length
       ? el("p", {
           class: "mt-2 text-[11px] leading-4 text-finn-iron",
-          text: `FINN didn't supply ${impact.missing.join(" or ")} for this car.`,
+          text: `FINN doesn't publish ${impact.missing.join(" or ")} for this car, so that part is left out rather than guessed.`,
         })
       : null,
 
+    /* 6. The method, closed. */
     toggle,
     method,
   ]);
 }
+
+/**
+ * The labels, each one a question the reader can ask.
+ *
+ * "Above-average emissions" and "Moderately efficient" both invite the same
+ * question — average by whose reckoning, efficient against what? — and the
+ * answers differ in kind: the class letter is set in law, the emissions
+ * average is an observation with no legal force, and the consumption benchmark
+ * is derived because none is published. That belongs one tap from the claim it
+ * justifies rather than in the reader's way.
+ *
+ * The React twin is `TagRow` in `components/EnvironmentalResult`.
+ */
+function tagRow(tags: EnvironmentalTag[]): HTMLElement | null {
+  if (!tags.length) return null;
+
+  const panel = el("div", {
+    class: "mt-2 hidden rounded-lg bg-white px-2.5 py-2",
+  });
+
+  const title = el("p", { class: "text-[11px] font-black text-finn-black" });
+
+  const body = el("p", {
+    class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+  });
+
+  panel.append(title, body);
+
+  /* One open at a time: this is a footnote, not a second article. */
+  let openId: string | null = null;
+
+  const chips = tags.map((tag) => {
+    const chip = el("button", {
+      class: [
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1",
+        "text-[11px] font-black transition",
+        TAG_CLASS[tag.tone],
+      ].join(" "),
+      attrs: { type: "button", "aria-expanded": "false" },
+      on: {
+        click: () => {
+          openId = openId === tag.id ? null : tag.id;
+
+          title.textContent = tag.title;
+          body.textContent = tag.body;
+
+          panel.classList.toggle("hidden", openId === null);
+
+          for (const [other, element] of pairs) {
+            const on = other.id === openId;
+
+            element.setAttribute("aria-expanded", String(on));
+            element.classList.toggle("ring-2", on);
+            element.classList.toggle("ring-finn-accent-blue/40", on);
+          }
+        },
+      },
+    });
+
+    chip.append(
+      el("span", { text: tag.label }),
+      el("span", {
+        class: [
+          "grid h-3.5 w-3.5 place-items-center rounded-full border",
+          "border-current text-[8px] leading-none opacity-70",
+        ].join(" "),
+        text: "i",
+        attrs: { "aria-hidden": "true" },
+      }),
+    );
+
+    return chip;
+  });
+
+  const pairs = tags.map(
+    (tag, index) => [tag, chips[index] as HTMLElement] as const,
+  );
+
+  return el("div", { class: "mt-3" }, [
+    el("div", { class: "flex flex-wrap gap-1.5" }, chips),
+    panel,
+  ]);
+}
+
+/**
+ * Coloured by what the label says, so cars separate before they are read.
+ * Deliberately not a red-to-green scale: this measures one quantity, and
+ * traffic lights would read as a verdict on the car.
+ */
+const TAG_CLASS: Record<EnvironmentalTag["tone"], string> = {
+  positive: "bg-finn-pale-blue text-finn-accent-blue",
+  neutral: "bg-finn-cotton text-finn-iron",
+  caution: "bg-finn-warning/10 text-finn-warning",
+};
 
 /**
  * What the car has and hasn't, in this priority, in four groups.

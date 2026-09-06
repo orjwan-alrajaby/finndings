@@ -4,7 +4,7 @@ import type { CostPosition, CostReasoning } from "./types";
 
 import { formatEUR, formatKm } from "../format";
 import { classifyMonthlyCostGap, isEffectivelyLevel } from "./magnitude";
-import { paragraph, sentence, shortName } from "./phrase";
+import { paragraph, sentence } from "./phrase";
 
 /**
  * Money, said precisely.
@@ -121,7 +121,7 @@ function describeAgainst(
 
   if (isEffectivelyLevel(magnitude)) {
     return sentence(
-      `${shortName(other.name)} works out at roughly the same —`,
+      `${other.name} works out at roughly the same —`,
       `${formatEUR(other.total)}/month against ${formatEUR(subject.total)}`,
     );
   }
@@ -131,8 +131,8 @@ function describeAgainst(
   if (difference > 0) {
     return sentence(
       role === "cheapest"
-        ? `${shortName(other.name)} is the cheapest of the close alternatives:`
-        : `${shortName(other.name)} costs less:`,
+        ? `${other.name} is the cheapest of the close alternatives:`
+        : `${other.name} costs less:`,
       `${formatEUR(other.total)}/month, about ${amount} less than this one`,
     );
   }
@@ -144,10 +144,10 @@ function describeAgainst(
   return role === "cheapest"
     ? sentence(
         "None of the close alternatives we can fully cost comes in lower —",
-        `the nearest is ${shortName(other.name)} at ${formatEUR(other.total)}/month`,
+        `the nearest is ${other.name} at ${formatEUR(other.total)}/month`,
       )
     : sentence(
-        `That's about ${amount}/month less than ${shortName(other.name)}`,
+        `That's about ${amount}/month less than ${other.name}`,
       );
 }
 

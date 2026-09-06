@@ -573,6 +573,35 @@ describe("feature names read as English inside a sentence", () => {
     expect(featurePhrase("hasAdaptiveCruiseControl")).toBe(
       "adaptive cruise control",
     );
+
+    /*
+     * Both of these carried an article they can't take, and the Hot Seat
+     * printed the result: "it has a heated steering wheel, ventilated seats,
+     * a headlight washers and electrically folding mirrors".
+     */
+    expect(featurePhrase("hasHeadlightCleaningSystem")).toBe(
+      "headlight washers",
+    );
+    expect(featurePhrase("hasWirelessChargingStation")).toBe(
+      "wireless phone charging",
+    );
+  });
+
+  /*
+   * The rule the two above broke, checked across the whole catalogue rather
+   * than one feature at a time: "a" and "an" attach to a singular noun, so a
+   * label ending in a plural -s cannot take one. The -ss and -us endings are
+   * the exceptions English actually has.
+   */
+  it("gives no article to a label that reads as a plural", () => {
+    for (const [key, meta] of Object.entries(FEATURES)) {
+      if (!("article" in meta)) continue;
+
+      expect(
+        /(?<![su])s$/i.test(meta.label),
+        `${key} ("${meta.label}") is a plural carrying "${meta.article}"`,
+      ).toBe(false);
+    }
   });
 
   it("keeps acronyms and symbols as written", () => {

@@ -19,7 +19,15 @@ export function WhyItWins({
     const { verdict, priorities } = narrative;
 
     return (
-        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
+        /*
+          * Blue, because this is the case *for* the car and blue is the
+          * colour the page already argues in — the accent on every "why"
+          * label, the hero it sits under. The priorities inside it are
+          * white cards on that blue, which is the same alternation the
+          * whole page runs on: a tinted field, and the evidence lifted off
+          * it.
+          */
+        <section className="rounded-[28px] bg-finn-pale-blue p-6 sm:p-8">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
                 {/*
                   * A budget-driven win didn't out-score anything, so calling
@@ -46,7 +54,7 @@ export function WhyItWins({
                 </div>
             )}
 
-            <div className="mt-6 space-y-6">
+            <div className="mt-6 space-y-3">
                 {priorities.map((reasoning) => (
                     <PrioritySection
                         key={reasoning.priority}

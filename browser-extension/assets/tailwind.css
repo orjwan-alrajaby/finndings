@@ -133,6 +133,25 @@
     display: none !important;
   }
 
+  /*
+     The other half of that bargain. Some of the page's evidence is folded
+     away behind something the reader taps — the "i" on a feature chip, the
+     tag that opens its own footnote — and a photograph of the page catches
+     the fold, not what is inside it. So those places carry a second
+     rendering of the same facts, laid flat as a table, which exists only in
+     the file.
+
+     Both renderings are written from the same data by the same component,
+     which is what keeps them from drifting into two different claims.
+  */
+  .finn-lens-export-only {
+    display: none;
+  }
+
+  [data-exporting] .finn-lens-export-only {
+    display: block;
+  }
+
   .finn-lens-toast {
     @apply rounded-2xl text-sm text-white shadow-lg relative;
     min-width: 320px;

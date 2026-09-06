@@ -19,16 +19,9 @@ export function CalculatedPriorityInfo({
                 </p>
 
                 {priority.id === "environmental" ? (
-                    <>
-                        <p className="mt-2 mb-3 text-xs leading-5 text-finn-black">
-                            Not from equipment, like every other priority —
-                            from what the car emits and uses. Four figures,
-                            each read against a fixed scale rather than
-                            against the other cars:
-                        </p>
-
+                    <div className="mt-2">
                         <EnvironmentalMethod />
-                    </>
+                    </div>
                 ) : (
                     <p className="mt-2 text-xs leading-5 text-finn-black">
                         This priority is calculated automatically from the

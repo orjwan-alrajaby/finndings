@@ -16,7 +16,6 @@ import {
   paragraph,
   phraseLabel,
   sentence,
-  shortName,
   toSentenceStart,
 } from "./phrase";
 
@@ -166,19 +165,19 @@ function describeBudgetOverride(
   const problem =
     cost?.budgetStatus === "over"
       ? sentence(
-          `${shortName(topScorer.name)} scores higher overall, but at about`,
+          `${topScorer.name} scores higher overall, but at about`,
           `${formatEUR(cost.totalMonthly)}/month it's over the ${formatEUR(budget)}`,
           `budget you set`,
         )
       : sentence(
-          `${shortName(topScorer.name)} scores higher overall, but part of its cost`,
+          `${topScorer.name} scores higher overall, but part of its cost`,
           `couldn't be estimated, so we can't confirm it fits your ${formatEUR(budget)}`,
           `budget`,
         );
 
   return sentence(
     problem.replace(/\.$/, ""),
-    `— so ${shortName(evaluation.vehicle.name)} is the strongest car you pinned`,
+    `— so ${evaluation.vehicle.name} is the strongest car you pinned`,
     `that does fit`,
   );
 }
@@ -229,7 +228,7 @@ function describeMargin(
   );
 
   return sentence(
-    `${shortName(margin.name)} finishes`,
+    `${margin.name} finishes`,
     margin.difference === 0
       ? "level with it on points"
       : `${Math.abs(margin.difference)} point${
@@ -259,8 +258,8 @@ function challengerVerdict(
   context: ReasoningContext,
   margin: Verdict["margin"],
 ): Verdict {
-  const name = shortName(evaluation.vehicle.name);
-  const winnerName = shortName(evaluation.comparison?.other.name ?? "the recommendation");
+  const name = evaluation.vehicle.name;
+  const winnerName = evaluation.comparison?.other.name ?? "the recommendation";
 
   const gains = evaluation.strengths.filter((item) => item.hasEvidence);
   const losses = evaluation.weaknesses.filter((item) => item.hasEvidence);
@@ -310,7 +309,7 @@ export function reasonAboutVerdict(
     return challengerVerdict(evaluation, context, margin);
   }
 
-  const name = shortName(evaluation.vehicle.name);
+  const name = evaluation.vehicle.name;
   const budget = context.budget.budget;
 
   /*

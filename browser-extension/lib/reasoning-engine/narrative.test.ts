@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { buildRecommendation, evaluateChallenger } from "./index";
-import { reasonAboutChallenge } from "./narrative/challenge";
+import { challengeRows, reasonAboutChallenge } from "./narrative/challenge";
 import { buildAdviceNarrative } from "./narrative";
 import { classifyMonthlyCostGap, classifyScoreGap } from "./narrative/magnitude";
-import { coverage, inSentence, phraseLabel, shortName } from "./narrative/phrase";
+import { coverage, inSentence, phraseLabel } from "./narrative/phrase";
 import { DEFAULT_CATEGORY_FEATURES, FEATURES } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
 import type { AdviceNarrative } from "./narrative";
@@ -598,10 +598,54 @@ describe("language primitives", () => {
     expect(phraseLabel("CO₂ Impact")).toBe("CO₂ impact");
   });
 
-  it("shortens a car name only when what's left still names a car", () => {
-    expect(shortName("Ford Puma")).toBe("Puma");
-    expect(shortName("Hyundai i30")).toBe("i30");
-    expect(shortName("MG 3")).toBe("MG 3");
+  /*
+   * Names are never abbreviated. The prose used to drop the make — "Puma"
+   * for a Ford Puma — and a reader comparing four cars had to reconcile two
+   * spellings of each one.
+   */
+  it("names a car in full wherever it names it", () => {
+    const result = buildRecommendation(
+      [
+        makeCar({ id: 1, name: "Ford Puma", trunk: 456, features: ["hasIsofix"] }),
+        makeCar({ id: 2, name: "Hyundai i30", trunk: 395 }),
+      ],
+      ["practicality", "familyFriendly"],
+      preferences,
+      DEFAULT_CATEGORY_FEATURES,
+    )!;
+
+    const challenger = result.alternatives[0]!;
+
+    const reasoning = reasonAboutChallenge(
+      evaluateChallenger(challenger, result),
+      result.context,
+    )!;
+
+    for (const name of [reasoning.winnerName, reasoning.challengerName]) {
+      expect([result.winner.name, challenger.name]).toContain(name);
+    }
+
+    const prose = [
+      reasoning.verdict,
+      ...reasoning.gains.map((line) => line.evidence),
+      ...reasoning.losses.map((line) => line.evidence),
+    ].join(" ");
+
+    /* The model on its own never appears without the make in front of it. */
+    let named = 0;
+
+    for (const [make, model] of [
+      ["Ford", "Puma"],
+      ["Hyundai", "i30"],
+    ]) {
+      for (const match of prose.matchAll(new RegExp(model as string, "g"))) {
+        expect(prose.slice(0, match.index)).toMatch(new RegExp(`${make} $`));
+        named += 1;
+      }
+    }
+
+    /* Otherwise the loop above proves nothing about prose naming no car. */
+    expect(named).toBeGreaterThan(0);
   });
 });
 
@@ -676,7 +720,6 @@ describe("the recommendation is explained on its own merits", () => {
 
       for (const other of others) {
         expect(prose).not.toContain(other.name);
-        expect(prose).not.toContain(shortName(other.name));
       }
     }
   });
@@ -808,8 +851,8 @@ describe("a challenger is always weighed against the recommendation", () => {
       result.context,
     )!;
 
-    expect(reasoning.winnerName).toBe(shortName(result.winner.name));
-    expect(reasoning.challengerName).toBe(shortName(challenger.name));
+    expect(reasoning.winnerName).toBe(result.winner.name);
+    expect(reasoning.challengerName).toBe(challenger.name);
 
     for (const line of [...reasoning.gains, ...reasoning.losses]) {
       /* Both cars are named, so the direction is never ambiguous. */
@@ -819,6 +862,85 @@ describe("a challenger is always weighed against the recommendation", () => {
       ).toBe(true);
 
       expect(line.relevance).toMatch(/you ranked/i);
+    }
+  });
+
+  /*
+   * The table's spine. Two lists ordered by impact cannot be read across;
+   * one list ordered by rank can, and that ordering is the reader's own.
+   */
+  it("merges both sides into one list in the reader's priority order", () => {
+    const result = setup();
+
+    for (const challenger of result.alternatives) {
+      const reasoning = reasonAboutChallenge(
+        evaluateChallenger(challenger, result),
+        result.context,
+      )!;
+
+      const rows = challengeRows(reasoning);
+
+      expect(rows).toHaveLength(
+        reasoning.gains.length + reasoning.losses.length,
+      );
+
+      const ranks = rows.map((row) => row.rank);
+
+      expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+
+      /* A priority lands on one side only, so no rank may repeat. */
+      expect(new Set(ranks).size).toBe(ranks.length);
+    }
+  });
+
+  it("says which car each row favours, and names it", () => {
+    const result = setup();
+
+    for (const challenger of result.alternatives) {
+      const reasoning = reasonAboutChallenge(
+        evaluateChallenger(challenger, result),
+        result.context,
+      )!;
+
+      for (const line of reasoning.gains) {
+        expect(line.favours).toBe("challenger");
+        expect(line.favoursName).toBe(reasoning.challengerName);
+      }
+
+      for (const line of reasoning.losses) {
+        expect(line.favours).toBe("winner");
+        expect(line.favoursName).toBe(reasoning.winnerName);
+      }
+    }
+  });
+
+  /*
+   * A table that runs #1, #2, #4 reads as a bug unless the missing rank is
+   * accounted for. Every ranked priority is either a row or on this list.
+   */
+  it("accounts for every ranked priority, reported or not", () => {
+    const result = setup();
+    const order = ["safetyAssistance", "practicality", "comfort"];
+
+    for (const challenger of result.alternatives) {
+      const evaluation = evaluateChallenger(challenger, result);
+
+      const reasoning = reasonAboutChallenge(evaluation, result.context)!;
+
+      const covered = [
+        ...challengeRows(reasoning).map((row) => row.priority),
+        ...reasoning.unseparated.map((item) => item.priority),
+      ];
+
+      expect(new Set(covered).size).toBe(order.length);
+      expect([...covered].sort()).toEqual([...order].sort());
+
+      /* And it never lists a priority that already has a row. */
+      for (const item of reasoning.unseparated) {
+        expect(challengeRows(reasoning).map((row) => row.priority)).not.toContain(
+          item.priority,
+        );
+      }
     }
   });
 

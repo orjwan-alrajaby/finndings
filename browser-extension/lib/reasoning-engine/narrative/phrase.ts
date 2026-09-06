@@ -74,21 +74,18 @@ export function inSentence(label: string): string {
   return label.charAt(0).toLowerCase() + label.slice(1);
 }
 
-/**
- * "Ford Puma" → "Puma". Short names keep comparative sentences readable.
+/*
+ * There was a `shortName` here, dropping the make so comparative sentences
+ * read "Puma" rather than "Ford Puma". It has been removed on purpose, and
+ * nothing should reintroduce it.
  *
- * The make is only dropped when what's left still identifies the car on its
- * own: "Hyundai i30" → "i30", but "MG 3" stays whole, because "3" is not the
- * name of anything.
+ * The saving was a few characters and the cost was the reader's certainty
+ * about which car a sentence is about. A page comparing four cars refers to
+ * them by name dozens of times, in prose, in headings and in the picker, and
+ * a name that appears in two forms is a name the reader has to stop and
+ * reconcile — worse when two pinned configurations share a model and differ
+ * only in the make or the trim. Cars are named in full, everywhere.
  */
-export function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length <= 1) return name;
-
-  const rest = parts.slice(1).join(" ");
-
-  return rest.length >= 2 && /[a-z]/i.test(rest) ? rest : name;
-}
 
 /**
  * Lowercases a Title Case category label for mid-sentence use —

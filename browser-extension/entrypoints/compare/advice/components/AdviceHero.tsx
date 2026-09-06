@@ -170,8 +170,17 @@ export function AdviceHero({
                         )}
                     </p>
 
+                    {/*
+                      * What it runs on belongs on the recommendation itself.
+                      * It is the first thing that decides whether a reader
+                      * can live with a car — a charger at home or not — and
+                      * it was only visible further down, inside the
+                      * environmental reading.
+                      */}
                     <p className={`mt-1 text-sm ${palette.sub}`}>
-                        {winner.vehicleType} · {winner.year}
+                        {[winner.vehicleType, winner.fuelType, winner.year]
+                            .filter(Boolean)
+                            .join(" · ")}
                     </p>
 
                     <p

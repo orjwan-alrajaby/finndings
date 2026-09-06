@@ -7,7 +7,6 @@ import {
   joinCapped,
   phraseLabel,
   sentence,
-  shortName,
 } from "./narrative/phrase";
 
 /**
@@ -21,8 +20,8 @@ import {
  *
  * The rule every sentence obeys: name the thing. A gap is explained by the
  * equipment or the measurement behind it, never by reciting the points it was
- * worth. The weighted arithmetic sits beside this paragraph in the
- * contribution table, where a number is what the reader came for.
+ * worth — a reader deciding between two cars needs to know it lacks the
+ * blind spot warning, not that it dropped four points somewhere.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -81,14 +80,14 @@ export function explainHeadToHead(head: Omit<HeadToHead, "summary">): string {
 
   if (totalDifference === 0) {
     return sentence(
-      `${shortName(subject.name)} and ${shortName(other.name)} finish level`,
+      `${subject.name} and ${other.name} finish level`,
       "under your current priority order",
     );
   }
 
   const ahead = totalDifference > 0;
-  const leadName = shortName(ahead ? subject.name : other.name);
-  const trailName = shortName(ahead ? other.name : subject.name);
+  const leadName = ahead ? subject.name : other.name;
+  const trailName = ahead ? other.name : subject.name;
 
   const magnitude = classifyTotalGap(totalDifference);
   const sentences: string[] = [];

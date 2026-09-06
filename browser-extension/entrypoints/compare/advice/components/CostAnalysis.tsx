@@ -42,12 +42,14 @@ function SourceTag({ source }: { source: CostFactSource }) {
 
 function Line({ line }: { line: CostLine }) {
     return (
-        <div className="border-t border-finn-cotton pt-4">
+        <div className="border-finn-cotton pt-4 not-first:border-t">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p
                     className={[
                         "text-lg font-black",
-                        line.available ? "text-finn-black" : "text-finn-warning",
+                        line.available
+                            ? "text-finn-black"
+                            : "text-finn-warning-deep",
                     ].join(" ")}
                 >
                     {line.available && line.amount != null
@@ -72,7 +74,7 @@ function Line({ line }: { line: CostLine }) {
                     {line.facts.map((fact) => (
                         <li
                             key={`${line.id}-${fact.label}`}
-                            className="flex items-center gap-1.5 rounded-full bg-finn-snow px-2.5 py-1"
+                            className="flex items-center gap-1.5 rounded-full bg-finn-cotton px-2.5 py-1"
                         >
                             <span className="text-[10px] font-bold text-finn-iron">
                                 {fact.label}
@@ -105,7 +107,14 @@ export function CostAnalysis({
     const overBudget = breakdown.budgetStatus === "over";
 
     return (
-        <section className="rounded-[28px] bg-white p-6 shadow-sm sm:p-8">
+        /*
+          * Green, for the one section that is entirely about money. It is
+          * the page's only use of `finn-success`, so it collides with
+          * neither the influence scale nor the fit bands — and it is naming
+          * the subject, not passing a verdict: an over-budget total still
+          * turns amber inside it.
+          */
+        <section className="rounded-[28px] bg-finn-success/10 p-6 sm:p-8">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
                 Cost analysis
             </p>
@@ -129,7 +138,7 @@ export function CostAnalysis({
                 Here's how we got there
             </p>
 
-            <div className="mt-3 space-y-4">
+            <div className="mt-3 space-y-4 rounded-[22px] bg-white p-5 sm:p-6">
                 {analysis.lines.map((line) => (
                     <Line key={line.id} line={line} />
                 ))}
@@ -138,7 +147,13 @@ export function CostAnalysis({
             <div
                 className={[
                     "mt-6 rounded-[22px] p-5",
-                    overBudget ? "bg-finn-warning/10" : "bg-finn-snow",
+                    /*
+                      * Opaque gold, not a translucent amber. This section's
+                      * ground is green, and a see-through warning laid over
+                      * it composites to olive — which reads as neither
+                      * colour and as no warning at all.
+                      */
+                    overBudget ? "bg-finn-warning-lift" : "bg-white",
                 ].join(" ")}
             >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -151,7 +166,9 @@ export function CostAnalysis({
                     <p
                         className={[
                             "text-2xl font-black",
-                            overBudget ? "text-finn-warning" : "text-finn-black",
+                            overBudget
+                                ? "text-finn-warning-deep"
+                                : "text-finn-black",
                         ].join(" ")}
                     >
                         {formatEUR(breakdown.totalMonthly)}/month
@@ -170,9 +187,9 @@ export function CostAnalysis({
                     {analysis.caveats.map((caveat) => (
                         <li
                             key={caveat}
-                            className="flex gap-2 rounded-2xl bg-finn-warning/10 p-3"
+                            className="flex gap-2 rounded-2xl bg-finn-warning-lift p-3"
                         >
-                            <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-finn-warning" />
+                            <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-finn-warning-deep" />
                             <span className="text-xs leading-5 text-finn-black">
                                 {caveat}
                             </span>

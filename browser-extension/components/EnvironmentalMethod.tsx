@@ -1,6 +1,16 @@
 import { ENVIRONMENTAL_METHOD } from "@/lib/reasoning-engine/environmental";
 
 /**
+ * What ranking this priority high will actually do, said in one line.
+ *
+ * Lives here rather than at each call site because it was written twice and
+ * both copies went stale together: they described "four figures, each read
+ * against a fixed scale" long after the model had been cut down to one.
+ */
+export const ENVIRONMENTAL_LEAD =
+    "Rank this high and Lens will favour cars that put less CO₂ into the air per kilometre — an electric car over a petrol one, a frugal petrol car over a thirsty one. It's the only priority judged on the car's own figures rather than on the equipment it carries.";
+
+/**
  * How environmental impact is judged, explained where there is no car yet.
  *
  * Every other priority explains itself through the list of features beneath
@@ -25,6 +35,10 @@ export function EnvironmentalMethod({
 
     return (
         <div className="space-y-2">
+            <p className="text-xs leading-5 text-finn-iron">
+                {ENVIRONMENTAL_LEAD}
+            </p>
+
             {ENVIRONMENTAL_METHOD.map((note) => (
                 <div
                     key={note.heading}

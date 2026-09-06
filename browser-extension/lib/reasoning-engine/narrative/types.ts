@@ -7,6 +7,7 @@ import type {
   FeatureImportance,
   NumericEvidence,
 } from "../types";
+import type { EnvironmentalAssessment } from "../environmental";
 import type { Magnitude } from "./magnitude";
 
 /**
@@ -174,6 +175,17 @@ export interface PriorityReasoning {
   features: FeatureEvidence;
   measurements: MeasurementFact[];
   traits: TraitFact[];
+
+  /**
+   * The environmental reading, for the one priority that has one.
+   *
+   * Carried whole rather than flattened into `measurements`, because the
+   * interpretation is the point: a table row saying "CO₂ emissions 140 g/km"
+   * asks the reader to know what 140 means, and every surface that only had
+   * the measurements ended up asking exactly that. Null on every other
+   * priority.
+   */
+  environmental: EnvironmentalAssessment | null;
 
   rival: RivalDifference | null;
   /** Only set when the category leader is neither the subject nor the rival. */

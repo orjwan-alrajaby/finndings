@@ -18,7 +18,7 @@ export type FeatureChipTone =
 
 const TONE_CLASS: Record<FeatureChipTone, string> = {
     present: "bg-finn-pale-blue text-finn-highlight-navy",
-    missing: "bg-finn-warning/10 text-finn-warning",
+    missing: "bg-finn-warning/15 text-finn-warning-deep",
     rivalOnly: "bg-finn-cotton text-finn-iron",
     quiet: "bg-white text-finn-iron",
 };

@@ -62,7 +62,7 @@ import {
 
 import { explainHeadToHead } from "./explain";
 import { classifyMeasurementGap, classifyMonthlyCostGap, isNoticeable } from "./narrative/magnitude";
-import { inSentence, shortName } from "./narrative/phrase";
+import { inSentence } from "./narrative/phrase";
 import { formatEUR } from "./format";
 
 /* -------------------------------------------------------------------------- */
@@ -627,7 +627,7 @@ function alternativeHook(
    * more useful than an empty line — it tells the reader this one isn't worth
    * opening.
    */
-  return `Nothing you ranked separates it from ${shortName(winner.name)}`;
+  return `Nothing you ranked separates it from ${winner.name}`;
 }
 
 /**

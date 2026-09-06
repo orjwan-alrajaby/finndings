@@ -25,9 +25,10 @@ interface AdviceSidebarProps {
  * A read-back of everything the user told us, so the reasoning on the page can
  * be checked against its inputs — and changed if any of them look wrong.
  *
- * Deliberately the inputs only. The weighting those inputs produce is stated
- * once, under "Behind the recommendation"; repeating it here is how a page
- * ends up saying the same thing in three places.
+ * Deliberately the inputs only, and the order rather than the arithmetic it
+ * produces. The reasoning above already argues in the reader's own ranking —
+ * "you put safety first, and nothing close beats it there" — so restating
+ * that as percentages is the same claim in a worse language.
  */
 export function AdviceSidebar({
     weights,
@@ -57,7 +58,13 @@ export function AdviceSidebar({
 
     return (
         <aside className="space-y-4">
-            <div className="rounded-[24px] bg-white p-5 shadow-sm">
+            {/*
+              * Grey, where the sections beside it are coloured: this column
+              * is the reader's own answers read back, not a finding about a
+              * car, and it should not compete with the argument for
+              * attention.
+              */}
+            <div className="rounded-[24px] bg-finn-cotton p-5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-iron">
                     Your priorities
                 </p>
@@ -68,7 +75,7 @@ export function AdviceSidebar({
                             key={weight.priority}
                             className="flex items-center gap-2"
                         >
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-finn-cotton text-[10px] font-black">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-black text-finn-accent-blue">
                                 {weight.rank}
                             </span>
 
@@ -81,20 +88,22 @@ export function AdviceSidebar({
                 </div>
 
                 <p className="mt-3 text-[11px] leading-4 text-finn-iron">
-                    The order you set. Higher priorities carry more of the
-                    result — the exact weighting is under "Behind the
-                    recommendation".
+                    The order you set. The higher you put a priority, the more
+                    it carries of the result.
                 </p>
             </div>
 
-            <div className="rounded-[24px] bg-white p-5 shadow-sm">
+            <div className="rounded-[24px] bg-finn-cotton p-5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-iron">
                     Your assumptions
                 </p>
 
                 <dl className="mt-4 space-y-2">
                     {assumptions.map(([label, value]) => (
-                        <div key={label} className="flex justify-between gap-2">
+                        <div
+                            key={label}
+                            className="flex justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5"
+                        >
                             <dt className="text-xs text-finn-iron">{label}</dt>
                             <dd className="text-xs font-black text-finn-black">
                                 {value}

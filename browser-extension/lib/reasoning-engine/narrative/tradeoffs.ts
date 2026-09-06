@@ -23,7 +23,6 @@ import {
   paragraph,
   phraseLabel,
   sentence,
-  shortName,
 } from "./phrase";
 
 /**
@@ -124,8 +123,8 @@ function missingSelected(
     `This car doesn't have ${labels}`,
     rescuer
       ? sameList
-        ? `— ${shortName(rescuer.name)} ${missing.length === 1 ? "has it" : "has them"}`
-        : `— ${shortName(rescuer.name)} has ${joinCapped(
+        ? `— ${rescuer.name} ${missing.length === 1 ? "has it" : "has them"}`
+        : `— ${rescuer.name} has ${joinCapped(
             rescued.map((fact) => fact.phrase),
             5,
           )}`
@@ -254,12 +253,12 @@ function priorityDeficit(
   const evidence =
     measured && behind.numeric
       ? sentence(
-          `${shortName(rival.name)} has the better ${inSentence(measured.label)}:`,
+          `${rival.name} has the better ${inSentence(measured.label)}:`,
           `${behind.numeric.display} against this car's ${measured.display}`,
         )
       : gained.length
         ? sentence(
-            `${shortName(rival.name)} has`,
+            `${rival.name} has`,
             `${joinCapped(gained.map((fact) => inSentence(fact.label)))}, which this car doesn't`,
           )
         : null;
@@ -271,9 +270,7 @@ function priorityDeficit(
     relevanceFor(reasoning.label, reasoning.rank).replace(/\.$/, ""),
     reasoning.rank === 1
       ? ", so this is the most significant thing you'd be giving up"
-      : `, so this is one of the main compromises in choosing ${shortName(
-          evaluation.vehicle.name,
-        )}`,
+      : `, so this is one of the main compromises in choosing ${evaluation.vehicle.name}`,
   );
 
   return {
@@ -285,7 +282,7 @@ function priorityDeficit(
     headline:
       measured && behind.numeric
         ? `${measured.label}: ${measured.display} vs ${behind.numeric.display}`
-        : `${shortName(rival.name)} has ${
+        : `${rival.name} has ${
             gained[0]?.phrase ?? phraseLabel(reasoning.label)
           }`,
     evidence,
@@ -374,7 +371,7 @@ function costTradeoff(
 
   const evidence = sentence(
     `At your mileage this is estimated at ${formatEUR(cost.subject.total)}/month,`,
-    `about ${formatEUR(difference)} more than ${shortName(alternative.name)} at`,
+    `about ${formatEUR(difference)} more than ${alternative.name} at`,
     formatEUR(alternative.total),
   );
 
@@ -394,7 +391,7 @@ function costTradeoff(
     priorityLabel: null,
     rank: null,
     severity: "high",
-    headline: `${formatEUR(difference)}/month more than ${shortName(alternative.name)}`,
+    headline: `${formatEUR(difference)}/month more than ${alternative.name}`,
     evidence,
     relevance,
     rival: { vehicleId: alternative.vehicleId, name: alternative.name },

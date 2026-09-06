@@ -71,11 +71,20 @@ export function buildAdviceNarrative(
 }
 
 export * from "./types";
+/*
+ * The one language primitive the UI needs: a Title Case category label
+ * lowercased for the middle of a sentence. The alternative is every
+ * component hard-coding its own, which is how "Family Friendly" and "family
+ * friendly" end up in the same paragraph.
+ */
+export { phraseLabel } from "./phrase";
 export {
+  challengeRows,
   challengeSentences,
   reasonAboutChallenge,
   type ChallengeLine,
   type ChallengeReasoning,
+  type UnseparatedPriority,
 } from "./challenge";
 export {
   classifyMeasurementGap,

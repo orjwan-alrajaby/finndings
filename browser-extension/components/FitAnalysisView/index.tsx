@@ -10,7 +10,7 @@ import {
     type FitLevel,
     type FitPriority,
 } from "@/lib/reasoning-engine/fit";
-import { describeEnvironment } from "@/lib/reasoning-engine/environmental";
+import { EnvironmentalResult } from "@/components/EnvironmentalResult";
 import { formatEUR } from "@/lib/reasoning-engine";
 import type { CostLine } from "@/lib/reasoning-engine/types";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
@@ -219,10 +219,6 @@ export function BandChip({
 function PrioritySection({ priority }: { priority: FitPriority }) {
     const [open, setOpen] = useState(true);
 
-    const sentences = priority.impact
-        ? [describeEnvironment(priority.impact)]
-        : priority.sentences;
-
     return (
         <section className="border-t border-finn-cotton">
             <button
@@ -280,17 +276,28 @@ function PrioritySection({ priority }: { priority: FitPriority }) {
 
             {open && (
                 <div className="flex flex-col gap-3 px-5 pb-4">
-                    {sentences.length > 0 && (
-                        <div className="flex flex-col gap-1.5">
-                            {sentences.map((line) => (
-                                <p
-                                    key={line}
-                                    className="text-[12px] leading-[18px] text-finn-iron"
-                                >
-                                    {line}
-                                </p>
-                            ))}
-                        </div>
+                    {/*
+                      * Environmental impact renders itself, in full. This
+                      * panel used to show its one summary sentence and drop
+                      * the figures, the caveats and the method on the floor —
+                      * the same reading, three surfaces, three different
+                      * amounts of it. There is one renderer now.
+                      */}
+                    {priority.impact ? (
+                        <EnvironmentalResult assessment={priority.impact} />
+                    ) : (
+                        priority.sentences.length > 0 && (
+                            <div className="flex flex-col gap-1.5">
+                                {priority.sentences.map((line) => (
+                                    <p
+                                        key={line}
+                                        className="text-[12px] leading-[18px] text-finn-iron"
+                                    >
+                                        {line}
+                                    </p>
+                                ))}
+                            </div>
+                        )
                     )}
 
                     <FeatureGroups priority={priority} />

@@ -41,7 +41,7 @@ export default function ReviewOrCompare() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-finn-snow">
+    <main className="min-h-screen bg-white">
       <CompareTab
         cars={cars}
         onSettings={() => openBrowserTab("OPEN_SETTINGS_PAGE")}

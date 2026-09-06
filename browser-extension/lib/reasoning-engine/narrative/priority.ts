@@ -35,7 +35,6 @@ import {
   paragraph,
   phraseLabel,
   sentence,
-  shortName,
 } from "./phrase";
 
 /**
@@ -142,7 +141,7 @@ function describeSelection(
     highMisses.length && highMisses.length < missing.length
       ? `, and you said ${joinSelection(highMisses)} should count highly`
       : "",
-    rivalHasIt && rival ? `, which ${shortName(rival.name)} does` : "",
+    rivalHasIt && rival ? `, which ${rival.name} does` : "",
   );
 }
 
@@ -233,13 +232,13 @@ function describeScoredMeasurement(fact: MeasurementFact | null): string | null 
   if (isEffectivelyLevel(rival.magnitude)) {
     return sentence(
       `${fact.label} is effectively the same on both:`,
-      `${fact.display} against ${shortName(rival.name)}'s ${rival.display}`,
+      `${fact.display} against ${rival.name}'s ${rival.display}`,
     );
   }
 
   return sentence(
     `Its ${inSentence(fact.label)} is ${fact.display}, against`,
-    `${shortName(rival.name)}'s ${rival.display}`,
+    `${rival.name}'s ${rival.display}`,
   );
 }
 
@@ -270,7 +269,7 @@ function describeDrivetrain(traits: TraitFact[]): string | null {
   return drivetrain.rival
     ? sentence(
         `It's ${article(value)} ${value} car;`,
-        `${shortName(drivetrain.rival.name)} is`,
+        `${drivetrain.rival.name} is`,
         `${article(drivetrain.rival.value.toLowerCase())} ${drivetrain.rival.value.toLowerCase()}`,
       )
     : sentence(`It's ${article(value)} ${value} car`);
@@ -297,11 +296,13 @@ function describeEmissions(breakdown: PriorityBreakdown): string[] {
 
   if (!assessment) return [];
 
-  return paragraph(
-    describeEnvironment(assessment),
-    /* One caveat in prose; the panel shows the rest beside the figures. */
-    assessment.caveats[0] ?? null,
-  );
+  /*
+   * The reading only. The caveats used to be appended here as a second
+   * paragraph, which put the limitation between the reader and the figures
+   * it limits. They travel on the assessment instead, and each surface places
+   * them after the numbers.
+   */
+  return paragraph(describeEnvironment(assessment));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -510,6 +511,7 @@ export function reasonAboutPriority(
     features,
     measurements,
     traits,
+    environmental: breakdown.environmental ?? null,
     rival,
     leader,
     sentences,

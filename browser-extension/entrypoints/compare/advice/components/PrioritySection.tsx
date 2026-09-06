@@ -5,6 +5,9 @@ import type {
     PriorityStanding,
 } from "@/lib/reasoning-engine/narrative";
 import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
+import { EnvironmentalResult } from "@/components/EnvironmentalResult";
+import { ExportTable, type ExportRow } from "@/components/ExportTable";
+import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 
 /**
  * One priority, answering one question: what does this car give me for the
@@ -13,9 +16,7 @@ import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
  * The heading carries the user's rank and nothing else. The category score
  * and its share of the weighting are deliberately absent — "practicality:
  * 48/100" asks the reader to interpret an abstraction, where "491 L of boot
- * space against 1,726 L" tells them what they'd actually notice. The
- * arithmetic is still on the page, under *Behind the recommendation*, where a
- * number is what the reader came for.
+ * space against 1,726 L" tells them what they'd actually notice.
  *
  * The feature rows keep the two halves of the model apart on purpose. What
  * the reader singled out for extra influence comes first, present and missing
@@ -36,7 +37,8 @@ const STANDING_CLASS: Record<PriorityStanding, string> = {
     leads: "bg-finn-pale-blue text-finn-accent-blue",
     levelWithLeader: "bg-finn-pale-blue text-finn-accent-blue",
     closeToLeader: "bg-finn-cotton text-finn-iron",
-    behindLeader: "bg-finn-warning/10 text-finn-warning",
+    /* Deep amber: the signal hue reads 1.9:1 on its own tint. */
+    behindLeader: "bg-finn-warning/15 text-finn-warning-deep",
     unsupported: "bg-finn-cotton text-finn-iron",
 };
 
@@ -59,8 +61,26 @@ export function PrioritySection({
     const picked = features.picked;
     const hasPicks = picked.present.length + picked.missing.length > 0;
 
+    /*
+     * A feature the reader singled out is already stated above as a pick, so
+     * the coverage list below it drops the duplicate rather than saying the
+     * same thing twice under a weaker label.
+     */
+    const alsoCounted = hasPicks
+        ? features.coverage.present.filter(
+              (fact) =>
+                  !picked.present.some((item) => item.key === fact.key),
+          )
+        : features.coverage.present;
+
     return (
-        <section className="border-t border-finn-cotton pt-6">
+        /*
+          * A card rather than a rule between rows. Five priorities separated
+          * by a hairline read as one long column that has to be counted;
+          * five white cards on the section's blue read as five answers, and
+          * the reader can stop after the ones they ranked highest.
+          */
+        <section className="rounded-[22px] bg-white p-5 sm:p-6">
             <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-sm font-black text-finn-accent-blue">
                     {reasoning.icon}
@@ -88,22 +108,50 @@ export function PrioritySection({
                         </span>
                     </div>
 
-                    <div className="mt-2 space-y-2">
-                        {reasoning.sentences.map((sentence) => (
-                            <p
-                                key={sentence}
-                                className="text-sm leading-6 text-finn-iron"
-                            >
-                                {sentence}
-                            </p>
-                        ))}
-                    </div>
+                    {/*
+                      * Environmental impact renders itself. Its figures need
+                      * an interpretation attached to each one — "140 g/km" in
+                      * a generic measurement row asks the reader to already
+                      * know what 140 means — and its caveats have to land
+                      * after the answer rather than in front of it. Every
+                      * other priority is explained by the feature lists
+                      * below, so the generic path is right for them.
+                      */}
+                    {reasoning.environmental ? (
+                        <EnvironmentalResult
+                            assessment={reasoning.environmental}
+                            variant="concise"
+                        />
+                    ) : (
+                        <>
+                            <div className="mt-2 space-y-2">
+                                {reasoning.sentences.map((sentence) => (
+                                    <p
+                                        key={sentence}
+                                        className="text-sm leading-6 text-finn-iron"
+                                    >
+                                        {sentence}
+                                    </p>
+                                ))}
+                            </div>
 
-                    {reasoning.measurements.length > 0 && (
-                        <MeasurementTable facts={reasoning.measurements} />
+                            {reasoning.measurements.length > 0 && (
+                                <MeasurementTable
+                                    facts={reasoning.measurements}
+                                />
+                            )}
+                        </>
                     )}
 
-                    <div className="mt-3 space-y-2">
+                    {/*
+                      * The same three lists, twice. On screen they are chips
+                      * with their explanations a tap away, which is what a
+                      * reader wants when only one word in twenty puzzles
+                      * them. In the exported file a tap reveals nothing, so
+                      * everything behind one is laid out flat instead — see
+                      * components/ExportTable.
+                      */}
+                    <div className="finn-lens-screen-only mt-3 space-y-2">
                         {hasPicks && (
                             <>
                                 <ChipRow
@@ -126,24 +174,92 @@ export function PrioritySection({
                                     ? "Also counted here, and it has"
                                     : "It has"
                             }
-                            facts={
-                                hasPicks
-                                    ? features.coverage.present.filter(
-                                          (fact) =>
-                                              !picked.present.some(
-                                                  (item) =>
-                                                      item.key === fact.key,
-                                              ),
-                                      )
-                                    : features.coverage.present
-                            }
+                            facts={alsoCounted}
                             tone="rivalOnly"
                         />
                     </div>
+
+                    <ExportTable
+                        caption={`Every feature counted under ${reasoning.label}`}
+                        subjectHeading="Feature · where it stands"
+                        detailHeading="What it is"
+                        rows={featureRows(picked, alsoCounted, hasPicks)}
+                    />
                 </div>
             </div>
         </section>
     );
+}
+
+/**
+ * The same features as the chip rows, flattened for the exported file.
+ *
+ * Three things that are one tap away on screen are simply present here: what
+ * the feature is, whether the car has it, and — for anything the reader gave
+ * extra influence to — how much they said it should count. On a chip the
+ * first sits behind an "i" and the last behind a coloured dot with a
+ * tooltip, and a photograph of the page keeps neither.
+ *
+ * The order is the chips' own: what the reader asked for and got, what they
+ * asked for and didn't, then what counted anyway. That is the order of
+ * interest, and it also puts the amber rows where a reader scanning the
+ * left edge will find them together.
+ */
+function featureRows(
+    picked: { present: FeatureFact[]; missing: FeatureFact[] },
+    alsoCounted: FeatureFact[],
+    hasPicks: boolean,
+): ExportRow[] {
+    return [
+        ...picked.present.map((fact) =>
+            featureRow(fact, "positive", "Has it · you asked for it"),
+        ),
+        ...picked.missing.map((fact) =>
+            featureRow(fact, "caution", "Doesn't have it · you asked for it"),
+        ),
+        ...alsoCounted.map((fact) =>
+            featureRow(
+                fact,
+                "neutral",
+                hasPicks ? "Has it · counted anyway" : "Has it",
+            ),
+        ),
+    ];
+}
+
+function featureRow(
+    fact: FeatureFact,
+    tone: ExportRow["tone"],
+    standing: string,
+): ExportRow {
+    const level = fact.importance ? FEATURE_IMPORTANCE[fact.importance] : null;
+
+    return {
+        /*
+         * A feature can appear in at most one of the three lists, so its own
+         * id is unique across the table.
+         */
+        key: fact.key,
+        tone,
+        subject: (
+            <>
+                {fact.label}
+
+                {level && (
+                    <span
+                        className={[
+                            "ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide",
+                            level.chipClass,
+                        ].join(" ")}
+                    >
+                        {level.badgeLabel}
+                    </span>
+                )}
+            </>
+        ),
+        standing,
+        detail: fact.explanation,
+    };
 }
 
 /**
@@ -183,7 +299,7 @@ function MeasurementTable({ facts }: { facts: MeasurementFact[] }) {
             {facts.map((fact) => (
                 <div
                     key={fact.label}
-                    className="rounded-xl bg-finn-snow px-3 py-2"
+                    className="rounded-xl bg-finn-pale-blue/60 px-3 py-2"
                 >
                     <dt className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
                         {fact.label}
