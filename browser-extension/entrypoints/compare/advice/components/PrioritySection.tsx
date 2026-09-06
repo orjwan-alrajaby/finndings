@@ -5,6 +5,8 @@ import type {
     PriorityStanding,
 } from "@/lib/reasoning-engine/narrative";
 import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
+
+import { PriorityIcon } from "@/components/PriorityIcon";
 import { EnvironmentalResult } from "@/components/EnvironmentalResult";
 import { ExportTable, type ExportRow } from "@/components/ExportTable";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
@@ -82,8 +84,8 @@ export function PrioritySection({
           */
         <section className="rounded-[22px] bg-white p-5 sm:p-6">
             <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-sm font-black text-finn-accent-blue">
-                    {reasoning.icon}
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-finn-accent-blue">
+                    <PriorityIcon name={reasoning.icon} className="h-5 w-5" />
                 </div>
 
                 <div className="min-w-0 flex-1">

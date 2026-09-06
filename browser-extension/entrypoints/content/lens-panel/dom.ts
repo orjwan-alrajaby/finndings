@@ -8,6 +8,8 @@
  * thrown away in one pass instead, which is all a read-only view needs.
  */
 
+import { LENS_PANEL_ICONS } from "./icons";
+
 type Child = Node | string | null | undefined | false;
 
 interface Options {
@@ -50,36 +52,41 @@ const SVG_NS = "http://www.w3.org/2000/svg";
  * An inline icon, built through the DOM rather than pasted in as markup.
  *
  * `el` deliberately has no `innerHTML`, so an icon can't be a string here.
- * Two namespaced elements is a small price for keeping the one function that
+ * A few namespaced elements is a small price for keeping the one function that
  * could inject markup out of the file entirely.
+ *
+ * Takes a whole lucide node rather than a single path because most of these
+ * marks are several shapes — a circle and two lines, twelve strokes for a
+ * snowflake — and the two that aren't were the exception. The stroke settings
+ * are lucide's own, so a mark drawn here and the same mark drawn by
+ * `PriorityIcon` in the React surfaces are the same picture.
  */
-export function icon(path: string, className: string): SVGElement {
+export function icon(name: string, className: string): SVGElement {
   const svg = document.createElementNS(SVG_NS, "svg");
 
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.6");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("class", className);
 
-  const shape = document.createElementNS(SVG_NS, "path");
+  /* An unknown name draws nothing rather than throwing: a missing mark should
+     cost the reader an empty box, not the panel. */
+  for (const [tag, attrs] of LENS_PANEL_ICONS[name] ?? []) {
+    const shape = document.createElementNS(SVG_NS, tag);
 
-  shape.setAttribute("d", path);
-  shape.setAttribute("stroke-linecap", "round");
-  shape.setAttribute("stroke-linejoin", "round");
+    for (const [attr, value] of Object.entries(attrs)) {
+      shape.setAttribute(attr, value);
+    }
 
-  svg.append(shape);
+    svg.append(shape);
+  }
 
   return svg;
 }
-
-/** heroicons/24/outline — information-circle. */
-export const INFORMATION_CIRCLE =
-  "m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z";
-
-/** heroicons/24/outline — chevron-down. */
-export const CHEVRON_DOWN = "m19.5 8.25-7.5 7.5-7.5-7.5";
 
 /** A run of elements with no wrapper of their own. */
 export function fragment(children: Child[]): DocumentFragment {

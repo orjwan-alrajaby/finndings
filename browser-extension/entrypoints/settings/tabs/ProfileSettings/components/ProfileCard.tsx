@@ -4,6 +4,7 @@ import {
     SetDefaultButton,
     Toggle,
 } from "@/entrypoints/settings/components/primitives";
+import { PriorityIcon } from "@/components/PriorityIcon";
 
 interface ProfileCardProps {
     profile: Profile;
@@ -28,8 +29,8 @@ export function ProfileCard({
     return (
         <div className="rounded-[22px] bg-finn-snow drop-shadow-sm">
             <div className="flex items-start gap-3 p-4">
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-2xl font-bold text-finn-accent-blue">
-                    {profile.icon}
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
+                    <PriorityIcon name={profile.icon} className="h-5 w-5" />
                 </span>
 
                 <div className="min-w-0 flex-1 space-y-1">

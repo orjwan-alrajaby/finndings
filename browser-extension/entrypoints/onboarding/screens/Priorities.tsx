@@ -7,6 +7,8 @@ import {
     Undo2,
 } from "lucide-react";
 
+import { PriorityIcon } from "@/components/PriorityIcon";
+
 import {
     applicableProfiles,
     matchingProfile,
@@ -233,10 +235,11 @@ function AppliedBanner({
             <CircleCheck className="h-5 w-5 shrink-0 text-finn-accent-blue" />
 
             <p className="min-w-0 flex-1 text-xs leading-5 text-finn-highlight-navy">
-                <strong className="font-black">
-                    <span aria-hidden className="mr-1">
-                        {applied.icon}
-                    </span>
+                <strong className="inline-flex items-center gap-1 font-black">
+                    <PriorityIcon
+                        name={applied.icon}
+                        className="h-3.5 w-3.5"
+                    />
                     {applied.label} applied.
                 </strong>{" "}
                 Your order below is now its priorities, in its order — change
@@ -298,7 +301,7 @@ function OrderView({
                       */}
                     {inUse && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-black text-finn-accent-blue">
-                            <span aria-hidden>{inUse.icon}</span>
+                            <PriorityIcon name={inUse.icon} className="h-3 w-3" />
                             {inUse.label}
                         </span>
                     )}

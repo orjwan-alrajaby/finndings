@@ -1,5 +1,7 @@
 import { Lock } from "lucide-react";
 
+import { PriorityIcon } from "@/components/PriorityIcon";
+
 import { InfoTip } from "@/components/InfoTip";
 import {
     FEATURE_IMPORTANCE,
@@ -199,8 +201,19 @@ function ElsewhereNote({ elsewhere }: { elsewhere: FeatureElsewhere[] }) {
             className="flex shrink-0 items-center gap-1 rounded-lg bg-finn-cotton px-2 py-1 @sm:ml-auto"
             title={`Raised under ${joined}. A feature counts extra in one priority only — put it back to standard there to raise it here.`}
         >
-            <span aria-hidden className="text-[10px]">
-                {elsewhere.map((item) => item.icon).join("")}
+            {/*
+              * One mark per priority the feature is raised under. These were
+              * emoji joined into a single string; drawn icons are elements,
+              * so they are laid out rather than concatenated.
+              */}
+            <span aria-hidden className="flex items-center gap-0.5">
+                {elsewhere.map((item) => (
+                    <PriorityIcon
+                        key={item.label}
+                        name={item.icon}
+                        className="h-3 w-3 text-finn-iron"
+                    />
+                ))}
             </span>
 
             <span className="text-[10px] font-bold text-finn-iron">

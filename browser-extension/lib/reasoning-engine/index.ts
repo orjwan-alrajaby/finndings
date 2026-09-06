@@ -268,7 +268,7 @@ function priorityBreakdown(
   return {
     priority: category,
     label: meta?.label ?? category,
-    icon: meta?.icon ?? "•",
+    icon: meta?.icon ?? "car",
     rank,
     weight,
     weightPercent: Math.round(weight * 100),

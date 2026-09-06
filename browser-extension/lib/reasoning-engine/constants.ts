@@ -500,7 +500,7 @@ export const CATEGORIES = {
    */
   safetyAssistance: {
     label: "Safety & Driver Assistance",
-    icon: "🛡️",
+    icon: "shield",
     color: "#2563EB",
     question: "What does the car do to keep you out of an accident?",
     description:
@@ -534,7 +534,7 @@ export const CATEGORIES = {
 
   familyFriendly: {
     label: "Family Friendly",
-    icon: "👨‍👩‍👧",
+    icon: "users",
     color: "#EA580C",
     question: "Will this work for transporting your family, week after week?",
     description:
@@ -563,7 +563,7 @@ export const CATEGORIES = {
 
   practicality: {
     label: "Practicality",
-    icon: "🎒",
+    icon: "backpack",
     color: "#0891B2",
     question: "Will everything you carry day-to-day actually fit?",
     description:
@@ -591,7 +591,7 @@ export const CATEGORIES = {
 
   longDistance: {
     label: "Long Distance Travel",
-    icon: "🛣️",
+    icon: "route",
     color: "#D97706",
     question: "How does this feel after three hours on the motorway?",
     description:
@@ -621,7 +621,7 @@ export const CATEGORIES = {
 
   climateSuitability: {
     label: "Climate Suitability",
-    icon: "❄️",
+    icon: "snowflake",
     color: "#0284C7",
     question: "How will this hold up through winter mornings and summer heat?",
     description:
@@ -651,7 +651,7 @@ export const CATEGORIES = {
 
   environmental: {
     label: "Environmental Impact",
-    icon: "🌿",
+    icon: "leaf",
     color: "#16A34A",
     question: "How much does this car emit, and what does it run on?",
     description:
@@ -667,7 +667,7 @@ export const CATEGORIES = {
 
   comfort: {
     label: "Comfort",
-    icon: "🛋️",
+    icon: "sofa",
     color: "#DB2777",
     question: "How pleasant is it to sit in, every single day?",
     description:
@@ -736,7 +736,7 @@ export const MAX_FEATURES_PER_CATEGORY = 5;
 export const PROFILES = {
   nervous: {
     label: "Nervous Driver",
-    icon: "🛡️",
+    icon: "shield",
     forWhom:
       "Drivers who want the car watching the road with them — braking, lane and blind spot warnings doing the heavy lifting.",
     assumes:
@@ -752,7 +752,7 @@ export const PROFILES = {
 
   commuter: {
     label: "City Commuter",
-    icon: "🧭",
+    icon: "compass",
     forWhom:
       "People doing the same short, busy journey twice a day, mostly in traffic.",
     assumes:
@@ -768,7 +768,7 @@ export const PROFILES = {
 
   family: {
     label: "Family First",
-    icon: "👨‍👩‍👧",
+    icon: "users",
     forWhom:
       "Parents moving children, car seats and everything that comes with them, week after week.",
     assumes:
@@ -784,7 +784,7 @@ export const PROFILES = {
 
   roadtrip: {
     label: "Road Tripper",
-    icon: "🛣️",
+    icon: "route",
     forWhom:
       "Anyone who regularly spends hours at a stretch behind the wheel.",
     assumes:
@@ -800,7 +800,7 @@ export const PROFILES = {
 
   eco: {
     label: "Eco-Conscious",
-    icon: "🌿",
+    icon: "leaf",
     forWhom:
       "Drivers who want emissions to be the first thing the choice answers to.",
     assumes:
@@ -816,7 +816,7 @@ export const PROFILES = {
 
   balanced: {
     label: "Balanced",
-    icon: "⚖️",
+    icon: "scale",
     forWhom:
       "Anyone without one dominant requirement who wants a sensible all-rounder.",
     assumes:

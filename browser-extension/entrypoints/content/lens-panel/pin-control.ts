@@ -1,6 +1,6 @@
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { el } from "./dom";
+import { el, icon } from "./dom";
 import { cardForCar } from "./currentCar";
 import {
   getPinnedCars,
@@ -56,7 +56,7 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
   const label = el("span", {});
 
   const mark = el("span", {
-    class: "text-[15px] leading-none",
+    class: "flex items-center leading-none",
     attrs: { "aria-hidden": "true" },
   });
 
@@ -101,7 +101,8 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
       ? "Pinned — compare it later"
       : "Pin this car for comparison";
 
-    mark.textContent = pinned ? "✓" : "+";
+    /* Redrawn rather than retyped: the mark is a shape now, not a glyph. */
+    mark.replaceChildren(icon(pinned ? "check" : "plus", "h-4 w-4"));
   };
 
   const toggle = async () => {

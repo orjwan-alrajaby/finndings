@@ -1,4 +1,4 @@
-import { el, panelStyles } from "./dom";
+import { el, icon, panelStyles } from "./dom";
 import { closePanel, openPanel, watchPanelVisibility } from "./panel";
 import { detailsPageRoot } from "./currentCar";
 
@@ -79,11 +79,7 @@ async function attach(mountedFor: number): Promise<void> {
       on: { click: () => void openPanel() },
     },
     [
-      el("span", {
-        class: "text-sm",
-        attrs: { "aria-hidden": "true" },
-        text: "🔍",
-      }),
+      icon("search", "h-4 w-4 shrink-0"),
       el("span", { text: "How does this car fit me?" }),
     ],
   );
@@ -95,7 +91,7 @@ async function attach(mountedFor: number): Promise<void> {
    *
    * Docked, the panel is the thing on the right of the screen; a floating
    * button offering to open what is already open would sit on top of it and
-   * say nothing. Closing brings it back, which is what the panel's own ✕ is
+   * say nothing. Closing brings it back, which is what the panel's own close button is
    * for.
    */
   watchPanelVisibility((visible) => {

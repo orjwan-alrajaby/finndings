@@ -105,6 +105,15 @@ export type FeatureSelection = FeaturePreference[];
 export interface Profile {
   id: ProfileId;
   label: string;
+  /**
+   * The name of the mark that stands for this, not the mark itself.
+   *
+   * A key into the table in `components/PriorityIcon` — "shield", "leaf" — so
+   * that the same value can be drawn as an icon by React and looked up
+   * separately by the panel on finn.com, which is not React. Kept a `string`
+   * rather than a union because settings saved by an older build hold an
+   * emoji here, and those still render as themselves.
+   */
   icon: string;
   forWhom: string;
   assumes: string;
@@ -119,6 +128,15 @@ export interface Profile {
 
 export interface CategoryDef {
   label: string;
+  /**
+   * The name of the mark that stands for this, not the mark itself.
+   *
+   * A key into the table in `components/PriorityIcon` — "shield", "leaf" — so
+   * that the same value can be drawn as an icon by React and looked up
+   * separately by the panel on finn.com, which is not React. Kept a `string`
+   * rather than a union because settings saved by an older build hold an
+   * emoji here, and those still render as themselves.
+   */
   icon: string;
   color: string;
   question: string;
@@ -142,6 +160,15 @@ export interface CategoryDef {
 export interface PriorityDefinition {
   id: CategoryId;
   label: string;
+  /**
+   * The name of the mark that stands for this, not the mark itself.
+   *
+   * A key into the table in `components/PriorityIcon` — "shield", "leaf" — so
+   * that the same value can be drawn as an icon by React and looked up
+   * separately by the panel on finn.com, which is not React. Kept a `string`
+   * rather than a union because settings saved by an older build hold an
+   * emoji here, and those still render as themselves.
+   */
   icon: string;
   description: string;
   isCustom: boolean;
@@ -392,6 +419,15 @@ export interface ScoreRef {
 export interface PriorityBreakdown {
   priority: CategoryId;
   label: string;
+  /**
+   * The name of the mark that stands for this, not the mark itself.
+   *
+   * A key into the table in `components/PriorityIcon` — "shield", "leaf" — so
+   * that the same value can be drawn as an icon by React and looked up
+   * separately by the panel on finn.com, which is not React. Kept a `string`
+   * rather than a union because settings saved by an older build hold an
+   * emoji here, and those still render as themselves.
+   */
   icon: string;
   rank: number;
   weight: number;

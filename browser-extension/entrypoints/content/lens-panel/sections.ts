@@ -36,12 +36,10 @@ import {
 } from "@/lib/personalisation";
 
 import {
-  CHEVRON_DOWN,
   el,
   empty,
   fragment,
   icon,
-  INFORMATION_CIRCLE,
 } from "./dom";
 import { pinControl } from "./pin-control";
 
@@ -177,7 +175,7 @@ function explains(subject: string, explanation: string): {
         },
       },
     },
-    [icon(INFORMATION_CIRCLE, "h-4 w-4")],
+    [icon("info", "h-4 w-4")],
   );
 
   return { button, panel };
@@ -501,7 +499,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
   );
 
   const chevron = icon(
-    CHEVRON_DOWN,
+    "chevron-down",
     "mt-1 h-4 w-4 shrink-0 rotate-180 text-finn-iron transition-transform",
   );
 
@@ -528,11 +526,21 @@ function prioritySection(priority: FitPriority): HTMLElement {
       },
     },
     [
-      el("span", {
-        class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-sm",
-        attrs: { "aria-hidden": "true" },
-        text: priority.icon,
-      }),
+      /*
+       * The priority's mark, drawn from the same lucide shapes the React
+       * surfaces use. It was the emoji held in the priority's `icon`, which
+       * is now the *name* of a shape — rendering it as text here would put
+       * the word "shield" in the box.
+       */
+      el(
+        "span",
+        {
+          class:
+            "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue",
+          attrs: { "aria-hidden": "true" },
+        },
+        [icon(priority.icon, "h-4 w-4")],
+      ),
 
       el("span", { class: "min-w-0 flex-1" }, [
         el("span", {
@@ -1040,7 +1048,7 @@ function featureChip(
             "aria-controls": slotId,
           },
         },
-        [icon(INFORMATION_CIRCLE, "h-4 w-4")],
+        [icon("info", "h-4 w-4")],
       )
     : null;
 

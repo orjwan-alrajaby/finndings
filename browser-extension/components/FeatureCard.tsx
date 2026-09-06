@@ -1,7 +1,10 @@
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { PriorityIcon } from "@/components/PriorityIcon";
+
 interface FeatureCardProps {
+    /** The priority's icon *name*, not the mark — see `PriorityIcon`. */
     icon: string;
     label: string;
     featureCount: number;
@@ -44,8 +47,8 @@ export function FeatureCard({
                 ].join(" ")}
             >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-2xl font-bold text-finn-accent-blue">
-                        {icon}
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
+                        <PriorityIcon name={icon} className="h-5 w-5" />
                     </span>
 
                     <div className="min-w-0 flex-1">

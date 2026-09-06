@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+
+import { PriorityIcon } from "@/components/PriorityIcon";
 import { useState } from "react";
 
 import {
@@ -229,9 +231,9 @@ function PrioritySection({ priority }: { priority: FitPriority }) {
             >
                 <span
                     aria-hidden="true"
-                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-sm"
+                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue"
                 >
-                    {priority.icon}
+                    <PriorityIcon name={priority.icon} className="h-4 w-4" />
                 </span>
 
                 <span className="min-w-0 flex-1">

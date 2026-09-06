@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, CircleCheck, Menu, Plus, X } from "lucide-react";
 
+import { PriorityIcon } from "@/components/PriorityIcon";
+
 import {
     MAX_PRIORITIES,
     MIN_PRIORITIES,
@@ -149,7 +151,7 @@ export function ProfilePresets({
                                     : "bg-finn-snow text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
                             ].join(" ")}
                         >
-                            <span aria-hidden="true">{profile.icon}</span>
+                            <PriorityIcon name={profile.icon} className="h-3.5 w-3.5" />
                             {profile.label}
                             {active && (
                                 <span className="text-[10px] font-black opacity-80">
@@ -182,8 +184,11 @@ export function ProfilePresets({
                         ].join(" ")}
                     >
                         <span className="flex items-start gap-3">
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-2xl">
-                                <span aria-hidden="true">{profile.icon}</span>
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
+                                <PriorityIcon
+                                    name={profile.icon}
+                                    className="h-5 w-5"
+                                />
                             </span>
 
                             <span className="min-w-0 flex-1">
@@ -345,8 +350,11 @@ export function PriorityOrderList({
                                 {index + 1}
                             </span>
 
-                            <span className="text-lg" aria-hidden="true">
-                                {definition?.icon ?? "•"}
+                            <span className="text-finn-iron" aria-hidden="true">
+                                <PriorityIcon
+                                    name={definition?.icon ?? "car"}
+                                    className="h-4 w-4"
+                                />
                             </span>
 
                             <span className="min-w-0 flex-1">
@@ -436,7 +444,7 @@ export function PriorityOrderList({
                                 ].join(" ")}
                             >
                                 <Plus className="h-3 w-3" />
-                                <span aria-hidden="true">{definition.icon}</span>
+                                <PriorityIcon name={definition.icon} className="h-3 w-3" />
                                 {definition.label}
                             </button>
                         ))}

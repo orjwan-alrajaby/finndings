@@ -4,7 +4,7 @@ import {
 } from "@/lib/reasoning-engine/fit";
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
-import { el, empty, fragment, panelStyles } from "./dom";
+import { el, empty, fragment, icon, panelStyles } from "./dom";
 import { canDock, dockPage, undockPage } from "./page-dock";
 import { clearHighlight, highlightConfiguration } from "./highlight";
 import {
@@ -488,15 +488,18 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   const close = () => closePanel();
 
-  const closeButton = el("button", {
-    class: [
-      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-      "text-finn-iron transition-colors hover:bg-finn-cotton hover:text-finn-black",
-    ].join(" "),
-    attrs: { type: "button", "aria-label": "Close FINN Lens" },
-    text: "✕",
-    on: { click: close },
-  });
+  const closeButton = el(
+    "button",
+    {
+      class: [
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+        "text-finn-iron transition-colors hover:bg-finn-cotton hover:text-finn-black",
+      ].join(" "),
+      attrs: { type: "button", "aria-label": "Close FINN Lens" },
+      on: { click: close },
+    },
+    [icon("x", "h-4 w-4")],
+  );
 
   const title = el("p", {
     class: "text-[13px] font-black text-finn-black",
@@ -511,11 +514,7 @@ async function build(request: PanelRequest): Promise<Panel> {
         "flex items-center gap-2 border-b border-finn-cotton px-5 py-3",
     },
     [
-      el("span", {
-        class: "text-sm",
-        attrs: { "aria-hidden": "true" },
-        text: "🔍",
-      }),
+      icon("search", "h-4 w-4 shrink-0 text-finn-accent-blue"),
       el("div", { class: "min-w-0 flex-1" }, [title]),
       el("button", {
         class: [
