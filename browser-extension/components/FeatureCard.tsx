@@ -1,3 +1,4 @@
+import * as Collapsible from "@radix-ui/react-collapsible";
 import { SquarePen } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,6 +23,11 @@ interface FeatureCardProps {
  * one saying how much a feature counts. A tint under all of them flattens
  * that: the pale levels have to read against white, not against a colour
  * competing with them.
+ *
+ * A collapsible, so that the pen button carries `aria-expanded` and points at
+ * the panel it opens. It was a bare button with an `aria-label` that swapped
+ * between "Edit" and "Close" — which told a screen reader what the button
+ * would do next but never that there was a region here, or that it was open.
  */
 export function FeatureCard({
     icon,
@@ -32,7 +38,9 @@ export function FeatureCard({
     children,
 }: FeatureCardProps) {
     return (
-        <div
+        <Collapsible.Root
+            open={open}
+            onOpenChange={onToggle}
             className={[
                 "overflow-hidden rounded-[20px] transition",
                 open
@@ -47,7 +55,10 @@ export function FeatureCard({
                 ].join(" ")}
             >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
+                    <span
+                        aria-hidden="true"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue"
+                    >
                         <PriorityIcon name={icon} className="h-5 w-5" />
                     </span>
 
@@ -87,9 +98,7 @@ export function FeatureCard({
                     </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={onToggle}
+                <Collapsible.Trigger
                     className={[
                         "rounded-full p-2 transition",
                         open
@@ -98,15 +107,15 @@ export function FeatureCard({
                     ].join(" ")}
                     aria-label={
                         open
-                            ? `Close ${label}`
-                            : `Edit ${label}`
+                            ? `Close what counts in ${label}`
+                            : `Choose what counts in ${label}`
                     }
                 >
-                    <SquarePen className="h-4 w-4" />
-                </button>
+                    <SquarePen aria-hidden="true" className="h-4 w-4" />
+                </Collapsible.Trigger>
             </div>
 
-            {children}
-        </div>
+            <Collapsible.Content>{children}</Collapsible.Content>
+        </Collapsible.Root>
     );
 }

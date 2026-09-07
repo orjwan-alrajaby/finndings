@@ -110,6 +110,12 @@ export function FeatureSection({
                                 onExpandedChange(open ? null : categoryId)
                             }
                         >
+                            {/*
+                              * Guarded so the editor is only built for the
+                              * card that is open — the collapsible drops the
+                              * closed ones from the tree, but the props are
+                              * assembled here either way.
+                              */}
                             {open && (
                                 <FeatureEditor
                                     categoryId={categoryId}

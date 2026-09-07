@@ -1,4 +1,4 @@
-import { useState } from "react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 import { CircleQuestionMark, Sparkles, Undo2 } from "lucide-react";
 
 import {
@@ -82,8 +82,6 @@ export function FeatureInfluencePicker({
     onResetAll,
     onResetToDefaults,
 }: FeatureInfluencePickerProps) {
-    const [explaining, setExplaining] = useState(false);
-
     const importanceOf = new Map(
         features.map((preference) => [preference.key, preference.importance]),
     );
@@ -153,11 +151,7 @@ export function FeatureInfluencePicker({
                 </span>
             </div>
 
-            <Explainer
-                open={explaining}
-                onToggle={() => setExplaining((value) => !value)}
-                categoryLabel={categoryLabel}
-            />
+            <Explainer categoryLabel={categoryLabel} />
 
             <div className="flex flex-col gap-3">
                 {rows.map((feature) => (
@@ -238,29 +232,15 @@ function isLocked(
  * true and still worth saying once — what changed is that saying it every
  * time, above the control, made the control hard to find.
  */
-function Explainer({
-    open,
-    onToggle,
-    categoryLabel,
-}: {
-    open: boolean;
-    onToggle: () => void;
-    categoryLabel: string;
-}) {
+function Explainer({ categoryLabel }: { categoryLabel: string }) {
     return (
-        <div className="overflow-hidden rounded-xl bg-white/70">
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-expanded={open}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left"
-            >
+        <Collapsible.Root className="overflow-hidden rounded-xl bg-white/70">
+            <Collapsible.Trigger className="group flex w-full items-center gap-2 px-3 py-2 text-left">
                 <CircleQuestionMark
-                    className={[
-                        "h-3.5 w-3.5 shrink-0 transition-colors",
-                        open ? "text-finn-black" : "text-finn-iron",
-                    ].join(" ")}
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 shrink-0 text-finn-iron transition-colors group-data-[state=open]:text-finn-black"
                 />
+
                 <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-[11px] font-black text-finn-black">
                         How influence works
@@ -268,9 +248,9 @@ function Explainer({
 
                     <Scale />
                 </span>
-            </button>
+            </Collapsible.Trigger>
 
-            {open && (
+            <Collapsible.Content>
                 <div className="space-y-2 border-t border-finn-snow px-3 py-2.5">
                     <p className="text-[11px] leading-4 text-finn-iron">
                         Every feature listed counts when Lens compares cars on{" "}
@@ -311,8 +291,8 @@ function Explainer({
                         it back to standard there to move it here.
                     </p>
                 </div>
-            )}
-        </div>
+            </Collapsible.Content>
+        </Collapsible.Root>
     );
 }
 

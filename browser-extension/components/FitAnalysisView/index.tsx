@@ -1,7 +1,7 @@
+import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDown } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
-import { useState } from "react";
 
 import {
     describeFit,
@@ -105,9 +105,24 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                 </Section>
             )}
 
-            {analysis.priorities.map((priority) => (
-                <PrioritySection key={priority.priority} priority={priority} />
-            ))}
+            {/*
+              * Every priority starts open, and closing one is how a reader
+              * folds away what they have already read. `multiple` because
+              * these are five independent answers, not five views of one.
+              */}
+            <Accordion.Root
+                type="multiple"
+                defaultValue={analysis.priorities.map(
+                    (priority) => priority.priority,
+                )}
+            >
+                {analysis.priorities.map((priority) => (
+                    <PrioritySection
+                        key={priority.priority}
+                        priority={priority}
+                    />
+                ))}
+            </Accordion.Root>
 
             <CostSection analysis={analysis} />
 
@@ -215,68 +230,68 @@ export function BandChip({
  * Every priority starts open: a reader who has opened this panel has already
  * asked "how does it fit me", and the answer is the evidence — which
  * features, which figures. But five priorities of features is a long scroll,
- * so the header is a button that folds one away once it has been read,
- * leaving the rank, the name and the band still on the page.
+ * so the header folds one away once it has been read, leaving the rank, the
+ * name and the band still on the page.
+ *
+ * An accordion item rather than a `useState` and a button. The heading used
+ * to be `role="heading"` on a span *inside* the button, because a button may
+ * not contain an h3 — which put a heading inside a control and left a screen
+ * reader with a heading it could not navigate to. Radix has the shape the
+ * markup actually wants: a real heading element wrapping the trigger.
  */
 function PrioritySection({ priority }: { priority: FitPriority }) {
-    const [open, setOpen] = useState(true);
-
     return (
-        <section className="border-t border-finn-cotton">
-            <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpen((was) => !was)}
-                className="flex w-full items-start gap-2.5 px-5 py-4 text-left transition-colors hover:bg-finn-snow"
-            >
-                <span
-                    aria-hidden="true"
-                    className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue"
-                >
-                    <PriorityIcon name={priority.icon} className="h-4 w-4" />
-                </span>
-
-                <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
-                        Your priority #{priority.rank}
-                    </span>
-
-                    {/* A button may not contain an h3, so the heading is a role. */}
+        <Accordion.Item
+            value={priority.priority}
+            className="border-t border-finn-cotton"
+        >
+            <Accordion.Header className="flex">
+                <Accordion.Trigger className="group flex w-full items-start gap-2.5 px-5 py-4 text-left transition-colors hover:bg-finn-snow">
                     <span
-                        role="heading"
-                        aria-level={3}
-                        className="mt-0.5 block text-[15px] font-black leading-5 text-finn-black"
-                    >
-                        {priority.label}
-                    </span>
-
-                    <span className="mt-0.5 block text-[11px] leading-4 text-finn-iron">
-                        {describeCoverage(priority)}
-                    </span>
-                </span>
-
-                {/*
-                  * The band and the chevron travel together, tight, so the
-                  * header's text column keeps as much width as it can.
-                  */}
-                <span className="flex shrink-0 items-start gap-1">
-                    <BandChip
-                        level={priority.band.level}
-                        label={priority.band.label}
-                        compact
-                    />
-
-                    <ChevronDown
                         aria-hidden="true"
-                        className={[
-                            "mt-1 h-4 w-4 shrink-0 text-finn-iron transition-transform",
-                            open ? "rotate-180" : "",
-                        ].join(" ")}
-                    />
-                </span>
-            </button>
+                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-finn-pale-blue text-finn-accent-blue"
+                    >
+                        <PriorityIcon
+                            name={priority.icon}
+                            className="h-4 w-4"
+                        />
+                    </span>
 
-            {open && (
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
+                            Your priority #{priority.rank}
+                        </span>
+
+                        <span className="mt-0.5 block text-[15px] font-black leading-5 text-finn-black">
+                            {priority.label}
+                        </span>
+
+                        <span className="mt-0.5 block text-[11px] leading-4 text-finn-iron">
+                            {describeCoverage(priority)}
+                        </span>
+                    </span>
+
+                    {/*
+                      * The band and the chevron travel together, tight, so
+                      * the header's text column keeps as much width as it
+                      * can.
+                      */}
+                    <span className="flex shrink-0 items-start gap-1">
+                        <BandChip
+                            level={priority.band.level}
+                            label={priority.band.label}
+                            compact
+                        />
+
+                        <ChevronDown
+                            aria-hidden="true"
+                            className="mt-1 h-4 w-4 shrink-0 text-finn-iron transition-transform group-data-[state=open]:rotate-180"
+                        />
+                    </span>
+                </Accordion.Trigger>
+            </Accordion.Header>
+
+            <Accordion.Content>
                 <div className="flex flex-col gap-3 px-5 pb-4">
                     {/*
                       * Environmental impact renders itself, in full. This
@@ -327,8 +342,8 @@ function PrioritySection({ priority }: { priority: FitPriority }) {
                         </p>
                     )}
                 </div>
-            )}
-        </section>
+            </Accordion.Content>
+        </Accordion.Item>
     );
 }
 
