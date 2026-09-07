@@ -61,7 +61,7 @@ export function ProgressRail({
                         >
                             {/* The check is for screen readers; the rail itself carries the state visually. */}
                             {done && (
-                                <Check className="sr-only h-3 w-3" />
+                                <Check aria-hidden="true" className="sr-only h-3 w-3" />
                             )}
                         </button>
                     );

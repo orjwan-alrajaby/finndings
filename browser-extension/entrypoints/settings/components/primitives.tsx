@@ -73,7 +73,7 @@ export function Toggle({ checked, onChange, disabled, label }: {
 export function DefaultBadge() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-finn-accent-blue">
-      <Star className="h-3 w-3 fill-current" /> Default
+      <Star aria-hidden="true" className="h-3 w-3 fill-current" /> Default
     </span>
   );
 }
@@ -93,7 +93,7 @@ export function SetDefaultButton({ onClick, label }: {
       title={said}
       className="inline-flex items-center gap-1 rounded-full bg-finn-iron/15 px-2.5 py-1 text-[10px] font-bold text-finn-iron hover:bg-finn-pale-blue hover:text-finn-accent-blue"
     >
-      <Star className="h-3 w-3" /> Set as default
+      <Star aria-hidden="true" className="h-3 w-3" /> Set as default
     </button>
   );
 }

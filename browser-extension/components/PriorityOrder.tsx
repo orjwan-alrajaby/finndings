@@ -248,7 +248,7 @@ export function ProfilePresets({
                                         </span>
 
                                         {active && (
-                                            <CircleCheck className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                                            <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-finn-accent-blue" />
                                         )}
                                     </span>
 
@@ -438,7 +438,7 @@ export function PriorityOrderList({
                                     disabled={index === 0}
                                     onClick={() => move(index, index - 1)}
                                 >
-                                    <ArrowUp className="h-3.5 w-3.5" />
+                                    <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -446,7 +446,7 @@ export function PriorityOrderList({
                                     disabled={index === priorities.length - 1}
                                     onClick={() => move(index, index + 1)}
                                 >
-                                    <ArrowDown className="h-3.5 w-3.5" />
+                                    <ArrowDown aria-hidden="true" className="h-3.5 w-3.5" />
                                 </IconButton>
 
                                 <IconButton
@@ -465,7 +465,7 @@ export function PriorityOrderList({
                                         )
                                     }
                                 >
-                                    <X className="h-3.5 w-3.5" />
+                                    <X aria-hidden="true" className="h-3.5 w-3.5" />
                                 </IconButton>
                             </span>
                         </li>
@@ -508,7 +508,7 @@ export function PriorityOrderList({
                                         atLimit ? "cursor-not-allowed" : "",
                                     ].join(" ")}
                                 >
-                                    <Plus className="h-3 w-3" />
+                                    <Plus aria-hidden="true" className="h-3 w-3" />
                                     {/*
                                       * Inherits rather than tints: this chip
                                       * turns solid blue on hover and dims

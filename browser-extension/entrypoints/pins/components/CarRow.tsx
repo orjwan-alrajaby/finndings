@@ -169,7 +169,7 @@ export function CarRow({
                     title={`View ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
                 >
-                    <Eye className="h-4 w-4" />
+                    <Eye aria-hidden="true" className="h-4 w-4" />
                 </button>
 
                 {/*
@@ -186,7 +186,7 @@ export function CarRow({
                         title="Open on finn.com"
                         className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-snow hover:text-finn-black"
                     >
-                        <ExternalLink className="h-4 w-4" />
+                        <ExternalLink aria-hidden="true" className="h-4 w-4" />
                     </a>
                 ) : null}
 
@@ -197,7 +197,7 @@ export function CarRow({
                     title={`Unpin ${car.name}`}
                     className="rounded-full p-1.5 text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
                 >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 aria-hidden="true" className="h-4 w-4" />
                 </button>
             </span>
         </li>

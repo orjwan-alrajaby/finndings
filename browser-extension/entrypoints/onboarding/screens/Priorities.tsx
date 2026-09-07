@@ -191,7 +191,7 @@ export function Priorities({
                     className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
                     aria-label="Back to how it works"
                 >
-                    <ArrowLeft className="h-5 w-5" />
+                    <ArrowLeft aria-hidden="true" className="h-5 w-5" />
                 </button>
 
                 <button
@@ -201,7 +201,7 @@ export function Priorities({
                     className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-not-allowed disabled:bg-finn-cotton disabled:text-finn-iron"
                 >
                     Next: how you drive
-                    <ArrowRight className="h-4 w-4" />
+                    <ArrowRight aria-hidden="true" className="h-4 w-4" />
                 </button>
             </div>
         </div>
@@ -232,7 +232,7 @@ function AppliedBanner({
 }) {
     return (
         <div className="finn-lens-attention mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-finn-pale-blue px-4 py-3">
-            <CircleCheck className="h-5 w-5 shrink-0 text-finn-accent-blue" />
+            <CircleCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-finn-accent-blue" />
 
             <p className="min-w-0 flex-1 flex items-center gap-1 text-xs leading-5 text-finn-highlight-navy">
                 <strong className="inline-flex items-center gap-1 font-black">
@@ -253,7 +253,7 @@ function AppliedBanner({
                 onClick={onUndo}
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-finn-accent-blue shadow-sm transition hover:bg-finn-accent-blue hover:text-white"
             >
-                <Undo2 className="h-3.5 w-3.5" />
+                <Undo2 aria-hidden="true" className="h-3.5 w-3.5" />
                 Undo
             </button>
         </div>
@@ -333,7 +333,7 @@ function OrderView({
                             onClick={onReset}
                             className="inline-flex items-center gap-1.5 rounded-full bg-finn-snow px-3.5 py-2 text-[11px] font-bold text-finn-iron transition hover:bg-finn-cotton hover:text-finn-black"
                         >
-                            <Undo2 className="h-3.5 w-3.5" />
+                            <Undo2 aria-hidden="true" className="h-3.5 w-3.5" />
                             Start over from Lens's order
                         </button>
                     </div>
@@ -347,7 +347,7 @@ function OrderView({
                     className="flex w-full items-center gap-3 border-t border-finn-cotton bg-finn-snow px-5 py-4 text-left transition hover:bg-finn-pale-blue sm:px-7"
                 >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-finn-accent-blue shadow-sm">
-                        <Sparkles className="h-4 w-4" />
+                        <Sparkles aria-hidden="true" className="h-4 w-4" />
                     </span>
 
                     <span className="min-w-0 flex-1">
@@ -361,7 +361,7 @@ function OrderView({
                         </span>
                     </span>
 
-                    <ArrowRight className="h-4 w-4 shrink-0 text-finn-accent-blue" />
+                    <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-finn-accent-blue" />
                 </button>
             )}
         </>
@@ -392,7 +392,7 @@ function PresetsView({
                     aria-label="Back to your priorities"
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
                 >
-                    <ArrowLeft className="h-4 w-4" />
+                    <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                 </button>
 
                 <div className="min-w-0">

@@ -139,10 +139,12 @@ export function AdviceHero({
                     >
                         {isFallback ? (
                             <TriangleAlert
+                                aria-hidden="true"
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         ) : (
                             <Sparkles
+                                aria-hidden="true"
                                 className={`h-4 w-4 ${palette.icon}`}
                             />
                         )}
@@ -233,7 +235,7 @@ export function AdviceHero({
                                 className={`inline-flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black shadow-sm transition ${palette.link}`}
                             >
                                 View this car on FINN
-                                <ExternalLink className="h-4 w-4" />
+                                <ExternalLink aria-hidden="true" className="h-4 w-4" />
                             </a>
                         )}
 

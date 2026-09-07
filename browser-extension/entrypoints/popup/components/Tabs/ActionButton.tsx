@@ -49,6 +49,7 @@ export function ActionButton({
             </span>
 
             <ChevronRight
+                aria-hidden="true"
                 className={[
                     "h-4 w-4 shrink-0 transition-transform",
                     disabled

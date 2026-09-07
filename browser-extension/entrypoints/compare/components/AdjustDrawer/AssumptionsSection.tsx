@@ -22,7 +22,7 @@ export function AssumptionsSection({
         <DrawerSection
             value="driving"
             tone={SECTION_TONE.driving}
-            icon={<Route className="h-4.5 w-4.5" />}
+            icon={<Route aria-hidden="true" className="h-4.5 w-4.5" />}
             eyebrow="What it costs you"
             title="How you drive"
             summary={

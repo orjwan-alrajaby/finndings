@@ -257,12 +257,12 @@ export function Advice({
             >
                 {exporting ? (
                     <>
-                        <RotateCw className="h-4 w-4 animate-spin" />
+                        <RotateCw aria-hidden="true" className="h-4 w-4 animate-spin" />
                         Building your PDF…
                     </>
                 ) : (
                     <>
-                        <Download className="h-4 w-4" />
+                        <Download aria-hidden="true" className="h-4 w-4" />
                         Save as PDF
                     </>
                 )}

@@ -62,7 +62,7 @@ export function Driving({
                         className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
                         aria-label="Back to your priorities"
                     >
-                        <ArrowLeft className="h-5 w-5" />
+                        <ArrowLeft aria-hidden="true" className="h-5 w-5" />
                     </button>
 
                     <button
@@ -73,7 +73,7 @@ export function Driving({
                         {untouched
                             ? "These look right — show me Lens working"
                             : "Show me Lens working"}
-                        <ArrowRight className="h-4 w-4" />
+                        <ArrowRight aria-hidden="true" className="h-4 w-4" />
                     </button>
                 </div>
 

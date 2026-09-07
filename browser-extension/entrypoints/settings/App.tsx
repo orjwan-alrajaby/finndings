@@ -249,20 +249,20 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       <PageHeader sticky={false}>
         {onBack && (
           <NavButton
-            icon={<ArrowLeft className="h-4 w-4" />}
+            icon={<ArrowLeft aria-hidden="true" className="h-4 w-4" />}
             label="Back"
             onClick={onBack}
           />
         )}
 
         <NavButton
-          icon={<Scale className="h-4 w-4" />}
+          icon={<Scale aria-hidden="true" className="h-4 w-4" />}
           label="See my recommendation"
           onClick={() => void openBrowserTab("OPEN_COMPARE_PAGE")}
         />
 
         <NavButton
-          icon={<Bookmark className="h-4 w-4" />}
+          icon={<Bookmark aria-hidden="true" className="h-4 w-4" />}
           label="Pinned cars"
           onClick={() => void openBrowserTab("OPEN_PINS_PAGE")}
         />
@@ -296,10 +296,10 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
               * timing may as well not exist.
               */}
             <button type="button" onClick={() => void openBrowserTab("OPEN_ONBOARDING_PAGE")} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
-              <GraduationCap className="h-3.5 w-3.5" /> Setup guide
+              <GraduationCap aria-hidden="true" className="h-3.5 w-3.5" /> Setup guide
             </button>
             <button type="button" onClick={() => setRestoreOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
-              <RotateCw className="h-3.5 w-3.5" /> Restore defaults
+              <RotateCw aria-hidden="true" className="h-3.5 w-3.5" /> Restore defaults
             </button>
           </div>
         </div>

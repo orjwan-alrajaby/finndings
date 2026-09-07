@@ -148,7 +148,7 @@ export function AdviceSidebar({
                     onClick={onAdjust}
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-black text-finn-black transition hover:bg-finn-snow"
                 >
-                    <SlidersHorizontal className="h-4 w-4" />
+                    <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
                     Adjust my answers
                 </button>
             </div>

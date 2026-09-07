@@ -41,7 +41,7 @@ export function PriorityOrderSection({
         <DrawerSection
             value="order"
             tone={SECTION_TONE.order}
-            icon={<ListOrdered className="h-4.5 w-4.5" />}
+            icon={<ListOrdered aria-hidden="true" className="h-4.5 w-4.5" />}
             eyebrow="Your ranking"
             title="What matters, and in what order"
             summary={`${priorities.length} of ${MAX_PRIORITIES} chosen · the top one carries the most`}

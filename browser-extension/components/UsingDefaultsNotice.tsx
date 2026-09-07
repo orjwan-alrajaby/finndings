@@ -31,7 +31,7 @@ export function UsingDefaultsNotice({
     if (compact) {
         return (
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-finn-pale-blue px-4 py-2.5 text-[11px] leading-4 text-finn-highlight-navy">
-                <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+                <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                 {DEFAULTS_SHORT}
                 <button
                     type="button"
@@ -47,7 +47,7 @@ export function UsingDefaultsNotice({
     return (
         <section className="flex flex-wrap items-start gap-3 rounded-[22px] bg-finn-pale-blue px-5 py-4">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-finn-accent-blue">
-                <SlidersHorizontal className="h-4 w-4" />
+                <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
             </span>
 
             <div className="min-w-0 flex-1">

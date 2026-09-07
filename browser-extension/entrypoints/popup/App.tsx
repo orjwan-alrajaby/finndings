@@ -173,7 +173,7 @@ function App() {
             aria-label="Settings"
             onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
           >
-            <Settings className="h-4 w-4" />
+            <Settings aria-hidden="true" className="h-4 w-4" />
           </button>
         </header>
 

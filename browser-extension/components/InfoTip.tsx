@@ -84,7 +84,7 @@ export function InfoTip({ subject, children }: InfoTipProps) {
                        outside rather than owned here. */
                     className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full align-middle text-finn-iron transition hover:text-finn-accent-blue data-[state=open]:text-finn-accent-blue"
                 >
-                    <Info className="h-4 w-4" />
+                    <Info aria-hidden="true" className="h-4 w-4" />
                 </button>
             }
         >

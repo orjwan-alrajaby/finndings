@@ -500,8 +500,13 @@ async function build(request: PanelRequest): Promise<Panel> {
     [icon("x", "h-4 w-4")],
   );
 
-  const title = el("p", {
-    class: "text-[13px] font-black text-finn-black",
+  /*
+   * A heading, not a paragraph. It is the region's accessible name and the
+   * top of its outline — the priorities inside it are h3s — so a reader
+   * navigating by heading should be able to land on it.
+   */
+  const title = el("h2", {
+    class: "m-0 text-[13px] font-black text-finn-black",
     attrs: { id: "finn-lens-title" },
     text: "How this car fits you",
   });

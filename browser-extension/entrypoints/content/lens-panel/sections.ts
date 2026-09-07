@@ -566,8 +566,6 @@ function prioritySection(priority: FitPriority): HTMLElement {
 
         el("span", {
           class: "mt-0.5 block text-[15px] font-black leading-5 text-finn-black",
-          /* A button may not contain an h3, so the heading is a role. */
-          attrs: { role: "heading", "aria-level": "3" },
           text: priority.label,
         }),
 
@@ -588,8 +586,19 @@ function prioritySection(priority: FitPriority): HTMLElement {
     ],
   );
 
+  /*
+   * The heading wraps the button rather than sitting inside it.
+   *
+   * The priority's name used to be a span carrying `role="heading"` inside
+   * the trigger, on the reasoning that a button may not contain an h3 — which
+   * is true, and was the sign that the nesting was the wrong way round. A
+   * heading inside a control is read out and then left out of the document
+   * outline, so a reader navigating this panel by heading could not reach any
+   * of the five priorities. The `h3` holds the button, and the button holds
+   * the name; both facts survive and neither is nested in the other's role.
+   */
   return el("section", { class: "border-t border-finn-cotton" }, [
-    header,
+    el("h3", { class: "m-0" }, [header]),
     body,
   ]);
 }

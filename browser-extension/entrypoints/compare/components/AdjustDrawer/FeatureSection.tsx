@@ -78,7 +78,7 @@ export function FeatureSection({
         <DrawerSection
             value="features"
             tone={SECTION_TONE.influence}
-            icon={<Gauge className="h-4.5 w-4.5" />}
+            icon={<Gauge aria-hidden="true" className="h-4.5 w-4.5" />}
             eyebrow="Extra influence"
             title="What counts inside a priority"
             summary={

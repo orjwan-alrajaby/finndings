@@ -119,11 +119,16 @@ describe("prioritySection", () => {
     expect(header.textContent).toContain("Safety & Driver Assistance");
   });
 
-  it("heads each priority even though a button can't hold an h3", () => {
+  it("heads each priority with a real h3 around the trigger", () => {
     const { header } = firstPriority();
-    const heading = header.querySelector('[role="heading"]');
 
-    expect(heading?.getAttribute("aria-level")).toBe("3");
+    /*
+     * Around, not inside. A heading nested in a button is read out and then
+     * left out of the outline, so a reader navigating by heading could not
+     * reach a single priority.
+     */
+    expect(header.parentElement?.tagName.toLowerCase()).toBe("h3");
+    expect(header.querySelector('[role="heading"]')).toBeNull();
   });
 });
 
