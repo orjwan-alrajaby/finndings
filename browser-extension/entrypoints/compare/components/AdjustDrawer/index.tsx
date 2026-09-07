@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Settings, X } from "lucide-react";
@@ -7,6 +7,7 @@ import type {
     CategoryId,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
+import { InfoPanelContainer } from "@/components/PriorityInfo";
 import { SaveControl } from "@/components/SaveControl";
 
 import { type Answers, useCompareStore } from "../../store";
@@ -76,14 +77,22 @@ export function AdjustDrawer({
     const applyAnswers = useCompareStore((state) => state.applyAnswers);
 
     /*
-     * What the page is currently reasoning from. Read as one object because
-     * that is what a draft is compared against and what a save replaces.
+     * What the page is currently reasoning from, as one object — that being
+     * what a draft is compared against and what a save replaces.
+     *
+     * Selected field by field and assembled here rather than returned whole
+     * from one selector. Zustand compares snapshots by identity, so a
+     * selector building `{ priorities, preferences, features }` hands back a
+     * different object on every call and the store never settles.
      */
-    const applied: Answers = useCompareStore((state) => ({
-        priorities: state.priorities,
-        preferences: state.preferences,
-        features: state.features,
-    }));
+    const priorities = useCompareStore((state) => state.priorities);
+    const preferences = useCompareStore((state) => state.preferences);
+    const features = useCompareStore((state) => state.features);
+
+    const applied: Answers = useMemo(
+        () => ({ priorities, preferences, features }),
+        [priorities, preferences, features],
+    );
 
     /*
      * Seeded once. The page holds this drawer back until the saved settings
@@ -95,6 +104,14 @@ export function AdjustDrawer({
         applied.priorities[0] ?? null,
     );
     const [saved, setSaved] = useState(false);
+
+    /*
+     * The drawer's own element, so the "i" panels the priority list opens can
+     * mount inside it. This is a modal dialog: anything portalled to the body
+     * lands outside its scroll lock and its focus trap, which for a panel
+     * with a scrolling body means one that cannot be scrolled or reached.
+     */
+    const [content, setContent] = useState<HTMLDivElement | null>(null);
 
     const dirty = !sameAnswers(draft, applied);
 
@@ -130,6 +147,7 @@ export function AdjustDrawer({
                 <Dialog.Overlay className="finn-lens-scrim fixed inset-0 z-40 bg-finn-black/40 backdrop-blur-[2px]" />
 
                 <Dialog.Content
+                    ref={setContent}
                     aria-describedby="adjust-drawer-purpose"
                     className={[
                         "finn-lens-drawer",
@@ -138,92 +156,94 @@ export function AdjustDrawer({
                         "border-l border-finn-cotton bg-finn-snow shadow-2xl outline-none",
                     ].join(" ")}
                 >
-                    <Header onSettings={onSettings} />
+                    <InfoPanelContainer.Provider value={content}>
+                        <Header onSettings={onSettings} />
 
-                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-                        {/*
-                          * `multiple`, and every section open to begin with:
-                          * the reader came here to change something and does
-                          * not yet know which of the three it is.
-                          */}
-                        <Accordion.Root
-                            type="multiple"
-                            defaultValue={["order", "features", "driving"]}
-                            className="flex flex-col gap-3"
-                        >
-                            <PriorityOrderSection
-                                priorities={draft.priorities}
-                                priorityDefinitions={priorityDefinitions}
-                                profiles={profiles}
-                                features={draft.features}
-                                onChange={setPriorities}
-                            />
+                        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                            {/*
+                              * `multiple`, and every section open to begin with:
+                              * the reader came here to change something and does
+                              * not yet know which of the three it is.
+                              */}
+                            <Accordion.Root
+                                type="multiple"
+                                defaultValue={["order", "features", "driving"]}
+                                className="flex flex-col gap-3"
+                            >
+                                <PriorityOrderSection
+                                    priorities={draft.priorities}
+                                    priorityDefinitions={priorityDefinitions}
+                                    profiles={profiles}
+                                    features={draft.features}
+                                    onChange={setPriorities}
+                                />
 
-                            <FeatureSection
-                                priorities={draft.priorities}
-                                features={draft.features}
-                                savedCategoryFeatures={savedCategoryFeatures}
-                                expanded={expanded}
-                                onExpandedChange={setExpanded}
-                                changed={featuresChanged(
-                                    draft,
-                                    savedCategoryFeatures,
-                                )}
-                                onToggleFeature={(category, feature) =>
-                                    setDraft((current) =>
-                                        toggleFeature(
-                                            current,
-                                            category,
-                                            feature,
-                                        ),
-                                    )
-                                }
-                                onImportanceChange={(
-                                    category,
-                                    feature,
-                                    importance,
-                                ) =>
-                                    setDraft((current) =>
-                                        setFeatureImportance(
-                                            current,
-                                            category,
-                                            feature,
-                                            importance,
-                                        ),
-                                    )
-                                }
-                                onClearCategory={(category) =>
-                                    setDraft((current) =>
-                                        clearFeatures(current, category),
-                                    )
-                                }
-                                onRestoreSaved={() =>
-                                    setDraft((current) =>
-                                        restoreSavedFeatures(
-                                            current,
-                                            savedCategoryFeatures,
-                                        ),
-                                    )
-                                }
-                            />
+                                <FeatureSection
+                                    priorities={draft.priorities}
+                                    features={draft.features}
+                                    savedCategoryFeatures={savedCategoryFeatures}
+                                    expanded={expanded}
+                                    onExpandedChange={setExpanded}
+                                    changed={featuresChanged(
+                                        draft,
+                                        savedCategoryFeatures,
+                                    )}
+                                    onToggleFeature={(category, feature) =>
+                                        setDraft((current) =>
+                                            toggleFeature(
+                                                current,
+                                                category,
+                                                feature,
+                                            ),
+                                        )
+                                    }
+                                    onImportanceChange={(
+                                        category,
+                                        feature,
+                                        importance,
+                                    ) =>
+                                        setDraft((current) =>
+                                            setFeatureImportance(
+                                                current,
+                                                category,
+                                                feature,
+                                                importance,
+                                            ),
+                                        )
+                                    }
+                                    onClearCategory={(category) =>
+                                        setDraft((current) =>
+                                            clearFeatures(current, category),
+                                        )
+                                    }
+                                    onRestoreSaved={() =>
+                                        setDraft((current) =>
+                                            restoreSavedFeatures(
+                                                current,
+                                                savedCategoryFeatures,
+                                            ),
+                                        )
+                                    }
+                                />
 
-                            <AssumptionsSection
-                                preferences={draft.preferences}
-                                savedPreferences={savedPreferences}
-                                onChange={setPreferences}
-                                onUseSaved={() =>
-                                    setPreferences({ ...savedPreferences })
-                                }
-                            />
-                        </Accordion.Root>
-                    </div>
+                                <AssumptionsSection
+                                    preferences={draft.preferences}
+                                    savedPreferences={savedPreferences}
+                                    onChange={setPreferences}
+                                    onUseSaved={() =>
+                                        setPreferences({ ...savedPreferences })
+                                    }
+                                />
+                            </Accordion.Root>
+                        </div>
 
-                    <Footer
-                        dirty={dirty}
-                        saved={saved}
-                        onSave={save}
-                        onSettings={onSettings}
-                    />
+                        <Footer
+                            dirty={dirty}
+                            saved={saved}
+                            onSave={save}
+                            onSettings={onSettings}
+                        />
+                    </InfoPanelContainer.Provider>
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Info, X } from "lucide-react";
 
@@ -93,6 +93,24 @@ const isSame = (a: InfoSubject | null, b: InfoSubject) =>
     a !== null && a.kind === b.kind && a.id === b.id;
 
 /* -------------------------------------------------------------------------- */
+/* Where the panel is mounted                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The element the panel portals into. Null means the document body.
+ *
+ * It has to leave wherever it was written, because it measures itself against
+ * the viewport and any transformed ancestor becomes the containing block for
+ * a fixed child — which would pin it to that ancestor's edge.
+ *
+ * The body is right for every caller but one. Inside the compare drawer — a
+ * modal dialog — the body is outside the drawer's scroll lock and its focus
+ * trap, so a panel opened from in there would be unscrollable and unfocusable.
+ * The drawer names itself here and the panel mounts inside it instead.
+ */
+export const InfoPanelContainer = createContext<HTMLElement | null>(null);
+
+/* -------------------------------------------------------------------------- */
 /* The trigger                                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -176,16 +194,11 @@ function InfoPanel({
     profiles: Profile[];
     priorityDefinitions: PriorityDefinition[];
 }) {
-    /*
-     * Portalled, because this has to measure itself against the viewport and
-     * one of the three places it opens from is the adjust drawer — which
-     * slides in on a transform, and a transformed ancestor becomes the
-     * containing block for anything fixed inside it. Left where it was
-     * written, the panel would pin itself to the drawer's edge and inherit
-     * its slide.
-     */
+    const container = useContext(InfoPanelContainer);
+
+    /* Portalled — see `InfoPanelContainer` for where to, and why. */
     return (
-        <Dialog.Portal>
+        <Dialog.Portal container={container ?? undefined}>
             <Dialog.Overlay className="fixed inset-0 z-[60] bg-finn-black/20" />
 
             <Dialog.Content
