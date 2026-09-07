@@ -8,12 +8,20 @@
  * number. Marking the card removes that job entirely: the answer and the thing
  * it is about are visibly the same object.
  *
+ * Marking is also what keeps the card out from under the panel. The panel is
+ * a strip over the right of the page and is allowed to cover it — except for
+ * this one card, whose own section is narrowed so it reflows into what is
+ * left. That pairing is deliberate: "the card the panel is talking about" and
+ * "the card that has to stay visible" are the same card, and splitting the
+ * two apart would let them disagree.
+ *
  * Nothing of FINN's is rewritten: a class goes on the card's photo block and a
  * stylesheet goes in the head, and both come off again when the panel closes
  * or the reader goes back to the list.
  */
 
 import { cardForCar, cardPhoto } from "./currentCar";
+import { dockSectionFor, undockSection } from "./section-dock";
 
 const STYLE_ID = "finn-lens-highlight-style";
 const HIGHLIGHTING = "finn-lens-highlighting";
@@ -88,12 +96,16 @@ export function highlightConfiguration(
 
   marked = card;
 
+  /* The one piece of finn.com that isn't the panel's to cover. */
+  dockSectionFor(card);
+
   if (scroll) reveal(card);
 }
 
 export function clearHighlight(): void {
   document.documentElement.classList.remove(HIGHLIGHTING);
 
+  undockSection();
 
   if (marked) {
     marked.classList.remove(CURRENT);

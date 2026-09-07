@@ -89,10 +89,10 @@ async function attach(mountedFor: number): Promise<void> {
   /*
    * Out of the way while the panel is open.
    *
-   * Docked, the panel is the thing on the right of the screen; a floating
+   * Open, the panel is the thing on the right of the screen; a floating
    * button offering to open what is already open would sit on top of it and
-   * say nothing. Closing brings it back, which is what the panel's own close button is
-   * for.
+   * say nothing. Closing brings it back, which is what the panel's own close
+   * button is for.
    */
   watchPanelVisibility((visible) => {
     node.style.display = visible ? "none" : "";

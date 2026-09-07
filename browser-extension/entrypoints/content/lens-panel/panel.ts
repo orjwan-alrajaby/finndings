@@ -5,7 +5,7 @@ import {
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, icon, panelStyles } from "./dom";
-import { canDock, dockPage, undockPage } from "./page-dock";
+import { hasRoomBeside, PANEL_WIDTH } from "./section-dock";
 import { clearHighlight, highlightConfiguration } from "./highlight";
 import {
   analysisBody,
@@ -26,14 +26,6 @@ import { detailsPageRoot, resolveCar, resolvePageCars } from "./currentCar";
  */
 
 const HOST_ID = "finn-lens-analysis-root";
-
-/**
- * How wide the panel sits, and how much room the page gives up for it.
- *
- * One number, used twice: the host's width and the margin the page is
- * narrowed by. They have to be the same or the seam shows.
- */
-const PANEL_WIDTH = 416;
 
 /**
  * How long the panel waits for a car that is already on its way.
@@ -458,6 +450,13 @@ function chooseLead(count: number): HTMLElement {
 /* The drawer                                                                 */
 /* -------------------------------------------------------------------------- */
 
+/** A strip down the right where there is room for one, and a sheet where there isn't. */
+function hostStyle(): string {
+  return hasRoomBeside(PANEL_WIDTH)
+    ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
+    : "position:fixed;inset:0;z-index:2147483000;";
+}
+
 async function build(request: PanelRequest): Promise<Panel> {
   const host = el("div", { attrs: { id: HOST_ID } });
 
@@ -465,18 +464,18 @@ async function build(request: PanelRequest): Promise<Panel> {
    * A strip down the right, not a sheet over everything.
    *
    * The host used to cover the viewport so a backdrop could fill it. Nothing
-   * outside the panel's own width is ours to occupy now: the page beside it
-   * stays clickable, scrollable and selectable, which is the entire point of
-   * docking rather than overlaying.
+   * outside the panel's own width is ours to occupy: the page beside it stays
+   * clickable, scrollable and selectable, which is the entire point of a
+   * strip rather than a modal.
+   *
+   * What it covers, it covers. Only the section holding the car the panel is
+   * talking about gets out of the way — see `section-dock` — because that is
+   * the one part of finn.com a reader needs beside the answer about it.
    *
    * On a narrow viewport there is no room to sit beside anything, so it
-   * covers the page instead and the page is not narrowed at all.
+   * covers the page instead.
    */
-  const docked = canDock(PANEL_WIDTH);
-
-  host.style.cssText = docked
-    ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
-    : "position:fixed;inset:0;z-index:2147483000;";
+  host.style.cssText = hostStyle();
 
   const shadow = host.attachShadow({ mode: "open" });
 
@@ -556,8 +555,6 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   shadow.append(drawer);
 
-  if (docked) dockPage(PANEL_WIDTH);
-
   /**
    * Escape closes it, and Tab is left alone.
    *
@@ -579,19 +576,12 @@ async function build(request: PanelRequest): Promise<Panel> {
   window.addEventListener("keydown", onKeyDown, true);
 
   /*
-   * A window narrow enough to dock into can stop being one — a resize, or
-   * devtools opening beside the page. Docking is re-decided rather than
-   * decided once, so a squeezed page isn't left squeezed.
+   * A window wide enough for a strip can stop being one — a resize, or
+   * devtools opening beside the page — so the shape is re-decided rather than
+   * decided once.
    */
   const onResize = () => {
-    const room = canDock(PANEL_WIDTH);
-
-    host.style.cssText = room
-      ? `position:fixed;top:0;right:0;bottom:0;width:${PANEL_WIDTH}px;z-index:2147483000;`
-      : "position:fixed;inset:0;z-index:2147483000;";
-
-    if (room) dockPage(PANEL_WIDTH);
-    else undockPage();
+    host.style.cssText = hostStyle();
   };
 
   window.addEventListener("resize", onResize);
@@ -637,9 +627,8 @@ async function build(request: PanelRequest): Promise<Panel> {
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("resize", onResize);
 
-    /* The page gets its width and its unmarked cards back. */
+    /* The section gets its width back, and the card its own colour. */
     clearHighlight();
-    undockPage();
 
     host.remove();
   };
