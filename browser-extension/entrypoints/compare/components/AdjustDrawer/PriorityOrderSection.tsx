@@ -11,7 +11,9 @@ import {
     ProfilePresets,
 } from "@/components/PriorityOrder";
 
-import { DrawerSection } from "./DrawerSection";
+import { ListOrdered } from "lucide-react";
+
+import { DrawerSection, SECTION_TONE } from "./DrawerSection";
 
 /**
  * The order itself, and the profiles as a way of setting it in one go.
@@ -38,6 +40,9 @@ export function PriorityOrderSection({
     return (
         <DrawerSection
             value="order"
+            tone={SECTION_TONE.order}
+            icon={<ListOrdered className="h-4.5 w-4.5" />}
+            eyebrow="Your ranking"
             title="What matters, and in what order"
             summary={`${priorities.length} of ${MAX_PRIORITIES} chosen · the top one carries the most`}
         >

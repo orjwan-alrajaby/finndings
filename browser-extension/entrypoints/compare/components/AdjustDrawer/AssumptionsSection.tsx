@@ -2,7 +2,9 @@ import { DEFAULT_PREFERENCES } from "@/lib/reasoning-engine/constants";
 import type { LensPreferences } from "@/lib/reasoning-engine/types";
 import { DrivingAssumptions } from "@/components/DrivingAssumptions";
 
-import { DrawerSection } from "./DrawerSection";
+import { Route } from "lucide-react";
+
+import { DrawerSection, SECTION_TONE } from "./DrawerSection";
 
 /** What the reader's driving costs, which decides the money on the page. */
 export function AssumptionsSection({
@@ -19,6 +21,9 @@ export function AssumptionsSection({
     return (
         <DrawerSection
             value="driving"
+            tone={SECTION_TONE.driving}
+            icon={<Route className="h-4.5 w-4.5" />}
+            eyebrow="What it costs you"
             title="How you drive"
             summary={
                 preferences.monthlyBudget > 0

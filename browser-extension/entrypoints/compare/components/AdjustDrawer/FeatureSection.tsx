@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { RotateCw } from "lucide-react";
+import { Gauge, RotateCw } from "lucide-react";
 
 import {
     AVAILABLE_CATEGORY_FEATURES,
@@ -14,7 +14,7 @@ import type {
 import { FeatureCard } from "@/components/FeatureCard";
 import { buildPickedElsewhere } from "@/components/FeatureInfluencePicker";
 
-import { DrawerSection } from "./DrawerSection";
+import { DrawerSection, SECTION_TONE } from "./DrawerSection";
 import { FeatureEditor } from "./FeatureEditor";
 
 /** What counts extra inside each priority. */
@@ -77,6 +77,9 @@ export function FeatureSection({
     return (
         <DrawerSection
             value="features"
+            tone={SECTION_TONE.influence}
+            icon={<Gauge className="h-4.5 w-4.5" />}
+            eyebrow="Extra influence"
             title="What counts inside a priority"
             summary={
                 raised === 0
