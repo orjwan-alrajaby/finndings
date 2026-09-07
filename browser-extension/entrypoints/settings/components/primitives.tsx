@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import * as Switch from "@radix-ui/react-switch";
 import { Star } from "lucide-react";
 
 // Unchanged from the original settings page — same visual language.
@@ -20,28 +21,44 @@ export function Section({ title, description, children }: {
   );
 }
 
+/**
+ * On or off, as a switch.
+ *
+ * Radix's, rather than a button carrying `role="switch"` by hand. The
+ * hand-rolled one got the role and `aria-checked` right and still had to be
+ * told not to fire while disabled inside its own click handler; Radix takes
+ * the disabled state seriously, handles Space and Enter, and keeps the thumb
+ * a child element whose position is driven by `data-state` rather than by a
+ * class computed alongside the one on the track.
+ */
 export function Toggle({ checked, onChange, disabled, label }: {
   checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; label?: string;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
+    <Switch.Root
+      checked={checked}
+      onCheckedChange={onChange}
+      disabled={disabled}
       aria-label={label}
       /* A switch is two states and no words. The label names the act for a
          screen reader; the title is the same sentence for everyone else. */
       title={label}
-      disabled={disabled}
-      onClick={() => !disabled && onChange(!checked)}
-      className={`relative h-5 w-10 flex-shrink-0 rounded-full p-1 transition-colors ${checked ? "bg-finn-accent-blue" : "bg-finn-iron/40 border border-finn-iron/15"
-        } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
+      className={[
+        "relative h-5 w-10 flex-shrink-0 rounded-full p-1 transition-colors",
+        "data-[state=checked]:bg-finn-accent-blue",
+        "data-[state=unchecked]:border data-[state=unchecked]:border-finn-iron/15",
+        "data-[state=unchecked]:bg-finn-iron/40",
+        "disabled:cursor-not-allowed disabled:opacity-40",
+      ].join(" ")}
     >
-      <span
-        className={`absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-white shadow transition-[left] duration-200 ease-in-out ${checked ? "left-6" : "left-1"
-          }`}
+      <Switch.Thumb
+        className={[
+          "absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow",
+          "transition-[left] duration-200 ease-in-out",
+          "data-[state=checked]:left-6 data-[state=unchecked]:left-1",
+        ].join(" ")}
       />
-    </button>
+    </Switch.Root>
   );
 }
 

@@ -1,3 +1,4 @@
+import * as RadioGroup from "@radix-ui/react-radio-group";
 import { Lock } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
@@ -14,6 +15,16 @@ import type {
     FeatureId,
     FeatureImportance,
 } from "@/lib/reasoning-engine/types";
+
+/**
+ * What the first rung is worth on the wire.
+ *
+ * A radio group's value is a string, and "standard" is the absence of a
+ * stored importance rather than one of the three. This is the name that
+ * absence answers to inside the control, and it is turned back into `null` on
+ * the way out.
+ */
+const STANDARD = "standard";
 
 /** A priority the user has already given this same feature extra influence in. */
 export interface FeatureElsewhere {
@@ -149,10 +160,20 @@ export function FeatureOption({
                         How much influence does this have?
                     </p>
 
-                    <div
-                        role="radiogroup"
+                    <RadioGroup.Root
+                        value={importance ?? STANDARD}
+                        onValueChange={(next) =>
+                            onSet(
+                                next === STANDARD
+                                    ? null
+                                    : (next as FeatureImportance),
+                            )
+                        }
                         aria-label={`How much influence ${label} has`}
-                        className={["mt-2 flex gap-2 p-2 border border-finn-iron/15 rounded-lg", cardClass()].join(" ")}
+                        className={[
+                            "mt-2 flex gap-2 rounded-lg border border-finn-iron/15 p-2",
+                            cardClass(),
+                        ].join(" ")}
                     >
                         {/*
                           * Standard first, because that is where every feature
@@ -160,6 +181,7 @@ export function FeatureOption({
                           * left to right is reading the scale.
                           */}
                         <Segment
+                            value={STANDARD}
                             label={STANDARD_INFLUENCE.label}
                             hint={STANDARD_INFLUENCE.hint}
                             active={importance == null}
@@ -172,7 +194,6 @@ export function FeatureOption({
                             /* Never blocked: dropping back to standard is how
                                the reader frees a slot at the cap. */
                             disabled={false}
-                            onClick={() => onSet(null)}
                         />
 
                         {IMPORTANCE_SCALE.map((option) => {
@@ -181,6 +202,7 @@ export function FeatureOption({
                             return (
                                 <Segment
                                     key={option}
+                                    value={option}
                                     label={meta.label}
                                     hint={
                                         blocked
@@ -192,11 +214,10 @@ export function FeatureOption({
                                     idleClass={meta.idleClass}
                                     dotClass={meta.dotClass}
                                     disabled={blocked}
-                                    onClick={() => onSet(option)}
                                 />
                             );
                         })}
-                    </div>
+                    </RadioGroup.Root>
                 </div>
             )}
         </div>
@@ -276,7 +297,7 @@ function segmentClass(
 }
 
 /**
- * One rung, as a button wide enough to read.
+ * One rung of the scale.
  *
  * Four of these share the width, so the labels sit under the question rather
  * than crammed against the name — which is what let the words shrink to 10px
@@ -284,8 +305,17 @@ function segmentClass(
  *
  * The dot carries the colour so the label never has to. Colour is the fast
  * read; the words are the real one, and they stay on every state.
+ *
+ * A Radix radio item rather than a button with `role="radio"` written on it.
+ * The hand-rolled version announced itself correctly and then behaved like
+ * four separate buttons: every rung took a tab stop, and the arrow keys — the
+ * one interaction a radio group promises — did nothing. Radix gives the group
+ * a single tab stop, moves the selection with the arrows, and sets
+ * `aria-checked` from the value rather than from a prop that could disagree
+ * with it.
  */
 function Segment({
+    value,
     label,
     hint,
     active,
@@ -294,8 +324,9 @@ function Segment({
     dotClass,
     activeDotClass = "bg-white",
     disabled,
-    onClick,
 }: {
+    /** The stored importance this rung sets, or `STANDARD` for the first. */
+    value: string;
     label: string;
     hint: string;
     active: boolean;
@@ -305,24 +336,21 @@ function Segment({
     /** Overridden where the active pill isn't a solid hue. */
     activeDotClass?: string;
     disabled: boolean;
-    onClick: () => void;
 }) {
     return (
-        <button
-            type="button"
-            role="radio"
-            aria-checked={active}
+        <RadioGroup.Item
+            value={value}
             disabled={disabled && !active}
             title={hint}
-            onClick={onClick}
             className={[
                 "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5",
                 "text-[10px] font-black leading-3 transition",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-finn-accent-blue/50",
                 segmentClass(active, disabled, activeClass, idleClass),
             ].join(" ")}
         >
             <span
-                aria-hidden
+                aria-hidden="true"
                 className={[
                     "h-2 w-2 shrink-0 rounded-full",
                     active ? activeDotClass : dotClass,
@@ -330,6 +358,6 @@ function Segment({
             />
 
             <span className="text-left">{label}</span>
-        </button>
+        </RadioGroup.Item>
     );
 }

@@ -1,3 +1,5 @@
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
+
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type {
     ContractType,
@@ -155,32 +157,44 @@ function ContractTypeToggle({
 }) {
     return (
         <div>
-            <span className="text-xs font-bold text-finn-black">
+            <span
+                id="contract-type-label"
+                className="text-xs font-bold text-finn-black"
+            >
                 Contract type
             </span>
 
-            <div className="mt-1 flex gap-2">
-                {CONTRACT_OPTIONS.map(([option, label]) => {
-                    const active = value === option;
-
-                    return (
-                        <button
-                            key={option}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => onChange(option)}
-                            className={[
-                                "h-11 flex-1 rounded-2xl text-xs font-black shadow-sm transition",
-                                active
-                                    ? "bg-finn-accent-blue text-white"
-                                    : "bg-finn-pale-blue text-finn-black hover:bg-finn-cotton",
-                            ].join(" ")}
-                        >
-                            {label}
-                        </button>
-                    );
-                })}
-            </div>
+            {/*
+              * A toggle group rather than two `aria-pressed` buttons under a
+              * span. This is one question with two answers, so it gets one
+              * tab stop, arrow keys between the answers, and the visible
+              * label above it names the group rather than merely sitting
+              * there. It cannot be deselected: every car is priced on one
+              * contract or the other.
+              */}
+            <ToggleGroup.Root
+                type="single"
+                value={value}
+                onValueChange={(next) => {
+                    if (next) onChange(next as ContractType);
+                }}
+                aria-labelledby="contract-type-label"
+                className="mt-1 flex gap-2"
+            >
+                {CONTRACT_OPTIONS.map(([option, label]) => (
+                    <ToggleGroup.Item
+                        key={option}
+                        value={option}
+                        className={[
+                            "h-11 flex-1 rounded-2xl text-xs font-black shadow-sm transition",
+                            "bg-finn-pale-blue text-finn-black hover:bg-finn-cotton",
+                            "data-[state=on]:bg-finn-accent-blue data-[state=on]:text-white",
+                        ].join(" ")}
+                    >
+                        {label}
+                    </ToggleGroup.Item>
+                ))}
+            </ToggleGroup.Root>
 
             <p className="mt-1 text-[11px] leading-4 text-finn-iron">
                 {value === "private"

@@ -1,5 +1,6 @@
 import "@/assets/tailwind.css";
 import { useEffect, useMemo, useState } from "react";
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
     Bookmark,
@@ -488,29 +489,37 @@ function Toolbar({
               * what the reader is looking at should be four things they can
               * see, and a native select was the one piece of unstyled
               * furniture on the page.
+              *
+              * A Radix toggle group rather than four `aria-pressed` buttons:
+              * one tab stop for the whole control and arrow keys between the
+              * options, which is what a reader expects of something drawn as
+              * a segmented row. `value` can never come back empty because
+              * the group is not deselectable — an empty sort order is not a
+              * state this list has.
               */}
-            <div
-                role="group"
+            <ToggleGroup.Root
+                type="single"
+                value={sort}
+                onValueChange={(next) => {
+                    if (next) onSort(next as SortKey);
+                }}
                 aria-label="Sort by"
                 className="flex flex-wrap items-center gap-1 rounded-full bg-finn-snow p-1"
             >
                 {SORTS.map(([key, label]) => (
-                    <button
+                    <ToggleGroup.Item
                         key={key}
-                        type="button"
-                        onClick={() => onSort(key)}
-                        aria-pressed={sort === key}
+                        value={key}
                         className={[
                             "rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors",
-                            sort === key
-                                ? "bg-white text-finn-black shadow-sm"
-                                : "text-finn-iron hover:text-finn-black",
+                            "text-finn-iron hover:text-finn-black",
+                            "data-[state=on]:bg-white data-[state=on]:text-finn-black data-[state=on]:shadow-sm",
                         ].join(" ")}
                     >
                         {label}
-                    </button>
+                    </ToggleGroup.Item>
                 ))}
-            </div>
+            </ToggleGroup.Root>
 
             <button
                 type="button"
