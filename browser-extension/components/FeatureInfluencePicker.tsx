@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, Sparkles, Undo2 } from "lucide-react";
+import { CircleQuestionMark, Sparkles, Undo2 } from "lucide-react";
 
 import {
     FEATURE_IMPORTANCE,
@@ -159,7 +159,7 @@ export function FeatureInfluencePicker({
                 categoryLabel={categoryLabel}
             />
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-3">
                 {rows.map((feature) => (
                     <FeatureOption
                         key={feature}
@@ -255,6 +255,12 @@ function Explainer({
                 aria-expanded={open}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left"
             >
+                <CircleQuestionMark
+                    className={[
+                        "h-3.5 w-3.5 shrink-0 transition-colors",
+                        open ? "text-finn-black" : "text-finn-iron",
+                    ].join(" ")}
+                />
                 <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-[11px] font-black text-finn-black">
                         How influence works
@@ -262,13 +268,6 @@ function Explainer({
 
                     <Scale />
                 </span>
-
-                <ChevronDown
-                    className={[
-                        "h-3.5 w-3.5 shrink-0 text-finn-iron transition-transform",
-                        open ? "rotate-180" : "",
-                    ].join(" ")}
-                />
             </button>
 
             {open && (

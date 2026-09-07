@@ -163,7 +163,7 @@ export const STANDARD_INFLUENCE = {
    * imply the reader chose it; most of the time they simply had no opinion,
    * and the honest badge says so without suggesting anything was lost.
    */
-  badgeLabel: "Not singled out",
+  badgeLabel: "Standard Influence",
   meaning:
     "Counts once, like every other feature in this priority. Nothing here is ignored — this one just isn't carrying extra weight.",
   /** Stated for the reader of this file; the scorer uses BASE_FEATURE_WEIGHT. */

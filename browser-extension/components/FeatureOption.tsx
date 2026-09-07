@@ -95,11 +95,11 @@ export function FeatureOption({
     const cardClass = () => {
         if (level) return level.selectedCardClass;
 
-        return locked ? "bg-white/50" : "bg-white shadow-sm";
+        return locked ? "bg-white/50" : "bg-finn-iron/10 shadow-sm";
     };
 
     return (
-        <div className={["rounded-2xl p-3 transition", cardClass()].join(" ")}>
+        <div className={["rounded-2xl p-3 transition drop-shadow-sm", cardClass()].join(" ")}>
             <div className="flex items-start gap-2.5">
                 {locked ? (
                     <Lock
@@ -116,47 +116,16 @@ export function FeatureOption({
                     />
                 )}
 
-                <div className="min-w-0 flex-1">
-                    <span
-                        className={[
-                            "block text-sm leading-5",
-                            nameClass(level, locked),
-                        ].join(" ")}
-                    >
-                        {label}
-                    </span>
-
-                    {/*
-                      * Said here rather than hidden behind an "i". A reader
-                      * deciding how much something should count needs to know
-                      * what it is first, and a tooltip makes that a second
-                      * action taken on a hunch.
-                      */}
-                    {explanation && (
-                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                            {explanation}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {locked ? (
-                <div className="mt-2.5">
-                    <ElsewhereNote elsewhere={elsewhere} />
-                </div>
-            ) : (
-                <div className="mt-2.5 rounded-xl bg-white/70 p-2">
-                    {/*
-                      * The question and the current answer on one line. The
-                      * badge used to sit beside the name, where it competed
-                      * with it for the same glance; here it lands at the end
-                      * of the sentence it answers, in space that was empty.
-                      */}
-                    <div className="flex items-center justify-between gap-2 px-0.5">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                            How much influence does this have?
-                        </p>
-
+                <div className="min-w-0 flex-1 flex flex-col gap-2">
+                    <div className="flex justify-between gap-4">
+                        <span
+                            className={[
+                                "block text-sm leading-5",
+                                nameClass(level, locked),
+                            ].join(" ")}
+                        >
+                            {label}
+                        </span>
                         <Tip subject={badge.badgeLabel} trigger={<button
                             type="button"
                             aria-label={`${badge.badgeLabel} — what does this mean?`}
@@ -184,10 +153,42 @@ export function FeatureOption({
                         </Tip>
                     </div>
 
+                    {/*
+                      * Said here rather than hidden behind an "i". A reader
+                      * deciding how much something should count needs to know
+                      * what it is first, and a tooltip makes that a second
+                      * action taken on a hunch.
+                      */}
+                    {explanation && (
+                        <p className="mt-1 text-[11px] leading-4 text-finn-black">
+                            {explanation}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {locked ? (
+                <div className="mt-2.5">
+                    <ElsewhereNote elsewhere={elsewhere} />
+                </div>
+            ) : (
+                <div className="mt-2.5 rounded-xl bg-white p-2">
+                    {/*
+                      * The question and the current answer on one line. The
+                      * badge used to sit beside the name, where it competed
+                      * with it for the same glance; here it lands at the end
+                      * of the sentence it answers, in space that was empty.
+                      */}
+                    <div className="flex items-center justify-between gap-2 px-0.5">
+                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
+                            How much influence does this have?
+                        </p>
+                    </div>
+
                     <div
                         role="radiogroup"
                         aria-label={`How much influence ${label} has`}
-                        className="mt-1.5 flex gap-1.5"
+                        className={["mt-2 flex gap-2 p-2 border border-finn-iron/15 rounded-lg", cardClass()].join(" ")}
                     >
                         {/*
                           * Standard first, because that is where every feature
