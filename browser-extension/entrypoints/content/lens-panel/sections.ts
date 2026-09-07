@@ -856,8 +856,14 @@ const TAG_CLASS: Record<EnvironmentalTag["tone"], string> = {
  * Each group is its own block rather than a heading over a list. Four labels
  * of the same size, a line apart, in a column 26rem wide, are read as one
  * long list with words in it: the distinction the grouping exists to make was
- * being lost in the layout that carried it. A tinted card and a coloured mark
- * on the label say "different answer" before either is read.
+ * being lost in the layout that carried it.
+ *
+ * So each block is tinted in the colour of the answer it carries, in the same
+ * hues the Advice page uses for the same four facts — the reader's own picks
+ * met in blue, a gap in one of them in amber, equipment that counted anyway
+ * in green, and everything unanswered in grey. They were five identical snow
+ * cards before, which is a grouping a reader has to read to see. Now the
+ * shape of the section is legible before a single word of it is.
  */
 function featureGroups(priority: FitPriority): HTMLElement | null {
   const has = (feature: FitFeature) => feature.state === "present";
@@ -868,31 +874,32 @@ function featureGroups(priority: FitPriority): HTMLElement | null {
   const rest = priority.alsoCounted;
 
   const groups = [
-    featureGroup("You gave extra influence, and it has", asked.filter(has), {
-      mark: "present",
-      picked: true,
-    }),
+    featureGroup(
+      "You gave extra influence, and it has",
+      asked.filter(has),
+      GROUP_TONE.pickedPresent,
+    ),
     featureGroup(
       "You gave extra influence, but it doesn't have",
       asked.filter(hasnt),
-      { mark: "absent", picked: true },
+      GROUP_TONE.pickedAbsent,
     ),
     featureGroup(
       asked.length ? "Also counted here, and it has" : "It has",
       rest.filter(has),
-      { mark: "present", picked: false },
+      GROUP_TONE.present,
     ),
     featureGroup(
       asked.length
         ? "Also counted here, but it doesn't have"
         : "It doesn't have",
       rest.filter(hasnt),
-      { mark: "absent", picked: false },
+      GROUP_TONE.absent,
     ),
     featureGroup(
       "FINN didn't say either way",
       [...asked, ...rest].filter(unknown),
-      { mark: "unknown", picked: false },
+      GROUP_TONE.unknown,
     ),
   ].filter((group): group is HTMLElement => group !== null);
 
@@ -901,17 +908,68 @@ function featureGroups(priority: FitPriority): HTMLElement | null {
   return el("div", { class: "flex flex-col gap-2.5" }, groups);
 }
 
-/** The mark on a group's label, in the colour its answer already uses. */
-const GROUP_MARK: Record<FitFeature["state"], string> = {
-  present: "bg-finn-influence-emerald",
-  absent: "bg-finn-warning",
-  unknown: "bg-finn-iron",
-};
+/**
+ * How one group is coloured: its ground, its label, its mark and its chips.
+ *
+ * All four together, because they have to agree. The chips were tinted by a
+ * two-axis function of their own — picked, and present — which is the same
+ * two facts the group is already built from, and on a tinted card the pale
+ * blue chip it produced for a met pick vanished into the pale blue block
+ * around it. The group decides once, and its chips sit on white so they read
+ * on whatever ground it chose.
+ *
+ * The hues are the Advice page's, for the same facts: blue for what the
+ * reader asked for and got, amber for what they asked for and didn't, green
+ * for equipment that counted anyway, grey for the rest.
+ */
+interface GroupTone {
+  /** The block's ground. */
+  card: string;
+  /** The label's ink, dark enough for 10px on that ground. */
+  label: string;
+  /** The dot beside the label. */
+  mark: string;
+  /** Every chip in the group. */
+  chip: string;
+}
+
+const GROUP_TONE = {
+  pickedPresent: {
+    card: "bg-finn-pale-blue",
+    label: "text-finn-highlight-navy",
+    mark: "bg-finn-accent-blue",
+    chip: "bg-white text-finn-highlight-navy",
+  },
+  pickedAbsent: {
+    card: "bg-finn-influence-orange-pale",
+    label: "text-finn-warning-deep",
+    mark: "bg-finn-warning",
+    chip: "bg-white text-finn-warning-deep",
+  },
+  present: {
+    card: "bg-finn-influence-emerald-pale",
+    label: "text-finn-influence-emerald",
+    mark: "bg-finn-influence-emerald",
+    chip: "bg-white text-finn-black",
+  },
+  absent: {
+    card: "bg-finn-cotton",
+    label: "text-finn-iron",
+    mark: "bg-finn-iron",
+    chip: "bg-white text-finn-iron",
+  },
+  unknown: {
+    card: "bg-finn-snow",
+    label: "text-finn-iron",
+    mark: "bg-finn-iron/60",
+    chip: "bg-white text-finn-iron",
+  },
+} as const satisfies Record<string, GroupTone>;
 
 function featureGroup(
   label: string,
   features: FitFeature[],
-  tone: { mark: FitFeature["state"]; picked: boolean },
+  tone: GroupTone,
 ): HTMLElement | null {
   if (!features.length) return null;
 
@@ -962,15 +1020,15 @@ function featureGroup(
     openFor = button;
   };
 
-  return el("div", { class: "rounded-xl bg-finn-snow px-3 py-2.5" }, [
+  return el("div", { class: `rounded-xl px-3 py-2.5 ${tone.card}` }, [
     el(
       "p",
       {
-        class: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+        class: `flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${tone.label}`,
       },
       [
         el("span", {
-          class: `h-1.5 w-1.5 shrink-0 rounded-full ${GROUP_MARK[tone.mark]}`,
+          class: `h-1.5 w-1.5 shrink-0 rounded-full ${tone.mark}`,
           attrs: { "aria-hidden": "true" },
         }),
         el("span", { text: `${label} (${features.length})` }),
@@ -981,9 +1039,7 @@ function featureGroup(
       "ul",
       { class: "mt-2 flex flex-wrap gap-1.5" },
       features.map((feature) =>
-        el("li", {}, [
-          featureChip(feature, tone.picked, slot.id, explain),
-        ]),
+        el("li", {}, [featureChip(feature, tone.chip, slot.id, explain)]),
       ),
     ),
 
@@ -1002,29 +1058,6 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
 };
 
 /**
- * The chip's colour: what the car does about this, and whether the reader
- * asked for it.
- *
- * Two axes rather than one. A pick the car is missing is the loudest thing in
- * the group and gets the warning tint; the same gap in equipment nobody asked
- * about is a fact, not a problem, and stays quiet. The reader's own picks
- * carry the accent either way, because those are the ones they wrote.
- */
-function chipClass(feature: FitFeature, picked: boolean): string {
-  if (feature.state === "present") {
-    return picked
-      ? "bg-finn-pale-blue text-finn-highlight-navy"
-      : "bg-white text-finn-iron";
-  }
-
-  if (feature.state === "absent" && picked) {
-    return "bg-finn-warning/10 text-finn-warning";
-  }
-
-  return "bg-white text-finn-iron";
-}
-
-/**
  * One feature, as the Advice page draws it.
  *
  * This was a list of ticks and crosses with the level bolted on the end. The
@@ -1036,11 +1069,12 @@ function chipClass(feature: FitFeature, picked: boolean): string {
  *
  * What is missing is struck through rather than crossed off in a column of
  * its own, and the group's label and colour say which of the four answers
- * this is.
+ * this is — which is also where the chip's own colour comes from now, handed
+ * down rather than worked out again from facts the group already knew.
  */
 function featureChip(
   feature: FitFeature,
-  picked: boolean,
+  chipClass: string,
   slotId: string,
   onExplain: (button: HTMLElement, feature: FitFeature) => void,
 ): HTMLElement {
@@ -1081,7 +1115,7 @@ function featureChip(
       class: [
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
         "text-[11px] font-bold",
-        chipClass(feature, picked),
+        chipClass,
       ].join(" "),
     },
     [
@@ -1106,7 +1140,7 @@ function featureChip(
        */
       feature.importance === "high"
         ? el("span", {
-            class: "text-[9px] font-black uppercase tracking-wide opacity-70",
+            class: "text-[10px] font-black opacity-70",
             attrs: {
               title: "You said this should have the most influence",
             },
