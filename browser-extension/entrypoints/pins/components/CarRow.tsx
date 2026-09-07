@@ -1,6 +1,6 @@
 import { ExternalLink, Eye, Image as ImageIcon, Trash2 } from "lucide-react";
 
-import { BandChip } from "@/components/FitAnalysisView";
+import { BandChip } from "@/components/FitAnalysisView/parts";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
 import type { FitBand } from "@/lib/reasoning-engine/fit";
 import { formatEUR } from "@/lib/reasoning-engine";
