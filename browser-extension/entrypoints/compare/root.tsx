@@ -22,11 +22,9 @@ import { useCompareStore } from "./store";
  * whether their order is right until they have seen what it recommends.
  *
  * So the page opens on the recommendation, built from the reader's saved
- * answers, and "something doesn't look right?" opens those answers beside it.
- * Every control in there writes to the same store this page renders from, so
- * changing one re-reasons the page immediately — on a wide screen the layout
- * makes room for the drawer rather than hiding behind it, so the reader can
- * watch their own change land.
+ * answers, and "something doesn't look right?" opens those answers over it in
+ * a drawer. The drawer holds a draft and commits it in one act, so this page
+ * re-reasons when the reader saves rather than on every keystroke inside it.
  */
 export default function CompareTab({
   cars,
@@ -124,46 +122,40 @@ export default function CompareTab({
     <Tooltip.Provider delayDuration={350}>
       <main className="min-h-screen bg-white text-finn-black">
         {/*
-          * The page makes room for the drawer where there is room to make.
-          * Below that it stays put and the drawer comes over it, which is
-          * why the drawer carries a scrim at those widths and not at these.
+          * The page keeps its full width, and there is no wrapper around it
+          * any more. It used to give up 27rem to the drawer, which squeezed
+          * the advice into a column too narrow to read while the reader
+          * worked in one too narrow to work in; the drawer overlays it now.
           */}
-        <div
-          className={[
-            "transition-[padding] duration-300 ease-out",
-            adjusting ? "lg:pr-108" : "",
-          ].join(" ")}
-        >
-          <PageHeader>
-            <NavButton
-              icon={<SlidersHorizontal className="h-4 w-4" />}
-              label="Adjust my answers"
-              onClick={() => setAdjusting((was) => !was)}
-              active={adjusting}
-              expanded={adjusting}
-            />
+        <PageHeader>
+          <NavButton
+            icon={<SlidersHorizontal className="h-4 w-4" />}
+            label="Adjust my answers"
+            onClick={() => setAdjusting((was) => !was)}
+            active={adjusting}
+            expanded={adjusting}
+          />
 
-            <NavButton
-              icon={<Bookmark className="h-4 w-4" />}
-              label="Pinned cars"
-              onClick={onManagePins}
-            />
+          <NavButton
+            icon={<Bookmark className="h-4 w-4" />}
+            label="Pinned cars"
+            onClick={onManagePins}
+          />
 
-            <NavButton
-              icon={<Settings className="h-4 w-4" />}
-              label="Settings"
-              onClick={onSettings}
-            />
-          </PageHeader>
+          <NavButton
+            icon={<Settings className="h-4 w-4" />}
+            label="Settings"
+            onClick={onSettings}
+          />
+        </PageHeader>
 
-          <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-            <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
-          </div>
+        <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
+          <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
         </div>
 
         <AdjustDrawer
           open={adjusting}
-          onClose={() => setAdjusting(false)}
+          onOpenChange={setAdjusting}
           onSettings={onSettings}
         />
       </main>

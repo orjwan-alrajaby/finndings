@@ -39,9 +39,9 @@ import { ProfilesSettings } from "./tabs/ProfileSettings";
 import { DrivingSettings } from "./tabs/DrivingSettings";
 import { DataSettings } from "./tabs/DataSettings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
-import { SaveControl } from "./components/SaveControl";
+import { SaveControl } from "@/components/SaveControl";
 import { getProfileIssues } from "./utils/PriorityValidation";
-import { snapshot } from "./utils/snapshot";
+import { stableStringify } from "@/lib/stable-stringify";
 import type { StoredDataGroupId } from "@/lib/stored-data";
 import { openBrowserTab } from "../popup/utils";
 
@@ -89,7 +89,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       setCategoryFeatures(settings.categoryFeatures);
       setProfiles(settings.profiles);
       setDefaultProfileId(settings.defaultProfileId);
-      setPersisted(snapshot(settings));
+      setPersisted(stableStringify(settings));
       setLoading(false);
     });
   }, []);
@@ -118,7 +118,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
 
     await saveLensSettings(settings);
 
-    setPersisted(snapshot(settings));
+    setPersisted(stableStringify(settings));
     flashSaved();
   };
 
@@ -189,7 +189,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
      * changes something, so a deletion is not silently written back.
      */
     setPersisted(
-      snapshot({
+      stableStringify({
         preferences: DEFAULT_PREFERENCES,
         priorities: DEFAULT_PRIORITIES,
         priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
@@ -221,7 +221,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
     });
     setPersisted(
-      snapshot({
+      stableStringify({
         preferences: DEFAULT_PREFERENCES,
         priorities: DEFAULT_PRIORITIES,
         priorityDefinitions: DEFAULT_PRIORITY_DEFINITIONS,
@@ -239,7 +239,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * plain data, and a deep equality helper would be a second description of
    * the same shape to keep in step with the first.
    */
-  const dirty = persisted !== null && snapshot(currentSettings()) !== persisted;
+  const dirty = persisted !== null && stableStringify(currentSettings()) !== persisted;
 
   const profilesNeedingAttention = profiles.filter((p) => getProfileIssues(p, priorityDefinitions).length > 0).length;
 

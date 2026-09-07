@@ -5,7 +5,7 @@ import type {
     FeatureSelection,
 } from "@/lib/reasoning-engine/types";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
-import { CalculatedPriorityDetails } from "./CalculatedPriorityDetails";
+import { CalculatedPriorityDetails } from "../CalculatedPriorityDetails";
 import {
     FeatureInfluencePicker,
     type PickedElsewhere,
@@ -69,11 +69,11 @@ export function FeatureEditor({
                 onToggleFeature={onToggleFeature}
                 onImportanceChange={onImportanceChange}
                 /*
-                 * No "reset to defaults" here. This step is a run rather than
-                 * a setting, and the reader's own saved picks — not Lens's
-                 * shipped ones — are what they mean by going back; the step's
-                 * own "Use my saved picks" does that for every category at
-                 * once.
+                 * No "reset to defaults" here. The drawer is a run rather
+                 * than a setting, and the reader's own saved picks — not
+                 * Lens's shipped ones — are what they mean by going back;
+                 * the section's own "Use my saved picks" does that for every
+                 * category at once.
                  */
                 onResetAll={onResetAll}
             />

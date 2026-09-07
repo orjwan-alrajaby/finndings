@@ -278,3 +278,51 @@
     animation: none;
   }
 }
+
+/* ========================================
+   DRAWER
+   The compare page's Adjust panel, opened and closed by Radix's dialog.
+   Radix stamps `data-state` on the overlay and the panel and holds both in
+   the tree until their animations finish, so the two keyframes below are all
+   the movement this needs — no transition classes, and nothing to keep in
+   step with the open flag in React.
+======================================== */
+
+@keyframes finn-lens-drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes finn-lens-drawer-out {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+@keyframes finn-lens-scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.finn-lens-drawer[data-state="open"] {
+  animation: finn-lens-drawer-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.finn-lens-drawer[data-state="closed"] {
+  animation: finn-lens-drawer-out 200ms ease-in;
+}
+
+.finn-lens-scrim[data-state="open"] {
+  animation: finn-lens-scrim-in 200ms ease-out;
+}
+
+.finn-lens-scrim[data-state="closed"] {
+  animation: finn-lens-scrim-in 160ms ease-in reverse;
+}
+
+/* Honour a reader who has asked the system for less movement. */
+@media (prefers-reduced-motion: reduce) {
+  .finn-lens-drawer[data-state],
+  .finn-lens-scrim[data-state] {
+    animation: none;
+  }
+}
