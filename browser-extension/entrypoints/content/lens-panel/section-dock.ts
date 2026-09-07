@@ -110,9 +110,21 @@ export function dockSectionFor(
 
   const section = sectionFor(card, width);
 
-  if (!section || section === docked) return;
+  /*
+   * Already narrowed, so there is nothing to do — and undocking first would
+   * make the page jump for no reason.
+   */
+  if (section === docked) return;
 
+  /*
+   * A card the panel covers nothing around — it is already clear of the
+   * strip, or it sits in no block worth narrowing. Whatever was narrowed for
+   * the last card still has to be given back, or the page keeps a gap for a
+   * car the panel has stopped talking about.
+   */
   undockSection();
+
+  if (!section) return;
 
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement("style");
