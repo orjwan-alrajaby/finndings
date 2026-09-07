@@ -1,3 +1,4 @@
+import { useId } from "react";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
@@ -205,6 +206,19 @@ function ContractTypeToggle({
     );
 }
 
+/**
+ * One figure, with its unit and its caveat attached to it.
+ *
+ * The label used to wrap the input, which associates the two but also folds
+ * everything else inside the label — the unit and the whole hint sentence —
+ * into the field's accessible name. "Monthly budget, euros per month,
+ * optional, the most you want to spend per month in total, including running
+ * costs…" is not a name.
+ *
+ * So the label names the field and nothing else, and the unit and the hint
+ * are descriptions: read out after the name, in that order, which is the
+ * order a sighted reader meets them in too.
+ */
 function AssumptionInput({
     label,
     hint,
@@ -225,14 +239,20 @@ function AssumptionInput({
     placeholder?: string;
     onChange: (value: number) => void;
 }) {
-    return (
-        <label className="block">
-            <span className="text-xs font-bold text-finn-black">
-                {label}
-            </span>
+    const id = useId();
 
-            <div className="mt-1 flex items-center rounded-2xl shadow-sm bg-finn-pale-blue px-3">
+    return (
+        <div>
+            <label
+                htmlFor={`${id}-field`}
+                className="text-xs font-bold text-finn-black"
+            >
+                {label}
+            </label>
+
+            <div className="mt-1 flex items-center rounded-2xl bg-finn-pale-blue px-3 shadow-sm">
                 <input
+                    id={`${id}-field`}
                     type="number"
                     min="0"
                     step={step}
@@ -241,23 +261,32 @@ function AssumptionInput({
                     onChange={(event) =>
                         onChange(Number(event.target.value) || 0)
                     }
+                    aria-describedby={[
+                        `${id}-unit`,
+                        hint ? `${id}-hint` : "",
+                    ]
+                        .filter(Boolean)
+                        .join(" ")}
                     className={[
                         "h-11 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none",
                         // line below removes the number input's default HTML up/down arrows
-                        "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                     ].join(" ")}
                 />
 
-                <span className="text-xs text-finn-iron">
+                <span id={`${id}-unit`} className="text-xs text-finn-iron">
                     {unit}
                 </span>
             </div>
 
             {hint && (
-                <span className="mt-1 block text-[11px] leading-4 text-finn-iron">
+                <p
+                    id={`${id}-hint`}
+                    className="mt-1 text-[11px] leading-4 text-finn-iron"
+                >
                     {hint}
-                </span>
+                </p>
             )}
-        </label>
+        </div>
     );
 }
