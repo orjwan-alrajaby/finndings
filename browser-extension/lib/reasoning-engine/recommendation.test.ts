@@ -6,7 +6,6 @@ import {
   buildReasoningContext,
   buildRecommendation,
   evaluateChallenger,
-  evaluateVehicle,
   migratePreferences,
   selectAlternatives,
 } from "./index";

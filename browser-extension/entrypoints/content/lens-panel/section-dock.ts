@@ -74,7 +74,7 @@ export function isSection(
 }
 
 /** The block the marked card is laid out in, or null when nothing is covered. */
-export function sectionFor(
+function sectionFor(
   card: HTMLElement,
   width: number = PANEL_WIDTH,
 ): HTMLElement | null {

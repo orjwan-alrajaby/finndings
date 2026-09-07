@@ -30,7 +30,7 @@ import {
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import { loadPinnedCars, unpinCars } from "@/lib/stored-data";
 import type { PinnedFinnCar } from "@/lib/types";
-import { openBrowserTab } from "../popup/utils";
+import { openBrowserTab } from "@/lib/utils";
 
 import { CarRow } from "./components/CarRow";
 import { ConfirmDialog } from "../settings/components/ConfirmDialog";

@@ -397,27 +397,6 @@ function describeStanding(
   return sentence("None of the closest alternatives does better here");
 }
 
-/**
- * Why a car can trail a priority and still be the recommendation.
- *
- * Said only where there is a real gap to account for and the priority sits
- * below others in the user's order — that being the actual reason, rather
- * than a reassurance.
- */
-function describeWhyItStillWins(
-  breakdown: PriorityBreakdown,
-  standing: PriorityStanding,
-  isRecommendation: boolean,
-): string | null {
-  if (!isRecommendation || standing !== "behindLeader") return null;
-  if (breakdown.rank <= 1 || !breakdown.leader) return null;
-
-  return sentence(
-    `You put ${phraseLabel(breakdown.label)} at #${breakdown.rank}, so that gap`,
-    `counted for less than the priorities above it`,
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Missing data                                                               */
 /* -------------------------------------------------------------------------- */

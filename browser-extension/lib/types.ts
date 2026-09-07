@@ -87,7 +87,6 @@ export type FinnApiConfig = {
   has_hitch: "true" | "false";
 };
 
-export type AvailabilityType = "now" | "soon" | "days" | "weeks" | "months";
 
 export type FuelType = "Electric" | "Diesel" | "Petrol" | "Plug-in Hybrid";
 
@@ -101,7 +100,6 @@ export type DriveType =
 
 export type ConsumptionUnit = "L/100Km" | "kWh/100Km";
 
-export type DiscountType = { percentage: string; amount: number };
 
 export interface FinnCar {
   id: number;
@@ -191,8 +189,6 @@ export interface PinnedFinnCar extends FinnCar {
   url: string;
   pinnedAt: string;
 }
-
-export type ViewMode = "grid" | "list";
 
 export type ActionType =
   | "OPEN_COMPARE_PAGE"

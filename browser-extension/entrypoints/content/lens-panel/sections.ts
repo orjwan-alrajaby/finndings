@@ -305,7 +305,7 @@ export function backToConfigurations(
 /* 1. Overall fit                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function fitHeader(
+function fitHeader(
   analysis: FitAnalysis,
   usingDefaults = false,
 ): HTMLElement {
@@ -415,7 +415,7 @@ function photo(analysis: FitAnalysis): HTMLElement {
 /* 2. Why it fits                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
+function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
   if (!analysis.strengths.length) return null;
 
   return section(
@@ -1200,7 +1200,7 @@ function costRow(line: CostLine): HTMLElement {
   return el("li", { class: "py-0.5" }, [row, info.panel]);
 }
 
-export function costSection(analysis: FitAnalysis): HTMLElement {
+function costSection(analysis: FitAnalysis): HTMLElement {
   const { cost, costReasoning } = analysis;
   const { breakdown } = cost;
 
@@ -1279,7 +1279,7 @@ function tradeoffRow(tradeoff: Tradeoff): HTMLElement {
   );
 }
 
-export function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
+function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
   if (!analysis.tradeoffs.length) return null;
 
   return section(

@@ -3,9 +3,12 @@ import * as RadixTabs from "@radix-ui/react-tabs";
 import { ActionButton } from "./ActionButton";
 import { CarPreviewCard } from "./CarPreviewCard";
 import { FINN_BASE_URL } from "@/lib/constants";
-import { calculateTimeAgo, sortAndSlicePinnedCars } from "@/lib/utils";
+import {
+    calculateTimeAgo,
+    openBrowserTab,
+    sortAndSlicePinnedCars,
+} from "@/lib/utils";
 import type { PinnedFinnCar } from "@/lib/types";
-import { openBrowserTab } from "../../utils";
 
 type TabsType = {
     pinnedCount: number;
@@ -153,14 +156,6 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                         onClick={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
                         accent={accent}
                     />
-                    {/* <ActionButton
-                        title="Edit/Add Profiles"
-                        description="Export your selected vehicles."
-                        icon={<FileDown className="h-5 w-5" />}
-                        disabled={!pinnedCount}
-                        onClick={() => openBrowserTab("OPEN_DOWNLOAD_AS_PDF_PAGE")}
-                        accent={accent}
-                    /> */}
                 </div>
             </RadixTabs.Content>
         </RadixTabs.Root>

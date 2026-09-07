@@ -9,7 +9,7 @@ import {
 } from "@/lib/onboarding";
 import { hasSavedLensSettings } from "@/lib/reasoning-engine";
 import { withFinnLinks } from "@/components/FinnLink";
-import { openBrowserTab } from "../utils";
+import { openBrowserTab } from "@/lib/utils";
 
 /**
  * The three things standing between a new reader and the product working.

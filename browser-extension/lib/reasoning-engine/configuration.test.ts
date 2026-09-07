@@ -12,7 +12,6 @@ import {
   FEATURES,
   IMPORTANCE_LEVELS,
   MAX_FEATURES_PER_CATEGORY,
-  NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
   PROFILES,
 } from "./constants";
@@ -64,10 +63,6 @@ describe("safety and driver assistance are one priority", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("feature selection", () => {
-  const featureCategories = CATEGORY_IDS.filter(
-    (id) => !NUMERIC_ONLY_CATEGORIES.includes(id),
-  );
-
   /*
    * Nothing is picked on the user's behalf. A pick now says "this matters to
    * me" and carries an importance they chose, so pre-selecting five would be

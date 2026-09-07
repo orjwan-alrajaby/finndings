@@ -2,7 +2,7 @@ import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
 import type { PinnedFinnCar } from "@/lib/types";
 import CompareTab from "./root";
-import { openBrowserTab } from "../popup/utils";
+import { openBrowserTab } from "@/lib/utils";
 
 async function getPinnedCars(): Promise<PinnedFinnCar[]> {
   const stored = await browser.storage.local.get("pinnedCars");

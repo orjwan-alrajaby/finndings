@@ -1,5 +1,4 @@
 import {
-  CATEGORY_IDS,
   MAX_FEATURES_PER_CATEGORY,
   NUMERIC_ONLY_CATEGORIES,
   PROFILE_PRIORITY_COUNT,
@@ -10,10 +9,6 @@ import type {
   PriorityDefinition,
   Profile,
 } from "@/lib/reasoning-engine/types";
-
-export function isBuiltInPriority(id: CategoryId): boolean {
-  return CATEGORY_IDS.includes(id);
-}
 
 export function isNumericOnlyPriority(id: CategoryId): boolean {
   return NUMERIC_ONLY_CATEGORIES.includes(id);
@@ -41,11 +36,6 @@ export function getProfileIssues(profile: Profile, priorityDefinitions: Priority
   return issues;
 }
 
-/** Every profile that references the given priority id, in its own order or not. */
-export function getAffectedProfiles(priorityId: CategoryId, profiles: Profile[]): Profile[] {
-  return profiles.filter((p) => p.priorities.includes(priorityId));
-}
-
 /**
  * The feature-selection rule, written down.
  *
@@ -65,16 +55,4 @@ export function validatePriorityDraft(features: FeatureSelection, id: CategoryId
   if (isNumericOnlyPriority(id)) return null;
   if (features.length > MAX_FEATURES_PER_CATEGORY) return `You can pick out at most ${MAX_FEATURES_PER_CATEGORY} features here.`;
   return null;
-}
-
-export function slugify(label: string): string {
-  return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "priority";
-}
-
-export function generateId(prefix: string, existingIds: string[]): string {
-  const base = `${prefix}-${Date.now().toString(36)}`;
-  if (!existingIds.includes(base)) return base;
-  let n = 1;
-  while (existingIds.includes(`${base}-${n}`)) n++;
-  return `${base}-${n}`;
 }

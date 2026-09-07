@@ -8,7 +8,7 @@ import Logo from "/icon/128.png";
 import Tabs from "./components/Tabs";
 import { MetricCard } from "./components/MetricCard";
 import type { PinnedFinnCar } from "@/lib/types";
-import { openBrowserTab } from "./utils";
+import { openBrowserTab } from "@/lib/utils";
 
 async function checkIfActiveTabIsFinn() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });

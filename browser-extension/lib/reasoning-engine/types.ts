@@ -14,7 +14,6 @@ export type ProfileId = keyof typeof PROFILES;
 /* Preferences                                                                */
 /* -------------------------------------------------------------------------- */
 
-export type PreferenceSource = "defaults" | "custom";
 
 /**
  * Which FINN contract Lens is evaluating a vehicle under.

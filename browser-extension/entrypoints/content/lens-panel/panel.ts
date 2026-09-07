@@ -184,7 +184,7 @@ interface Session {
  * on a detail page asks. A card badge asks the other way: it names the car,
  * and the page it was clicked on may be a list of forty others.
  */
-export interface PanelRequest {
+interface PanelRequest {
   carId?: number;
   /**
    * The car's name as the card that was clicked spells it, so the loading

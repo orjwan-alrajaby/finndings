@@ -487,7 +487,7 @@ describe("describeFit", () => {
 });
 
 describe("what the car has, in the reader's terms and the category's", () => {
-  const [first, second, third] = SAFETY as [string, string, string];
+  const [first, , third] = SAFETY as [string, string, string];
 
   const analysis = () =>
     buildFitAnalysis(

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Star, TriangleAlert } from "lucide-react";
+import { Star } from "lucide-react";
 
 // Unchanged from the original settings page — same visual language.
 export function Section({ title, description, children }: {
@@ -79,21 +79,4 @@ export function SetDefaultButton({ onClick, label }: {
       <Star className="h-3 w-3" /> Set as default
     </button>
   );
-}
-
-export function IssuesNotice({ issues }: { issues: string[] }) {
-  if (issues.length === 0) return null;
-  return (
-    <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-finn-warning/10 px-3 py-2">
-      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-finn-warning" />
-      <ul className="space-y-0.5 text-[11px] leading-4 text-finn-warning font-medium">
-        {issues.map((issue, i) => <li key={i}>{issue}</li>)}
-      </ul>
-    </div>
-  );
-}
-
-
-export function CustomBadge() {
-  return <span className="rounded-full bg-finn-cotton px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-finn-iron">Custom</span>;
 }

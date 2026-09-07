@@ -1,10 +1,9 @@
 import "@/assets/tailwind.css";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
     ArrowLeft,
     Bookmark,
-    Check,
     GraduationCap,
     RotateCw,
     Scale,
@@ -20,7 +19,6 @@ import {
 } from "@/lib/reasoning-engine/constants";
 import {
   loadLensSettings,
-  registerCategoryMeta,
   saveLensSettings,
   unregisterCategoryMeta,
 } from "@/lib/reasoning-engine";
@@ -43,19 +41,7 @@ import { SaveControl } from "@/components/SaveControl";
 import { getProfileIssues } from "./utils/PriorityValidation";
 import { stableStringify } from "@/lib/stable-stringify";
 import type { StoredDataGroupId } from "@/lib/stored-data";
-import { openBrowserTab } from "../popup/utils";
-
-function registerCustomMeta(priority: PriorityDefinition) {
-  registerCategoryMeta(priority.id, {
-    label: priority.label,
-    icon: priority.icon,
-    color: "#5B6472",
-    question: priority.description || priority.label,
-    description: priority.description,
-    recommendedFor: [],
-    features: [],
-  });
-}
+import { openBrowserTab } from "@/lib/utils";
 
 export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [tab, setTab] = useState<SettingsTab>("priorities");

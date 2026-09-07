@@ -5,8 +5,6 @@ import { Settings, X } from "lucide-react";
 
 import type {
     CategoryId,
-    FeatureId,
-    FeatureImportance,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 import { SaveControl } from "@/components/SaveControl";

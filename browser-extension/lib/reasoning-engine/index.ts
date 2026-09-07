@@ -56,13 +56,11 @@ import {
   registerCategoryMeta,
   scoreFor,
   totalFor,
-  unregisterCategoryMeta,
   winnerForCategory,
 } from "./scoring";
 
 import { explainHeadToHead } from "./explain";
 import { classifyMeasurementGap, classifyMonthlyCostGap, isNoticeable } from "./narrative/magnitude";
-import { inSentence } from "./narrative/phrase";
 import { formatEUR } from "./format";
 
 /* -------------------------------------------------------------------------- */
