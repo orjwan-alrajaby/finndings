@@ -1,5 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useSyncExternalStore } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Info, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
@@ -65,12 +65,12 @@ function subscribe(listener: () => void) {
     };
 }
 
-export function openInfo(subject: InfoSubject) {
+function openInfo(subject: InfoSubject) {
     openSubject = subject;
     announce();
 }
 
-export function closeInfo() {
+function closeInfo() {
     openSubject = null;
     announce();
 }
@@ -128,32 +128,38 @@ export function InfoButton({
     const mine = isSame(open, subject);
 
     return (
-        <>
-            <button
-                type="button"
+        /*
+         * Not modal. The list behind stays live and reachable, which is the
+         * whole point of a panel beside it: a reader who reads what a
+         * priority is and then tabs straight back to move it is doing the
+         * thing this exists for. Radix still gives it the escape key, the
+         * click-outside, the portal and the labelled dialog role.
+         */
+        <Dialog.Root
+            modal={false}
+            open={mine}
+            onOpenChange={(next) => (next ? openInfo(subject) : closeInfo())}
+        >
+            <Dialog.Trigger
                 aria-label={`What is ${label}?`}
                 title={`What is ${label}?`}
-                aria-expanded={mine}
-                onClick={() => (mine ? closeInfo() : openInfo(subject))}
                 className={[
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
                     tone === "onDark"
                         ? "text-white/70 hover:bg-white/20 hover:text-white"
                         : "text-finn-iron/60 hover:bg-finn-pale-blue hover:text-finn-accent-blue",
-                    mine ? "bg-finn-pale-blue text-finn-accent-blue" : "",
+                    "data-[state=open]:bg-finn-pale-blue data-[state=open]:text-finn-accent-blue",
                 ].join(" ")}
             >
-                <Info className="h-3.5 w-3.5" />
-            </button>
+                <Info aria-hidden="true" className="h-3.5 w-3.5" />
+            </Dialog.Trigger>
 
-            {mine && (
-                <InfoPanel
-                    subject={subject}
-                    profiles={profiles}
-                    priorityDefinitions={priorityDefinitions}
-                />
-            )}
-        </>
+            <InfoPanel
+                subject={subject}
+                profiles={profiles}
+                priorityDefinitions={priorityDefinitions}
+            />
+        </Dialog.Root>
     );
 }
 
@@ -170,56 +176,21 @@ function InfoPanel({
     profiles: Profile[];
     priorityDefinitions: PriorityDefinition[];
 }) {
-    const panel = useRef<HTMLDivElement>(null);
-
     /*
-     * Focus moves in when it opens, so the keyboard follows the eye and Escape
-     * reaches the handler below without a tab first. Not trapped: the list
-     * behind stays live, and a reader who reads what a priority is and then
-     * tabs straight back to move it is doing the thing this panel is for.
+     * Portalled, because this has to measure itself against the viewport and
+     * one of the three places it opens from is the adjust drawer — which
+     * slides in on a transform, and a transformed ancestor becomes the
+     * containing block for anything fixed inside it. Left where it was
+     * written, the panel would pin itself to the drawer's edge and inherit
+     * its slide.
      */
-    useEffect(() => {
-        panel.current?.focus();
-    }, []);
+    return (
+        <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-[60] bg-finn-black/20" />
 
-    /* Escape closes it, from wherever the focus happens to be. */
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") closeInfo();
-        };
-
-        window.addEventListener("keydown", onKeyDown);
-
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
-        };
-    }, []);
-
-    /*
-     * Through a portal, because this has to measure itself against the
-     * viewport and one of the three places it opens from is the adjust
-     * drawer — which slides in on a transform, and a transformed ancestor
-     * becomes the containing block for anything fixed inside it. Left where
-     * it was written, the panel would pin itself to the drawer's edge and
-     * inherit its slide.
-     */
-    return createPortal(
-        <>
-            <div
-                aria-hidden="true"
-                onClick={closeInfo}
-                className="fixed inset-0 z-[60] bg-finn-black/20"
-            />
-
-            <div
-                ref={panel}
-                role="dialog"
-                aria-label={
-                    subject.kind === "profile"
-                        ? "About this profile"
-                        : "About this priority"
-                }
-                tabIndex={-1}
+            <Dialog.Content
+                /* Its body is the description; there is no separate line. */
+                aria-describedby={undefined}
                 className={[
                     "fixed right-0 top-0 z-[61] flex h-screen w-full max-w-96 flex-col",
                     "border-l border-finn-cotton bg-white shadow-2xl outline-none",
@@ -234,9 +205,8 @@ function InfoPanel({
                 ) : (
                     <PriorityBody id={subject.id} />
                 )}
-            </div>
-        </>,
-        document.body,
+            </Dialog.Content>
+        </Dialog.Portal>
     );
 }
 
@@ -251,19 +221,17 @@ function PanelHeader({ icon, label, kind }: { icon: string; label: string; kind:
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
                     {kind}
                 </p>
-                <h2 className="mt-0.5 text-base font-black leading-5 text-finn-black">
+                <Dialog.Title className="mt-0.5 text-base font-black leading-5 text-finn-black">
                     {label}
-                </h2>
+                </Dialog.Title>
             </div>
 
-            <button
-                type="button"
-                onClick={closeInfo}
+            <Dialog.Close
                 aria-label="Close"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-finn-iron transition-colors hover:bg-finn-cotton hover:text-finn-black"
             >
-                <X className="h-4 w-4" />
-            </button>
+                <X aria-hidden="true" className="h-4 w-4" />
+            </Dialog.Close>
         </div>
     );
 }
