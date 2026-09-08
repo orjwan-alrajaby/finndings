@@ -283,17 +283,27 @@ export function Advice({
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">
-                <WhyItWins
-                    narrative={winnerNarrative}
-                    subjectName={winner.name}
-                />
-
-                <Tradeoffs
-                    tradeoffs={winnerNarrative.tradeoffs}
-                    isRecommendation
-                    subjectName={winner.name}
-                />
-
+                {/*
+                  * The decision first, the reasoning behind it after.
+                  *
+                  * This column used to open with the equipment audit — five
+                  * priority sections inside `WhyItWins` — and put the money
+                  * below all of it. That is the same order the in-page panel
+                  * had and it was wrong for the same reason: what a car costs
+                  * at the reader's own mileage, and how much it drinks, are
+                  * the two things this page can tell them that a listing
+                  * cannot. The hero already carries the verdict, so nothing
+                  * is lost by making the case for it afterwards.
+                  *
+                  * The picker and the hot seat come with them rather than
+                  * staying below, and that placement is load-bearing: the
+                  * cost and energy sections describe whoever is in the hot
+                  * seat, so they have to sit under the control that puts
+                  * somebody there. Split apart, a reader who picked a
+                  * challenger would meet "What <challenger> costs you"
+                  * directly beneath a hero recommending a different car, with
+                  * nothing in between to say why the subject had changed.
+                  */}
                 {/*
                   * Screen only: it is the control that chooses what the hot
                   * seat holds, and a page of buttons in a PDF is furniture.
@@ -345,6 +355,17 @@ export function Advice({
                   * It follows the hot seat's subject, like the cost does.
                   */}
                 <EnergyUse car={challenger ?? winner} />
+
+                <WhyItWins
+                    narrative={winnerNarrative}
+                    subjectName={winner.name}
+                />
+
+                <Tradeoffs
+                    tradeoffs={winnerNarrative.tradeoffs}
+                    isRecommendation
+                    subjectName={winner.name}
+                />
             </div>
 
             <AdviceSidebar
