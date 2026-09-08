@@ -11,7 +11,6 @@ import {
   describeEnvironment,
   environmentalTags,
   ENVIRONMENTAL_METHOD,
-  type EfficiencyLevel,
   type EnvironmentalTag,
 } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
@@ -25,6 +24,7 @@ import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
 import { formatEUR, formatNumber } from "@/lib/reasoning-engine";
 import { advertisedGap, costLead } from "@/lib/cost-copy";
+import { EFFICIENCY_TONE, readUsage } from "@/lib/usage-copy";
 
 /**
  * The two tone classes for one mark, in the order the stylesheet expects.
@@ -1008,39 +1008,6 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
 /* -------------------------------------------------------------------------- */
 
 /** How a level colours its chip. Efficiency is good news, not a warning. */
-const EFFICIENCY_CLASS: Record<EfficiencyLevel, string> = {
-  high: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
-  moderate: "bg-finn-pale-blue text-finn-accent-blue",
-  low: "bg-finn-warning-lift text-finn-warning-deep",
-};
-
-/**
- * What the car runs on, said loudly, at the top of the section it governs.
- *
- * It used to be a word in the header's spec line, between the trim and the
- * range, where it read as one more number about the car. It belongs here: what
- * a car runs on is the single fact that decides everything this section says —
- * which cohort its consumption is measured against, what "typical" means, and
- * whether the figure can be graded at all. A reader who reads "15,9
- * kWh/100km · typical is 17" without registering that this is an electric car
- * has been given a comparison with nothing to hold it up.
- *
- * Solid rather than tinted, so it reads as the subject of the section rather
- * than as a second verdict competing with the efficiency chip beside it.
- */
-function fuelChip(fuel: string | null | undefined): HTMLElement | null {
-  if (!fuel) return null;
-
-  return el("span", {
-    class: [
-      "inline-flex shrink-0 items-center rounded-full px-2.5 py-1",
-      "text-[11px] font-black",
-      "bg-finn-highlight-navy text-white",
-    ].join(" "),
-    text: fuel,
-  });
-}
-
 /** A small coloured label carrying a verdict the text then justifies. */
 function verdictChip(label: string, className: string): HTMLElement {
   return el("span", {
@@ -1056,99 +1023,77 @@ function verdictChip(label: string, className: string): HTMLElement {
 /**
  * How much energy this car uses, for every car and every reader.
  *
- * This used to appear only inside the environmental-impact priority, so
- * whether the reader was told what a car costs to run in fuel depended on
- * whether they had ranked the environment. Those are two different questions
- * with one answer between them, and the running-cost half is owed to everyone:
- * it is on the bill every month whatever the reader thinks about emissions.
+ * One of three renderings of `readUsage` — this panel, the pinned car's card,
+ * and the advice page's `EnergyUse`. Which of the three answers a car gets,
+ * and the words it gets them in, are decided there; this only lays them out.
  *
- * Three things, in the order a sceptical reader wants them: the verdict, the
- * two figures it was read from, and the reasoning that gets from one to the
- * other — including how big the gap actually is, because "Highly efficient"
- * could otherwise mean 2% or 30%. The caveat comes last, after the answer
- * rather than in front of it.
+ * The reading used to be written only inside the environmental-impact
+ * priority, so whether a reader was told a car drinks 9 L/100km depended on
+ * whether they had ranked the environment — when it is on their bill every
+ * month either way.
  *
- * Every case says something. A plug-in hybrid is shown its figure and told why
- * it cannot honestly be graded; a car FINN publishes no consumption for is
- * told that, rather than being quietly skipped and leaving the reader to
- * wonder whether the section failed to load.
+ * What a car runs on leads, because it is the single fact that decides
+ * everything below it: which cohort the figure is measured against, what
+ * "typical" means, and whether it can be graded at all. Solid rather than
+ * tinted, so it reads as the subject of the section rather than as a second
+ * verdict competing with the efficiency chip beside it.
  */
 function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
-  const impact = analysis.environment;
-  const efficiency = impact?.efficiency;
-
   /*
    * The environmental priority block already covers this ground in full, with
    * emissions beside it. Saying it twice in one panel would read as a bug.
    */
   if (analysis.priorities.some((priority) => priority.impact)) return null;
 
-  if (efficiency) {
+  const reading = readUsage(analysis.vehicle);
+
+  const chips = el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+    reading.fuel
+      ? verdictChip(reading.fuel, "bg-finn-highlight-navy text-white")
+      : null,
+
+    reading.kind === "graded"
+      ? verdictChip(
+          reading.efficiency.label,
+          EFFICIENCY_TONE[reading.efficiency.level],
+        )
+      : verdictChip(reading.verdict, "bg-finn-cotton text-finn-iron"),
+  ]);
+
+  if (reading.kind !== "graded") {
     return section(
       "How much it uses",
-
-      el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
-        fuelChip(analysis.vehicle.fuelType),
-        verdictChip(efficiency.label, EFFICIENCY_CLASS[efficiency.level]),
-      ]),
-
-      el("div", { class: "mt-3 flex flex-wrap gap-x-8 gap-y-2.5" }, [
-        readout("This car", efficiency.display),
-        readout("Typical for its kind", efficiency.typical.replace(" is typical", "")),
-      ]),
-
+      chips,
       el("p", {
         class: "mt-3 text-[12px] leading-[18px] text-finn-black",
-        text: efficiency.reasoning,
-      }),
-
-      el("p", {
-        class: "mt-2 text-[11px] leading-4 text-finn-iron",
-        text: efficiency.caveat,
+        text: reading.body,
       }),
     );
   }
 
-  /*
-   * A blend of two energy sources over an assumed pattern of charging. The
-   * figure is real and worth showing; the grade would not be.
-   */
-  if (impact?.powertrain === "Plug-in Hybrid") {
-    return section(
-      "How much it uses",
-
-      el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
-        fuelChip(analysis.vehicle.fuelType),
-        verdictChip("Can't be graded fairly", "bg-finn-cotton text-finn-iron"),
-      ]),
-
-      el("p", {
-        class: "mt-3 text-[12px] leading-[18px] text-finn-black",
-        text:
-          "FINN publishes one combined figure for plug-in hybrids, covering " +
-          "both the petrol it burns and the electricity it charges on, over " +
-          "an assumed pattern of charging. There is no petrol car or electric " +
-          "car it can fairly be measured against, so we would rather say that " +
-          "than invent a comparison. What it actually costs you comes down to " +
-          "how often you plug it in.",
-      }),
-    );
-  }
+  const { efficiency } = reading;
 
   return section(
     "How much it uses",
+    chips,
 
-    el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
-      fuelChip(analysis.vehicle.fuelType),
-      verdictChip("Not published", "bg-finn-cotton text-finn-iron"),
+    el("div", { class: "mt-3 flex flex-wrap gap-x-8 gap-y-2.5" }, [
+      readout("This car", efficiency.display),
+      readout(
+        "Typical for its kind",
+        efficiency.typical.replace(" is typical", ""),
+      ),
     ]),
 
     el("p", {
       class: "mt-3 text-[12px] leading-[18px] text-finn-black",
-      text:
-        "FINN doesn't publish a consumption figure for this car, so there is " +
-        "nothing to measure it against and we won't guess. Everything else on " +
-        "this page still stands — this is the one thing we can't tell you.",
+      text: efficiency.reasoning,
+    }),
+
+    /* After the answer, not in front of it. */
+    el("p", {
+      class: "mt-2 text-[11px] leading-4 text-finn-iron",
+      text: efficiency.caveat,
     }),
   );
 }

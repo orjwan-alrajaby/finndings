@@ -1,4 +1,5 @@
 import type { FitAnalysis } from "./reasoning-engine/fit";
+import type { CostAnalysis, CostLine } from "./reasoning-engine/types";
 
 import { formatEUR, formatKm } from "./reasoning-engine";
 
@@ -106,4 +107,109 @@ export function advertisedGap(analysis: FitAnalysis): number | null {
   const gap = breakdown.totalMonthly - advertised;
 
   return gap > 0 ? gap : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Cost, against another car                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One line of the bill, next to the same line on the car being compared.
+ *
+ * `favours` is the reader's side of it rather than the arithmetic's: "subject"
+ * means taking this car costs less here, which is a gain. A line neither side
+ * can be priced on, or one they land on together, favours nobody and is
+ * reported as level rather than quietly dropped — a comparison that shows only
+ * the differences invites the reader to assume the rest was checked and equal,
+ * which is exactly what an unpriceable line was not.
+ */
+export interface CostComparisonRow {
+  id: CostLine["id"] | "total";
+  label: string;
+  subject: number | null;
+  against: number | null;
+  /** subject − against, when both are known. */
+  difference: number | null;
+  favours: "subject" | "against" | "level" | "unknown";
+}
+
+function compare(
+  id: CostComparisonRow["id"],
+  label: string,
+  subject: number | null,
+  against: number | null,
+): CostComparisonRow {
+  if (subject == null || against == null) {
+    return { id, label, subject, against, difference: null, favours: "unknown" };
+  }
+
+  const difference = subject - against;
+
+  /*
+   * Rounded to the euro before being called a difference. These are estimates
+   * built from a consumption figure and a price per kWh, and reporting that
+   * one car costs 40 cents more a month is precision the inputs cannot carry
+   * — it reads as a real distinction when it is arithmetic noise.
+   */
+  const favours =
+    Math.round(difference) === 0
+      ? "level"
+      : difference < 0
+        ? "subject"
+        : "against";
+
+  return { id, label, subject, against, difference, favours };
+}
+
+/**
+ * What taking this car instead of another would do to the monthly bill.
+ *
+ * The advice page puts one car in the hot seat against the recommendation and
+ * answers "what would you gain, what would you give up" for everything the
+ * reader ranked — and then, until now, dropped that framing entirely for the
+ * one thing every reader cares about. The cost section simply swapped to the
+ * challenger's figures, so the winner's disappeared and the comparison the
+ * whole page is built around had to be done from memory.
+ *
+ * Line by line rather than on the total alone, because the total hides the
+ * shape of the decision: two cars a few euros apart in the end can be a
+ * cheaper subscription paying for a thirstier engine, and that is worth
+ * knowing — one of those numbers moves if the reader's mileage changes and
+ * the other does not.
+ */
+export function compareCosts(
+  subject: CostAnalysis,
+  against: CostAnalysis,
+): CostComparisonRow[] {
+  const amountOf = (analysis: CostAnalysis, id: CostLine["id"]) => {
+    const line = analysis.lines.find((item) => item.id === id);
+
+    return line?.available ? (line.amount ?? null) : null;
+  };
+
+  const lines = subject.lines.map((line) =>
+    compare(
+      line.id,
+      line.label,
+      amountOf(subject, line.id),
+      amountOf(against, line.id),
+    ),
+  );
+
+  /*
+   * The total is only comparable when both sides are whole. Two partial totals
+   * differ by whatever each happens to be missing, and a chip reading "€80
+   * cheaper" off that would be reporting a gap in FINN's data as a saving.
+   */
+  const totals =
+    subject.breakdown.complete && against.breakdown.complete
+      ? compare(
+          "total",
+          "Total a month",
+          subject.breakdown.totalMonthly,
+          against.breakdown.totalMonthly,
+        )
+      : compare("total", "Total a month", null, null);
+
+  return [...lines, totals];
 }

@@ -14,6 +14,7 @@ import { AdviceSidebar } from "./components/AdviceSidebar";
 import { BudgetNotice } from "./components/BudgetNotice";
 import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
+import { EnergyUse } from "./components/EnergyUse";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
@@ -319,7 +320,31 @@ export function Advice({
                 <CostAnalysis
                     analysis={subject.cost}
                     reasoning={subjectNarrative.cost}
+                    /*
+                     * Only when somebody else is in the hot seat. The page
+                     * answers "what would you gain, what would you give up"
+                     * for every priority the reader ranked and then dropped
+                     * that framing for the money: swapping the subject over
+                     * took the recommendation's figures off the page, leaving
+                     * the reader to hold them in their head. Comparing the
+                     * winner with itself would be a table of zeroes.
+                     */
+                    against={
+                        challenger
+                            ? {
+                                  name: winner.name,
+                                  analysis: recommendation.evaluation.cost,
+                              }
+                            : null
+                    }
                 />
+
+                {/*
+                  * After the cost, because it explains one line of it: what a
+                  * car uses is why the energy figure above is the size it is.
+                  * It follows the hot seat's subject, like the cost does.
+                  */}
+                <EnergyUse car={challenger ?? winner} />
             </div>
 
             <AdviceSidebar
