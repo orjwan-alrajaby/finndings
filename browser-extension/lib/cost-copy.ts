@@ -1,5 +1,6 @@
 import type { FitAnalysis } from "./reasoning-engine/fit";
 import type { CostAnalysis, CostLine } from "./reasoning-engine/types";
+import { classifyMonthlyCostGap } from "./reasoning-engine/narrative/magnitude";
 
 import { formatEUR, formatKm } from "./reasoning-engine";
 
@@ -146,13 +147,21 @@ function compare(
   const difference = subject - against;
 
   /*
-   * Rounded to the euro before being called a difference. These are estimates
-   * built from a consumption figure and a price per kWh, and reporting that
-   * one car costs 40 cents more a month is precision the inputs cannot carry
-   * — it reads as a real distinction when it is arithmetic noise.
+   * "Level" is the engine's own judgement, not a rounding.
+   *
+   * These are estimates built from a consumption figure and a price per kWh,
+   * so a difference has to be large enough to survive them before it is worth
+   * calling a difference. `classifyMonthlyCostGap` is where that threshold
+   * already lives — it is what decides whether the narrative says two cars
+   * "cost about the same" — and borrowing it here is what stops this table
+   * reporting "€6 more" a few lines under a sentence saying money is not what
+   * separates them. Judged against the line it is being compared to, so a €6
+   * gap is noise on a €500 subscription and real on a €48 energy estimate.
    */
+  const magnitude = classifyMonthlyCostGap(difference, against);
+
   const favours =
-    Math.round(difference) === 0
+    magnitude === "tie" || magnitude === "negligible"
       ? "level"
       : difference < 0
         ? "subject"

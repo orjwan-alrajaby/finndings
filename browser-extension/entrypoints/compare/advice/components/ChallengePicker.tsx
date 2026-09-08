@@ -56,10 +56,16 @@ export function ChallengePicker({
                 </div>
 
                 {selectedId != null && (
+                    /*
+                      * The one part of this section that is only a control.
+                      * The cards below it are the shortlist and belong in the
+                      * exported report; a button that empties the hot seat is
+                      * an action, and an action in a file is a dead pixel.
+                      */
                     <button
                         type="button"
                         onClick={() => onSelect(null)}
-                        className="rounded-full border border-finn-cotton px-4 py-2 text-[11px] font-bold text-finn-iron transition hover:text-finn-black"
+                        className="finn-lens-screen-only rounded-full border border-finn-cotton px-4 py-2 text-[11px] font-bold text-finn-iron transition hover:text-finn-black"
                     >
                         Back to {winnerName}
                     </button>

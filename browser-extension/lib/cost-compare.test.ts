@@ -87,6 +87,30 @@ describe("compareCosts", () => {
     expect(rowFor(rows, "energy")?.favours).toBe("level");
   });
 
+  /*
+   * The threshold is the engine's `classifyMonthlyCostGap`, the same one that
+   * decides whether the narrative says two cars "cost about the same". Sharing
+   * it is what stops this table reporting a difference a few lines under a
+   * sentence saying money is not what separates them.
+   */
+  it("calls a few euros on a large line level, and on a small one real", () => {
+    const onSubscription = compareCosts(
+      analysis({ subscription: 506 }),
+      analysis({ subscription: 500 }),
+    );
+
+    /* €6 on €500 is under both the absolute and the proportional bar. */
+    expect(rowFor(onSubscription, "subscription")?.favours).toBe("level");
+
+    const onEnergy = compareCosts(
+      analysis({ energy: 54 }),
+      analysis({ energy: 48 }),
+    );
+
+    /* The same €6 is an eighth of the energy bill, so it counts. */
+    expect(rowFor(onEnergy, "energy")?.favours).toBe("against");
+  });
+
   it("reports a line it cannot price as unknown rather than dropping it", () => {
     const rows = compareCosts(
       analysis({ energy: null }),

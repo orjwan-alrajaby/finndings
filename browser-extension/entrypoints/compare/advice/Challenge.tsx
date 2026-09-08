@@ -3,6 +3,7 @@ import { FinnLink } from "@/components/FinnLink";
 import { challengeFileName } from "@/lib/advice-pdf";
 
 import { AdviceSidebar } from "./components/AdviceSidebar";
+import { ChallengeHero } from "./components/ChallengeHero";
 import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
 import { EnergyUse } from "./components/EnergyUse";
@@ -97,14 +98,22 @@ export function Challenge({
                     </p>
 
                     <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-                        Would another one suit you better?
+                        {challenger
+                            ? `Would ${challenger.name} suit you better?`
+                            : "Would another one suit you better?"}
                     </h1>
 
+                    {/*
+                      * The subtitle changes with the state because the page
+                      * does. Before a car is chosen this is an invitation;
+                      * after, it is a report about one swap, and telling a
+                      * reader to "pick a car" underneath a full comparison of
+                      * the car they picked reads as though nothing registered.
+                      */}
                     <p className="mt-2 text-sm text-finn-iron">
-                        Pick a car to hold up against{" "}
-                        {winner.name}. Nothing here changes the
-                        recommendation — it only shows what swapping would gain
-                        you and what it would cost.
+                        {challenger
+                            ? `Everything below sets ${challenger.name} against ${winner.name} — judged on the same priorities, mileage, prices and budget. Nothing here changes the recommendation.`
+                            : `Pick a car to hold up against ${winner.name}. Nothing here changes the recommendation — it only shows what swapping would gain you and what it would cost.`}
                     </p>
                 </div>
 
@@ -117,23 +126,39 @@ export function Challenge({
                 )}
             </header>
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            {challenger && challengeReasoning && advice.challengerEvaluation && (
+                <ChallengeHero
+                    challenger={challenger}
+                    winnerName={winner.name}
+                    reasoning={challengeReasoning}
+                    cost={advice.challengerEvaluation.cost}
+                    against={advice.recommendation.evaluation.cost}
+                />
+            )}
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="space-y-6">
                     {/*
-                      * Screen only: it is the control that chooses what the hot
-                      * seat holds, and a page of buttons in a PDF is furniture.
-                      * Whatever it was pointing at when the reader pressed save
-                      * is kept, though — that comparison is below it, and it is
-                      * what they are taking away.
+                      * Exported along with everything else, which it did not
+                      * used to be. It looked like a control — a row of buttons
+                      * is furniture in a file — but what it actually holds is
+                      * the shortlist: every car close enough to the winner to
+                      * be worth weighing, each with its own monthly figure and
+                      * the gap to the recommendation, and one of them marked as
+                      * the subject of the pages that follow. A report that
+                      * compares two cars without saying what else was on the
+                      * table has left out the part that makes it a comparison
+                      * rather than a coincidence.
+                      *
+                      * The picker's own "Back to <winner>" control still hides
+                      * itself for the file; see `ChallengePicker`.
                       */}
-                    <div className="finn-lens-screen-only">
-                        <ChallengePicker
-                            options={options}
-                            winnerName={winner.name}
-                            selectedId={challenger?.id ?? null}
-                            onSelect={setChallengerId}
-                        />
-                    </div>
+                    <ChallengePicker
+                        options={options}
+                        winnerName={winner.name}
+                        selectedId={challenger?.id ?? null}
+                        onSelect={setChallengerId}
+                    />
 
                     {challenger && challengeReasoning && challengerNarrative ? (
                         <>
