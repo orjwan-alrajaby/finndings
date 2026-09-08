@@ -1,12 +1,13 @@
 import * as Accordion from "@radix-ui/react-accordion";
 
 import { configurationDetail, configurationName } from "@/lib/car-labels";
-import { describeFit, type FitAnalysis } from "@/lib/reasoning-engine/fit";
+import type { FitAnalysis } from "@/lib/reasoning-engine/fit";
 
 import { CostSection } from "./CostSection";
 import { PrioritySection } from "./PrioritySection";
 import { BandChip, Section } from "./parts";
 import { TradeoffRow } from "./TradeoffRow";
+import { UsageSection } from "./UsageSection";
 
 /**
  * One car, judged against the reader's saved settings.
@@ -19,9 +20,11 @@ import { TradeoffRow } from "./TradeoffRow";
  * out of `FitAnalysis`, and the two renderers read the same fields in the
  * same order. If a claim isn't in the analysis it isn't on the screen.
  *
- * The order is the order a reader asks the questions in: how well does it
- * fit, why, how does it do on each thing I said I cared about, did I get the
- * features I asked for, what does it cost, and what am I accepting.
+ * The order matches the panel's, and for the panel's reason: the two answers
+ * only this extension can give — what the car costs at the reader's own
+ * mileage, and whether it is a thirsty example of its kind — come before the
+ * equipment audit, which is the most thorough thing here and the least urgent.
+ * The band chip in the header still gives the verdict first.
  */
 export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
     const { vehicle } = analysis;
@@ -39,8 +42,21 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                             {configurationName(vehicle)}
                         </p>
 
+                        {/*
+                          * Without the power, which decides nothing said
+                          * below it, and without the fuel type, which has
+                          * moved to "How much it uses" — what a car runs on
+                          * is what decides the cohort its consumption is
+                          * judged against, so it belongs beside that
+                          * judgement. The price stays: unlike the panel, this
+                          * page is not standing on FINN's listing, so it is
+                          * the only place the reader sees it.
+                          */}
                         <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                            {configurationDetail(vehicle)}
+                            {configurationDetail(vehicle, {
+                                withPower: false,
+                                withFuel: false,
+                            })}
                         </p>
                     </div>
 
@@ -50,25 +66,21 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                     />
                 </div>
 
-                <p className="mt-3 text-[13px] leading-5 text-finn-black">
-                    {describeFit(analysis)}
-                </p>
-
                 {/*
-                  * Requirement, not decoration. The same car opened by
-                  * somebody else gets a different word, and a band shown
-                  * without saying what it is a match *with* invites being
-                  * read as a verdict on the car.
+                  * The tally that used to sit here — "a good or strong match
+                  * on 3 of the 5 priorities you set, led by safety & driver
+                  * assistance, your #1" — is gone. The band chip beside the
+                  * name already gives the verdict, and every claim the
+                  * sentence made (the count, the order, which one led) is made
+                  * again with its evidence by the sections below. It was a
+                  * summary of the card placed at the top of the card.
                   */}
-                <p className="mt-3 text-[11px] leading-4 text-finn-iron">
-                    Measured against your saved Lens settings — your
-                    priorities, their order, and the features you picked out.
-                    Someone with different settings would see a different
-                    answer.
-                </p>
             </header>
 
-            {analysis.strengths.length > 0 && (
+            <CostSection analysis={analysis} />
+            <UsageSection analysis={analysis} />
+
+            {analysis.strengths.length > 0 ? (
                 <Section title="Why it fits">
                     <ul className="mt-2 flex flex-col gap-2">
                         {analysis.strengths.map((reason) => (
@@ -84,7 +96,19 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                             </li>
                         ))}
                     </ul>
+
+                    <BasisNote />
                 </Section>
+            ) : (
+                /*
+                 * A car that serves nothing the reader ranked has no reasons
+                 * to list, and a "Why it fits" heading over nothing would be
+                 * the card insisting. The note still has to appear, so it
+                 * keeps its place without a heading it can't earn.
+                 */
+                <div className="border-t border-finn-cotton px-5 py-4">
+                    <BasisNote />
+                </div>
             )}
 
             {/*
@@ -106,8 +130,6 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                 ))}
             </Accordion.Root>
 
-            <CostSection analysis={analysis} />
-
             {analysis.tradeoffs.length > 0 && (
                 <Section title="What you'd be accepting">
                     <div className="mt-2 flex flex-col gap-3">
@@ -120,12 +142,28 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                     </div>
                 </Section>
             )}
-
-            <footer className="border-t border-finn-cotton px-5 py-4">
-                <p className="text-[11px] leading-4 text-finn-iron">
-                    {analysis.cost.disclaimer}
-                </p>
-            </footer>
         </article>
+    );
+}
+
+/**
+ * What the verdict was measured against.
+ *
+ * Requirement, not decoration. The same car opened by somebody else gets a
+ * different word, and a band shown without saying what it is a match *with*
+ * invites being read as a verdict on the car.
+ *
+ * It sits under the reasons rather than in the header. At the top it was a
+ * disclaimer standing between the reader and the answer, read before there was
+ * anything to qualify; under the reasons it is the last word on them, which is
+ * where a caveat earns its place.
+ */
+function BasisNote() {
+    return (
+        <p className="mt-3 text-[11px] leading-4 text-finn-iron">
+            Measured against your saved Lens settings — your priorities, their
+            order, and the features you picked out. Someone with different
+            settings would see a different answer.
+        </p>
     );
 }

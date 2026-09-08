@@ -107,7 +107,17 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
 
                     <FeatureGroups priority={priority} />
 
-                    {priority.measurements.length > 0 && !priority.impact && (
+                    {/*
+                      * Only where the prose above is absent. The engine writes
+                      * the same facts into a sentence — "It has 5 seats and
+                      * 400 L of boot space" — and this list was repeating it
+                      * verbatim a few lines below. Where there is no sentence
+                      * (a car FINN sent no equipment list for) this is the
+                      * only place the figures appear, so it stays.
+                      */}
+                    {priority.measurements.length > 0 &&
+                        !priority.impact &&
+                        priority.sentences.length === 0 && (
                         <dl className="flex flex-wrap gap-x-4 gap-y-1">
                             {priority.measurements.map((fact) => (
                                 <div key={fact.label} className="flex gap-1.5">

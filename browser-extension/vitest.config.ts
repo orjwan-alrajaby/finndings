@@ -17,6 +17,15 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "entrypoints/**/*.test.ts"],
+    /*
+     * `components/` joins the other two so the advice card can be asserted on
+     * the same terms as the panel it mirrors. It renders to static markup
+     * rather than into a DOM, so it needs no more environment than these do.
+     */
+    include: [
+      "lib/**/*.test.ts",
+      "entrypoints/**/*.test.ts",
+      "components/**/*.test.ts",
+    ],
   },
 });

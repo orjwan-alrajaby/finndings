@@ -23,7 +23,8 @@ import {
 } from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
-import { formatEUR, formatKm, formatNumber } from "@/lib/reasoning-engine";
+import { formatEUR, formatNumber } from "@/lib/reasoning-engine";
+import { advertisedGap, costLead } from "@/lib/cost-copy";
 
 /**
  * The two tone classes for one mark, in the order the stylesheet expects.
@@ -1296,76 +1297,6 @@ function costRow(line: CostLine): HTMLElement {
 }
 
 /**
- * The total, said as a sentence about the reader rather than about the car.
- *
- * The figures were already right and already broken down; what was missing was
- * the sentence that connects them to the person reading. "€612 estimated per
- * month" over a table is a quote. "At the 1,200 km a month you drive, this
- * comes to about €612" is an answer to the question they actually asked, and
- * it does two things a table cannot: it says the number depends on *their*
- * driving rather than being a property of the car, and it shows the assumption
- * it rests on, so a reader whose driving has changed knows immediately why the
- * figure looks wrong and where to fix it.
- *
- * The parts are named in the sentence as well as listed below it, because the
- * split is the actionable part — a total that is mostly excess-mileage charges
- * is a different problem from one that is mostly subscription, and only one of
- * them is solved by picking a different car.
- */
-function costLead(analysis: FitAnalysis): string {
-  const { breakdown } = analysis.cost;
-  const { energy, excessMileage, subscription } = breakdown;
-
-  const km = formatKm(breakdown.monthlyKm);
-  const advertised = subscription.available ? subscription.amount : null;
-
-  /* What the reader does not already know: everything except the sticker. */
-  const added: string[] = [];
-
-  if (energy.available && energy.amount != null) {
-    added.push(`about ${formatEUR(energy.amount)} of ${energy.energyLabel}`);
-  }
-
-  if (excessMileage.available && (excessMileage.amount ?? 0) > 0) {
-    const over = breakdown.monthlyKm - breakdown.includedMonthlyKm;
-
-    added.push(
-      `${formatEUR(excessMileage.amount ?? 0)} for the ${formatKm(over)} ` +
-        `you'd go past the ${formatKm(breakdown.includedMonthlyKm)} included`,
-    );
-  }
-
-  const total = formatEUR(breakdown.totalMonthly);
-
-  /*
-   * No advertised price to build on — rare, and the sentence has to stand on
-   * its own rather than contrast with a number that isn't there.
-   */
-  if (advertised == null) {
-    return breakdown.complete
-      ? `At the ${km} a month you told us you drive, this comes to about ${total} a month.`
-      : `At the ${km} a month you told us you drive, the part we can price comes to about ${total} a month.`;
-  }
-
-  const sticker = `FINN's page says ${formatEUR(advertised)} a month.`;
-
-  if (!added.length) {
-    return breakdown.complete
-      ? `${sticker} At the ${km} a month you told us you drive, that is what it costs you — nothing to add.`
-      : `${sticker} We can't price everything this car would cost you, so ${total} is a floor rather than the answer.`;
-  }
-
-  const last = added.pop() as string;
-  const listed = added.length ? `${added.join(", ")} and ${last}` : last;
-
-  return breakdown.complete
-    ? `${sticker} At the ${km} a month you told us you drive, you'd also pay ` +
-        `${listed} — so about ${total} all in.`
-    : `${sticker} At the ${km} a month you told us you drive, you'd also pay ` +
-        `${listed}, which brings the part we can price to about ${total}.`;
-}
-
-/**
  * The gap between the price on FINN's page and the price for this reader.
  *
  * The one number in this section that is genuinely news. The subscription is
@@ -1380,16 +1311,9 @@ function costLead(analysis: FitAnalysis): string {
  * where the reader has actually set a limit and this car has passed it.
  */
 function costGapChip(analysis: FitAnalysis): HTMLElement | null {
-  const { breakdown } = analysis.cost;
-  const advertised = breakdown.subscription.available
-    ? breakdown.subscription.amount
-    : null;
+  const gap = advertisedGap(analysis);
 
-  if (advertised == null || !breakdown.complete) return null;
-
-  const gap = breakdown.totalMonthly - advertised;
-
-  if (gap <= 0) return null;
+  if (gap == null) return null;
 
   return verdictChip(
     `${formatEUR(gap)} a month more than the advertised price`,
