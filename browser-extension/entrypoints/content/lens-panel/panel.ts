@@ -5,6 +5,7 @@ import { brandMark, el, empty, fragment, icon, panelStyles } from "./dom";
 import { hasRoomBeside, PANEL_WIDTH } from "./panel-width";
 import { clearHighlight, highlightConfiguration } from "./highlight";
 import { analysisBody, defaultsNotice } from "./sections";
+import { pinControl } from "./pin-control";
 import { resolveCar } from "./currentCar";
 
 /**
@@ -164,10 +165,18 @@ interface PanelRequest {
 
 async function render(
   into: HTMLElement,
+  dock: HTMLElement,
   retry: () => void,
   request: PanelRequest,
 ): Promise<void> {
   empty(into);
+  /*
+   * Emptied on every render, and filled again only once there is a car to pin.
+   * Every path out of this function that isn't a loaded car — still loading,
+   * settings unreadable, car unreachable — leaves it empty, so the dock never
+   * offers to pin something the panel could not read.
+   */
+  empty(dock);
   into.append(loadingState(request.carName));
 
   /*
@@ -250,6 +259,23 @@ async function render(
   );
 
   into.scrollTop = 0;
+
+  /*
+   * The pin button, docked below the analysis rather than inside it.
+   *
+   * It used to sit in the header, directly under the verdict, on the reasoning
+   * that a reader just told a car suits them is the reader who wants to keep
+   * it. That was true and it was in the wrong place: the decision it asks for
+   * is made *after* reading — the cost, what the car uses, the compromises —
+   * and by then the button was several screens up, so acting on the answer
+   * meant scrolling back to the top of it.
+   *
+   * Outside the scroller, so it stays put while the analysis moves under it and
+   * is reachable at any point in a long read. Its `pinControl` is rebuilt with
+   * the rest of the panel on every render, which is what keeps it pointed at
+   * the car currently on screen.
+   */
+  dock.append(pinControl(car as never));
 }
 
 
@@ -290,6 +316,21 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   const scroller = el("div", {
     class: "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+  });
+
+  /*
+   * The one action the panel asks for, held at the bottom of it.
+   *
+   * Empty until there is a car, and it draws no border or padding of its own
+   * when empty — `:empty` rather than a flag this file has to remember to
+   * set, so a render that leaves it unfilled cannot leave a strip of white
+   * across the foot of the panel.
+   */
+  const dock = el("div", {
+    class: [
+      "shrink-0 border-t border-finn-cotton bg-white px-5 py-3",
+      "[&:empty]:hidden",
+    ].join(" "),
   });
 
   const close = () => closePanel();
@@ -371,7 +412,7 @@ async function build(request: PanelRequest): Promise<Panel> {
         "aria-labelledby": "finn-lens-title",
       },
     },
-    [bar, scroller],
+    [bar, scroller, dock],
   );
 
   shadow.append(drawer);
@@ -416,7 +457,7 @@ async function build(request: PanelRequest): Promise<Panel> {
    */
   let current = request;
 
-  const retry = () => void render(scroller, retry, current);
+  const retry = () => void render(scroller, dock, retry, current);
 
   const show = (next: PanelRequest) => {
     current = next;
@@ -449,7 +490,7 @@ async function build(request: PanelRequest): Promise<Panel> {
     host.remove();
   };
 
-  void render(scroller, retry, current);
+  void render(scroller, dock, retry, current);
 
   document.body.append(host);
   closeButton.focus();

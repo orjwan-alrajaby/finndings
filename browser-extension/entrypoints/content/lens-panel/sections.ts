@@ -17,7 +17,6 @@ import {
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 
 import {
-  describeFit,
   FIT_BANDS,
   FIT_METER_SEGMENTS,
   FIT_SEGMENTS,
@@ -57,7 +56,6 @@ import {
   fragment,
   icon,
 } from "./dom";
-import { pinControl } from "./pin-control";
 
 /**
  * The analysis, drawn.
@@ -234,47 +232,53 @@ function fitHeader(
       el("p", {
         class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
         /*
-         * Neither the price nor the power. The reader is standing on FINN's
-         * page with both already in front of them, and this panel exists to
-         * add to that rather than to recite it back.
+         * Without the power, which decides nothing the panel goes on to say,
+         * and without the fuel type, which has moved to "How much it uses" —
+         * what a car runs on is what decides the cohort its consumption is
+         * judged against, so it belongs beside that judgement.
          */
         text: configurationDetail(vehicle, {
-          withPrice: false,
           withPower: false,
+          withFuel: false,
         }),
       }),
 
-      el("p", {
-        class: "mt-2.5 text-[13px] leading-5 text-finn-black",
-        text: describeFit(analysis),
-      }),
-
       /*
-       * The one action the answer invites, and the only reason to make it
-       * loud: a reader who has just been told a car suits them is exactly the
-       * reader who wants to keep it, and the alternative is hunting for a
-       * small circle on a card.
+       * The tally that used to sit here — "a good or strong match on 3 of the
+       * 5 priorities you set, led by safety & driver assistance, your #1" —
+       * is gone. The band chip over the photograph already gives the verdict,
+       * and every claim the sentence made is made again, with its evidence,
+       * by the priority sections underneath: the count, the order, and which
+       * one led. It was a summary of the page placed at the top of the page.
        */
-      pinControl(vehicle as never),
-
-      /*
-       * Requirement, not decoration. The same car opened by somebody else gets a
-       * different word, and a panel that says "Strong match" without saying what
-       * it is a match *with* invites being read as a verdict on the car.
-       *
-       * Which settings, though, has to be true. Saying "your saved settings"
-       * to a reader who has saved none — which is now a reader who still gets
-       * a full reading — would be the panel asserting the one thing the
-       * notice above it exists to deny.
-       */
-      el("p", {
-        class: "mt-3 text-[11px] leading-4 text-finn-iron",
-        text: usingDefaults
-          ? "Measured against the priorities and picks Lens starts you on, not ones you have given it. Someone with different settings would see a different answer."
-          : "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
-      }),
     ]),
   ]);
+}
+
+/**
+ * What the verdict was measured against.
+ *
+ * Requirement, not decoration. The same car opened by somebody else gets a
+ * different word, and a panel that says "Strong match" without saying what it
+ * is a match *with* invites being read as a verdict on the car.
+ *
+ * Which settings, though, has to be true. Saying "your saved settings" to a
+ * reader who has saved none — which is now a reader who still gets a full
+ * reading — would be the panel asserting the one thing `defaultsNotice`
+ * exists to deny.
+ *
+ * It sits under "Why it fits" rather than in the header. At the top it was a
+ * disclaimer standing between the reader and the answer, read before there was
+ * anything to qualify; under the reasons it is the last word on them, which is
+ * where a caveat is worth reading.
+ */
+function basisNote(usingDefaults: boolean): HTMLElement {
+  return el("p", {
+    class: "mt-3 text-[11px] leading-4 text-finn-iron",
+    text: usingDefaults
+      ? "Measured against the priorities and picks Lens starts you on, not ones you have given it. Someone with different settings would see a different answer."
+      : "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
+  });
 }
 
 /**
@@ -325,8 +329,21 @@ function photo(analysis: FitAnalysis): HTMLElement {
 /* 2. Why it fits                                                             */
 /* -------------------------------------------------------------------------- */
 
-function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
-  if (!analysis.strengths.length) return null;
+function strengthsSection(
+  analysis: FitAnalysis,
+  usingDefaults = false,
+): HTMLElement {
+  /*
+   * A car that serves nothing the reader ranked has no reasons to list, and a
+   * "Why it fits" heading over nothing would be the panel insisting. The note
+   * still has to appear — it is what the verdict above was measured against —
+   * so it keeps its place in the flow without a heading it can't earn.
+   */
+  if (!analysis.strengths.length) {
+    return el("div", { class: "border-t border-finn-cotton px-5 py-4" }, [
+      basisNote(usingDefaults),
+    ]);
+  }
 
   return section(
     "Why it fits",
@@ -343,6 +360,8 @@ function strengthsSection(analysis: FitAnalysis): HTMLElement | null {
         ]),
       ),
     ),
+
+    basisNote(usingDefaults),
   );
 }
 
@@ -994,6 +1013,33 @@ const EFFICIENCY_CLASS: Record<EfficiencyLevel, string> = {
   low: "bg-finn-warning-lift text-finn-warning-deep",
 };
 
+/**
+ * What the car runs on, said loudly, at the top of the section it governs.
+ *
+ * It used to be a word in the header's spec line, between the trim and the
+ * range, where it read as one more number about the car. It belongs here: what
+ * a car runs on is the single fact that decides everything this section says —
+ * which cohort its consumption is measured against, what "typical" means, and
+ * whether the figure can be graded at all. A reader who reads "15,9
+ * kWh/100km · typical is 17" without registering that this is an electric car
+ * has been given a comparison with nothing to hold it up.
+ *
+ * Solid rather than tinted, so it reads as the subject of the section rather
+ * than as a second verdict competing with the efficiency chip beside it.
+ */
+function fuelChip(fuel: string | null | undefined): HTMLElement | null {
+  if (!fuel) return null;
+
+  return el("span", {
+    class: [
+      "inline-flex shrink-0 items-center rounded-full px-2.5 py-1",
+      "text-[11px] font-black",
+      "bg-finn-highlight-navy text-white",
+    ].join(" "),
+    text: fuel,
+  });
+}
+
 /** A small coloured label carrying a verdict the text then justifies. */
 function verdictChip(label: string, className: string): HTMLElement {
   return el("span", {
@@ -1041,6 +1087,7 @@ function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
       "How much it uses",
 
       el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+        fuelChip(analysis.vehicle.fuelType),
         verdictChip(efficiency.label, EFFICIENCY_CLASS[efficiency.level]),
       ]),
 
@@ -1070,6 +1117,7 @@ function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
       "How much it uses",
 
       el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+        fuelChip(analysis.vehicle.fuelType),
         verdictChip("Can't be graded fairly", "bg-finn-cotton text-finn-iron"),
       ]),
 
@@ -1090,6 +1138,7 @@ function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
     "How much it uses",
 
     el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+      fuelChip(analysis.vehicle.fuelType),
       verdictChip("Not published", "bg-finn-cotton text-finn-iron"),
     ]),
 
@@ -1406,6 +1455,20 @@ function costSection(analysis: FitAnalysis): HTMLElement {
         text: caveat,
       }),
     ),
+
+    /*
+     * The estimate disclaimer, with the estimates.
+     *
+     * It used to close the whole panel, several screens below the only numbers
+     * it qualifies — so a reader who had finished with the cost and moved on to
+     * the equipment never met it, and one who reached it had long since stopped
+     * looking at the figures it was about. A caveat is worth reading next to
+     * the thing it is a caveat about.
+     */
+    el("p", {
+      class: "mt-3 border-t border-finn-cotton pt-3 text-[11px] leading-4 text-finn-iron",
+      text: cost.disclaimer,
+    }),
   );
 }
 
@@ -1523,15 +1586,8 @@ export function analysisBody(
     costSection(analysis),
     efficiencySection(analysis),
 
-    strengthsSection(analysis),
+    strengthsSection(analysis, notice != null),
     ...analysis.priorities.map(prioritySection),
     tradeoffsSection(analysis),
-
-    el("footer", { class: "border-t border-finn-cotton px-5 py-4" }, [
-      el("p", {
-        class: "text-[11px] leading-4 text-finn-iron",
-        text: analysis.cost.disclaimer,
-      }),
-    ]),
   ]);
 }

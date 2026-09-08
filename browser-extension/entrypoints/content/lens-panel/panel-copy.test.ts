@@ -220,20 +220,53 @@ describe("what the panel leads with", () => {
     expect(uses).toBeLessThan(firstPriority);
   });
 
-  /*
-   * Both are on the listing behind the panel. Repeating them spends the first
-   * line the reader looks at on something they have just read.
-   */
-  it("does not recite the advertised price back in the header", () => {
+  it("keeps FINN's own price in the header", () => {
     const host = panel({ id: 21, customerMonthly: 500 });
 
-    expect(header(host)).not.toContain("from €500");
+    expect(header(host)).toContain("€500");
   });
 
   it("leaves horsepower out, since nothing here is decided by it", () => {
     const host = panel({ id: 22 });
 
     expect(header(host)).not.toMatch(/\bPS\b/);
+  });
+
+  /*
+   * What a car runs on decides which cohort its consumption is judged against,
+   * so it belongs beside that judgement rather than mid-way through a line of
+   * specs where it reads as one more number.
+   */
+  it("moves the fuel type out of the header and into the usage section", () => {
+    const host = panel({ id: 25, fuelType: "Electric", consumption: 15 });
+
+    expect(header(host)).not.toContain("Electric");
+    expect(usage(host)).toContain("Electric");
+  });
+
+  /*
+   * The chip over the photograph already gives the verdict, and every claim the
+   * tally made — the count, the order, which priority led — is made again with
+   * its evidence by the sections underneath.
+   */
+  it("drops the tally that summarised the page at the top of the page", () => {
+    const host = panel({ id: 26, featuresSupplied: true, features: ["hasIsofix"] });
+
+    expect(header(host)).not.toMatch(/match on \d+ of the \d+ priorities/);
+  });
+
+  it("puts the basis for the verdict under the reasons, not above them", () => {
+    const host = panel({ id: 27, featuresSupplied: true, features: ["hasIsofix"] });
+
+    expect(header(host)).not.toContain("Measured against");
+    expect(host.textContent).toContain("Measured against");
+  });
+
+  /* A caveat is worth reading next to the thing it is a caveat about. */
+  it("keeps the estimate disclaimer with the estimates", () => {
+    const host = panel({ id: 28, consumption: 6 });
+
+    expect(costs(host)).toContain("These numbers are estimates");
   });
 
   /*

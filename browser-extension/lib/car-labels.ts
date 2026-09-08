@@ -33,6 +33,7 @@ export function configurationDetail(
     {
         withPrice = true,
         withPower = true,
+        withFuel = true,
     }: {
         /**
          * Drop the price where the surface already shows it. The pinned list
@@ -57,6 +58,13 @@ export function configurationDetail(
          * trim name above it and the analysis below are all still that car's.
          */
         withPower?: boolean;
+        /**
+         * Drop the fuel type where the surface gives it a place of its own.
+         * The panel does: what a car runs on decides which cohort its
+         * consumption is judged against, so it belongs beside that judgement
+         * rather than buried mid-way through a line of specs.
+         */
+        withFuel?: boolean;
     } = {},
 ): string {
     const range =
@@ -68,7 +76,7 @@ export function configurationDetail(
 
     return [
         withPower && car.power?.inHp ? `${car.power.inHp} PS` : null,
-        car.fuelType,
+        withFuel ? car.fuelType : null,
         range,
         withPrice && price ? `from ${formatEUR(price)}/mo` : null,
     ]

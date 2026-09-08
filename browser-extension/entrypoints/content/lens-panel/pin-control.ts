@@ -167,7 +167,7 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
    */
   const paint = () => {
     button.className = [
-      "mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-full",
+      "flex h-11 w-full items-center justify-center gap-2 rounded-full",
       "text-[13px] font-black transition-colors",
       pinned
         ? "bg-finn-pale-blue text-finn-highlight-navy hover:bg-finn-cotton"
