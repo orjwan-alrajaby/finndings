@@ -9,6 +9,7 @@ import { NavButton, PageHeader } from "@/components/PageHeader";
 
 import { AdjustDrawer } from "./components/AdjustDrawer";
 import { Advice } from "./advice";
+import { Challenge } from "./advice/Challenge";
 import { useCompareStore } from "./store";
 
 /**
@@ -39,6 +40,23 @@ export default function CompareTab({
   const settingsLoaded = useCompareStore((state) => state.settingsLoaded);
 
   const [adjusting, setAdjusting] = useState(false);
+
+  /**
+   * Which of the two readings is on screen.
+   *
+   * They used to be one page, and the trouble with that was not length but
+   * subject: the recommendation argued for a car and the hot seat argued for
+   * a different one, with a control halfway down deciding which the cost
+   * section was currently about. The PDF settled it — the export flattened
+   * both into a document that recommended and challenged at once, and a
+   * reader sending it on could not say which car it was for.
+   *
+   * Local rather than in the store: which tab is open is not one of the
+   * reader's answers and has no bearing on the reasoning. The *challenger*
+   * they picked does live in the store, so crossing between tabs and back
+   * finds the hot seat as they left it.
+   */
+  const [view, setView] = useState<"advice" | "challenge">("advice");
 
   useEffect(() => {
     void loadSettings();
@@ -150,7 +168,38 @@ export default function CompareTab({
         </PageHeader>
 
         <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-          <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
+          {/*
+            * Two readings of one set of answers, and the tabs say which is
+            * which before either is read. Above the page rather than inside
+            * it, because they switch the whole subject — a control that
+            * changed the page from under its own heading is what this split
+            * was undoing.
+            */}
+          <div
+            role="tablist"
+            aria-label="Advice views"
+            className="finn-lens-screen-only mb-6 inline-flex rounded-full bg-finn-cotton p-1"
+          >
+            <ViewTab
+              id="advice"
+              current={view}
+              onSelect={setView}
+              label="The recommendation"
+            />
+
+            <ViewTab
+              id="challenge"
+              current={view}
+              onSelect={setView}
+              label="Challenge it"
+            />
+          </div>
+
+          {view === "advice" ? (
+            <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
+          ) : (
+            <Challenge cars={cars} onAdjust={() => setAdjusting(true)} />
+          )}
         </div>
 
         <AdjustDrawer
@@ -160,5 +209,47 @@ export default function CompareTab({
         />
       </main>
     </Tooltip.Provider>
+  );
+}
+
+/**
+ * One of the two views, as a tab.
+ *
+ * `role="tab"` with `aria-selected` rather than two buttons that merely look
+ * chosen: a reader on a screen reader is being told these are alternatives and
+ * which one they are in, which is the whole content of the control.
+ *
+ * Hidden from the PDF along with every other control. Each view exports
+ * itself, so a row of tabs in the file would be a picture of a choice the
+ * reader has already made.
+ */
+function ViewTab({
+  id,
+  current,
+  onSelect,
+  label,
+}: {
+  id: "advice" | "challenge";
+  current: "advice" | "challenge";
+  onSelect: (view: "advice" | "challenge") => void;
+  label: string;
+}) {
+  const selected = current === id;
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={() => onSelect(id)}
+      className={[
+        "rounded-full px-4 py-2 text-xs font-black transition-colors",
+        selected
+          ? "bg-white text-finn-black shadow-sm"
+          : "text-finn-iron hover:text-finn-black",
+      ].join(" ")}
+    >
+      {label}
+    </button>
   );
 }

@@ -19,8 +19,22 @@ import { EFFICIENCY_TONE, readUsage } from "@/lib/usage-copy";
  * of one line in it: what a car uses is why the energy figure above is the
  * size it is.
  */
-export function EnergyUse({ car }: { car: PinnedFinnCar }) {
+export function EnergyUse({
+    car,
+    against,
+}: {
+    car: PinnedFinnCar;
+    /**
+     * The recommendation, when this section is describing a challenger.
+     *
+     * Same reason the cost section takes one: a comparison page that shows
+     * only the challenger's figure asks the reader to remember the winner's.
+     * Null on the recommendation view, where there is nothing to be next to.
+     */
+    against?: { name: string; car: PinnedFinnCar } | null;
+}) {
     const reading = readUsage(car);
+    const rival = against ? readUsage(against.car) : null;
 
     return (
         /*
@@ -96,7 +110,60 @@ export function EnergyUse({ car }: { car: PinnedFinnCar }) {
                     {reading.body}
                 </p>
             )}
+
+            {against && rival && (
+                <Rival name={against.name} reading={rival} />
+            )}
         </section>
+    );
+}
+
+/**
+ * The recommendation's own figure, for the challenger to be read against.
+ *
+ * Deliberately a line rather than a second copy of the section above it. The
+ * question on the challenge tab is "would swapping cost me more to run", and
+ * that is answered by two numbers next to each other — repeating the cohort
+ * reasoning, the readouts and the WLTP caveat for a car the reader has already
+ * read about under the other tab would bury the one line they came for.
+ *
+ * Two cars on different fuels are still worth putting side by side even though
+ * their figures are not directly comparable: the labels are, because each was
+ * graded against its own kind. So the verdict leads and the raw figure follows
+ * it, rather than the other way round.
+ */
+function Rival({
+    name,
+    reading,
+}: {
+    name: string;
+    reading: ReturnType<typeof readUsage>;
+}) {
+    return (
+        <p className="mt-4 rounded-[22px] bg-white p-5 text-sm leading-6 text-finn-black">
+            <span className="font-black">{name}</span>
+            {", the recommendation, is "}
+            {reading.kind === "graded" ? (
+                <>
+                    <span className="font-black">
+                        {reading.efficiency.label.toLowerCase()}
+                    </span>
+                    {/*
+                      * No "for a Petrol" clause here. It needed an article the
+                      * fuel name cannot supply — "a Electric" — and it was not
+                      * carrying its weight anyway: the label already means
+                      * "for its kind", and the unit says which kind.
+                      */}
+                    {` at ${reading.efficiency.display}.`}
+                </>
+            ) : (
+                <>
+                    {reading.kind === "ungradable"
+                        ? "a plug-in hybrid, which can't be graded on one blended figure."
+                        : "a car FINN publishes no consumption for, so there is nothing to set against this."}
+                </>
+            )}
+        </p>
     );
 }
 

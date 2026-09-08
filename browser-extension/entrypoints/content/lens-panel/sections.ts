@@ -206,10 +206,7 @@ function prose(text: string, tone = "text-finn-black"): HTMLElement {
 /* 1. Overall fit                                                             */
 /* -------------------------------------------------------------------------- */
 
-function fitHeader(
-  analysis: FitAnalysis,
-  usingDefaults = false,
-): HTMLElement {
+function fitHeader(analysis: FitAnalysis): HTMLElement {
   const { vehicle } = analysis;
 
   return el("header", { class: "pb-4" }, [
@@ -1433,7 +1430,7 @@ export function analysisBody(
 ): DocumentFragment {
   return fragment([
     notice,
-    fitHeader(analysis, notice != null),
+    fitHeader(analysis),
 
     /*
      * Money first, then what drives it, then the fit.
