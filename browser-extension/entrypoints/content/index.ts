@@ -7,7 +7,7 @@ import {
   getPinnedCars,
   mergeLoadedCars,
 } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
-import { mountLauncher, unmountLauncher } from "./lens-panel/launcher";
+import { closePanel } from "./lens-panel/panel";
 import {
   applyFitVerdicts,
   injectFitButtons,
@@ -112,7 +112,6 @@ export default defineContentScript({
 
       if (document.querySelector(DETAILS_PAGE_SELECTOR)) {
         injectPinBtnIntoDetailsPage();
-        void mountLauncher();
       }
 
       /*
@@ -174,11 +173,18 @@ export default defineContentScript({
       }
 
       /*
-       * Taken down before the new page is read rather than after. FINN moves
-       * between cars without reloading, and a panel still describing the car
-       * the reader has just left is worse than no panel at all.
+       * Shut before the new page is read rather than after. FINN moves between
+       * cars without reloading, and a panel still describing the car the
+       * reader has just left is worse than no panel at all.
+       *
+       * This used to be `unmountLauncher`, which closed the panel on its way
+       * out. The launcher is gone — every configuration carries its own badge,
+       * so a floating button offering the same thing for whichever car the
+       * page happened to be about was a second way in that named no car — and
+       * closing the panel is the part of that teardown that still has to
+       * happen.
        */
-      unmountLauncher();
+      closePanel();
       removeFitBadges();
 
       navDebounceTimer = setTimeout(() => {

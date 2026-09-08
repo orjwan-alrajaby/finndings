@@ -5,7 +5,6 @@ import type {
   FitPriority,
 } from "@/lib/reasoning-engine/fit";
 import type { CostLine } from "@/lib/reasoning-engine/types";
-import type { FinnCar } from "@/lib/types";
 import type { EnvironmentalAssessment } from "@/lib/reasoning-engine/environmental";
 import {
   describeEmissionsVersusEfficiency,
@@ -199,106 +198,6 @@ function explains(subject: string, explanation: string): {
 /** A short line of plain prose, as the engine wrote it. */
 function prose(text: string, tone = "text-finn-black"): HTMLElement {
   return el("p", { class: `text-[13px] leading-5 ${tone}`, text });
-}
-
-/* -------------------------------------------------------------------------- */
-/* Configurations                                                             */
-/* -------------------------------------------------------------------------- */
-
-/**
- * The configurations this model comes in, as a choice.
- *
- * Shown whenever there is more than one, selected or not. When the URL already
- * names one this is how the reader flips to a sibling without leaving the
- * panel; when it doesn't, this is the question the panel opens with. Each row
- * carries its own band, so the choice is informed before it is made — which is
- * the one thing FINN's own configuration grid can't tell them.
- */
-export function configurationsSection({
-  cars,
-  bandOf,
-  onSelect,
-}: {
-  cars: FinnCar[];
-  bandOf: (id: number) => { level: FitLevel; label: string } | null;
-  onSelect: (id: number) => void;
-}): HTMLElement | null {
-  if (cars.length < 2) return null;
-
-  const rows = cars.map((car) => {
-    const band = bandOf(car.id);
-
-    return el(
-      "button",
-      {
-        class: [
-          "flex w-full items-center gap-3 rounded-xl bg-finn-snow px-3 py-2.5",
-          "text-left transition-colors hover:bg-finn-cotton",
-        ].join(" "),
-        attrs: { type: "button" },
-        on: { click: () => onSelect(car.id) },
-      },
-      [
-        el("span", { class: "min-w-0 flex-1" }, [
-          el("span", {
-            class: "block truncate text-[13px] font-bold text-finn-black",
-            text: configurationName(car),
-          }),
-          el("span", {
-            class: "block truncate text-[11px] leading-4 text-finn-iron",
-            text: configurationDetail(car),
-          }),
-        ]),
-
-        band ? bandChip(band.level, band.label) : null,
-
-        el("span", {
-          class: "shrink-0 text-finn-iron",
-          attrs: { "aria-hidden": "true" },
-          text: "›",
-        }),
-      ],
-    );
-  });
-
-  return el("div", { class: "px-5 pb-4 pt-2" }, [
-    el("div", { class: "flex flex-col gap-1.5" }, rows),
-  ]);
-}
-
-/**
- * The way back to the list, and the only thing on screen that offers it.
- *
- * The list used to stay under the analysis so a reader could switch without
- * going anywhere. That reads as two screens stacked into one: the answer to
- * "how does this fit me" sits below a control asking which car we're talking
- * about, and every time the reader scrolls past it they have to re-establish
- * which row is the one they're reading. One thing at a time is easier to hold
- * — the list, or a car — so choosing replaces the list, and this brings it
- * back.
- */
-export function backToConfigurations(
-  count: number,
-  onBack: () => void,
-): HTMLElement {
-  return el("div", { class: "px-5 pt-4" }, [
-    el(
-      "button",
-      {
-        class: [
-          "inline-flex items-center gap-1.5 rounded-full bg-finn-snow px-3 py-1.5",
-          "text-[11px] font-bold text-finn-iron transition-colors",
-          "hover:bg-finn-cotton hover:text-finn-black",
-        ].join(" "),
-        attrs: { type: "button" },
-        on: { click: onBack },
-      },
-      [
-        el("span", { attrs: { "aria-hidden": "true" }, text: "‹" }),
-        el("span", { text: `All ${count} configurations` }),
-      ],
-    ),
-  ]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1351,11 +1250,9 @@ export function defaultsNotice(onPersonalise: () => void): HTMLElement {
 
 export function analysisBody(
   analysis: FitAnalysis,
-  back: Node | null = null,
   notice: Node | null = null,
 ): DocumentFragment {
   return fragment([
-    back,
     notice,
     fitHeader(analysis, notice != null),
     strengthsSection(analysis),

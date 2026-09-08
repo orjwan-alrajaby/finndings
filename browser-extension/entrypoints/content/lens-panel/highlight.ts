@@ -8,12 +8,10 @@
  * number. Marking the card removes that job entirely: the answer and the thing
  * it is about are visibly the same object.
  *
- * Marking is also what keeps the card out from under the panel. The panel is
- * a strip over the right of the page and is allowed to cover it — except for
- * this one card, whose own section is narrowed so it reflows into what is
- * left. That pairing is deliberate: "the card the panel is talking about" and
- * "the card that has to stay visible" are the same card, and splitting the
- * two apart would let them disagree.
+ * Marking is all this does now. It used to also narrow the block the card sat
+ * in, so the card reflowed out from under the panel — see `panel-width` for
+ * why that went. The mark says *which* car and changes no geometry doing it,
+ * which is what makes it safe to leave on someone else's page.
  *
  * Nothing of FINN's is rewritten: a class goes on the card's photo block and a
  * stylesheet goes in the head, and both come off again when the panel closes
@@ -21,7 +19,6 @@
  */
 
 import { cardForCar, cardPhoto } from "./currentCar";
-import { dockSectionFor, undockSection } from "./section-dock";
 
 const STYLE_ID = "finn-lens-highlight-style";
 const HIGHLIGHTING = "finn-lens-highlighting";
@@ -62,21 +59,17 @@ let marked: HTMLElement | null = null;
 /**
  * Marks one configuration on FINN's page, and clears whatever was marked.
  *
- * `scroll` is deliberately not automatic. Choosing a configuration in the
- * panel is a request to be shown it, so the page goes there; opening the panel
- * on a car the URL already named is not, and moving someone's page under them
- * before they have asked for anything is the kind of help nobody wants.
+ * It used to be able to scroll the page to the card as well, for the one
+ * caller that needed it: choosing a configuration from the panel's chooser was
+ * a request to be shown that car, so the page went to it. Opening the panel
+ * from a badge never was — the reader is already looking at the card they
+ * clicked — so with the chooser gone every remaining call just marks, and
+ * moving someone's page under them is not a thing this can do any more.
  */
-export function highlightConfiguration(
-  id: number | null,
-  { scroll = false }: { scroll?: boolean } = {},
-): void {
+export function highlightConfiguration(id: number | null): void {
   const card = id == null ? null : configurationCard(id);
 
-  if (card === marked) {
-    if (card && scroll) reveal(card);
-    return;
-  }
+  if (card === marked) return;
 
   clearHighlight();
 
@@ -95,17 +88,10 @@ export function highlightConfiguration(
   document.documentElement.classList.add(HIGHLIGHTING);
 
   marked = card;
-
-  /* The one piece of finn.com that isn't the panel's to cover. */
-  dockSectionFor(card);
-
-  if (scroll) reveal(card);
 }
 
 export function clearHighlight(): void {
   document.documentElement.classList.remove(HIGHLIGHTING);
-
-  undockSection();
 
   if (marked) {
     marked.classList.remove(CURRENT);
@@ -117,13 +103,4 @@ export function clearHighlight(): void {
   marked = null;
 
   document.getElementById(STYLE_ID)?.remove();
-}
-
-/**
- * Centred rather than scrolled to the top, so the cards either side of it stay
- * visible — the reader is being shown which of several this one is, and a card
- * alone at the top of the screen doesn't answer that.
- */
-function reveal(card: HTMLElement): void {
-  card.scrollIntoView({ behavior: "smooth", block: "center" });
 }

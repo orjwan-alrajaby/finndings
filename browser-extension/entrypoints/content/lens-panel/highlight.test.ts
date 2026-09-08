@@ -131,23 +131,19 @@ describe("highlightConfiguration", () => {
     expect(css).not.toContain("border");
   });
 
-  it("goes to the car when the reader picked it", () => {
-    highlightConfiguration(34889, { scroll: true });
-
-    expect(scrolled).toEqual(["34889"]);
-  });
-
-  it("doesn't move the page for a car the reader merely arrived on", () => {
+  /*
+   * Marking used to be able to scroll, for the panel's configuration chooser:
+   * picking a car there was a request to be shown it. The chooser is gone and
+   * the badge is the only way in, so the reader is always already looking at
+   * the card — moving the page under them would now never be asked for, and
+   * this is the test that says the ability went away with the caller.
+   */
+  it("never moves the page", () => {
+    highlightConfiguration(34889);
+    highlightConfiguration(36918);
     highlightConfiguration(34889);
 
     expect(scrolled).toEqual([]);
-  });
-
-  it("goes there again when the same car is asked for again", () => {
-    highlightConfiguration(34889, { scroll: true });
-    highlightConfiguration(34889, { scroll: true });
-
-    expect(scrolled).toEqual(["34889", "34889"]);
   });
 
   it("doesn't re-mark on a repaint that changes nothing", () => {
@@ -170,7 +166,7 @@ describe("highlightConfiguration", () => {
   it("gives everything back", () => {
     const before = document.documentElement.outerHTML;
 
-    highlightConfiguration(34889, { scroll: true });
+    highlightConfiguration(34889);
     clearHighlight();
 
     expect(document.documentElement.outerHTML).toBe(before);

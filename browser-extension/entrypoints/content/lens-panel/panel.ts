@@ -1,19 +1,11 @@
-import {
-  buildFitAnalysis,
-  type FitAnalysis,
-} from "@/lib/reasoning-engine/fit";
+import { buildFitAnalysis } from "@/lib/reasoning-engine/fit";
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
 import { el, empty, fragment, icon, panelStyles } from "./dom";
-import { hasRoomBeside, PANEL_WIDTH } from "./section-dock";
+import { hasRoomBeside, PANEL_WIDTH } from "./panel-width";
 import { clearHighlight, highlightConfiguration } from "./highlight";
-import {
-  analysisBody,
-  backToConfigurations,
-  configurationsSection,
-  defaultsNotice,
-} from "./sections";
-import { detailsPageRoot, resolveCar, resolvePageCars } from "./currentCar";
+import { analysisBody, defaultsNotice } from "./sections";
+import { resolveCar } from "./currentCar";
 
 /**
  * The panel itself: a drawer over finn.com, and the states it can be in.
@@ -53,20 +45,6 @@ interface Panel {
 }
 
 let open: Panel | null = null;
-
-/**
- * Told when the panel comes and goes, so the launcher can get out of its way.
- *
- * A callback rather than the launcher being imported here: it already imports
- * this module, and the dependency should keep pointing one way.
- */
-let onVisibility: ((visible: boolean) => void) | null = null;
-
-export function watchPanelVisibility(
-  listener: (visible: boolean) => void,
-): void {
-  onVisibility = listener;
-}
 
 /* -------------------------------------------------------------------------- */
 /* States                                                                     */
@@ -161,31 +139,21 @@ const openSetup = () => {
  * we know which car this is but couldn't load it.
  */
 /**
- * Where the reader has navigated inside the panel, kept across re-renders.
+ * The car the panel was opened about. Always one, now.
  *
- * A re-render is not a fresh start — settings changing in the options tab
- * redraws the analysis, and redrawing it for a different car than the one the
- * reader was reading would be its own small betrayal.
+ * `carId` used to be optional, meaning "whatever this page is showing" — which
+ * is how the floating launcher asked, because it belonged to the page rather
+ * than to any car on it. That is what the configuration chooser existed to
+ * resolve: the launcher could only say "this model", so the panel had to ask
+ * which of the model's configurations the reader meant.
  *
- * Three states, not two. `undefined` means they haven't navigated at all and
- * the URL still decides; a number is the car they opened; and `null` is the
- * list, which they reached by deliberately going back. Collapsing that last
- * one into "nothing chosen" would send a reader who had just returned to the
- * list straight back into the car the URL names.
- */
-interface Session {
-  choice: number | null | undefined;
-}
-
-/**
- * The car the panel was opened about, when it was opened about one.
- *
- * Undefined means "whatever this page is showing", which is how the launcher
- * on a detail page asks. A card badge asks the other way: it names the car,
- * and the page it was clicked on may be a list of forty others.
+ * The badge asks the other way round. It sits on a card, so it names the car,
+ * and it is now the only way in — every configuration on a detail page carries
+ * its own. The question the chooser asked is answered before the panel opens,
+ * so the chooser and everything reachable only through it is gone.
  */
 interface PanelRequest {
-  carId?: number;
+  carId: number;
   /**
    * The car's name as the card that was clicked spells it, so the loading
    * state can name what it is loading. Only ever used for that: the analysis
@@ -197,7 +165,6 @@ interface PanelRequest {
 async function render(
   into: HTMLElement,
   retry: () => void,
-  session: Session,
   request: PanelRequest,
 ): Promise<void> {
   empty(into);
@@ -236,100 +203,29 @@ async function render(
   }
 
   /*
-   * Asked about one particular car, so the page it was asked from doesn't
-   * come into it. No chooser either — the reader already chose, by clicking
-   * the card they were looking at.
+   * Waited for, then asked for. The badge is drawn as soon as the card is,
+   * which is before the interceptor's copy of FINN's response has reached
+   * storage — so on a listing the reader can very reasonably click a car we
+   * are about to know about, and a moment's wait answers that. A car FINN
+   * never sent us is fetched outright, the way the pin button has always
+   * fetched it. See `resolveCar`.
    */
-  if (request.carId != null) {
-    /*
-     * Waited for, then asked for. The badge is drawn as soon as the card is,
-     * which is before the interceptor's copy of FINN's response has reached
-     * storage — so on a listing the reader can very reasonably click a car we
-     * are about to know about, and a moment's wait answers that. A car FINN
-     * never sent us is fetched outright, the way the pin button has always
-     * fetched it. See `resolveCar`.
-     */
-    const car = await resolveCar(request.carId, {
-      waitMs: CAR_WAIT_MS,
-      fetchIfMissing: true,
-    });
+  const car = await resolveCar(request.carId, {
+    waitMs: CAR_WAIT_MS,
+    fetchIfMissing: true,
+  });
 
-    if (!car) {
-      empty(into);
-      into.append(
-        message(
-          "We couldn't load this car",
-          "Lens asked FINN for it and didn't get an answer it could use. That is usually the connection rather than the car — try again in a moment.",
-          {
-            label: "Try again",
-            onClick: retry,
-          },
-        ),
-      );
-
-      return;
-    }
-
-    const settings = await loadLensSettings();
-
-    /* Marked, not scrolled to: the card is already under the reader's cursor. */
-    highlightConfiguration(car.id);
-
-    empty(into);
-    into.append(
-      analysisBody(
-        buildFitAnalysis(
-          car,
-          settings.priorities,
-          settings.preferences,
-          settings.categoryFeatures,
-        ),
-        null,
-        configured ? null : defaultsNotice(openSetup),
-      ),
-    );
-
-    into.scrollTop = 0;
-
-    return;
-  }
-
-  const root = detailsPageRoot();
-
-  if (!root) {
+  if (!car) {
     empty(into);
     into.append(
       message(
-        "This isn't a car page",
-        "Open a car on FINN and Lens can tell you how it fits what you asked for.",
+        "We couldn't load this car",
+        "Lens asked FINN for it and didn't get an answer it could use. That is usually the connection rather than the car — try again in a moment.",
+        {
+          label: "Try again",
+          onClick: retry,
+        },
       ),
-    );
-
-    return;
-  }
-
-  const page = await resolvePageCars(root);
-
-  if (page.status === "unidentified") {
-    empty(into);
-    into.append(
-      message(
-        "We can't tell which car this is",
-        "Nothing on this page says which car it's showing. Open one from FINN's list and Lens will pick it up — analysing the wrong car would be worse than not analysing one.",
-        { label: "Try again", onClick: retry },
-      ),
-    );
-
-    return;
-  }
-
-  if (page.status === "unavailable") {
-    empty(into);
-    into.append(
-      message("We couldn't load this car", page.reason, {
-        label: "Try again",
-        onClick: retry,
-      }),
     );
 
     return;
@@ -337,114 +233,25 @@ async function render(
 
   const settings = await loadLensSettings();
 
-  /*
-   * Every configuration is analysed, not only the one on screen. They are
-   * already loaded, each analysis is arithmetic over one car, and having them
-   * all is what lets the chooser show what each one would mean for this reader
-   * before they commit to reading about it.
-   */
-  const analyses = new Map<number, FitAnalysis>(
-    page.cars.map((car) => [
-      car.id,
+  /* Marked, not scrolled to: the card is already under the reader's cursor. */
+  highlightConfiguration(car.id);
+
+  empty(into);
+  into.append(
+    analysisBody(
       buildFitAnalysis(
         car,
         settings.priorities,
         settings.preferences,
         settings.categoryFeatures,
       ),
-    ]),
+      configured ? null : defaultsNotice(openSetup),
+    ),
   );
 
-  const [first] = page.cars;
-
-  /*
-   * With one configuration there is nothing to choose, so it is the subject.
-   * With several, the URL decides — and where it says nothing, so does the
-   * panel, until the reader picks.
-   */
-  /* A car they chose that the page no longer offers is no longer a choice. */
-  const navigated =
-    session.choice != null &&
-    !page.cars.some((car) => car.id === session.choice)
-      ? undefined
-      : session.choice;
-
-  let subjectId: number | null =
-    navigated !== undefined
-      ? navigated
-      : (page.selectedId ??
-        (page.cars.length === 1 && first ? first.id : null));
-
-  /*
-   * One screen at a time: the list, or one car. Choosing a configuration
-   * replaces the list rather than sitting under it, and the way back is a
-   * link at the top of the analysis.
-   */
-  const show = (id: number | null) => {
-    subjectId = id;
-    session.choice = id;
-
-    /*
-     * Choosing in the panel is a request to be shown the car, so FINN's own
-     * page goes to it. Going back to the list is a request for the opposite,
-     * and clears the mark rather than leaving one car singled out on a page
-     * the panel has stopped talking about.
-     */
-    highlightConfiguration(id, { scroll: true });
-
-    paint();
-  };
-
-  const paint = () => {
-    const analysis = subjectId == null ? null : analyses.get(subjectId);
-
-    empty(into);
-
-    into.append(
-      analysis
-        ? analysisBody(
-            analysis,
-            /* With one configuration there is no list to go back to. */
-            page.cars.length > 1
-              ? backToConfigurations(page.cars.length, () => show(null))
-              : null,
-            configured ? null : defaultsNotice(openSetup),
-          )
-        : fragment([
-            chooseLead(page.cars.length),
-            configurationsSection({
-              cars: page.cars,
-              bandOf: (id) => analyses.get(id)?.overall ?? null,
-              onSelect: show,
-            }),
-          ]),
-    );
-
-    into.scrollTop = 0;
-  };
-
-  /*
-   * Marked on arrival but not scrolled to. A reader who opened a car FINN
-   * already had selected hasn't asked to be moved anywhere.
-   */
-  highlightConfiguration(subjectId);
-
-  paint();
+  into.scrollTop = 0;
 }
 
-/** What the panel opens with when the reader hasn't chosen a car yet. */
-function chooseLead(count: number): HTMLElement {
-  return el("div", { class: "px-5 pb-1 pt-4" }, [
-    el("p", {
-      class: "text-base font-black leading-6 text-finn-black",
-      text: "Which one are you looking at?",
-    }),
-    el("p", {
-      class: "mt-1.5 text-[13px] leading-5 text-finn-iron",
-      text: `This page is showing a model, not a car — FINN sells it in ${count} configurations, and they don't fit you equally. Pick one and Lens will explain it.`,
-    }),
-  ]);
-}
 
 /* -------------------------------------------------------------------------- */
 /* The drawer                                                                 */
@@ -468,9 +275,9 @@ async function build(request: PanelRequest): Promise<Panel> {
    * clickable, scrollable and selectable, which is the entire point of a
    * strip rather than a modal.
    *
-   * What it covers, it covers. Only the section holding the car the panel is
-   * talking about gets out of the way — see `section-dock` — because that is
-   * the one part of finn.com a reader needs beside the answer about it.
+   * What it covers, it covers — including the card the panel is about. That
+   * card's section used to be narrowed so it reflowed clear; see `panel-width`
+   * for why nothing on finn.com moves any more.
    *
    * On a narrow viewport there is no room to sit beside anything, so it
    * covers the page instead.
@@ -591,8 +398,6 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   window.addEventListener("resize", onResize);
 
-  const session: Session = { choice: undefined };
-
   /*
    * Which car the panel is currently about. It changes without the panel
    * being rebuilt: a reader clicking through the verdicts on a list is asking
@@ -602,13 +407,10 @@ async function build(request: PanelRequest): Promise<Panel> {
    */
   let current = request;
 
-  const retry = () => void render(scroller, retry, session, current);
+  const retry = () => void render(scroller, retry, current);
 
   const show = (next: PanelRequest) => {
     current = next;
-
-    /* A different car is a different question, so nothing carries over. */
-    session.choice = undefined;
 
     retry();
   };
@@ -632,13 +434,13 @@ async function build(request: PanelRequest): Promise<Panel> {
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("resize", onResize);
 
-    /* The section gets its width back, and the card its own colour. */
+    /* The card gets its own colour back. */
     clearHighlight();
 
     host.remove();
   };
 
-  void render(scroller, retry, session, current);
+  void render(scroller, retry, current);
 
   document.body.append(host);
   closeButton.focus();
@@ -652,7 +454,7 @@ async function build(request: PanelRequest): Promise<Panel> {
 
 let opener: Element | null = null;
 
-export async function openPanel(request: PanelRequest = {}): Promise<void> {
+export async function openPanel(request: PanelRequest): Promise<void> {
   /*
    * An open panel is pointed at the new car rather than left showing the old
    * one. Returning early here was a bug the badges made obvious: every card
@@ -666,8 +468,6 @@ export async function openPanel(request: PanelRequest = {}): Promise<void> {
   opener = document.activeElement;
 
   open = await build(request);
-
-  onVisibility?.(true);
 }
 
 export function closePanel(): void {
@@ -679,6 +479,4 @@ export function closePanel(): void {
   if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
 
   opener = null;
-
-  onVisibility?.(false);
 }

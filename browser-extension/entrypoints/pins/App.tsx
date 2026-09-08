@@ -39,10 +39,10 @@ import { sortCars, type SortKey } from "./utils/sorting";
  *
  * So: the whole set, with the two things missing from it — removing one, and
  * reading the analysis of one without hunting for it on finn.com. The second
- * matters more than it looks. That analysis was reachable only from a card
- * badge or the launcher on a detail page, which means the reader could only
- * ask "how does this suit me?" about a car they were already looking at. Here
- * they can ask it about any car they kept, side by side with the rest.
+ * matters more than it looks. That analysis is reachable only from a card
+ * badge on finn.com, which means the reader could only ask "how does this suit
+ * me?" about a car they were already looking at. Here they can ask it about
+ * any car they kept, side by side with the rest.
  */
 export default function PinsPage() {
     const [cars, setCars] = useState<PinnedFinnCar[] | null>(null);

@@ -25,86 +25,6 @@ import { getPageContext } from "../injectors/inject-pin-button/injectPinCarButto
  * reliable signal to the least, and it returns `null` rather than a guess.
  */
 
-/**
- * Every configuration this page offers, and which of them is on screen.
- *
- * The page is read as a set rather than as one car because that is what it is:
- * a model page lists the configurations FINN sells the model in, and
- * `selected_config` picks one out. Loading them all costs nothing extra — the
- * one API call that answers "what is config 34889?" answers it for every
- * sibling too — and it is what lets the panel offer the choice instead of
- * refusing to answer until the reader makes it somewhere else.
- */
-export type PageCars =
-  | {
-      status: "ready";
-      /** In the order FINN lists them. */
-      cars: PinnedFinnCar[];
-      /** The one named by the URL, when it names one. */
-      selectedId: number | null;
-    }
-  | { status: "unidentified" }
-  | { status: "unavailable"; reason: string };
-
-/** Where FINN lists the configurations a model is available in. */
-const CONFIGURATIONS_SELECTOR = '[data-testid="group-comparison"]';
-
-/**
- * The configuration cards on a model page.
- *
- * Each carries its own `id="product-XXXXX"`, which is where the pin button
- * gets the id of the car it pins. They are scoped to FINN's comparison grid
- * rather than looked for anywhere in the page, so nothing else that happens to
- * use that id shape can be mistaken for a car.
- */
-export function configurationCards(root: HTMLElement): number[] {
-  const grid = root.querySelector(CONFIGURATIONS_SELECTOR) ?? root;
-
-  const ids = Array.from(grid.querySelectorAll<HTMLElement>('[id^="product-"]'))
-    .map((element) => /^product-(\d+)$/.exec(element.id)?.[1])
-    .map((digits) => (digits == null ? null : Number(digits)))
-    .filter((id): id is number => id != null && Number.isSafeInteger(id));
-
-  return [...new Set(ids)];
-}
-
-/**
- * The config id of the car on screen, if one is on screen at all.
- *
- * `selected_config` in the URL is the answer whenever there is one. It is how
- * FINN addresses a configuration — every "similar car" on a detail page links
- * with it, and `buildCarUrl` writes the same parameter when pinning — so it is
- * as close to canonical as the page gets.
- *
- * Without it, a model page is not showing a car. `/models/byd/dolphin-surf`
- * heads its sidebar "Wähle ein Auto", prices the model "ab 209 €" rather than
- * at any one configuration's price, and lists three of them to choose between.
- * The one case that still resolves is a model with a single configuration,
- * where there is nothing to choose.
- */
-export function resolveCurrentConfigId(
-  root: HTMLElement,
-  search: string = window.location.search,
-): number | null {
-  /*
-   * Read whole, not through `extractConfigId` — that helper matches the first
-   * five digits it finds, which is right for the ids it was written against
-   * and would quietly truncate anything longer.
-   */
-  const fromUrl = new URLSearchParams(search).get("selected_config")?.trim();
-
-  if (fromUrl && /^\d+$/.test(fromUrl)) {
-    const parsed = Number(fromUrl);
-
-    if (Number.isSafeInteger(parsed)) return parsed;
-  }
-
-  const cards = configurationCards(root);
-  const [only] = cards;
-
-  return cards.length === 1 && only != null ? only : null;
-}
-
 /** Every card FINN draws that stands for one car the reader could open. */
 export const CARD_SELECTORS = [
   '[data-testid="product-card"]',
@@ -185,91 +105,17 @@ export function cardPhoto(card: HTMLElement): HTMLElement {
   return card;
 }
 
-/** The details page root, or null when this isn't one. */
-export function detailsPageRoot(): HTMLElement | null {
+/**
+ * The details page root, or null when this isn't one.
+ *
+ * Not exported any more: the panel used to ask for it directly, to read the
+ * whole page as a set of configurations. It now only serves as the fallback
+ * anchor in `resolveCar` for a car FINN never drew a card for.
+ */
+function detailsPageRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>(DETAILS_PAGE_SELECTOR);
 }
 
-/**
- * Every configuration on this page, ready for the reasoning engine.
- *
- * Storage is consulted before the network in both directions — the pinned
- * record first, because that is the same car with a real pinned date on it,
- * then the cache the interceptor fills as the reader browses. Most opens of
- * this panel therefore cost nothing: FINN has already fetched these cars and
- * we already kept them. Only a gap in the cache reaches the API, through the
- * same helper the pin button uses, and that one call returns every
- * configuration of the model at once.
- */
-export async function resolvePageCars(
-  root: HTMLElement,
-): Promise<PageCars> {
-  const selectedId = resolveCurrentConfigId(root);
-  const listed = configurationCards(root);
-
-  /*
-   * The URL wins on order as well as on selection: a configuration it names
-   * that FINN hasn't listed on the page is still the car the reader opened.
-   */
-  const wanted = [...new Set(selectedId != null ? [selectedId, ...listed] : listed)];
-
-  if (!wanted.length) return { status: "unidentified" };
-
-  try {
-    const pinned = await getPinnedCars();
-    let loaded = await getLoadedCars();
-
-    const missing = wanted.filter((id) => !pinned[id] && !loaded[id]);
-
-    if (missing.length) {
-      const response = await loadCarsFromFinnApi({
-        isHomePage: false,
-        isListingsPage: false,
-        isDetailsPage: root,
-        anchorElementIsAListItem: false,
-        /* The branch that asks FINN for every configuration of this model. */
-        anchorElementIsAConfigCardItem: true,
-        anchorElement: root,
-        carConfigId: missing[0] as number,
-      });
-
-      const mapped = mapFinnConfigToAll(response.results);
-
-      await mergeLoadedCars(mapped);
-
-      loaded = { ...loaded, ...mapped };
-    }
-
-    const cars = wanted
-      .map((id) => pinned[id] ?? (loaded[id] ? asEvaluatable(loaded[id]) : null))
-      .filter((car): car is PinnedFinnCar => car != null);
-
-    if (!cars.length) {
-      return {
-        status: "unavailable",
-        reason:
-          "FINN's data came back without the configurations this page is showing.",
-      };
-    }
-
-    return {
-      status: "ready",
-      cars,
-      /* Only claim a selection we actually have a car for. */
-      selectedId:
-        selectedId != null && cars.some((car) => car.id === selectedId)
-          ? selectedId
-          : null,
-    };
-  } catch (error) {
-    console.error("[FinnLens] couldn't load this model's configurations", error);
-
-    return {
-      status: "unavailable",
-      reason: "We couldn't load FINN's data for this car.",
-    };
-  }
-}
 
 /**
  * One car by id: from what we have, then from what is arriving, then by
