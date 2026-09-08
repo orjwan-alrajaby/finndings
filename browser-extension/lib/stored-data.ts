@@ -1,7 +1,7 @@
 import type { FinnCar, PinnedFinnCar } from "@/lib/types";
 
 /**
- * Everything FINN Lens has put in browser storage, and how to take it back
+ * Everything Finn Lens has put in browser storage, and how to take it back
  * out.
  *
  * The extension could only ever accumulate. Settings could be restored to
@@ -123,7 +123,7 @@ export async function summariseStoredData(): Promise<StoredDataCount[]> {
             unknown
         >;
     } catch (error) {
-        console.error("FINN Lens: could not read what is stored", error);
+        console.error("Finn Lens: could not read what is stored", error);
     }
 
     const pinned = countEntries(stored.pinnedCars);
@@ -215,7 +215,7 @@ export async function loadPinnedCars(): Promise<PinnedFinnCar[]> {
 
         return value ? Object.values(value) : [];
     } catch (error) {
-        console.error("FINN Lens: could not read your pinned cars", error);
+        console.error("Finn Lens: could not read your pinned cars", error);
 
         return [];
     }
@@ -270,7 +270,7 @@ export async function loadCachedCars(): Promise<FinnCar[]> {
 
         return Object.values(cars);
     } catch (error) {
-        console.error("FINN Lens: could not read the browsing cache", error);
+        console.error("Finn Lens: could not read the browsing cache", error);
 
         return [];
     }

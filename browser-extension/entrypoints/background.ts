@@ -35,7 +35,7 @@ export default defineBackground(() => {
           await openOrFocusNewPage("/onboarding.html");
         }
       } catch (error) {
-        console.error("FINN Lens: could not open the setup flow", error);
+        console.error("Finn Lens: could not open the setup flow", error);
       }
     })();
   });

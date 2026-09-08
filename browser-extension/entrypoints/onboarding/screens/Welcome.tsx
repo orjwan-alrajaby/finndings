@@ -16,16 +16,16 @@ import Logo from "/icon/128.png";
 export function Welcome({ onNext }: { onNext: () => void }) {
     return (
         <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-white shadow-sm">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-sm">
                 <img
                     src={Logo}
                     alt=""
-                    className="h-9 w-9 object-contain"
+                    className="h-20 w-20 object-contain"
                 />
             </div>
 
             <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue">
-                Welcome to FINN Lens
+                Welcome to Finn Lens
             </p>
 
             <h1 className="mx-auto mt-3 max-w-3xl text-4xl font-black leading-tight tracking-tight text-finn-black sm:text-5xl">

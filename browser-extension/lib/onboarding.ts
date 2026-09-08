@@ -1,7 +1,7 @@
 import { hasSavedLensSettings } from "@/lib/reasoning-engine";
 
 /**
- * What FINN Lens remembers about getting you started.
+ * What Finn Lens remembers about getting you started.
  *
  * Deliberately separate from `LensSettings`. Everything in there is an answer
  * the reader gave that changes what Lens says; nothing in here is. This is
@@ -71,7 +71,7 @@ export async function loadOnboardingState(): Promise<OnboardingState> {
             checklistDismissed: record.checklistDismissed === true,
         };
     } catch (error) {
-        console.error("FINN Lens: could not read onboarding state", error);
+        console.error("Finn Lens: could not read onboarding state", error);
 
         return { ...EMPTY };
     }
@@ -85,7 +85,7 @@ async function patch(changes: Partial<OnboardingState>): Promise<void> {
             [ONBOARDING_STORAGE_KEY]: { ...current, ...changes },
         });
     } catch (error) {
-        console.error("FINN Lens: could not save onboarding state", error);
+        console.error("Finn Lens: could not save onboarding state", error);
     }
 }
 

@@ -1,4 +1,4 @@
-# FINN Lens
+# Finn Lens
 
 A browser extension that helps you choose between [FINN](https://www.finn.com) car
 subscriptions.
@@ -6,7 +6,7 @@ subscriptions.
 FINN's listings are good at showing you what exists and bad at telling you which one is
 right for you. Comparing five subscriptions means five tabs, a mental spreadsheet, and no
 way to weigh "this one has adaptive cruise control" against "this one is €80/month cheaper
-and emits less." FINN Lens is the thing that does that weighing, out loud, using the data
+and emits less." Finn Lens is the thing that does that weighing, out loud, using the data
 FINN already publishes.
 
 It is unofficial and not affiliated with FINN.

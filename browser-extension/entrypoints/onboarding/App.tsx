@@ -33,7 +33,7 @@ import { Driving } from "./screens/Driving";
 import { Preview } from "./screens/Preview";
 
 /**
- * Setting FINN Lens up, once.
+ * Setting Finn Lens up, once.
  *
  * The product asks four things of a reader — pin some cars, say what matters,
  * order it, say what your driving costs — and before this flow existed it
@@ -94,7 +94,7 @@ export default function OnboardingPage() {
             })
             .catch((error: unknown) => {
                 console.error(
-                    "FINN Lens: could not read your settings",
+                    "Finn Lens: could not read your settings",
                     error,
                 );
             })
@@ -140,7 +140,7 @@ export default function OnboardingPage() {
 
             then();
         } catch (error) {
-            console.error("FINN Lens: could not save your setup", error);
+            console.error("Finn Lens: could not save your setup", error);
             setSaveError(true);
         } finally {
             setSaving(false);
@@ -244,7 +244,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <footer className="pb-10 text-center text-[11px] leading-4 text-finn-iron">
-                    FINN Lens is unofficial and not affiliated with{" "}
+                    Finn Lens is unofficial and not affiliated with{" "}
                     <FinnLink />.
                 </footer>
             </main>
@@ -263,6 +263,6 @@ async function openPage(type: "OPEN_COMPARE_PAGE"): Promise<void> {
     try {
         await browser.runtime.sendMessage({ type });
     } catch (error) {
-        console.error("FINN Lens: could not open that page", error);
+        console.error("Finn Lens: could not open that page", error);
     }
 }

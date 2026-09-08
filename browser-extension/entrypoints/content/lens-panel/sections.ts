@@ -667,7 +667,7 @@ function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
       "transition-colors hover:underline",
     ].join(" "),
     attrs: { type: "button", "aria-expanded": "false" },
-    text: "How FINN Lens works this out",
+    text: "How Finn Lens works this out",
     on: {
       click: () => {
         const open = method.classList.toggle("hidden");

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The bar every FINN Lens page wears.
+ * The bar every Finn Lens page wears.
  *
  * The three pages were each introducing themselves differently — one with a
  * sticky bar of pills, two with a block of prose and a couple of buttons
@@ -36,7 +36,7 @@ export function PageHeader({
             ].join(" ")}
         >
             <p className="text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue">
-                FINN Lens
+                Finn Lens
             </p>
 
             <nav className="flex flex-wrap items-center gap-2">{children}</nav>

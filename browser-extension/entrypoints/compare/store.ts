@@ -111,7 +111,7 @@ export function copyFeatures(
  */
 function persistPriorities(priorities: CategoryId[]) {
     void saveLensSettings({ priorities }).catch((error: unknown) => {
-        console.error("FINN Lens: could not save priority order", error);
+        console.error("Finn Lens: could not save priority order", error);
     });
 }
 

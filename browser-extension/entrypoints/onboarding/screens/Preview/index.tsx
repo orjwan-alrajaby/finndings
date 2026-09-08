@@ -191,7 +191,7 @@ export function Preview({
                         disabled={saving}
                         className="inline-flex h-13 items-center justify-center rounded-full px-5 text-xs font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline disabled:cursor-wait"
                     >
-                        Open FINN Lens instead
+                        Open Finn Lens instead
                     </button>
                 </div>
 

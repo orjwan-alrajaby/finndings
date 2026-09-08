@@ -117,7 +117,7 @@ export function DataSettings({
             setSelected([]);
             await refresh();
         } catch (error) {
-            console.error("FINN Lens: could not delete your data", error);
+            console.error("Finn Lens: could not delete your data", error);
             setFailed(true);
         } finally {
             setBusy(false);
@@ -132,7 +132,7 @@ export function DataSettings({
     return (
         <>
             <Section
-                title="What FINN Lens has stored"
+                title="What Finn Lens has stored"
                 description="Everything here lives in this browser's own extension storage. None of it is sent anywhere, there is no account behind it, and nothing survives uninstalling the extension. You can delete any of it, at any time, without deleting the rest."
             >
                 {counts === null ? (
@@ -268,7 +268,7 @@ export function DataSettings({
                 onOpenChange={setConfirming}
                 title={
                     selected.length === STORED_DATA_GROUPS.length
-                        ? "Delete everything FINN Lens has stored?"
+                        ? "Delete everything Finn Lens has stored?"
                         : "Delete the selected data?"
                 }
                 confirmLabel="Delete permanently"

@@ -1,6 +1,6 @@
-# FINN Lens — browser extension
+# Finn Lens — browser extension
 
-The extension itself. See the [repository README](../README.md) for what FINN Lens is, how
+The extension itself. See the [repository README](../README.md) for what Finn Lens is, how
 the scoring works and what its limitations are, and `../docs/FINN-LENS-HANDOFF.md` for the
 engineering write-up.
 

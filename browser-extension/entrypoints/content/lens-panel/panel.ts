@@ -494,7 +494,7 @@ async function build(request: PanelRequest): Promise<Panel> {
         "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
         "text-finn-iron transition-colors hover:bg-finn-cotton hover:text-finn-black",
       ].join(" "),
-      attrs: { type: "button", "aria-label": "Close FINN Lens" },
+      attrs: { type: "button", "aria-label": "Close Finn Lens" },
       on: { click: close },
     },
     [icon("x", "h-4 w-4")],

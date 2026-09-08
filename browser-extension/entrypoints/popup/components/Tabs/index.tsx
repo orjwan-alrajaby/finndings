@@ -24,7 +24,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
         >
             <RadixTabs.List
                 className={["flex gap-1 m-1.5 rounded-[22px]", accent ? "bg-finn-pale-blue" : "bg-finn-cotton"].join(" ")}
-                aria-label="FINN Lens views"
+                aria-label="Finn Lens views"
             >
                 {(["pinned", "actions"] as const).map((val) => (
                     <RadixTabs.Trigger

@@ -157,12 +157,12 @@ function App() {
         {/* brand row */}
         <header className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm">
-              <img src={Logo} alt="FINNDINGS Logo" className="h-6 w-6 object-contain" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+              <img src={Logo} alt="Finn Lens logo" className="h-11 w-11 object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-black leading-none tracking-tight">FINNDINGS</h1>
+                <h1 className="text-sm font-black leading-none tracking-tight">Finn Lens</h1>
               </div>
               <p className="mt-1 text-[11px] text-white/60">Decision helper</p>
             </div>
@@ -279,7 +279,7 @@ function App() {
           />
 
           <footer className="py-5 text-center text-[11px] leading-4 text-finn-iron">
-            FINNDINGS is unofficial and not affiliated with{" "}
+            Finn Lens is unofficial and not affiliated with{" "}
             <a
               href={FINN_BASE_URL}
               target="_blank"

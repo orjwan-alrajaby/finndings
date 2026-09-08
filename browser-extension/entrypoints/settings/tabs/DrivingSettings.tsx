@@ -55,7 +55,7 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
     return (
         <Section
             title="Driving"
-            description="These describe you, not FINN — how far you actually drive, what fuel or electricity costs where you live, and what you're willing to spend. FINN Lens can't know this on its own, so estimates are only as good as what you enter here."
+            description="These describe you, not FINN — how far you actually drive, what fuel or electricity costs where you live, and what you're willing to spend. Finn Lens can't know this on its own, so estimates are only as good as what you enter here."
         >
             <div className="grid gap-4 sm:grid-cols-2">
                 {FIELDS.map(({ key, label, unit, step, hint, optional, placeholder }) => (
@@ -121,7 +121,7 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                     market if you're comparing elsewhere.
                 </p>
                 <p>
-                    FINN Lens also doesn't know your charging setup (home vs public, tariff), so electricity cost is estimated
+                    Finn Lens also doesn't know your charging setup (home vs public, tariff), so electricity cost is estimated
                     from the single price above rather than a mixed charging model.
                 </p>
                 <p>

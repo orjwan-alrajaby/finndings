@@ -151,7 +151,7 @@ export function Advice({
 
                 await pdf.save(filename, { returnPromise: true });
             } catch (error) {
-                console.error("FINN Lens: could not export the PDF", error);
+                console.error("Finn Lens: could not export the PDF", error);
             } finally {
                 if (alive) setExporting(false);
             }
@@ -171,7 +171,7 @@ export function Advice({
                     </h1>
 
                     <p className="mt-2 text-sm leading-6 text-finn-iron">
-                        Pin a few cars on <FinnLink /> and FINN Lens will compare
+                        Pin a few cars on <FinnLink /> and Finn Lens will compare
                         them here.
                     </p>
                 </div>
@@ -235,7 +235,7 @@ export function Advice({
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
-                    FINN Lens · Advice
+                    Finn Lens · Advice
                 </p>
 
                 <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">

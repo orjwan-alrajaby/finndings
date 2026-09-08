@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="FINN Lens 16px master reversed — The Lens">
+<title>FINN Lens 16px master reversed — The Lens</title>
+<desc>A lens element on the N's diagonal.</desc>
+<mask id="u22-c1" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#000"/><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M 21.29 13.93 A 27.96 27.96 0 0 1 42.71 50.07 A 27.96 27.96 0 0 1 21.29 13.93 Z" fill="#000"/></mask><rect width="64" height="64" fill="#FFFFFF" mask="url(#u22-c1)"/>
+</svg>

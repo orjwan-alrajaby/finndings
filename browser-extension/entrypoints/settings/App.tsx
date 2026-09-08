@@ -272,7 +272,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         <header className="mb-7">
           <h1 className="text-3xl font-black tracking-tight">Settings</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-finn-iron">
-            Change the priorities, profiles, and driving assumptions FINN Lens uses when explaining your pinned cars.
+            Change the priorities, profiles, and driving assumptions Finn Lens uses when explaining your pinned cars.
           </p>
         </header>
 
@@ -348,7 +348,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         confirmLabel="Restore defaults"
         tone="danger"
         onConfirm={handleRestoreDefaults}
-        description="This resets priorities, features, which profiles are enabled, the default profile, and driving assumptions to FINN Lens's factory configuration. Any custom priorities or edits you've made will be lost. This can't be undone."
+        description="This resets priorities, features, which profiles are enabled, the default profile, and driving assumptions to Finn Lens's factory configuration. Any custom priorities or edits you've made will be lost. This can't be undone."
       />
     </main>
     </Tooltip.Provider>

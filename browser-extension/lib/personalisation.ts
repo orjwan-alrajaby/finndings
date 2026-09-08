@@ -54,7 +54,7 @@ export async function isPersonalised(): Promise<boolean> {
     try {
         return await hasSavedLensSettings();
     } catch (error) {
-        console.error("FINN Lens: could not read your settings", error);
+        console.error("Finn Lens: could not read your settings", error);
 
         /*
          * Unreadable settings are settings we cannot claim are the reader's.

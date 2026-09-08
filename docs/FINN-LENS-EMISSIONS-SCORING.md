@@ -1,4 +1,4 @@
-# FINN Lens — Emissions & Efficiency Scoring
+# Finn Lens — Emissions & Efficiency Scoring
 
 > **Status of this document.** A design record for the Environmental Impact priority as
 > rebuilt in commit `7f3e212`, written so another engineer can change it without having to
@@ -467,7 +467,7 @@ remain, and both name something a reader would otherwise misread:
 `ENVIRONMENTAL_METHOD` was rewritten to open on what the priority measures rather than on
 what it excludes, and `lib/car-labels.ts` no longer subtitles the priority with
 "Judged on emissions, not on equipment" — every other priority's subtitle says something
-about the car, and that one said something about FINN Lens.
+about the car, and that one said something about Finn Lens.
 
 ### "Says who?" — the provenance chips
 

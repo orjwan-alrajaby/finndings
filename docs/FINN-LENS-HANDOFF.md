@@ -1,4 +1,4 @@
-# FINN Lens — Engineering & Product Handoff
+# Finn Lens — Engineering & Product Handoff
 
 > **Status of this document.** A read-only audit of the codebase as of commit `7f3e212`
 > (2026-09-02), written to hand the project to another engineer without inviting a
@@ -10,7 +10,7 @@
 
 ---
 
-## 1. What FINN Lens is
+## 1. What Finn Lens is
 
 **The problem.** FINN rents cars by subscription. Its listing pages are good at showing you
 *what exists* and bad at telling you *which one is right for you*. A shopper comparing five
@@ -696,7 +696,6 @@ The rule is documented in the store but will read as a bug to a user.
 dozens of branch combinations. Every individual rule is good; collectively it's hard to be
 confident there isn't an ungrammatical sentence lurking in some combination.
 
-**Popup branding says "FINNDINGS", everything else says "FINN Lens."**
 
 ---
 

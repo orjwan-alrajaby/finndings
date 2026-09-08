@@ -57,7 +57,7 @@ export default function CompareTab({
           </h1>
 
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
-            Pin a few cars on <FinnLink /> first. FINN Lens will
+            Pin a few cars on <FinnLink /> first. Finn Lens will
             automatically include every pinned car here.
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function CompareTab({
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-finn-iron">
-            Keep browsing and pin another car. FINN Lens compares
+            Keep browsing and pin another car. Finn Lens compares
             the full pinned set automatically — there is no
             separate selection step.
           </p>

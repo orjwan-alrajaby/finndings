@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 423.2 132" width="423.2" height="132" role="img" aria-label="FINN Lens lockup — Lens + Car">
+<title>FINN Lens lockup — Lens + Car</title>
+<desc>The car cut out of the lens.</desc>
+<rect x="0" y="0" width="423.2" height="132" rx="0" fill="#191919"/><g transform="translate(40,40)"><g transform="translate(0,0) scale(0.81)"><mask id="u99-c4" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#000"/><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M 8 40.5 L 8 31 L 17 31 L 24 20.5 L 41 20.5 L 47 31 L 56 31 L 56 40.5 Z" fill="#000"/><circle cx="22" cy="40.5" r="5.5" fill="#000"/><circle cx="43" cy="40.5" r="5.5" fill="#000"/></mask><rect width="64" height="64" fill="#F8F8F8" mask="url(#u99-c4)"/><path d="M 26 23.5 L 31.5 23.5 L 31.5 29.5 L 22.5 29.5 Z" fill="#0072EA"/><path d="M 33.5 23.5 L 39 23.5 L 42.5 29.5 L 33.5 29.5 Z" fill="#0072EA"/></g><g transform="translate(77.6,10)"><!-- PLACEHOLDER WORDMARK - replace this entire <g> with the official FINN SVG -->
+<g id="finn-wordmark" transform="translate(0,0) scale(0.8)">
+<polygon points="0,0 30,0 30,10 10,10 10,15 26,15 26,25 10,25 10,40 0,40" fill="#F8F8F8"/>
+<polygon points="38,0 48,0 48,40 38,40" fill="#F8F8F8"/>
+<polygon points="56,40 56,0 66,0 82,27 82,0 92,0 92,40 82,40 66,13 66,40" fill="#F8F8F8"/>
+<polygon points="100,40 100,0 110,0 126,27 126,0 136,0 136,40 126,40 110,13 110,40" fill="#F8F8F8"/>
+</g></g><g transform="translate(216.8,10)"><g id="lens-wordmark" transform="translate(0,0) scale(0.8)">
+<polygon points="0,0 10,0 10,30 28,30 28,40 0,40" fill="#9BA3AE"/>
+<polygon points="40,0 70,0 70,10 50,10 50,15 66,15 66,25 50,25 50,30 70,30 70,40 40,40" fill="#9BA3AE"/>
+<polygon points="82,40 82,0 92,0 108,27 108,0 118,0 118,40 108,40 92,13 92,40" fill="#9BA3AE"/>
+<path d="M 18.75 6 A 7.5 7.5 0 1 0 15 20 A 7.5 7.5 0 1 1 11.25 34" transform="translate(130,0)" fill="none" stroke="#9BA3AE" stroke-width="10" stroke-linecap="butt"/>
+</g></g></g>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="FINN Lens icon mono — Lens + Car">
+<title>FINN Lens icon mono — Lens + Car</title>
+<desc>The car cut out of the lens.</desc>
+<mask id="u94-c4" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#000"/><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M 8 40.5 L 8 31 L 17 31 L 24 20.5 L 41 20.5 L 47 31 L 56 31 L 56 40.5 Z" fill="#000"/><circle cx="22" cy="40.5" r="5.5" fill="#000"/><circle cx="43" cy="40.5" r="5.5" fill="#000"/></mask><rect width="64" height="64" fill="#000000" mask="url(#u94-c4)"/>
+</svg>

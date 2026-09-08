@@ -144,7 +144,7 @@ describe("injectFitButtons", () => {
     injectFitButtons();
 
     expect(badges()[0]?.getAttribute("aria-label")).toBe(
-      "FINN Lens: see how BYD Dolphin fits you.",
+      "Finn Lens: see how BYD Dolphin fits you.",
     );
   });
 
@@ -248,7 +248,7 @@ describe("applyFitVerdicts", () => {
     await injectFitBadges();
 
     expect(badges()[0]?.getAttribute("aria-label")).toMatch(
-      /FINN Lens: .*match for BYD Dolphin/,
+      /Finn Lens: .*match for BYD Dolphin/,
     );
   });
 

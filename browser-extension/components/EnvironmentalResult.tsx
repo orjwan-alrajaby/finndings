@@ -197,7 +197,7 @@ function MethodDisclosure() {
                 onClick={() => setOpen((was) => !was)}
                 className="flex items-center gap-1 text-[11px] font-black text-finn-accent-blue"
             >
-                How FINN Lens works this out
+                How Finn Lens works this out
 
                 <ChevronDown
                     aria-hidden="true"

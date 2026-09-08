@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1640" width="1200" height="1640" role="img" aria-label="FINN Lens — Concept 3: The Glasses">
+<title>FINN Lens — Concept 3: The Glasses</title>
+<desc>A browline pair. One lens is solid.</desc>
+<rect x="0" y="0" width="1200" height="1640" rx="0" fill="#F8F8F8"/>
+<text x="40" y="56" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="700" fill="#0072EA" text-anchor="start" letter-spacing="2">CONCEPT 3</text>
+<text x="40" y="90" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="30" font-weight="700" fill="#191919" text-anchor="start">The Glasses</text>
+<text x="320" y="90" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="15" font-weight="400" fill="#707070" text-anchor="start">A browline pair. One lens is solid.</text>
+<text x="40" y="140" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.4">1 · PRIMARY LOGO</text>
+<rect x="40" y="152" width="1120" height="170" rx="6" fill="#F3F3F3"/>
+<g transform="translate(96,213)"><g transform="translate(0,0) scale(0.75)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g><g transform="translate(72,9)"><!-- PLACEHOLDER WORDMARK - replace this entire <g> with the official FINN SVG -->
+<g id="finn-wordmark" transform="translate(0,0) scale(0.75)">
+<polygon points="0,0 30,0 30,10 10,10 10,15 26,15 26,25 10,25 10,40 0,40" fill="#191919"/>
+<polygon points="38,0 48,0 48,40 38,40" fill="#191919"/>
+<polygon points="56,40 56,0 66,0 82,27 82,0 92,0 92,40 82,40 66,13 66,40" fill="#191919"/>
+<polygon points="100,40 100,0 110,0 126,27 126,0 136,0 136,40 126,40 110,13 110,40" fill="#191919"/>
+</g></g><g transform="translate(202.5,9)"><g id="lens-wordmark" transform="translate(0,0) scale(0.75)">
+<polygon points="0,0 10,0 10,30 28,30 28,40 0,40" fill="#707070"/>
+<polygon points="40,0 70,0 70,10 50,10 50,15 66,15 66,25 50,25 50,30 70,30 70,40 40,40" fill="#707070"/>
+<polygon points="82,40 82,0 92,0 108,27 108,0 118,0 118,40 108,40 92,13 92,40" fill="#707070"/>
+<path d="M 18.75 6 A 7.5 7.5 0 1 0 15 20 A 7.5 7.5 0 1 1 11.25 34" transform="translate(130,0)" fill="none" stroke="#707070" stroke-width="10" stroke-linecap="butt"/>
+</g></g></g>
+<text x="40" y="364" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.4">2 · STANDALONE ICON — 3 · MONOCHROME — 4 · BRAND COLOUR</text>
+<rect x="40" y="376" width="268" height="200" rx="6" fill="#F3F3F3"/>
+<g transform="translate(128,420) scale(1.44)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="174" y="554" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="500" fill="#707070" text-anchor="middle">Brand colour</text>
+<rect x="324" y="376" width="268" height="200" rx="6" fill="#FFFFFF"/>
+<g transform="translate(412,420) scale(1.44)"><rect x="2" y="14" width="59" height="7" fill="#000000"/><circle cx="16" cy="35" r="11" fill="none" stroke="#000000" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#000000"/></g>
+<text x="458" y="554" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="500" fill="#707070" text-anchor="middle">Monochrome</text>
+<rect x="608" y="376" width="268" height="200" rx="6" fill="#191919"/>
+<g transform="translate(696,420) scale(1.44)"><rect x="2" y="14" width="59" height="7" fill="#FFFFFF"/><circle cx="16" cy="35" r="11" fill="none" stroke="#FFFFFF" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#FFFFFF"/></g>
+<text x="742" y="554" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="500" fill="#9BA3AE" text-anchor="middle">Monochrome reversed</text>
+<rect x="892" y="376" width="268" height="200" rx="6" fill="#191919"/>
+<g transform="translate(980,420) scale(1.44)"><rect x="2" y="14" width="59" height="7" fill="#F8F8F8"/><circle cx="16" cy="35" r="11" fill="none" stroke="#F8F8F8" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="1026" y="554" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="500" fill="#9BA3AE" text-anchor="middle">Brand on dark</text>
+<text x="40" y="616" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.4">5 · SMALL-SIZE PREVIEW — 6 · LIGHT AND DARK</text>
+<rect x="40" y="628" width="1120" height="200" rx="6" fill="#F3F3F3"/>
+<text x="64" y="656" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.2">On light</text>
+<g transform="translate(230,650) scale(2)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="294" y="800" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="middle">128px</text>
+<g transform="translate(420,730) scale(0.75)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="444" y="800" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="middle">48px</text>
+<g transform="translate(530,746) scale(0.5)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="546" y="800" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="middle">32px</text>
+<g transform="translate(624,754) scale(0.38)"><rect x="2" y="13" width="59" height="8" fill="#191919"/><circle cx="16" cy="35" r="10.5" fill="none" stroke="#191919" stroke-width="7"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="636" y="800" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="middle">24px</text>
+<g transform="translate(710,762) scale(0.25)"><rect x="2" y="13" width="59" height="8" fill="#191919"/><circle cx="16" cy="35" r="10.5" fill="none" stroke="#191919" stroke-width="7"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="718" y="800" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="middle">16px</text>
+<text x="1136" y="656" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#707070" text-anchor="end">16 / 24px use the simplified master</text>
+<rect x="40" y="848" width="1120" height="200" rx="6" fill="#191919"/>
+<text x="64" y="876" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#9BA3AE" text-anchor="start" letter-spacing="1.2">On dark</text>
+<g transform="translate(230,870) scale(2)"><rect x="2" y="14" width="59" height="7" fill="#F8F8F8"/><circle cx="16" cy="35" r="11" fill="none" stroke="#F8F8F8" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="294" y="1020" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="middle">128px</text>
+<g transform="translate(420,950) scale(0.75)"><rect x="2" y="14" width="59" height="7" fill="#F8F8F8"/><circle cx="16" cy="35" r="11" fill="none" stroke="#F8F8F8" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="444" y="1020" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="middle">48px</text>
+<g transform="translate(530,966) scale(0.5)"><rect x="2" y="14" width="59" height="7" fill="#F8F8F8"/><circle cx="16" cy="35" r="11" fill="none" stroke="#F8F8F8" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="546" y="1020" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="middle">32px</text>
+<g transform="translate(624,974) scale(0.38)"><rect x="2" y="13" width="59" height="8" fill="#F8F8F8"/><circle cx="16" cy="35" r="10.5" fill="none" stroke="#F8F8F8" stroke-width="7"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="636" y="1020" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="middle">24px</text>
+<g transform="translate(710,982) scale(0.25)"><rect x="2" y="13" width="59" height="8" fill="#F8F8F8"/><circle cx="16" cy="35" r="10.5" fill="none" stroke="#F8F8F8" stroke-width="7"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="718" y="1020" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="middle">16px</text>
+<text x="1136" y="876" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10" font-weight="400" fill="#9BA3AE" text-anchor="end">16 / 24px use the simplified master</text>
+<text x="40" y="1088" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.4">7 · RELATIONSHIP: FINN WORDMARK → LENS SYMBOL</text>
+<rect x="40" y="1100" width="1120" height="250" rx="6" fill="#F3F3F3"/>
+<g transform="translate(172.2,1178)"><g transform="scale(0.85)"><polygon points="0,0 30,0 30,10 10,10 10,15 26,15 26,25 10,25 10,40 0,40" fill="#191919"/><polygon points="0,0 30,0 30,10 0,10" fill="#0072EA"/><polygon points="38,0 48,0 48,40 38,40" fill="#191919"/><polygon points="56,40 56,0 66,0 82,27 82,0 92,0 92,40 82,40 66,13 66,40" fill="#0072EA"/><polygon points="100,40 100,0 110,0 126,27 126,0 136,0 136,40 126,40 110,13 110,40" fill="#0072EA"/></g></g>
+<text x="230" y="1290" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#191919" text-anchor="middle">The F's arm, the two N's</text>
+<path d="M 384 1223 L 410 1223 M 404 1218 L 410 1223 L 404 1228" stroke="#707070" stroke-width="1.4" fill="none"/>
+<g transform="translate(514,1158) scale(1.44)"><rect x="2" y="14" width="59" height="7" stroke="#707070" stroke-width="0.7" fill="none" opacity="0.5" stroke-dasharray="2.5 2"/><circle cx="16" cy="35" r="14" stroke="#707070" stroke-width="0.7" fill="none" opacity="0.5" stroke-dasharray="2.5 2"/><circle cx="48" cy="35" r="13.2" stroke="#707070" stroke-width="0.7" fill="none" opacity="0.5" stroke-dasharray="2.5 2"/><line x1="16" y1="35" x2="48" y2="35" stroke="#0072EA" stroke-width="0.8" fill="none" opacity="0.55"/><line x1="2" y1="17.5" x2="61" y2="17.5" stroke="#0072EA" stroke-width="0.8" fill="none" opacity="0.55"/></g>
+<text x="560" y="1290" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#191919" text-anchor="middle">A brow and two lenses</text>
+<path d="M 714 1223 L 740 1223 M 734 1218 L 740 1223 L 734 1228" stroke="#707070" stroke-width="1.4" fill="none"/>
+<g transform="translate(844,1158) scale(1.44)"><rect x="2" y="14" width="59" height="7" fill="#191919"/><circle cx="16" cy="35" r="11" fill="none" stroke="#191919" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g>
+<text x="890" y="1290" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#191919" text-anchor="middle">The glasses</text>
+<text x="110" y="1324" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#707070" text-anchor="start">The brow bar is the F's arm. The doubled lens is FINN's doubled N. One lens is solid: the single thing being looked at.</text>
+<text x="40" y="1382" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#707070" text-anchor="start" letter-spacing="1.4">PRIMARY LOGO · REVERSED</text>
+<rect x="40" y="1394" width="1120" height="170" rx="6" fill="#191919"/>
+<g transform="translate(96,1455)"><g transform="translate(0,0) scale(0.75)"><rect x="2" y="14" width="59" height="7" fill="#F8F8F8"/><circle cx="16" cy="35" r="11" fill="none" stroke="#F8F8F8" stroke-width="6"/><circle cx="48" cy="35" r="13.2" fill="#0072EA"/></g><g transform="translate(72,9)"><!-- PLACEHOLDER WORDMARK - replace this entire <g> with the official FINN SVG -->
+<g id="finn-wordmark" transform="translate(0,0) scale(0.75)">
+<polygon points="0,0 30,0 30,10 10,10 10,15 26,15 26,25 10,25 10,40 0,40" fill="#F8F8F8"/>
+<polygon points="38,0 48,0 48,40 38,40" fill="#F8F8F8"/>
+<polygon points="56,40 56,0 66,0 82,27 82,0 92,0 92,40 82,40 66,13 66,40" fill="#F8F8F8"/>
+<polygon points="100,40 100,0 110,0 126,27 126,0 136,0 136,40 126,40 110,13 110,40" fill="#F8F8F8"/>
+</g></g><g transform="translate(202.5,9)"><g id="lens-wordmark" transform="translate(0,0) scale(0.75)">
+<polygon points="0,0 10,0 10,30 28,30 28,40 0,40" fill="#9BA3AE"/>
+<polygon points="40,0 70,0 70,10 50,10 50,15 66,15 66,25 50,25 50,30 70,30 70,40 40,40" fill="#9BA3AE"/>
+<polygon points="82,40 82,0 92,0 108,27 108,0 118,0 118,40 108,40 92,13 92,40" fill="#9BA3AE"/>
+<path d="M 18.75 6 A 7.5 7.5 0 1 0 15 20 A 7.5 7.5 0 1 1 11.25 34" transform="translate(130,0)" fill="none" stroke="#9BA3AE" stroke-width="10" stroke-linecap="butt"/>
+</g></g></g>
+<text x="40" y="1608" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#707070" text-anchor="start">The FINN wordmark shown is a PLACEHOLDER — swap the &lt;g id="finn-wordmark"&gt; group for the official FINN SVG. The symbol geometry is final.</text>
+</svg>

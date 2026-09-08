@@ -150,8 +150,8 @@ function badgeFor(id: number, name: string | undefined): HTMLElement {
       attrs: {
         type: "button",
         "aria-label": name
-          ? `FINN Lens: see how ${name} fits you.`
-          : "FINN Lens: see how this car fits you.",
+          ? `Finn Lens: see how ${name} fits you.`
+          : "Finn Lens: see how this car fits you.",
       },
       on: {
         /*
@@ -222,8 +222,8 @@ function applyVerdict(
   badge.setAttribute(
     "aria-label",
     name
-      ? `FINN Lens: ${label} for ${name}. See how it fits you.`
-      : `FINN Lens: ${label}. See how this car fits you.`,
+      ? `Finn Lens: ${label} for ${name}. See how it fits you.`
+      : `Finn Lens: ${label}. See how this car fits you.`,
   );
 }
 

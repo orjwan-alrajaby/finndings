@@ -66,7 +66,7 @@ export function describeCoverage(priority: FitPriority): string {
      * The environmental line carries the car's own figure rather than a note
      * about how the priority works. Every other priority's subtitle says
      * something about this car — "3 of your 5 picks" — and "judged on
-     * emissions, not on equipment" said something about FINN Lens instead,
+     * emissions, not on equipment" said something about Finn Lens instead,
      * in the one place a reader is scanning for the car.
      */
     if (priority.impact) {
