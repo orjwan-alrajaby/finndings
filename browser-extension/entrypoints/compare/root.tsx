@@ -196,9 +196,17 @@ export default function CompareTab({
           </div>
 
           {view === "advice" ? (
-            <Advice cars={cars} onAdjust={() => setAdjusting(true)} />
+            <Advice
+              cars={cars}
+              onAdjust={() => setAdjusting(true)}
+              onChallenge={() => setView("challenge")}
+            />
           ) : (
-            <Challenge cars={cars} onAdjust={() => setAdjusting(true)} />
+            <Challenge
+              cars={cars}
+              onAdjust={() => setAdjusting(true)}
+              onBack={() => setView("advice")}
+            />
           )}
         </div>
 

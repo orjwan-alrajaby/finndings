@@ -25,12 +25,23 @@ export function ChallengePicker({
     options,
     winnerName,
     selectedId,
+    onBack,
     onSelect,
 }: {
     options: AlternativeOption[];
     winnerName: string;
     /** The car currently in the hot seat, or null when it's the winner. */
     selectedId: number | null;
+    /**
+     * Crosses back to the recommendation tab.
+     *
+     * It used to empty the hot seat instead, which was the only thing "back to
+     * <winner>" could mean while both readings shared one page. With them on
+     * separate tabs the label means what it says — go and look at the winner —
+     * and the challenger is left where the reader put it, so returning finds
+     * the comparison rather than an empty picker.
+     */
+    onBack: () => void;
     onSelect: (vehicleId: number | null) => void;
 }) {
     if (!options.length) return null;
@@ -81,7 +92,7 @@ export function ChallengePicker({
                       */
                     <button
                         type="button"
-                        onClick={() => onSelect(null)}
+                        onClick={onBack}
                         className="finn-lens-screen-only rounded-full border border-finn-cotton px-4 py-2 text-[11px] font-bold text-finn-iron transition hover:text-finn-black"
                     >
                         Back to {winnerName}

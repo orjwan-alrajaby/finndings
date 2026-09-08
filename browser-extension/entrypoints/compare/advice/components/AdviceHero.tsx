@@ -13,8 +13,19 @@ interface AdviceHeroProps {
     cost: CostBreakdown;
     priorities: CategoryId[];
     isFallback: boolean;
-    /** Opens the drawer, on the answers this verdict was reached from. */
-    onAdjust: () => void;
+    /**
+     * Crosses to the challenge tab, or null when there is nothing to challenge
+     * with — one pinned car is a recommendation with no rivals, and a button
+     * leading to a page that says so is a button that wasted a click.
+     *
+     * This slot used to open the answers drawer. That was the wrong thing for
+     * it to do from here: the drawer is already reachable from the page header
+     * and again from the sidebar directly below this hero, so it was the third
+     * copy of one control — while the obvious next question after reading a
+     * recommendation, "is there something better?", had no affordance at all
+     * until the reader found the tabs.
+     */
+    onChallenge: (() => void) | null;
 }
 
 function determineSubtitle(
@@ -109,7 +120,7 @@ export function AdviceHero({
     cost,
     priorities,
     isFallback,
-    onAdjust,
+    onChallenge,
 }: AdviceHeroProps) {
     const winner = evaluation.vehicle;
     const { headline, budgetNote, marginNote } = narrative.verdict;
@@ -239,13 +250,15 @@ export function AdviceHero({
                             </a>
                         )}
 
-                        <button
-                            type="button"
-                            onClick={onAdjust}
-                            className={`finn-lens-screen-only rounded-full px-5 py-3 text-xs font-bold ring-1 transition ${palette.secondary}`}
-                        >
-                            Change my answers
-                        </button>
+                        {onChallenge && (
+                            <button
+                                type="button"
+                                onClick={onChallenge}
+                                className={`finn-lens-screen-only rounded-full px-5 py-3 text-xs font-bold ring-1 transition ${palette.secondary}`}
+                            >
+                                Challenge recommendation
+                            </button>
+                        )}
                     </div>
                 </div>
 

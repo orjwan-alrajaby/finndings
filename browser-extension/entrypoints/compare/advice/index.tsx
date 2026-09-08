@@ -45,10 +45,13 @@ import { useRecommendation } from "./useRecommendation";
 export function Advice({
     cars,
     onAdjust,
+    onChallenge,
 }: {
     cars: PinnedFinnCar[];
     /** Opens the drawer, which is where every input to this page lives. */
     onAdjust: () => void;
+    /** Crosses to the challenge tab. */
+    onChallenge: () => void;
 }) {
     const advice = useRecommendation(cars);
 
@@ -81,6 +84,7 @@ export function Advice({
         winnerCost,
         isFallback,
         fallbackReason,
+        options,
     } = advice;
 
     return (
@@ -115,7 +119,8 @@ export function Advice({
                     cost={winnerCost}
                     priorities={context.priorities}
                     isFallback={isFallback}
-                    onAdjust={onAdjust}
+                    /* Nothing to challenge with means nowhere to send them. */
+                    onChallenge={options.length ? onChallenge : null}
                 />
             )}
 

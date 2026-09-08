@@ -6,6 +6,7 @@ import { parseHTML } from "linkedom";
 
 import { Advice } from "./index";
 import { Challenge } from "./Challenge";
+import { ChallengePicker } from "./components/ChallengePicker";
 import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 
 /**
@@ -51,16 +52,8 @@ function cars() {
   ];
 }
 
-function render(
-  view: typeof Advice | typeof Challenge,
-): Document {
-  const html = renderToStaticMarkup(
-    createElement(
-      Provider,
-      null,
-      createElement(view, { cars: cars(), onAdjust: () => {} }),
-    ),
-  );
+function render(element: ReturnType<typeof createElement>): Document {
+  const html = renderToStaticMarkup(createElement(Provider, null, element));
 
   const { document } = parseHTML(
     `<!doctype html><html><body>${html}</body></html>`,
@@ -69,8 +62,30 @@ function render(
   return document as unknown as Document;
 }
 
-const page = () => render(Advice);
-const challenge = () => render(Challenge);
+const noop = () => {};
+
+/*
+ * The two views take different callbacks now — one crosses to the challenge,
+ * the other crosses back — so they cannot share a render helper that guesses
+ * at the props.
+ */
+const page = () =>
+  render(
+    createElement(Advice, {
+      cars: cars(),
+      onAdjust: noop,
+      onChallenge: noop,
+    }),
+  );
+
+const challenge = () =>
+  render(
+    createElement(Challenge, {
+      cars: cars(),
+      onAdjust: noop,
+      onBack: noop,
+    }),
+  );
 
 const headingsIn = (root: Element | null) =>
   [...(root?.querySelectorAll("h2") ?? [])].map((node) =>
@@ -147,5 +162,77 @@ describe("the challenge view", () => {
     const grid = challenge().querySelector("div.grid");
 
     expect(grid?.childElementCount).toBe(2);
+  });
+});
+
+/**
+ * Where the two views send the reader.
+ *
+ * Both of these are navigation dressed as something else, and both were wrong
+ * before. The hero's secondary button opened the answers drawer — the third
+ * control on the page to do that, while the obvious next question after
+ * reading a recommendation had no affordance at all. And "Back to <winner>"
+ * emptied the hot seat, which was the only thing it could mean while the two
+ * readings shared a page; with them on separate tabs it means what it says.
+ */
+describe("crossing between the two views", () => {
+  it("offers the challenge from the recommendation's hero", () => {
+    const text = (page().body?.textContent ?? "").replace(/\s+/g, " ");
+
+    expect(text).toContain("Challenge recommendation");
+    /* The drawer is still reachable — from the header and the sidebar. */
+    expect(text).not.toContain("Change my answers");
+  });
+
+  /*
+   * One pinned car is a recommendation with no rivals, and a button leading to
+   * a page that says so is a button that wasted a click.
+   */
+  it("offers no challenge when there is nothing to challenge with", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        Provider,
+        null,
+        createElement(Advice, {
+          cars: [cars()[0]!],
+          onAdjust: noop,
+          onChallenge: noop,
+        }),
+      ),
+    );
+
+    expect(html).not.toContain("Challenge recommendation");
+  });
+
+  /*
+   * Rendered directly because the tab cannot reach this state under test:
+   * `renderToStaticMarkup` does not observe zustand writes, so the challenger
+   * is always null there and the picker never draws its selected form.
+   */
+  it("offers the way back once a car is in the seat", () => {
+    const [winner, rival] = cars();
+
+    const html = renderToStaticMarkup(
+      createElement(ChallengePicker, {
+        options: [
+          {
+            vehicle: rival!,
+            rank: 2,
+            isSelected: true,
+            monthly: 660,
+            difference: "€12 more than Alpha",
+            summary: "Adds roof rails",
+          },
+        ] as never,
+        winnerName: winner!.name,
+        selectedId: rival!.id,
+        onSelect: noop,
+        onBack: noop,
+      }),
+    );
+
+    expect(html).toContain(`Back to ${winner!.name}`);
+    /* Navigation, so it leaves the exported report. */
+    expect(html).toContain("finn-lens-screen-only");
   });
 });

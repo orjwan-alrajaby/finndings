@@ -39,10 +39,13 @@ import { useRecommendation } from "./useRecommendation";
 export function Challenge({
     cars,
     onAdjust,
+    onBack,
 }: {
     cars: PinnedFinnCar[];
     /** Opens the drawer, which is where every input to this page lives. */
     onAdjust: () => void;
+    /** Crosses back to the recommendation tab. */
+    onBack: () => void;
 }) {
     const advice = useRecommendation(cars);
 
@@ -160,6 +163,7 @@ export function Challenge({
                         winnerName={winner.name}
                         selectedId={challenger?.id ?? null}
                         onSelect={setChallengerId}
+                        onBack={onBack}
                     />
 
                     {challenger && challengeReasoning && challengerNarrative ? (
