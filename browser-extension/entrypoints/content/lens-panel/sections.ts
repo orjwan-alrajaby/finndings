@@ -67,9 +67,10 @@ import { pinControl } from "./pin-control";
  * on the panel. That is deliberate — the moment this file starts writing its
  * own copy is the moment the panel can say something the engine can't back up.
  *
- * The order is the order a reader asks the questions in: how well does it fit,
- * why, what about each thing I said I cared about, did I get the features I
- * asked for, what does it cost, and what am I accepting.
+ * The order is what this panel can tell a reader that the page underneath it
+ * cannot: the verdict, then what the car costs *them* at their own mileage,
+ * then how much energy it uses for its kind, and only then the equipment audit
+ * behind the verdict and what they would be giving up. See `analysisBody`.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -232,7 +233,15 @@ function fitHeader(
 
       el("p", {
         class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-        text: configurationDetail(vehicle),
+        /*
+         * Neither the price nor the power. The reader is standing on FINN's
+         * page with both already in front of them, and this panel exists to
+         * add to that rather than to recite it back.
+         */
+        text: configurationDetail(vehicle, {
+          withPrice: false,
+          withPower: false,
+        }),
       }),
 
       el("p", {
@@ -388,7 +397,14 @@ function prioritySection(priority: FitPriority): HTMLElement {
 
       featureGroups(priority),
 
-      priority.measurements.length && !priority.impact
+      /*
+       * Only when the prose above is absent. The engine writes the same facts
+       * into a sentence — "It has 5 seats and 400 L of boot space" — and this
+       * list was repeating it verbatim two lines below, in a section that is
+       * already long. Where there is no sentence (a car FINN sent no equipment
+       * list for), this is the only place the figures appear, so it stays.
+       */
+      priority.measurements.length && !priority.impact && !sentences.length
         ? el(
             "dl",
             { class: "flex flex-wrap gap-x-4 gap-y-1" },
@@ -1252,37 +1268,84 @@ function costLead(analysis: FitAnalysis): string {
   const { energy, excessMileage, subscription } = breakdown;
 
   const km = formatKm(breakdown.monthlyKm);
-  const parts: string[] = [];
+  const advertised = subscription.available ? subscription.amount : null;
 
-  if (subscription.available && subscription.amount != null) {
-    parts.push(`${formatEUR(subscription.amount)} to FINN for the subscription`);
-  }
+  /* What the reader does not already know: everything except the sticker. */
+  const added: string[] = [];
 
   if (energy.available && energy.amount != null) {
-    parts.push(`about ${formatEUR(energy.amount)} of ${energy.energyLabel}`);
+    added.push(`about ${formatEUR(energy.amount)} of ${energy.energyLabel}`);
   }
 
   if (excessMileage.available && (excessMileage.amount ?? 0) > 0) {
     const over = breakdown.monthlyKm - breakdown.includedMonthlyKm;
 
-    parts.push(
+    added.push(
       `${formatEUR(excessMileage.amount ?? 0)} for the ${formatKm(over)} ` +
-        `you'd drive past the ${formatKm(breakdown.includedMonthlyKm)} included`,
+        `you'd go past the ${formatKm(breakdown.includedMonthlyKm)} included`,
     );
   }
 
-  const opening = breakdown.complete
-    ? `At the ${km} a month you told us you drive, this car works out at about ` +
-      `${formatEUR(breakdown.totalMonthly)} a month`
-    : `At the ${km} a month you told us you drive, the part we can price ` +
-      `comes to about ${formatEUR(breakdown.totalMonthly)} a month`;
+  const total = formatEUR(breakdown.totalMonthly);
 
-  if (!parts.length) return `${opening}.`;
+  /*
+   * No advertised price to build on — rare, and the sentence has to stand on
+   * its own rather than contrast with a number that isn't there.
+   */
+  if (advertised == null) {
+    return breakdown.complete
+      ? `At the ${km} a month you told us you drive, this comes to about ${total} a month.`
+      : `At the ${km} a month you told us you drive, the part we can price comes to about ${total} a month.`;
+  }
 
-  const last = parts.pop() as string;
-  const listed = parts.length ? `${parts.join(", ")} and ${last}` : last;
+  const sticker = `FINN's page says ${formatEUR(advertised)} a month.`;
 
-  return `${opening} — ${listed}.`;
+  if (!added.length) {
+    return breakdown.complete
+      ? `${sticker} At the ${km} a month you told us you drive, that is what it costs you — nothing to add.`
+      : `${sticker} We can't price everything this car would cost you, so ${total} is a floor rather than the answer.`;
+  }
+
+  const last = added.pop() as string;
+  const listed = added.length ? `${added.join(", ")} and ${last}` : last;
+
+  return breakdown.complete
+    ? `${sticker} At the ${km} a month you told us you drive, you'd also pay ` +
+        `${listed} — so about ${total} all in.`
+    : `${sticker} At the ${km} a month you told us you drive, you'd also pay ` +
+        `${listed}, which brings the part we can price to about ${total}.`;
+}
+
+/**
+ * The gap between the price on FINN's page and the price for this reader.
+ *
+ * The one number in this section that is genuinely news. The subscription is
+ * on the listing the panel is standing on; the reader has already read it, and
+ * repeating it is the panel spending its most valuable space saying something
+ * already known. What they cannot see anywhere on FINN is that their own
+ * mileage and their own energy prices turn that number into a bigger one.
+ *
+ * Amber rather than red. Going over the included allowance is not a fault or a
+ * warning — it is the ordinary consequence of driving more than the base
+ * contract assumes, and most readers will. Red is kept for the budget line,
+ * where the reader has actually set a limit and this car has passed it.
+ */
+function costGapChip(analysis: FitAnalysis): HTMLElement | null {
+  const { breakdown } = analysis.cost;
+  const advertised = breakdown.subscription.available
+    ? breakdown.subscription.amount
+    : null;
+
+  if (advertised == null || !breakdown.complete) return null;
+
+  const gap = breakdown.totalMonthly - advertised;
+
+  if (gap <= 0) return null;
+
+  return verdictChip(
+    `${formatEUR(gap)} a month more than the advertised price`,
+    "bg-finn-warning-lift text-finn-warning-deep",
+  );
 }
 
 function costSection(analysis: FitAnalysis): HTMLElement {
@@ -1301,7 +1364,7 @@ function costSection(analysis: FitAnalysis): HTMLElement {
         ? "text-finn-iron"
         : "text-finn-influence-emerald";
 
-  const perHundred = breakdown.energy.costPer100Km;
+  const gap = costGapChip(analysis);
 
   return section(
     "What it costs you",
@@ -1319,22 +1382,16 @@ function costSection(analysis: FitAnalysis): HTMLElement {
       }),
     ]),
 
+    gap
+      ? el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [gap])
+      : null,
+
     el("p", {
       class: "mt-2 text-[12px] leading-[18px] text-finn-black",
       text: costLead(analysis),
     }),
 
     el("ul", { class: "mt-2.5 divide-y divide-finn-cotton" }, cost.lines.map(costRow)),
-
-    perHundred != null
-      ? el("p", {
-          class: "mt-2 text-[11px] leading-4 text-finn-iron",
-          text:
-            `That's about ${formatEUR(perHundred)} of ${breakdown.energy.energyLabel} ` +
-            `every 100 km you drive — the part of the bill that moves when your ` +
-            `driving does.`,
-        })
-      : null,
 
     cost.budgetSentence
       ? el("p", {
@@ -1445,10 +1502,29 @@ export function analysisBody(
   return fragment([
     notice,
     fitHeader(analysis, notice != null),
+
+    /*
+     * Money first, then what drives it, then the fit.
+     *
+     * The panel opens over a listing the reader has already read, so its first
+     * screen has to earn its place by saying something that page does not. The
+     * five priority sections are the most *detailed* thing here and were the
+     * first thing here, which put a long audit of equipment — much of which
+     * the reader can see in FINN's own spec list — in front of the two answers
+     * only this extension can give: what the car actually costs at their
+     * mileage, and whether it is a thirsty example of its kind.
+     *
+     * The header still carries the verdict, so a reader who wants only the
+     * fit answer has it before any of this. What follows is the working, in
+     * the order it is worth reading: the cost, the consumption that explains
+     * part of the cost, why it fits, each priority in turn, and last what they
+     * would be giving up.
+     */
+    costSection(analysis),
+    efficiencySection(analysis),
+
     strengthsSection(analysis),
     ...analysis.priorities.map(prioritySection),
-    efficiencySection(analysis),
-    costSection(analysis),
     tradeoffsSection(analysis),
 
     el("footer", { class: "border-t border-finn-cotton px-5 py-4" }, [

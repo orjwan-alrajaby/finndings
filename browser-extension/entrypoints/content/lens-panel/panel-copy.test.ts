@@ -152,19 +152,32 @@ describe("how much it uses", () => {
 });
 
 describe("what it costs you", () => {
-  it("ties the total to the reader's own driving, and names the parts", () => {
+  it("ties the total to the reader's own driving, and names what is added", () => {
     const text = costs(panel({ id: 8, consumption: 6 }));
 
     expect(text).toMatch(/At the [\d.,]+ km a month you told us you drive/);
-    expect(text).toContain("to FINN for the subscription");
+    expect(text).toContain("you'd also pay");
     expect(text).toContain("of fuel");
+    expect(text).toContain("all in");
   });
 
-  it("says which part of the bill moves with the driving", () => {
+  /*
+   * The one number here that is news. The subscription is on the listing the
+   * panel is standing on; what the reader cannot see anywhere on FINN is that
+   * their own mileage turns it into a bigger number.
+   */
+  it("leads with the gap between the advertised price and theirs", () => {
     const text = costs(panel({ id: 9, consumption: 6 }));
 
-    expect(text).toContain("every 100 km you drive");
-    expect(text).toContain("moves when your driving does");
+    expect(text).toContain("more than the advertised price");
+    expect(text).toContain("FINN's page says");
+  });
+
+  it("does not repeat the running cost it has already itemised", () => {
+    const text = costs(panel({ id: 12, consumption: 6 }));
+
+    /* The per-100km figure belongs to the energy row's own explanation. */
+    expect(text.match(/per 100 km/g) ?? []).toHaveLength(1);
   });
 
   it("still leads with the reader's mileage when a part can't be priced", () => {
@@ -173,5 +186,95 @@ describe("what it costs you", () => {
     expect(text).toMatch(/At the [\d.,]+ km a month you told us you drive/);
     /* Named as partial rather than quietly presented as the whole answer. */
     expect(text).toContain("the part we can price");
+  });
+});
+
+/**
+ * What the panel leads with, and what it declines to repeat.
+ *
+ * The panel opens over a FINN listing the reader has just read, so its first
+ * screen has to earn its place. Anything on that page — the advertised price,
+ * the horsepower — is not news, and the two things only this extension can say
+ * are what the car costs at *their* mileage and how thirsty it is for its kind.
+ */
+describe("what the panel leads with", () => {
+  const headings = (host: HTMLElement) =>
+    [...host.querySelectorAll("section")].map((node) =>
+      node.querySelector("h3")?.textContent?.trim() ?? "",
+    );
+
+  const header = (host: HTMLElement) =>
+    (host.querySelector("header")?.textContent ?? "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  it("puts cost and consumption ahead of the equipment audit", () => {
+    const order = headings(panel({ id: 20, consumption: 6 }));
+
+    const cost = order.indexOf("What it costs you");
+    const uses = order.indexOf("How much it uses");
+    const firstPriority = order.findIndex((name) => name.includes("Your priority"));
+
+    expect(cost).toBeGreaterThanOrEqual(0);
+    expect(cost).toBeLessThan(uses);
+    expect(uses).toBeLessThan(firstPriority);
+  });
+
+  /*
+   * Both are on the listing behind the panel. Repeating them spends the first
+   * line the reader looks at on something they have just read.
+   */
+  it("does not recite the advertised price back in the header", () => {
+    const host = panel({ id: 21, customerMonthly: 500 });
+
+    expect(header(host)).not.toContain("from €500");
+  });
+
+  it("leaves horsepower out, since nothing here is decided by it", () => {
+    const host = panel({ id: 22 });
+
+    expect(header(host)).not.toMatch(/\bPS\b/);
+  });
+
+  /*
+   * The engine writes these figures into a sentence — "It has 5 seats and
+   * 400 L of boot space" — and the readout list underneath was saying them
+   * again two lines below, in a section that is already long.
+   */
+  it("states a measurement once, not twice, in one section", () => {
+    const host = panel({
+      id: 23,
+      seats: "5",
+      trunk: 400,
+      /* With an equipment list the engine writes the prose, which is the
+         copy this readout would be duplicating. */
+      featuresSupplied: true,
+      features: ["hasIsofix"],
+    });
+
+    const practicality = [...host.querySelectorAll("section")].find((node) =>
+      node.querySelector("h3")?.textContent?.includes("Practicality"),
+    );
+
+    const text = (practicality?.textContent ?? "").replace(/\s+/g, " ");
+
+    expect(text).toContain("400 L of boot space");
+    expect(text.match(/400 L/g) ?? []).toHaveLength(1);
+  });
+
+  /*
+   * The other side of that gate: a car FINN sent no equipment list for gets no
+   * prose, so the readouts are the only place the figures appear and must stay.
+   */
+  it("still shows the figures when there is no sentence carrying them", () => {
+    const host = panel({ id: 24, seats: "5", trunk: 400 });
+
+    const practicality = [...host.querySelectorAll("section")].find((node) =>
+      node.querySelector("h3")?.textContent?.includes("Practicality"),
+    );
+
+    expect((practicality?.textContent ?? "").replace(/\s+/g, " ")).toContain(
+      "400 L",
+    );
   });
 });

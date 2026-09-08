@@ -30,12 +30,34 @@ export function configurationName(car: FinnCar): string {
 /** The figures a reader tells configurations apart by. */
 export function configurationDetail(
     car: FinnCar,
-    /**
-     * Drop the price where the surface already shows it. The pinned list
-     * gives every car its price in its own column, and repeating it inside
-     * the spec line spends the row's remaining width saying it twice.
-     */
-    { withPrice = true }: { withPrice?: boolean } = {},
+    {
+        withPrice = true,
+        withPower = true,
+    }: {
+        /**
+         * Drop the price where the surface already shows it. The pinned list
+         * gives every car its price in its own column, and repeating it inside
+         * the spec line spends the row's remaining width saying it twice.
+         *
+         * The in-page panel drops it for a different reason: it is standing on
+         * FINN's own listing, where the reader has just read that number. A
+         * panel that opens by repeating the page behind it has spent its first
+         * line saying nothing.
+         */
+        withPrice?: boolean;
+        /**
+         * Same again for PS. It is here at all because two configurations of
+         * one model can differ by power alone, and a reader choosing between
+         * them needs to see it — but the panel is opened *from* a card, so
+         * that choice is already made, and horsepower has no part in anything
+         * the panel goes on to say.
+         *
+         * The cost of dropping it: two configurations distinguished only by
+         * power read identically in the panel's subtitle. The photograph, the
+         * trim name above it and the analysis below are all still that car's.
+         */
+        withPower?: boolean;
+    } = {},
 ): string {
     const range =
         car.electric?.range != null && car.electric.range !== "Unknown"
@@ -45,7 +67,7 @@ export function configurationDetail(
     const price = car.pricing?.customerMonthly?.price;
 
     return [
-        car.power?.inHp ? `${car.power.inHp} PS` : null,
+        withPower && car.power?.inHp ? `${car.power.inHp} PS` : null,
         car.fuelType,
         range,
         withPrice && price ? `from ${formatEUR(price)}/mo` : null,
