@@ -46,12 +46,29 @@ export function ChallengePicker({
         <section className="rounded-[28px] bg-white p-6 ring-2 ring-finn-cotton sm:p-8">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
                 <div>
+                    {/*
+                      * "Shortlist", not "Hot seat". The section that follows
+                      * this one is headed "In the hot seat", and on a tab that
+                      * is itself the hot seat the two labels a few hundred
+                      * pixels apart said the same thing about different
+                      * things. This one is the list of candidates; that one is
+                      * the comparison of the chosen candidate.
+                      */}
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
-                        Hot seat
+                        Shortlist
                     </p>
 
+                    {/*
+                      * An invitation until a car is chosen, and the record of
+                      * what was on the table afterwards — which is what it has
+                      * to be in the exported report, where the choice has
+                      * already been made and asking the reader to make it
+                      * again reads as a page that did not register it.
+                      */}
                     <h2 className="mt-2 text-2xl font-black">
-                        Want to challenge the recommendation?
+                        {selectedId == null
+                            ? "Want to challenge the recommendation?"
+                            : `The cars closest to ${winnerName}`}
                     </h2>
                 </div>
 

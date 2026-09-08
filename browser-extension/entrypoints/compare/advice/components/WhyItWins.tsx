@@ -12,9 +12,20 @@ import { PrioritySection } from "./PrioritySection";
 export function WhyItWins({
     narrative,
     subjectName,
+    isRecommendation = true,
 }: {
     narrative: AdviceNarrative;
     subjectName: string;
+    /**
+     * False for a car in the hot seat, which has not won anything.
+     *
+     * Only the label changes. The blue ground and the white priority cards
+     * stay, because the challenge tab is meant to read as the same kind of
+     * report as the recommendation — one subject, examined the same way — and
+     * these sections are the same evidence about the same priorities. What
+     * they are not is an endorsement, and the label is what says so.
+     */
+    isRecommendation?: boolean;
 }) {
     const { verdict, priorities } = narrative;
 
@@ -34,7 +45,11 @@ export function WhyItWins({
                   * the section "why it wins" would be the page arguing with
                   * the note directly above it.
                   */}
-                {verdict.budgetNote ? "Why this one" : "Why it wins"}
+                {!isRecommendation
+                    ? "How it measures up"
+                    : verdict.budgetNote
+                      ? "Why this one"
+                      : "Why it wins"}
             </p>
 
             <h2 className="mt-2 text-2xl font-black">

@@ -36,9 +36,17 @@ export function Tradeoffs({
             </p>
 
             <h2 className="mt-2 text-2xl font-black">
+                {/*
+                  * "What <car> would cost you" until this branch first
+                  * shipped, which was fine while it was unreachable and is
+                  * not now: the challenge tab carries a cost section headed
+                  * "What <car> costs you" a few hundred pixels above it, and
+                  * two headings that differ by one word while meaning money
+                  * and not-money is a way to lose a reader.
+                  */}
                 {isRecommendation
                     ? "What you're giving up to take this one."
-                    : `What ${subjectName} would cost you.`}
+                    : `What you'd be giving up with ${subjectName}.`}
             </h2>
 
             {tradeoffs.length === 0 ? (

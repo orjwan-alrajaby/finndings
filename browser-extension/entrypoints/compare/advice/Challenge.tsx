@@ -8,6 +8,8 @@ import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
 import { EnergyUse } from "./components/EnergyUse";
 import { HotSeatComparison } from "./components/HotSeatComparison";
+import { Tradeoffs } from "./components/Tradeoffs";
+import { WhyItWins } from "./components/WhyItWins";
 import { ExportButton, usePdfExport } from "./usePdfExport";
 import { useRecommendation } from "./useRecommendation";
 
@@ -190,6 +192,33 @@ export function Challenge({
                             <EnergyUse
                                 car={challenger}
                                 against={{ name: winner.name, car: winner }}
+                            />
+
+                            {/*
+                              * The challenger against the reader's own
+                              * priorities, in the reader's own order — the
+                              * same evidence the recommendation tab lays out
+                              * for the winner, and the reason this tab is a
+                              * report rather than a diff.
+                              *
+                              * Not a repeat of the hot seat table above it.
+                              * That answers "which of the two is ahead on each
+                              * priority", which is a claim about a pair; these
+                              * answer "what does this car actually have", which
+                              * is a claim about one car and is what a reader
+                              * needs before deciding whether being ahead on
+                              * something is worth anything.
+                              */}
+                            <WhyItWins
+                                narrative={challengerNarrative}
+                                subjectName={challenger.name}
+                                isRecommendation={false}
+                            />
+
+                            <Tradeoffs
+                                tradeoffs={challengerNarrative.tradeoffs}
+                                isRecommendation={false}
+                                subjectName={challenger.name}
                             />
                         </>
                     ) : (
