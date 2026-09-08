@@ -11,6 +11,7 @@ import {
   describeEnvironment,
   environmentalTags,
   ENVIRONMENTAL_METHOD,
+  type EfficiencyLevel,
   type EnvironmentalTag,
 } from "@/lib/reasoning-engine/environmental";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
@@ -966,6 +967,126 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
   unknown: "not available",
 };
 
+/* -------------------------------------------------------------------------- */
+/* Efficiency                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** How a level colours its chip. Efficiency is good news, not a warning. */
+const EFFICIENCY_CLASS: Record<EfficiencyLevel, string> = {
+  high: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
+  moderate: "bg-finn-pale-blue text-finn-accent-blue",
+  low: "bg-finn-warning-lift text-finn-warning-deep",
+};
+
+/** A small coloured label carrying a verdict the text then justifies. */
+function verdictChip(label: string, className: string): HTMLElement {
+  return el("span", {
+    class: [
+      "inline-flex shrink-0 items-center rounded-full px-2.5 py-1",
+      "text-[11px] font-black",
+      className,
+    ].join(" "),
+    text: label,
+  });
+}
+
+/**
+ * How much energy this car uses, for every car and every reader.
+ *
+ * This used to appear only inside the environmental-impact priority, so
+ * whether the reader was told what a car costs to run in fuel depended on
+ * whether they had ranked the environment. Those are two different questions
+ * with one answer between them, and the running-cost half is owed to everyone:
+ * it is on the bill every month whatever the reader thinks about emissions.
+ *
+ * Three things, in the order a sceptical reader wants them: the verdict, the
+ * two figures it was read from, and the reasoning that gets from one to the
+ * other — including how big the gap actually is, because "Highly efficient"
+ * could otherwise mean 2% or 30%. The caveat comes last, after the answer
+ * rather than in front of it.
+ *
+ * Every case says something. A plug-in hybrid is shown its figure and told why
+ * it cannot honestly be graded; a car FINN publishes no consumption for is
+ * told that, rather than being quietly skipped and leaving the reader to
+ * wonder whether the section failed to load.
+ */
+function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
+  const impact = analysis.environment;
+  const efficiency = impact?.efficiency;
+
+  /*
+   * The environmental priority block already covers this ground in full, with
+   * emissions beside it. Saying it twice in one panel would read as a bug.
+   */
+  if (analysis.priorities.some((priority) => priority.impact)) return null;
+
+  if (efficiency) {
+    return section(
+      "How much it uses",
+
+      el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+        verdictChip(efficiency.label, EFFICIENCY_CLASS[efficiency.level]),
+      ]),
+
+      el("div", { class: "mt-3 flex flex-wrap gap-x-8 gap-y-2.5" }, [
+        readout("This car", efficiency.display),
+        readout("Typical for its kind", efficiency.typical.replace(" is typical", "")),
+      ]),
+
+      el("p", {
+        class: "mt-3 text-[12px] leading-[18px] text-finn-black",
+        text: efficiency.reasoning,
+      }),
+
+      el("p", {
+        class: "mt-2 text-[11px] leading-4 text-finn-iron",
+        text: efficiency.caveat,
+      }),
+    );
+  }
+
+  /*
+   * A blend of two energy sources over an assumed pattern of charging. The
+   * figure is real and worth showing; the grade would not be.
+   */
+  if (impact?.powertrain === "Plug-in Hybrid") {
+    return section(
+      "How much it uses",
+
+      el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+        verdictChip("Can't be graded fairly", "bg-finn-cotton text-finn-iron"),
+      ]),
+
+      el("p", {
+        class: "mt-3 text-[12px] leading-[18px] text-finn-black",
+        text:
+          "FINN publishes one combined figure for plug-in hybrids, covering " +
+          "both the petrol it burns and the electricity it charges on, over " +
+          "an assumed pattern of charging. There is no petrol car or electric " +
+          "car it can fairly be measured against, so we would rather say that " +
+          "than invent a comparison. What it actually costs you comes down to " +
+          "how often you plug it in.",
+      }),
+    );
+  }
+
+  return section(
+    "How much it uses",
+
+    el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+      verdictChip("Not published", "bg-finn-cotton text-finn-iron"),
+    ]),
+
+    el("p", {
+      class: "mt-3 text-[12px] leading-[18px] text-finn-black",
+      text:
+        "FINN doesn't publish a consumption figure for this car, so there is " +
+        "nothing to measure it against and we won't guess. Everything else on " +
+        "this page still stands — this is the one thing we can't tell you.",
+    }),
+  );
+}
+
 /**
  * One feature, as the Advice page draws it.
  *
@@ -1109,16 +1230,76 @@ function costRow(line: CostLine): HTMLElement {
   return el("li", { class: "py-0.5" }, [row, info.panel]);
 }
 
+/**
+ * The total, said as a sentence about the reader rather than about the car.
+ *
+ * The figures were already right and already broken down; what was missing was
+ * the sentence that connects them to the person reading. "€612 estimated per
+ * month" over a table is a quote. "At the 1,200 km a month you drive, this
+ * comes to about €612" is an answer to the question they actually asked, and
+ * it does two things a table cannot: it says the number depends on *their*
+ * driving rather than being a property of the car, and it shows the assumption
+ * it rests on, so a reader whose driving has changed knows immediately why the
+ * figure looks wrong and where to fix it.
+ *
+ * The parts are named in the sentence as well as listed below it, because the
+ * split is the actionable part — a total that is mostly excess-mileage charges
+ * is a different problem from one that is mostly subscription, and only one of
+ * them is solved by picking a different car.
+ */
+function costLead(analysis: FitAnalysis): string {
+  const { breakdown } = analysis.cost;
+  const { energy, excessMileage, subscription } = breakdown;
+
+  const km = formatKm(breakdown.monthlyKm);
+  const parts: string[] = [];
+
+  if (subscription.available && subscription.amount != null) {
+    parts.push(`${formatEUR(subscription.amount)} to FINN for the subscription`);
+  }
+
+  if (energy.available && energy.amount != null) {
+    parts.push(`about ${formatEUR(energy.amount)} of ${energy.energyLabel}`);
+  }
+
+  if (excessMileage.available && (excessMileage.amount ?? 0) > 0) {
+    const over = breakdown.monthlyKm - breakdown.includedMonthlyKm;
+
+    parts.push(
+      `${formatEUR(excessMileage.amount ?? 0)} for the ${formatKm(over)} ` +
+        `you'd drive past the ${formatKm(breakdown.includedMonthlyKm)} included`,
+    );
+  }
+
+  const opening = breakdown.complete
+    ? `At the ${km} a month you told us you drive, this car works out at about ` +
+      `${formatEUR(breakdown.totalMonthly)} a month`
+    : `At the ${km} a month you told us you drive, the part we can price ` +
+      `comes to about ${formatEUR(breakdown.totalMonthly)} a month`;
+
+  if (!parts.length) return `${opening}.`;
+
+  const last = parts.pop() as string;
+  const listed = parts.length ? `${parts.join(", ")} and ${last}` : last;
+
+  return `${opening} — ${listed}.`;
+}
+
 function costSection(analysis: FitAnalysis): HTMLElement {
-  const { cost, costReasoning } = analysis;
+  const { cost } = analysis;
   const { breakdown } = cost;
 
+  /*
+   * Over budget is the one case worth colouring. Within budget is the ordinary
+   * outcome and does not need congratulating in green every time; unknown is
+   * not a verdict at all.
+   */
   const budgetTone =
     breakdown.budgetStatus === "over"
       ? "text-finn-influence-red"
       : breakdown.budgetStatus === "unknown"
         ? "text-finn-iron"
-        : "text-finn-black";
+        : "text-finn-influence-emerald";
 
   const perHundred = breakdown.energy.costPer100Km;
 
@@ -1132,18 +1313,26 @@ function costSection(analysis: FitAnalysis): HTMLElement {
       }),
       el("span", {
         class: "text-[11px] text-finn-iron",
-        text: breakdown.complete ? "estimated per month" : "per month, and incomplete",
+        text: breakdown.complete
+          ? "estimated per month"
+          : "per month, and incomplete",
       }),
     ]),
+
+    el("p", {
+      class: "mt-2 text-[12px] leading-[18px] text-finn-black",
+      text: costLead(analysis),
+    }),
 
     el("ul", { class: "mt-2.5 divide-y divide-finn-cotton" }, cost.lines.map(costRow)),
 
     perHundred != null
       ? el("p", {
           class: "mt-2 text-[11px] leading-4 text-finn-iron",
-          text: `About ${formatEUR(perHundred)} per 100 km at the ${formatKm(
-            costReasoning.monthlyKm,
-          )} a month you told us you drive.`,
+          text:
+            `That's about ${formatEUR(perHundred)} of ${breakdown.energy.energyLabel} ` +
+            `every 100 km you drive — the part of the bill that moves when your ` +
+            `driving does.`,
         })
       : null,
 
@@ -1258,6 +1447,7 @@ export function analysisBody(
     fitHeader(analysis, notice != null),
     strengthsSection(analysis),
     ...analysis.priorities.map(prioritySection),
+    efficiencySection(analysis),
     costSection(analysis),
     tradeoffsSection(analysis),
 

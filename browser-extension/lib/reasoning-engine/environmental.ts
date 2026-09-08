@@ -179,6 +179,23 @@ export interface EfficiencyAssessment {
   display: string;
   /** What an ordinary car of this kind uses, so the reader can judge it. */
   typical: string;
+
+  /**
+   * The same judgement with its working shown, for a reader who wants to know
+   * why we called it that rather than being told to accept it.
+   *
+   * `reasoning` names both figures and the distance between them, because
+   * "Highly efficient" on its own is a verdict the reader has no way to check
+   * — and this one is a comparison against a fleet average, not a property of
+   * the car. `caveat` is the part that is true of every figure here and would
+   * be dishonest to leave implied: it is a lab result.
+   */
+  reasoning: string;
+  caveat: string;
+  /** The car's own figure and the cohort's, for a side-by-side readout. */
+  value: number;
+  typicalValue: number;
+  unit: string;
 }
 
 /**
@@ -468,12 +485,61 @@ export function assessEfficiency(
     low: `Uses noticeably more ${cohort.noun} than ${cohort.peer}.`,
   }[level];
 
+  /*
+   * How far off the cohort it actually is, rounded to whole percent.
+   *
+   * Quoted rather than kept internal because the band is the whole judgement:
+   * a reader told "Highly efficient" has no way to know whether that meant 2%
+   * better or 30%, and the difference is the difference between a rounding
+   * artefact and a real saving.
+   */
+  const differencePct = Math.round(
+    (Math.abs(consumption - cohort.typical) / cohort.typical) * 100,
+  );
+
+  const mine = `${formatNumber(consumption)} ${cohort.unit}`;
+  const theirs = `${formatNumber(cohort.typical)} ${cohort.unit}`;
+
+  const reasoning = {
+    high:
+      `This car is rated at ${mine}. Measured against ${cohort.peer}, ` +
+      `which uses about ${theirs}, it needs roughly ${differencePct}% less ` +
+      `${cohort.noun} to cover the same distance — enough of a gap to call ` +
+      `it genuinely frugal for its kind.`,
+    moderate:
+      `This car is rated at ${mine}, and ${cohort.peer} uses about ` +
+      `${theirs}. That is close enough — within ${differencePct}% — that we ` +
+      `would not claim it is either frugal or thirsty. It is an ordinary ` +
+      `car for its kind on ${cohort.noun}, which is a perfectly reasonable ` +
+      `thing to be.`,
+    low:
+      `This car is rated at ${mine}, against about ${theirs} for ` +
+      `${cohort.peer}. That is roughly ${differencePct}% more ${cohort.noun} ` +
+      `for the same distance, which is worth knowing because you pay for it ` +
+      `every month rather than once.`,
+  }[level];
+
   return {
     level,
     label: EFFICIENCY_LABEL[level],
     explanation,
-    display: `${formatNumber(consumption)} ${cohort.unit}`,
-    typical: `${formatNumber(cohort.typical)} ${cohort.unit} is typical`,
+    display: mine,
+    typical: `${theirs} is typical`,
+    reasoning,
+    /*
+     * The one caveat that is true of every consumption figure FINN publishes,
+     * and the one a reader is most likely to be caught out by — the comparison
+     * above is lab-against-lab, so it stays fair, but the absolute number will
+     * not match their own driving.
+     */
+    caveat:
+      `Both figures are official WLTP lab results, so they are measured the ` +
+      `same way and fair to compare. Real driving — motorway speeds, winter, ` +
+      `a loaded car — usually uses more than the lab does, so treat the ` +
+      `comparison as reliable and the exact number as optimistic.`,
+    value: consumption,
+    typicalValue: cohort.typical,
+    unit: cohort.unit,
   };
 }
 

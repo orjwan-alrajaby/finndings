@@ -6,6 +6,7 @@ import type {
   LensPreferences,
   PriorityBreakdown,
 } from "./types";
+import { assessEnvironment } from "./environmental";
 import type { EnvironmentalAssessment } from "./environmental";
 import type {
   CostReasoning,
@@ -322,6 +323,20 @@ export interface FitAnalysis {
   cost: CostAnalysis;
   costReasoning: CostReasoning;
 
+  /**
+   * How this car uses energy, whatever the reader ranked.
+   *
+   * The same reading already reaches `FitPriority.impact`, but only for a
+   * reader who put environmental impact in their priorities — which made how
+   * much fuel or electricity a car uses a fact the product would mention or
+   * withhold depending on whether they had said they cared about the planet.
+   * Those are different questions: one is about emissions, the other is about
+   * what the car costs to run and turns up on the bill every month. So it is
+   * carried here for every car and every reader, and the panel decides how to
+   * say it.
+   */
+  environment: EnvironmentalAssessment | null;
+
   /** False when FINN supplied no equipment list for this car. */
   equipmentKnown: boolean;
 
@@ -394,6 +409,7 @@ export function buildFitAnalysis(
       : reasonAboutTradeoffs(evaluation, [], costReasoning, context, []),
     cost: evaluation.cost,
     costReasoning,
+    environment: assessEnvironment(vehicle),
     equipmentKnown,
     preferences,
   };

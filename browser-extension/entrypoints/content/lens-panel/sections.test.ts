@@ -58,7 +58,23 @@ beforeEach(() => {
     "<!doctype html><html><body></body></html>",
   );
 
-  Object.assign(globalThis, { document: doc });
+  /*
+   * `analysisBody` builds a pin control, which subscribes to storage so that
+   * pinning from the card behind the panel reaches it. That subscription is
+   * synchronous, so the panel can no longer be rendered in a world with no
+   * extension APIs at all — which this test was previously getting away with
+   * only because the control's other browser call is a promise whose rejection
+   * it already swallows.
+   */
+  Object.assign(globalThis, {
+    document: doc,
+    browser: {
+      storage: {
+        local: { get: async () => ({}), set: async () => {} },
+        onChanged: { addListener: () => {}, removeListener: () => {} },
+      },
+    },
+  });
 
   root = render();
 });
