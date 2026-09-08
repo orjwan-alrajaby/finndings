@@ -1,16 +1,21 @@
-const PLUS_ICON = `
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-    stroke-width="2" stroke="currentColor" class="size-3.5">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
-  </svg>
-`;
+import { icon } from "../lens-panel/dom";
 
-const CHECK_ICON = `
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-    stroke-width="2" stroke="currentColor" class="size-3.5">
-    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
-  </svg>
-`;
+/**
+ * The circle on every card, and the one on the details page.
+ *
+ * It drew a plus, and a tick once the car was pinned — two shapes, hand-written
+ * as SVG strings in this file, describing the mechanics of the action rather
+ * than the action. Everything else in the product calls this pinning: the
+ * label on this very button says "Pin this car for comparison", the panel's
+ * control says it, the page of results is called Pinned cars. So it draws a
+ * pin, from the same generated lucide set the panel uses, and fills it once
+ * the car is on the board — outline is the offer, solid is the state.
+ *
+ * Sharing `icon` with the panel rather than keeping a second copy of the
+ * markup is the other half of the change. These two controls are the same
+ * fact on two surfaces and they used to be able to drift; `icons.test.ts`
+ * now covers the shape they both draw.
+ */
 
 function getButtonClasses(pinned: boolean): string {
   const base = [
@@ -44,7 +49,9 @@ function getButtonClasses(pinned: boolean): string {
 
 function applyPinnedState(button: HTMLButtonElement, pinned: boolean) {
   button.dataset.pinned = String(pinned);
-  button.innerHTML = pinned ? CHECK_ICON : PLUS_ICON;
+  button.replaceChildren(
+    icon("pin", pinned ? "size-3.5 fill-current" : "size-3.5"),
+  );
   button.className = getButtonClasses(pinned);
   button.setAttribute(
     "aria-label",

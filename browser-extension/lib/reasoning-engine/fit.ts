@@ -125,14 +125,39 @@ export const FIT_BANDS = {
   }
 >;
 
-/** How many of the four segments a band fills. */
+/**
+ * How many of the five segments a band fills.
+ *
+ * Five rather than four because five is the number of priorities Lens asks
+ * for, so a reader who has answered the setup sees a meter whose length
+ * matches the thing it is summarising. It does not mean "three of your five
+ * priorities are met" — the meter is a picture of the band, and the band is a
+ * summary of one weighted score — but the two being the same length stops the
+ * meter reading as an arbitrary mark out of four. A reader who set fewer than
+ * five priorities still gets five segments, which is fine: the scale is the
+ * product's, not their own.
+ *
+ * The steps are the presentation judgement, and only the ends are forced.
+ * `strong` has to fill the meter or the top band looks unfinished, `unknown`
+ * has to be empty because it is the one state that is an absence of a claim
+ * rather than a weak one, and the middle has to stay monotonic. That leaves
+ * one segment more than there are bands to spend it on, and it goes into the
+ * gap above `limited`: those are the cars that answer almost nothing the
+ * reader asked for, and one lit segment says so more honestly than two.
+ *
+ * See `FIT_BANDS` and the thresholds below — like those, these are worth
+ * recalibrating against real inventory rather than treated as settled.
+ */
 export const FIT_SEGMENTS: Record<FitLevel, number> = {
-  strong: 4,
-  good: 3,
-  partial: 2,
+  strong: 5,
+  good: 4,
+  partial: 3,
   limited: 1,
   unknown: 0,
 };
+
+/** The meter's length, so the three places that draw it agree on it. */
+export const FIT_METER_SEGMENTS = 5;
 
 /**
  * Where the bands sit on the engine's own 0–100 category score.

@@ -336,22 +336,6 @@ export const LENS_PANEL_ICONS: Record<string, IconNode> = {
       }
     ]
   ],
-  "search": [
-    [
-      "path",
-      {
-        "d": "m21 21-4.34-4.34"
-      }
-    ],
-    [
-      "circle",
-      {
-        "cx": "11",
-        "cy": "11",
-        "r": "8"
-      }
-    ]
-  ],
   "x": [
     [
       "path",
@@ -366,25 +350,17 @@ export const LENS_PANEL_ICONS: Record<string, IconNode> = {
       }
     ]
   ],
-  "check": [
+  "pin": [
     [
       "path",
       {
-        "d": "M20 6 9 17l-5-5"
-      }
-    ]
-  ],
-  "plus": [
-    [
-      "path",
-      {
-        "d": "M5 12h14"
+        "d": "M12 17v5"
       }
     ],
     [
       "path",
       {
-        "d": "M12 5v14"
+        "d": "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"
       }
     ]
   ]

@@ -1,6 +1,7 @@
 import {
   buildFitAnalysis,
   FIT_BANDS,
+  FIT_METER_SEGMENTS,
   FIT_SEGMENTS,
   type FitLevel,
 } from "@/lib/reasoning-engine/fit";
@@ -8,7 +9,7 @@ import { loadLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { el } from "./dom";
+import { brandMark, el } from "./dom";
 import { openPanel } from "./panel";
 import {
   cardConfigId,
@@ -106,7 +107,7 @@ function meter(level: FitLevel | null): HTMLElement {
       class: "finn-lens-fit-meter flex items-center gap-[2px]",
       attrs: { "aria-hidden": "true" },
     },
-    [0, 1, 2, 3].map((index) =>
+    Array.from({ length: FIT_METER_SEGMENTS }, (_, index) =>
       el("span", {
         class: ["block h-2.5 w-[3px] rounded-full", segmentClass(index)].join(
           " ",
@@ -169,6 +170,24 @@ function badgeFor(id: number, name: string | undefined): HTMLElement {
       },
     },
     [
+      /*
+       * Whose verdict this is, before what the verdict says.
+       *
+       * The pill sits on FINN's photograph inside FINN's card, and everything
+       * around it is FINN's. Without a mark it reads as one more thing the
+       * site is telling you about the car — which is exactly wrong, because
+       * the claim it makes is ranked against what *this reader* said matters
+       * and FINN has no part in it. The mark is the cheapest way to say that,
+       * and it goes first because "whose is this" is the question that has to
+       * be answered before the label means anything.
+       *
+       * A 16px disc against an 11px label. Small enough that the pill still
+       * reads as a verdict with a source on it rather than a logo with a
+       * verdict attached, and big enough that the artwork inside it — an
+       * aperture, at 13px — is still a shape rather than a smudge.
+       */
+      brandMark(16),
+
       meter(null),
 
       el("span", {

@@ -1,7 +1,7 @@
 import { buildFitAnalysis } from "@/lib/reasoning-engine/fit";
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
-import { el, empty, fragment, icon, panelStyles } from "./dom";
+import { brandMark, el, empty, fragment, icon, panelStyles } from "./dom";
 import { hasRoomBeside, PANEL_WIDTH } from "./panel-width";
 import { clearHighlight, highlightConfiguration } from "./highlight";
 import { analysisBody, defaultsNotice } from "./sections";
@@ -325,7 +325,16 @@ async function build(request: PanelRequest): Promise<Panel> {
         "flex items-center gap-2 border-b border-finn-cotton px-5 py-3",
     },
     [
-      icon("search", "h-4 w-4 shrink-0 text-finn-accent-blue"),
+      /* The mark, not a magnifier. This bar is the first line of a panel that
+         opens over finn.com, and it has to say whose panel it is before it
+         says what the panel is about — see `brandMark`.
+
+         Deliberately larger than the 13px heading beside it rather than
+         matched to it. At icon size it read as one more piece of the bar's
+         furniture, in a row that already ends in two controls; as a 28px disc
+         it is the first thing in the panel, which is what a reader arriving
+         from FINN's own page needs it to be. */
+      brandMark(28),
       el("div", { class: "min-w-0 flex-1" }, [title]),
       el("button", {
         class: [

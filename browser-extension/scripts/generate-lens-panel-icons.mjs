@@ -44,10 +44,13 @@ export const PANEL_ICONS = {
   /* The panel's own furniture. Drawn as outlines, like every other control. */
   info: "info",
   "chevron-down": "chevron-down",
-  search: "search",
   x: "x",
-  check: "check",
-  plus: "plus",
+  /* Pinning, on both controls that do it: the panel's button and the circle
+     on each card. Outline is the offer, and the same shape filled is the
+     state — see `pinControl`. It replaced a plus and a tick, which said
+     "add"/"done" about an action whose whole vocabulary elsewhere in the
+     product is pinning. */
+  pin: "pin",
 };
 
 export const PANEL_ICON_NAMES = Object.keys(PANEL_ICONS);

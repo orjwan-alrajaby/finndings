@@ -18,6 +18,7 @@ import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 import {
   describeFit,
   FIT_BANDS,
+  FIT_METER_SEGMENTS,
   FIT_SEGMENTS,
 } from "@/lib/reasoning-engine/fit";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
@@ -75,11 +76,11 @@ import { pinControl } from "./pin-control";
 /* -------------------------------------------------------------------------- */
 
 /**
- * How full the band is, as four segments.
+ * How full the band is, as five segments.
  *
  * A band is a summary of a score the reader is deliberately never shown, so
  * the indicator has to read as "how much of this" without reading as a mark
- * out of ten. Four segments do that; a number or a letter grade would not.
+ * out of ten. Five segments do that; a number or a letter grade would not.
  *
  * Coloured by band rather than in one accent, so the four are told apart
  * before they are read — see FIT_BANDS.
@@ -94,7 +95,7 @@ function meter(level: FitLevel): HTMLElement {
       class: "inline-flex items-center gap-[3px]",
       attrs: { "aria-hidden": "true" },
     },
-    [0, 1, 2, 3].map((index) =>
+    Array.from({ length: FIT_METER_SEGMENTS }, (_, index) =>
       el("span", {
         class: [
           "block h-3 w-[3px] rounded-full",

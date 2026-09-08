@@ -101,8 +101,18 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
       ? "Pinned — compare it later"
       : "Pin this car for comparison";
 
-    /* Redrawn rather than retyped: the mark is a shape now, not a glyph. */
-    mark.replaceChildren(icon(pinned ? "check" : "plus", "h-4 w-4"));
+    /*
+     * One shape in two weights, rather than two shapes.
+     *
+     * A plus and a tick described the *mechanics* — add this, done — in a
+     * product whose word for it everywhere else is "pin". The pin says what
+     * the button is for, and filling it is what says the car is already on
+     * the board: outline is the offer, solid is the state. `icon` draws with
+     * `fill="none"`, so `fill-current` is what gives the mark an inside.
+     */
+    mark.replaceChildren(
+      icon("pin", pinned ? "h-4 w-4 fill-current" : "h-4 w-4"),
+    );
   };
 
   const toggle = async () => {

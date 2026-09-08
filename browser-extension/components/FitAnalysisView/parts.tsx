@@ -1,4 +1,9 @@
-import { FIT_BANDS, FIT_SEGMENTS, type FitLevel } from "@/lib/reasoning-engine/fit";
+import {
+    FIT_BANDS,
+    FIT_METER_SEGMENTS,
+    FIT_SEGMENTS,
+    type FitLevel,
+} from "@/lib/reasoning-engine/fit";
 
 /**
  * The parts every section of the reading is built from.
@@ -57,7 +62,10 @@ export function BandChip({
         >
             {!compact && (
                 <span className="flex items-center gap-0.5" aria-hidden="true">
-                    {[0, 1, 2, 3].map((segment) => (
+                    {Array.from(
+                        { length: FIT_METER_SEGMENTS },
+                        (_, segment) => segment,
+                    ).map((segment) => (
                         <span
                             key={segment}
                             className={[

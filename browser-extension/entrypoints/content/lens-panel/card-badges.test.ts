@@ -80,6 +80,12 @@ beforeEach(() => {
 
   Object.assign(globalThis, {
     browser: {
+      /*
+       * The badge carries Lens's mark, and `brandMark` resolves it to an
+       * extension URL. Identity is enough here: these tests are about what
+       * the pill says and when, not where an image lives.
+       */
+      runtime: { getURL: (path: string) => path },
       storage: {
         local: {
           get: async (keys: string | string[]) =>

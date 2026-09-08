@@ -48,11 +48,18 @@ export default defineConfig({
          * is applying to finn.com is being loaded into that page — so without
          * this the request is blocked there and the panel alone falls back to
          * system sans while every extension page renders in Inter.
+         *
+         * The icon is here for the same reason. The fit badge, the launcher
+         * and the panel header all carry Lens's mark so a reader can tell
+         * whose opinion they are reading while standing on FINN's page, and
+         * an <img> pointing at an extension resource from inside that page is
+         * blocked unless the file is listed.
          */
         resources: [
           "network-interceptor.js",
           "content-scripts/content.css",
           "fonts/*",
+          "icon/*",
         ],
         matches: ["https://www.finn.com/*"]
       }

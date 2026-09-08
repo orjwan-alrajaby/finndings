@@ -95,6 +95,103 @@ export function icon(name: string, className: string): SVGElement {
   return svg;
 }
 
+/**
+ * Lens's own mark, for the places that have to say whose they are.
+ *
+ * Everything else this file draws is lucide, and a lucide magnifier is what
+ * the badge and the panel header used to open with. On finn.com that is the
+ * wrong picture twice over: a magnifier on a car listing reads as *search*,
+ * which is FINN's own control at the top of the page, and a generic glyph
+ * over FINN's photography reads as FINN's. A reader has no way to tell that
+ * the pill on the card and the panel it opens are a different party's
+ * opinion — which is the one thing they most need to know, because Lens
+ * ranks these cars against what the reader said and FINN does not.
+ *
+ * So the surfaces that sit inside FINN's page carry the mark instead. The
+ * panel's inner furniture stays lucide: once the reader is in the panel the
+ * question of whose it is has been answered, and a brand mark on every
+ * section would be noise.
+ *
+ * It is the shipped PNG rather than a drawn shape because that is the only
+ * form the mark exists in — public/icon/ is raster, and the SVG masters in
+ * design/ are five earlier concepts, none of them this aperture. 128 is the
+ * only size asked for anywhere here: these slots are 16-28px, so even a 3x
+ * display is drawing it down, and one URL means the browser decodes it once
+ * for a page of forty cards rather than once per size.
+ *
+ * **The white disc is part of the mark, not decoration.** It is the same
+ * lockup the onboarding's first screen and the popup's brand row use — a
+ * circle of white with a soft shadow, the artwork inset inside it — and the
+ * reason to repeat it here is that these are the surfaces where the mark has
+ * the least help. In the popup it sits under the word "Finn Lens"; on
+ * finn.com it is alone, at 16px, over somebody else's photograph of a car.
+ * The disc gives it a consistent ground to sit on whatever it lands over,
+ * the shadow lifts it off a chip whose colour changes with the verdict, and
+ * a reader who met the mark during setup meets the same object here.
+ *
+ * `alt` is empty on purpose. Every caller sits inside a control that already
+ * names Lens in its own accessible name — the badge's `aria-label`, the
+ * panel's heading — so a second announcement here would only repeat it.
+ */
+export function brandMark(size: number, className = ""): HTMLElement {
+  const disc = document.createElement("span");
+  const img = document.createElement("img");
+
+  /*
+   * Reachable from finn.com only because `icon/*` is a web-accessible
+   * resource; see wxt.config.ts. Without that the browser blocks it and
+   * these controls lose their mark with nothing in its place.
+   */
+  img.src = browser.runtime.getURL("/icon/128.png");
+  img.alt = "";
+  img.setAttribute("aria-hidden", "true");
+
+  /*
+   * Styled inline rather than by utility classes, which is the one thing here
+   * that is not a style preference. The badge hangs in FINN's own card in the
+   * light DOM, so FINN's stylesheet reaches it, and a listing rule as ordinary
+   * as `.card img { width: 100% }` outranks `w-3` on specificity and would
+   * blow the mark up to the width of the photograph. An inline declaration is
+   * the one thing a page rule cannot outrank without `!important`.
+   *
+   * `size` is the disc, in px — the whole object, so callers size the thing
+   * they are actually placing. The artwork is inset to 0.8 of it, which is
+   * the same proportion as the 20-in-24 on the onboarding screen; the ring of
+   * white left around it is what keeps the aperture from touching the edge
+   * and reading as a cropped circle rather than a mark on a disc.
+   */
+  const inner = Math.round(size * 0.8);
+
+  disc.className = className;
+  disc.style.cssText = [
+    "display:inline-flex",
+    "align-items:center",
+    "justify-content:center",
+    `width:${size}px`,
+    `height:${size}px`,
+    "flex-shrink:0",
+    "border-radius:9999px",
+    "background:#fff",
+    /* Tailwind's own `shadow-sm`, spelled out — the panel is in a shadow root
+       and the badge is on FINN's page, and neither can rely on a class here. */
+    "box-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+  ].join(";");
+
+  img.style.cssText = [
+    `width:${inner}px`,
+    `height:${inner}px`,
+    "flex-shrink:0",
+    "object-fit:contain",
+    /* FINN sets `img { display: block }` in places; the disc centres either
+       way, but this keeps the box from picking up a text baseline gap. */
+    "display:block",
+  ].join(";");
+
+  disc.append(img);
+
+  return disc;
+}
+
 /** A run of elements with no wrapper of their own. */
 export function fragment(children: Child[]): DocumentFragment {
   const frame = document.createDocumentFragment();
