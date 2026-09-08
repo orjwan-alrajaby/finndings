@@ -19,9 +19,10 @@ import { setPinButtonPinnedState } from "../creators/PinButton";
  * to do the extension's filing.
  *
  * It writes through the same storage helper the card button uses — there is
- * one pinned set, not a panel one and a card one — and then tells the card's
- * own button what happened, so the two controls for the same fact can't sit on
- * screen disagreeing about it.
+ * one pinned set, not a panel one and a card one — and the two controls for
+ * that one fact are kept from sitting on screen disagreeing about it, in both
+ * directions: this button tells the card's directly, and anything that writes
+ * the pinned set reaches this button through `storage.onChanged`.
  */
 
 /**
@@ -50,6 +51,84 @@ function syncCardButton(id: number, pinned: boolean): void {
   );
 
   if (button) setPinButtonPinnedState(button, pinned);
+}
+
+/**
+ * The pin controls currently on screen, so a change made elsewhere reaches
+ * them.
+ *
+ * There are two buttons for one fact — the circle on the card and this one in
+ * the panel — and the panel sits *over* the card it is about, so both are
+ * frequently visible at once. Pressing either used to leave the other saying
+ * the opposite: the panel told the card what it had done (`syncCardButton`),
+ * but nothing told the panel. Pinning from the card behind an open drawer left
+ * the drawer still offering to pin a car that was already pinned, until it was
+ * closed and reopened.
+ *
+ * Storage is what they now agree through, which is the same thing they already
+ * agreed through for the *value* — `updatePinnedCars` is the one writer, and
+ * `storage.onChanged` fires for every writer including the popup, the pins
+ * page and a second tab. A control repaints from what was actually stored
+ * rather than from what its own button did.
+ *
+ * Only the button's own state is repainted, deliberately. Adding `pinnedCars`
+ * to the panel's `WATCHED_KEYS` would have been two lines, but a full
+ * re-render resets the scroll position — so pinning a car from the panel would
+ * throw the reader back to the top of the analysis they were part-way through
+ * reading, as a side effect of agreeing with a button six inches away.
+ */
+interface LiveControl {
+  /** The car this control speaks for. */
+  id: number;
+  /** Dropped once this is off the page — see the sweep in `listenOnce`. */
+  button: HTMLElement;
+  apply: (pinned: boolean) => void;
+}
+
+const live = new Set<LiveControl>();
+
+let listening = false;
+
+/**
+ * Subscribed on first use rather than at import.
+ *
+ * The unit tests import this module to build a button and assert on it, in a
+ * plain `node` environment with no extension APIs — see vitest.config.ts,
+ * which allows a content-script module in a test exactly as long as it touches
+ * no browser API at module level. Registering the listener here keeps that
+ * true while still costing one registration for the life of the page.
+ */
+function listenOnce(): void {
+  if (listening) return;
+
+  listening = true;
+
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+
+    const change = changes.pinnedCars as
+      | { newValue?: Record<number, unknown> }
+      | undefined;
+
+    if (!change) return;
+
+    const stored = change.newValue ?? {};
+
+    for (const control of live) {
+      /*
+       * The panel is thrown away and rebuilt on every render, so its buttons
+       * are abandoned rather than removed one by one. Sweeping the ones that
+       * have left the document here means no caller has to remember to
+       * unsubscribe, and the set cannot grow for the life of the page.
+       */
+      if (!control.button.isConnected) {
+        live.delete(control);
+        continue;
+      }
+
+      control.apply(Boolean(stored[control.id]));
+    }
+  });
 }
 
 export function pinControl(car: PinnedFinnCar): HTMLElement {
@@ -140,11 +219,29 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
 
   paint();
 
+  /*
+   * Repainted from what is stored, whoever stored it — this button, the
+   * circle on the card behind the panel, the popup, another tab.
+   *
+   * Guarded on the value actually changing, so a write that says what the
+   * button already shows costs nothing: pressing this button paints
+   * optimistically, and the storage event that follows its own write would
+   * otherwise repaint the same state a second time.
+   */
+  const apply = (next: boolean) => {
+    if (next === pinned) return;
+
+    pinned = next;
+    paint();
+  };
+
+  listenOnce();
+  live.add({ id: car.id, button, apply });
+
   /* The stored answer, once it arrives, replaces the assumed one. */
   void getPinnedCars()
     .then((cars) => {
-      pinned = Boolean(cars[car.id]);
-      paint();
+      apply(Boolean(cars[car.id]));
     })
     .catch(() => {
       /* Left as unpinned: the button still works, it just starts wrong. */

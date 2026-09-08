@@ -16,6 +16,46 @@ import type { PinnedFinnCar } from "@/lib/types";
 let storage: Record<string, unknown>;
 let document: Document;
 
+/**
+ * One `onChanged` for the whole file, on purpose.
+ *
+ * `pin-control` subscribes once and keeps the subscription for the life of the
+ * page, which is right in a content script and awkward in a test file that
+ * rebuilds the world between cases: a fresh emitter per test would leave that
+ * one subscription pointing at the first test's. So the emitter outlives the
+ * tests, and it is the *controls* that come and go — which is what the module
+ * sweeps for anyway.
+ */
+type ChangeListener = (
+  changes: Record<string, { newValue?: unknown }>,
+  areaName: string,
+) => void;
+
+const changeListeners: ChangeListener[] = [];
+
+const onChanged = {
+  addListener: (fn: ChangeListener) => changeListeners.push(fn),
+  removeListener: (fn: ChangeListener) => {
+    const at = changeListeners.indexOf(fn);
+
+    if (at >= 0) changeListeners.splice(at, 1);
+  },
+};
+
+/** What the browser sends every open surface after a write to the pinned set. */
+const storedPinnedCarsChanged = () => {
+  for (const listener of changeListeners) {
+    listener({ pinnedCars: { newValue: storage.pinnedCars ?? {} } }, "local");
+  }
+};
+
+/** On the page, which is the only state the module keeps a control for. */
+const onPage = (button: HTMLElement) => {
+  document.body.append(button);
+
+  return button;
+};
+
 const car = (over = {}) =>
   ({ ...makeCar({ id: 36933, name: "BYD Dolphin" }), url: "", ...over }) as PinnedFinnCar;
 
@@ -51,6 +91,7 @@ beforeEach(() => {
             Object.assign(storage, values);
           },
         },
+        onChanged,
       },
     },
   });
@@ -124,6 +165,71 @@ describe("pinControl", () => {
     await settle();
 
     expect(Object.keys(pinned())).toEqual([]);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+/**
+ * The other direction, which is the one that was missing.
+ *
+ * The panel sits over the card it is about, so the card's own pin circle is
+ * usually visible right behind it. Pressing that one wrote the pinned set and
+ * told nobody, leaving the panel offering to pin a car that was already
+ * pinned until it was closed and opened again.
+ */
+describe("a change made somewhere else", () => {
+  it("pins the panel's button when the card behind it is pinned", async () => {
+    const button = onPage(pinControl(car()));
+    await settle();
+
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    storage.pinnedCars = { 36933: car({ pinnedAt: "2026-01-01" }) };
+    storedPinnedCarsChanged();
+
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.textContent).toContain("Pinned");
+  });
+
+  it("unpins it again when the car is dropped elsewhere", async () => {
+    storage.pinnedCars = { 36933: car({ pinnedAt: "2026-01-01" }) };
+
+    const button = onPage(pinControl(car()));
+    await settle();
+
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+
+    storage.pinnedCars = {};
+    storedPinnedCarsChanged();
+
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(button.textContent).toContain("Pin this car");
+  });
+
+  it("ignores a change about a car it isn't showing", async () => {
+    const button = onPage(pinControl(car()));
+    await settle();
+
+    storage.pinnedCars = { 99999: car({ id: 99999 }) };
+    storedPinnedCarsChanged();
+
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  /*
+   * The panel is thrown away and rebuilt on every render, so its buttons are
+   * abandoned rather than unsubscribed. Nothing may keep them alive, or a long
+   * browsing session accumulates one dead control per render.
+   */
+  it("lets go of a button that has left the page", async () => {
+    const button = onPage(pinControl(car()));
+    await settle();
+
+    button.remove();
+
+    storage.pinnedCars = { 36933: car({ pinnedAt: "2026-01-01" }) };
+    storedPinnedCarsChanged();
+
     expect(button.getAttribute("aria-pressed")).toBe("false");
   });
 });
