@@ -172,8 +172,8 @@ export default function PinsPage() {
 
         if (!node) return;
 
-        /* The page bar and the sticky way back under it, plus a little air. */
-        const HEADER = 144;
+        /* Where the two sticky bars end — see `STUCK` below. */
+        const HEADER = STUCK;
         const { top } = node.getBoundingClientRect();
 
         if (top >= HEADER - 8 && top <= HEADER + 200) return;
@@ -436,7 +436,7 @@ export default function PinsPage() {
                                     className={[
                                         "grid gap-4",
                                         open
-                                            ? "lg:sticky lg:top-32"
+                                            ? "lg:sticky lg:top-38"
                                             : "sm:grid-cols-2 xl:grid-cols-3",
                                     ].join(" ")}
                                 >
@@ -488,7 +488,7 @@ export default function PinsPage() {
                             {openAnalysis && (
                                 <section
                                     ref={reading}
-                                    className="min-w-0 scroll-mt-36"
+                                    className="min-w-0 scroll-mt-38"
                                 >
                                     <FitAnalysisView analysis={openAnalysis} />
                                 </section>
@@ -507,6 +507,21 @@ export default function PinsPage() {
         </Tooltip.Provider>
     );
 }
+
+/**
+ * Where the page's sticky furniture ends, in pixels.
+ *
+ * Two bars stack at the top of the reading: the page's own header at 64, and
+ * the way back under it at another 64. The card and the analysis then start a
+ * `gap-6` below that — the same 24 the grid keeps from the bar when nothing
+ * is stuck, so the spacing does not collapse the moment the reader scrolls.
+ *
+ * Three places have to agree about this number and only one of them is
+ * arithmetic: `lg:top-38` on the card, `scroll-mt-38` on the analysis, and
+ * this. `38` is that 152 in Tailwind's quarter-rem steps; if the bars change
+ * height, all three move together.
+ */
+const STUCK = 152;
 
 /**
  * The system setting, honoured here rather than in CSS: there is no media
