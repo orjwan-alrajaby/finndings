@@ -9,6 +9,7 @@ import {
     Scale,
 } from "lucide-react";
 import { NavButton, PageHeader } from "@/components/PageHeader";
+import { LoadingScreen } from "@/components/Spinner";
 import {
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
@@ -230,11 +231,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const profilesNeedingAttention = profiles.filter((p) => getProfileIssues(p, priorityDefinitions).length > 0).length;
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-finn-snow">
-        <span className="text-sm text-finn-iron">Loading settings…</span>
-      </main>
-    );
+    return <LoadingScreen>Loading settings…</LoadingScreen>;
   }
 
   return (

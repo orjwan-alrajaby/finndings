@@ -6,6 +6,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import type { PinnedFinnCar } from "@/lib/types";
 import { FinnLink } from "@/components/FinnLink";
 import { NavButton, PageHeader } from "@/components/PageHeader";
+import { LoadingScreen } from "@/components/Spinner";
 
 import { AdjustDrawer } from "./components/AdjustDrawer";
 import { Advice } from "./advice";
@@ -128,11 +129,9 @@ export default function CompareTab({
    */
   if (!settingsLoaded) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <span className="text-sm text-finn-iron">
-          Reading your settings…
-        </span>
-      </div>
+      <LoadingScreen className="min-h-screen bg-white">
+        Reading your settings…
+      </LoadingScreen>
     );
   }
 

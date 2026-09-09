@@ -2,6 +2,7 @@ import "@/assets/tailwind.css";
 import { useCallback, useEffect, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
+import { LoadingScreen } from "@/components/Spinner";
 import { MIN_PRIORITIES } from "@/lib/reasoning-engine/constants";
 import {
     DEFAULT_CATEGORY_FEATURES,
@@ -292,13 +293,7 @@ export default function OnboardingPage() {
     })();
 
     if (loading) {
-        return (
-            <main className="flex min-h-screen items-center justify-center bg-finn-snow">
-                <span className="text-sm text-finn-iron">
-                    Getting things ready…
-                </span>
-            </main>
-        );
+        return <LoadingScreen>Getting things ready…</LoadingScreen>;
     }
 
     return (

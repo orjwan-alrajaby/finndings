@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, LoaderCircle } from "lucide-react";
+import { Download } from "lucide-react";
+
+import { Spinner } from "@/components/Spinner";
 
 import {
     advicePdfOptions,
@@ -82,10 +84,7 @@ export function ExportButton({
         >
             {exporting ? (
                 <>
-                    <LoaderCircle
-                        aria-hidden="true"
-                        className="h-4 w-4 animate-spin"
-                    />
+                    <Spinner className="h-4 w-4" />
                     Building your PDF…
                 </>
             ) : (

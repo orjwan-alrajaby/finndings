@@ -9,6 +9,16 @@
  */
 
 import { LENS_PANEL_ICONS } from "./icons";
+import {
+  SPINNER_ANIMATION,
+  SPINNER_CENTRE,
+  SPINNER_HUB,
+  SPINNER_SPOKE,
+  SPINNER_SPOKE_ANGLES,
+  SPINNER_SPOKE_WIDTH,
+  SPINNER_TYRE,
+  SPINNER_VIEW_BOX,
+} from "@/lib/brand-spinner";
 
 type Child = Node | string | null | undefined | false;
 
@@ -96,6 +106,72 @@ export function icon(name: string, className: string): SVGElement {
 }
 
 /**
+ * The app's loading indicator, drawn where React cannot reach.
+ *
+ * The twin of `components/Spinner`, and the same wheel out of
+ * `lib/brand-spinner` — the panel lives in a shadow root inside finn.com and
+ * builds its DOM by hand, so the mark has to be constructed twice even though
+ * it is defined once.
+ *
+ * It replaces a ring drawn in CSS with a border and a coloured top edge, which
+ * was a perfectly good spinner and the wrong one: it was the sixth surface in
+ * this extension to say "working on it" and the fourth way of saying it.
+ */
+export function spinner(className: string): SVGElement {
+  const svg = document.createElementNS(SVG_NS, "svg");
+
+  svg.setAttribute("viewBox", SPINNER_VIEW_BOX);
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.setAttribute("class", `${className} shrink-0 ${SPINNER_ANIMATION}`);
+
+  const circle = (radius: number, fill: string, stroke?: number) => {
+    const node = document.createElementNS(SVG_NS, "circle");
+
+    node.setAttribute("cx", String(SPINNER_CENTRE));
+    node.setAttribute("cy", String(SPINNER_CENTRE));
+    node.setAttribute("r", String(radius));
+    node.setAttribute("fill", fill);
+
+    if (stroke != null) {
+      node.setAttribute("stroke", "currentColor");
+      node.setAttribute("stroke-width", String(stroke));
+    }
+
+    return node;
+  };
+
+  svg.append(circle(SPINNER_TYRE.radius, "none", SPINNER_TYRE.width));
+
+  const spokes = document.createElementNS(SVG_NS, "g");
+
+  spokes.setAttribute("fill", "currentColor");
+  spokes.setAttribute("stroke", "currentColor");
+  spokes.setAttribute("stroke-width", String(SPINNER_SPOKE_WIDTH));
+  spokes.setAttribute("stroke-linejoin", "round");
+
+  for (const angle of SPINNER_SPOKE_ANGLES) {
+    const path = document.createElementNS(SVG_NS, "path");
+
+    path.setAttribute("d", SPINNER_SPOKE);
+
+    if (angle) {
+      path.setAttribute(
+        "transform",
+        `rotate(${angle} ${SPINNER_CENTRE} ${SPINNER_CENTRE})`,
+      );
+    }
+
+    spokes.append(path);
+  }
+
+  svg.append(spokes);
+  svg.append(circle(SPINNER_HUB.radius, SPINNER_HUB.fill));
+
+  return svg;
+}
+
+/**
  * Lens's own mark, for the places that have to say whose they are.
  *
  * Everything else this file draws is lucide, and a lucide magnifier is what
@@ -112,12 +188,17 @@ export function icon(name: string, className: string): SVGElement {
  * question of whose it is has been answered, and a brand mark on every
  * section would be noise.
  *
- * It is the shipped PNG rather than a drawn shape because that is the only
- * form the mark exists in — public/icon/ is raster, and the SVG masters in
- * design/ are five earlier concepts, none of them this aperture. 128 is the
- * only size asked for anywhere here: these slots are 16-28px, so even a 3x
- * display is drawing it down, and one URL means the browser decodes it once
- * for a page of forty cards rather than once per size.
+ * It is the shipped PNG rather than a drawn shape. That used to be because no
+ * SVG of this mark existed; `design/finn-lens-aperture/finn-lens-wheel.svg`
+ * now does, and is what `public/icon/*.png` is rendered from — so this could
+ * become inline SVG, as `spinner` above already has. It has not, and the
+ * reason is that the two want different things: the spinner needs the
+ * silhouette and drops the aperture, while this wants the full mark with its
+ * white lens and blue centre, which is what the raster already carries.
+ *
+ * 128 is the only size asked for anywhere here: these slots are 16-28px, so
+ * even a 3x display is drawing it down, and one URL means the browser decodes
+ * it once for a page of forty cards rather than once per size.
  *
  * **The white disc is part of the mark, not decoration.** It is the same
  * lockup the onboarding's first screen and the popup's brand row use — a

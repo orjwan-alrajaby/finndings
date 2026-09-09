@@ -1,7 +1,15 @@
 import { buildFitAnalysis } from "@/lib/reasoning-engine/fit";
 import { hasSavedLensSettings, loadLensSettings } from "@/lib/reasoning-engine";
 
-import { brandMark, el, empty, fragment, icon, panelStyles } from "./dom";
+import {
+  brandMark,
+  el,
+  empty,
+  fragment,
+  icon,
+  panelStyles,
+  spinner,
+} from "./dom";
 import { hasRoomBeside, PANEL_WIDTH } from "./panel-width";
 import { clearHighlight, highlightConfiguration } from "./highlight";
 import { analysisBody, defaultsNotice } from "./sections";
@@ -97,11 +105,7 @@ function message(
 function loadingState(carName?: string): DocumentFragment {
   return fragment([
     el("div", { class: "flex items-center gap-3 px-5 py-6" }, [
-      el("span", {
-        class:
-          "block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-finn-cotton border-t-finn-accent-blue",
-        attrs: { "aria-hidden": "true" },
-      }),
+      spinner("h-4 w-4 text-finn-black/70"),
       el("p", {
         class: "text-[13px] text-finn-iron",
         text: carName

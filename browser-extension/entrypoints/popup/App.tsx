@@ -2,6 +2,7 @@ import "@/assets/tailwind.css";
 import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import { FINN_BASE_URL } from "@/lib/constants";
+import { LoadingScreen } from "@/components/Spinner";
 import { GettingStarted } from "./components/GettingStarted";
 import { GoToFinnSection } from "./components/GoToFinnSection";
 import Logo from "/icon/128.png";
@@ -131,9 +132,11 @@ function App() {
 
   if (state.loading) {
     return (
-      <main className="min-h-140 w-full max-w-100 bg-finn-snow flex items-center justify-center">
-        <span className="text-sm text-finn-iron">Checking current page…</span>
-      </main>
+      /* The popup is a fixed panel rather than a page, so it brings its own
+         measurements to the shared shell. */
+      <LoadingScreen className="min-h-140 w-full max-w-100 bg-finn-snow">
+        Checking current page…
+      </LoadingScreen>
     );
   }
 
