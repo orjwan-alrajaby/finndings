@@ -114,9 +114,33 @@ export function ProfilePresets({
                             className={[
                                 "inline-flex items-center gap-1 rounded-full pr-1.5",
                                 "text-[11px] font-bold transition-colors",
+                                /*
+                                 * An unapplied profile is an offer, and it
+                                 * has to look like one before the pointer
+                                 * reaches it.
+                                 *
+                                 * It was `finn-snow` with `finn-iron` text:
+                                 * a near-white ground on a white panel with
+                                 * grey type, which is this design's own
+                                 * shorthand for something switched off. The
+                                 * one signal that it could be pressed at all
+                                 * arrived on hover, which is no signal on a
+                                 * touchscreen and a late one everywhere else.
+                                 *
+                                 * White with an edge and the label in full
+                                 * ink instead — a button at rest — and the
+                                 * accent kept for hover and for the applied
+                                 * state, so the chip still has somewhere to
+                                 * go when it is pressed.
+                                 */
                                 active
-                                    ? "bg-finn-accent-blue text-white"
-                                    : "bg-finn-snow text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
+                                    ? "bg-finn-accent-blue text-white ring-1 ring-finn-accent-blue"
+                                    : [
+                                          "bg-white text-finn-black",
+                                          "ring-1 ring-finn-iron/35",
+                                          "hover:bg-finn-pale-blue hover:text-finn-accent-blue",
+                                          "hover:ring-finn-accent-blue",
+                                      ].join(" "),
                             ].join(" ")}
                         >
                             <button
