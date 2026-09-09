@@ -1,7 +1,7 @@
 import "@/assets/tailwind.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Scale, Settings, X } from "lucide-react";
+import { ArrowLeft, Scale, Settings } from "lucide-react";
 
 import { FitAnalysisView } from "@/components/FitAnalysisView";
 import { NavButton, PageHeader } from "@/components/PageHeader";
@@ -155,8 +155,8 @@ export default function PinsPage() {
 
         if (!node) return;
 
-        /* The sticky page bar, plus enough air to read as a top edge. */
-        const HEADER = 96;
+        /* The page bar and the sticky way back under it, plus a little air. */
+        const HEADER = 144;
         const { top } = node.getBoundingClientRect();
 
         if (top >= HEADER - 8 && top <= HEADER + 200) return;
@@ -196,6 +196,18 @@ export default function PinsPage() {
     const stopSelecting = () => {
         setSelecting(false);
         setChecked([]);
+    };
+
+    /**
+     * Into the reading, and out of whatever the board was doing.
+     *
+     * The two views are two jobs — arranging the set, and reading one car —
+     * and a half-finished selection carried into the second would come back
+     * to a board the reader had stopped looking at. Stepping in ends it.
+     */
+    const openCar = (id: number) => {
+        stopSelecting();
+        setOpenId(id);
     };
 
     const remove = async (ids: number[]) => {
@@ -285,6 +297,51 @@ export default function PinsPage() {
                          * folds to a single rail beside the reading when one
                          * is.
                          */
+                        <>
+                        {/*
+                          * The way back, and the only thing on the page that
+                          * says which of the two views the reader is in.
+                          *
+                          * A breadcrumb rather than a close button on the
+                          * panel: leaving is a move between views, not the
+                          * dismissal of a thing, and the reader arrived here
+                          * from a board they will want again to sort or thin
+                          * out. It sits above both columns because it applies
+                          * to both of them.
+                          */}
+                        {open && (
+                            /*
+                             * Pinned under the page bar, because a reading
+                             * runs to several screens and the way out of a
+                             * view cannot be a thing you have to scroll eight
+                             * thousand pixels back up to reach. It carries
+                             * the page's own ground and a blur so the cards
+                             * pass under it rather than through it.
+                             */
+                            <div className="sticky top-16 z-20 -mx-4 mt-6 flex flex-wrap items-center gap-3 bg-finn-snow/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenId(null)}
+                                    className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-xs font-black text-finn-black shadow-sm ring-1 ring-black/[0.06] transition hover:bg-finn-pale-blue hover:text-finn-accent-blue hover:ring-finn-accent-blue"
+                                >
+                                    <ArrowLeft
+                                        aria-hidden="true"
+                                        className="h-4 w-4"
+                                    />
+                                    All {cars.length} cars
+                                </button>
+
+                                <p className="min-w-0 truncate text-xs text-finn-iron">
+                                    Reading{" "}
+                                    <strong className="font-black text-finn-black">
+                                        {open.name}
+                                    </strong>
+                                    . Pick another on the left, or go back to
+                                    sort and thin out the set.
+                                </p>
+                            </div>
+                        )}
+
                         <div
                             className={[
                                 "mt-6 grid gap-6",
@@ -294,37 +351,47 @@ export default function PinsPage() {
                             ].join(" ")}
                         >
                             <section className="min-w-0">
-                                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                                    <h2 className="text-sm font-black text-finn-black">
-                                        {open
-                                            ? "Your set"
-                                            : `Your set · ${cars.length}`}
-                                    </h2>
+                                {/*
+                                  * The board's own controls, and only on the
+                                  * board. Sorting and picking cars off are
+                                  * things you do to a set; once the reader
+                                  * has stepped into one car they are reading,
+                                  * and a row of sort pills beside a five-page
+                                  * analysis is furniture for a job nobody is
+                                  * doing.
+                                  */}
+                                {!open && (
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                                        <h2 className="text-sm font-black text-finn-black">
+                                            Your set · {cars.length}
+                                        </h2>
 
-                                    <Toolbar
-                                        total={cars.length}
-                                        checked={checked}
-                                        selecting={selecting}
-                                        sort={sort}
-                                        onSort={setSort}
-                                        onStartSelecting={() =>
-                                            setSelecting(true)
-                                        }
-                                        onStopSelecting={stopSelecting}
-                                        onSelectAll={() =>
-                                            setChecked(
-                                                checked.length === cars.length
-                                                    ? []
-                                                    : cars.map(
-                                                          (car) => car.id,
-                                                      ),
-                                            )
-                                        }
-                                        onUnpinChecked={() =>
-                                            setConfirming(checked)
-                                        }
-                                    />
-                                </div>
+                                        <Toolbar
+                                            total={cars.length}
+                                            checked={checked}
+                                            selecting={selecting}
+                                            sort={sort}
+                                            onSort={setSort}
+                                            onStartSelecting={() =>
+                                                setSelecting(true)
+                                            }
+                                            onStopSelecting={stopSelecting}
+                                            onSelectAll={() =>
+                                                setChecked(
+                                                    checked.length ===
+                                                        cars.length
+                                                        ? []
+                                                        : cars.map(
+                                                              (car) => car.id,
+                                                          ),
+                                                )
+                                            }
+                                            onUnpinChecked={() =>
+                                                setConfirming(checked)
+                                            }
+                                        />
+                                    </div>
+                                )}
 
                                 <ul
                                     className={[
@@ -354,11 +421,7 @@ export default function PinsPage() {
                                             checked={checked.includes(car.id)}
                                             selecting={selecting}
                                             onOpen={() =>
-                                                setOpenId(
-                                                    car.id === openId
-                                                        ? null
-                                                        : car.id,
-                                                )
+                                                openCar(car.id)
                                             }
                                             onToggleChecked={() =>
                                                 setChecked((current) =>
@@ -385,34 +448,13 @@ export default function PinsPage() {
                             {openAnalysis && (
                                 <section
                                     ref={reading}
-                                    className="min-w-0 scroll-mt-24"
+                                    className="min-w-0 scroll-mt-36"
                                 >
-                                    <div className="lg:sticky lg:top-24">
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                            <h2 className="min-w-0 truncate text-sm font-black text-finn-black">
-                                                {open?.name}
-                                            </h2>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => setOpenId(null)}
-                                                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold text-finn-iron transition hover:bg-white hover:text-finn-black"
-                                            >
-                                                <X
-                                                    aria-hidden="true"
-                                                    className="h-3.5 w-3.5"
-                                                />
-                                                Close the reading
-                                            </button>
-                                        </div>
-
-                                        <FitAnalysisView
-                                            analysis={openAnalysis}
-                                        />
-                                    </div>
+                                    <FitAnalysisView analysis={openAnalysis} />
                                 </section>
                             )}
                         </div>
+                        </>
                     )}
                 </div>
 

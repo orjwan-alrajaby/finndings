@@ -1,4 +1,4 @@
-import { ExternalLink, Eye, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Eye, Trash2 } from "lucide-react";
 
 import { CarSilhouette } from "@/components/CarSilhouette";
 import { BandChip } from "@/components/FitAnalysisView/parts";
@@ -71,15 +71,32 @@ export function CarCard({
             className={[
                 "group relative flex flex-col overflow-hidden rounded-[24px] bg-white",
                 "ring-1 transition",
-                selected
-                    ? "shadow-lg ring-2 ring-finn-accent-blue"
-                    : "shadow-sm ring-black/[0.06] hover:shadow-md",
+                selecting && checked
+                    ? "shadow-md ring-2 ring-finn-accent-blue"
+                    : !selecting && selected
+                        ? "shadow-lg ring-2 ring-finn-accent-blue"
+                        : "shadow-sm ring-black/[0.06] hover:shadow-md",
             ].join(" ")}
         >
+            {/*
+              * One target, two jobs — and which one is live is the mode, not
+              * a guess.
+              *
+              * While the reader is picking cars off, the card ticks itself.
+              * It used to open the reading instead, so telling the page you
+              * wanted to select something and then clicking the something
+              * took you to a different view entirely, with a tick box left
+              * behind in the corner as the only thing that actually did what
+              * you asked. The box is still drawn, because it is what says
+              * *this is a selection*, but it is a mark now rather than the
+              * one live pixel on the card.
+              */}
             <button
                 type="button"
-                onClick={onOpen}
-                aria-current={selected ? "true" : undefined}
+                onClick={selecting ? onToggleChecked : onOpen}
+                aria-pressed={selecting ? checked : undefined}
+                aria-current={!selecting && selected ? "true" : undefined}
+                aria-label={selecting ? `Select ${car.name}` : undefined}
                 className="flex flex-1 flex-col text-left"
             >
                 <span className="relative block aspect-5/3 overflow-hidden bg-finn-pale-blue">
@@ -120,19 +137,22 @@ export function CarCard({
                     {selecting && (
                         /*
                          * On the photograph rather than beside the name: the
-                         * card is the target in this mode, and the tick has
-                         * to be findable in the same place on every one of
-                         * them however long the names run.
+                         * tick has to be findable in the same place on every
+                         * card however long the names run. Inert, and hidden
+                         * from screen readers — the card around it is the
+                         * control and carries the pressed state.
                          */
-                        <span className="absolute top-2.5 right-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-sm">
-                            <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={onToggleChecked}
-                                onClick={(event) => event.stopPropagation()}
-                                aria-label={`Select ${car.name}`}
-                                className="h-4 w-4 accent-finn-accent-blue"
-                            />
+                        <span
+                            aria-hidden="true"
+                            className={[
+                                "pointer-events-none absolute top-2.5 right-2.5 flex h-7 w-7",
+                                "items-center justify-center rounded-full shadow-sm transition-colors",
+                                checked
+                                    ? "bg-finn-accent-blue text-white"
+                                    : "bg-white text-transparent ring-1 ring-black/10",
+                            ].join(" ")}
+                        >
+                            <Check className="h-4 w-4" strokeWidth={3} />
                         </span>
                     )}
                 </span>
@@ -184,43 +204,45 @@ export function CarCard({
               * appears at all — and quiet enough that the name, the verdict
               * and the price are read first.
               */}
-            <span className="flex items-center gap-1 border-t border-finn-cotton px-2 py-1.5">
-                <RailButton
-                    label={`View ${car.name}`}
-                    onClick={onOpen}
-                    icon={<Eye aria-hidden="true" className="h-4 w-4" />}
-                    text="Read it"
-                />
+            {!selecting && (
+                <span className="flex items-center gap-1 border-t border-finn-cotton px-2 py-1.5">
+                    <RailButton
+                        label={`View ${car.name}`}
+                        onClick={onOpen}
+                        icon={<Eye aria-hidden="true" className="h-4 w-4" />}
+                        text="Read it"
+                    />
 
-                {/*
-                  * Only rendered when the car actually has a page. Cars
-                  * pinned by older builds, and the ones this extension makes
-                  * up for its own demonstrations, have no URL to open.
-                  */}
-                {car.url ? (
-                    <a
-                        href={car.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open ${car.name} on finn.com`}
-                        title="Open on finn.com"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
+                    {/*
+                      * Only rendered when the car actually has a page. Cars
+                      * pinned by older builds, and the ones this extension makes
+                      * up for its own demonstrations, have no URL to open.
+                      */}
+                    {car.url ? (
+                        <a
+                            href={car.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open ${car.name} on finn.com`}
+                            title="Open on finn.com"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold text-finn-iron transition hover:bg-finn-snow hover:text-finn-black"
+                        >
+                            <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                            finn.com
+                        </a>
+                    ) : null}
+
+                    <button
+                        type="button"
+                        onClick={onUnpin}
+                        aria-label={`Unpin ${car.name}`}
+                        title={`Unpin ${car.name}`}
+                        className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
                     >
-                        <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                        finn.com
-                    </a>
-                ) : null}
-
-                <button
-                    type="button"
-                    onClick={onUnpin}
-                    aria-label={`Unpin ${car.name}`}
-                    title={`Unpin ${car.name}`}
-                    className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-full text-finn-iron/60 transition hover:bg-finn-error/10 hover:text-finn-error"
-                >
-                    <Trash2 aria-hidden="true" className="h-4 w-4" />
-                </button>
-            </span>
+                        <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                </span>
+            )}
         </li>
     );
 }

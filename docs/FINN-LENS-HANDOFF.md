@@ -195,11 +195,17 @@ leads, which is cheapest, what the gap between them is — built from the same a
 everything below is. Under it the set is a grid of cards: the photograph on the pale blue
 ground the panel and the setup flow's mock also use, the fit band in the corner the badge
 occupies on finn.com, and every price stated against the cheapest in the set, which is the
-comparison the page exists to support. The reading takes a column only once a car is opened;
-before that the grid has the width, rather than half the page being a dashed box explaining
-what would appear there. Sort by pinned date, fit, price or name; tick cards for a bulk
-unpin; every removal is confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also
-listens for it, so a pin made on finn.com while it is open lands without a reload.
+comparison the page exists to support.
+
+Two views, and `openId` is the whole of the state that separates them. On the board the set
+has the full width and carries the controls that act on a set — sort by pinned date, fit,
+price or name, and tick cards for a bulk unpin. Opening a car steps into the reading: the
+cards fold to a column beside the analysis, the board's controls go, and a sticky row under
+the page bar carries the way back. Selecting is board-only and ends when a car is opened,
+which is what fixes the trap the two used to share — while picking cars off, a click on a
+card ticks it rather than navigating away from the job the reader had just asked for. Every
+removal is confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also listens for it, so
+a pin made on finn.com while it is open lands without a reload.
 
 Scoring is no longer gated on `hasSavedLensSettings()` — Lens ships defaults, so there is
 always something honest to say. The flag now decides whether the page shows
