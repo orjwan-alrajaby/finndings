@@ -219,8 +219,27 @@ export function PriorityOrderList({
                                 className={[
                                     "inline-flex items-center gap-1 rounded-full pr-1.5",
                                     "text-[11px] font-bold transition-colors",
+                                    /*
+                                     * A chip that cannot be pressed has to
+                                     * look like one, and this one did not:
+                                     * `finn-snow` on the panel's white is a
+                                     * 1.04:1 ground and `finn-iron/40` is
+                                     * barely ink, so at the limit — which is
+                                     * the state a reader arrives in, since
+                                     * the defaults fill all five slots — the
+                                     * row read as a set of chips that had
+                                     * failed to render rather than a set that
+                                     * was closed.
+                                     *
+                                     * A filled grey ground and the label at
+                                     * full strength instead. Solid `finn-iron`
+                                     * was the other candidate and is too
+                                     * heavy: it would make the one row of
+                                     * things a reader cannot use the darkest
+                                     * thing on the panel.
+                                     */
                                     atLimit
-                                        ? "bg-finn-snow text-finn-iron/40"
+                                        ? "bg-finn-iron/15 text-finn-iron"
                                         : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
                                 ].join(" ")}
                             >
