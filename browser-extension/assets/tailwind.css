@@ -350,6 +350,64 @@
 }
 
 /* ========================================
+   BECKON
+   The same halo, but it does not stop.
+
+   `finn-lens-attention` above pulses twice and gives up, which is right for
+   the Save button it was written for: unsaved work is a state the reader can
+   see stated in words beside the control, so the animation only has to point
+   at it once.
+
+   A guided tour is the other case. Its whole premise is that the reader is
+   being asked to do one specific thing, right now, and nothing else on the
+   screen is asking — so the ask has to survive being read, thought about, and
+   come back to. It stops the moment the step is done, which is what keeps it
+   from being the nagging the two-beat version was avoiding.
+
+   Under reduced motion it becomes a still ring rather than nothing. Killing
+   it outright would take the pointing away from the reader who needs it most.
+======================================== */
+
+@keyframes finn-lens-beckon {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 114, 234, 0.5); }
+  70%  { box-shadow: 0 0 0 11px rgba(0, 114, 234, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 114, 234, 0); }
+}
+
+.finn-lens-beckon {
+  animation: finn-lens-beckon 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finn-lens-beckon {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(0, 114, 234, 0.35);
+  }
+}
+
+/* The same halo in white, for the one place that asks from a dark ground —
+   the tour's coach mark, which is navy so that it cannot be mistaken for one
+   more white card among the white cards it hangs over. A blue glow on navy is
+   a smudge; this is the same gesture, legible. */
+
+@keyframes finn-lens-beckon-light {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+  70%  { box-shadow: 0 0 0 11px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.finn-lens-beckon-light {
+  animation: finn-lens-beckon-light 2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finn-lens-beckon-light {
+    animation: none;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* ========================================
    DRAWER
    The compare page's Adjust panel, opened and closed by Radix's dialog.
    Radix stamps `data-state` on the overlay and the panel and holds both in

@@ -101,8 +101,14 @@ pages only. Pinning writes the full normalized car into `browser.storage.local` 
 `pinnedCars`.
 
 **Setup flow (`entrypoints/onboarding/`).** Opened once, by `runtime.onInstalled` when the
-reason is `install` and `needsOnboarding()` agrees. Five screens: what Lens is and what it
-does with your data; how it works in three parts; your priorities (the shared
+reason is `install` and `needsOnboarding()` agrees. Back, forward and skip live on a
+fixed white stripe across the foot of the window — present on every screen, and not to be
+confused with the page's own footer, which is a line of small print above it — and the tour screen is the one place the way
+forward is held shut — until all three of its controls have been worked. `Skip setup` is
+unaffected: it leaves the whole flow, from every screen, at every point. Five screens: what Lens is, what it
+does with your data, and what the remaining four screens will ask for; a working copy of a
+finn.com listing page carrying the real pin button, the real verdict pill and the real
+toolbar button, all of them pressable (`screens/Tour/`); your priorities (the shared
 `PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
 a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order
@@ -805,7 +811,16 @@ Then stop. Do not touch the engine, the migrations, the narrative layer, or the 
 
 **Product / UI**
 
-- `entrypoints/onboarding/App.tsx` — the setup flow, its five screens and its one write
+- `entrypoints/onboarding/App.tsx` — the setup flow, its five screens, the action stripe
+  that navigates them (`components/StepNav.tsx`) and its one write
+- `entrypoints/onboarding/screens/Tour/` — the finn.com mock: React copies of the pin
+  button, the verdict pill and the panel, judged by the real engine on the demo cars, plus
+  the guided tour that walks the three controls (`Callout.tsx`, `Steps.tsx`). `MockCard` is
+  built to FINN's own listing card — no chrome, a tinted photo block, then model,
+  configuration and `from … per month` underneath — so the corners the controls occupy are
+  the corners they occupy on the real page. The mock's photo grounds, the real panel's and
+  the card badges' white edge all come from `lib/card-controls.ts` and
+  `lens-panel/sections.ts` — one picture across three surfaces.
 - `lib/onboarding.ts` — `needsOnboarding`, and what the product remembers about explaining
   itself
 - `lib/demo-cars.ts` — the three invented cars the setup flow's worked example runs on

@@ -6,6 +6,12 @@ import {
   type FitLevel,
 } from "@/lib/reasoning-engine/fit";
 import { loadLensSettings } from "@/lib/reasoning-engine";
+import {
+  FIT_BADGE_BASE,
+  FIT_BADGE_HOOK,
+  FIT_BADGE_NEUTRAL_CLASS,
+  FIT_BADGE_NEUTRAL_LABEL,
+} from "@/lib/card-controls";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
@@ -69,7 +75,9 @@ import {
  *   `defaultsNotice`.
  */
 
-const BADGE = "finn-lens-fit-badge";
+/* Shared with the setup flow's React copy of this pill — see
+   `lib/card-controls.ts` for why the strings live outside both drawings. */
+const BADGE = FIT_BADGE_HOOK;
 
 /** Marks a card as carrying a control, whether or not it has a verdict yet. */
 const MARKER = "data-finn-lens-fit";
@@ -118,8 +126,8 @@ function meter(level: FitLevel | null): HTMLElement {
 }
 
 /** How the pill looks and reads before there is a verdict on it. */
-const NEUTRAL_CLASS = "bg-white text-finn-accent-blue";
-const NEUTRAL_LABEL = "How does it fit?";
+const NEUTRAL_CLASS = FIT_BADGE_NEUTRAL_CLASS;
+const NEUTRAL_LABEL = FIT_BADGE_NEUTRAL_LABEL;
 
 /**
  * A pill over the photograph, in the corner nothing else uses.
@@ -137,17 +145,7 @@ function badgeFor(id: number, name: string | undefined): HTMLElement {
   return el(
     "button",
     {
-      class: [
-        BADGE,
-        "absolute bottom-2 left-2 z-10 flex max-w-[calc(100%-1rem)]",
-        "items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5",
-        "cursor-pointer border-0 text-left",
-        "shadow-[0_1px_6px_rgba(0,0,0,0.14)] transition-all",
-        "hover:shadow-[0_2px_10px_rgba(0,0,0,0.2)]",
-        "focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-finn-accent-blue/50",
-        NEUTRAL_CLASS,
-      ].join(" "),
+      class: [BADGE, FIT_BADGE_BASE, NEUTRAL_CLASS].join(" "),
       attrs: {
         type: "button",
         "aria-label": name

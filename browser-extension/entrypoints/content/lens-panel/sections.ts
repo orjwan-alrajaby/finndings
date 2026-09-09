@@ -114,6 +114,9 @@ function bandChip(level: FitLevel, label: string): HTMLElement {
       class: [
         "inline-flex items-center gap-2 rounded-full px-2.5 py-1",
         "text-[11px] font-bold whitespace-nowrap",
+        /* See `FIT_BADGE_BASE`: the strong band and the photograph's ground
+           are the same pale blue, so the chip needs an edge of its own. */
+        "ring-1 ring-white",
         "shadow-[0_1px_6px_rgba(0,0,0,0.12)]",
         FIT_BANDS[level].chipClass,
       ].join(" "),
@@ -296,7 +299,12 @@ function photo(analysis: FitAnalysis): HTMLElement {
     {
       class: [
         "relative flex h-[150px] items-center justify-center overflow-hidden",
-        "border-b border-finn-cotton bg-finn-snow",
+        /* Pale blue rather than snow. A photograph of a car is cut out on
+           white, so on a near-white ground it floated in an undefined space
+           that read as an image still loading; the tint gives it a stage.
+           The same ground is used by the setup flow's mock of this panel and
+           by the cards on finn.com, so the three are one picture. */
+        "border-b border-finn-cotton bg-finn-pale-blue",
       ].join(" "),
     },
     [

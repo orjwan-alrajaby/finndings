@@ -173,11 +173,13 @@ npm run test:watch
 
 ### Trying it out
 
-1. On install, Lens opens a setup flow: what it is, how it works, your priorities, your
-   driving, and a worked example run against three cars that don't exist. It takes about a
-   minute and it is the only time you are asked. Skipping is fine — everything below still
-   works on the defaults, and you can reopen it from Settings → **Setup guide**.
-2. Browse finn.com and pin two or more cars with the ⊕ button on any card.
+1. On install, Lens opens a setup flow: what it is; a working copy of a finn.com listing
+   page with the real controls on it, to press; your priorities; your driving; and a worked
+   example run against three cars that don't exist. It takes about a minute and it is the
+   only time you are asked. Skipping is fine — everything below still works on the
+   defaults, and you can reopen it from Settings → **Setup guide**.
+2. Browse finn.com and pin two or more cars with the pin button at the top right of any
+   card's photo.
 3. Open the popup → **Compare Pinned Cars**. Once you've been set up, that opens on your
    saved answers with **See my advice** rather than asking again; **Change something first**
    walks the four steps.

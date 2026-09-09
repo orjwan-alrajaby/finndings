@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ArrowLeft, ExternalLink, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 
 import { FinnLink } from "@/components/FinnLink";
 import {
@@ -55,26 +55,16 @@ export function Preview({
     priorities,
     preferences,
     categoryFeatures,
-    saving,
     saveError,
-    onBack,
     onEditPriorities,
-    onFinish,
-    onOpenCompare,
 }: {
     priorities: CategoryId[];
     preferences: LensPreferences;
     categoryFeatures: Record<CategoryId, FeatureSelection>;
-    /** True while the reader's answers are being written to storage. */
-    saving: boolean;
     /** Set when that write failed, so the screen can stop claiming it worked. */
     saveError: boolean;
-    onBack: () => void;
     /** The hero's own "Change priorities" has to go to the priorities. */
     onEditPriorities: () => void;
-    /** Finishes setup and sends the reader to finn.com to pin real cars. */
-    onFinish: () => void;
-    onOpenCompare: () => void;
 }) {
     const cars = useMemo(() => demoCars(), []);
 
@@ -164,42 +154,11 @@ export function Preview({
                 </p>
             )}
 
-            <div className="mt-8 flex flex-col items-center gap-3">
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
-                        aria-label="Back to your driving assumptions"
-                    >
-                        <ArrowLeft aria-hidden="true" className="h-5 w-5" />
-                    </button>
+            <p className="mx-auto mt-6 max-w-md text-center text-[11px] leading-4 text-finn-iron">
+                Pin two or more cars on <FinnLink /> and you'll get this page
+                about them. It won't ask you any of this again.
+            </p>
 
-                    <button
-                        type="button"
-                        onClick={onFinish}
-                        disabled={saving}
-                        className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-wait disabled:bg-finn-cotton disabled:text-finn-iron"
-                    >
-                        {saving ? "Saving…" : "Go pin some real cars"}
-                        <ExternalLink aria-hidden="true" className="h-4 w-4" />
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={onOpenCompare}
-                        disabled={saving}
-                        className="inline-flex h-13 items-center justify-center rounded-full px-5 text-xs font-bold text-finn-iron underline-offset-2 transition hover:text-finn-black hover:underline disabled:cursor-wait"
-                    >
-                        Open Finn Lens instead
-                    </button>
-                </div>
-
-                <p className="max-w-md text-center text-[11px] leading-4 text-finn-iron">
-                    Pin two or more cars on <FinnLink /> and you'll get this
-                    page about them. It won't ask you any of this again.
-                </p>
-            </div>
         </div>
     );
 }

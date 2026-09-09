@@ -53,16 +53,12 @@ export function Priorities({
     categoryFeatures,
     profiles,
     onChange,
-    onBack,
-    onNext,
 }: {
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     categoryFeatures: Record<CategoryId, FeatureSelection>;
     profiles: Profile[];
     onChange: (next: CategoryId[]) => void;
-    onBack: () => void;
-    onNext: () => void;
 }) {
     const [view, setView] = useState<View>("order");
 
@@ -184,26 +180,6 @@ export function Priorities({
                 )}
             </section>
 
-            <div className="mt-8 flex items-center justify-center gap-3">
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="flex h-13 w-13 items-center justify-center rounded-full border-2 border-finn-cotton text-finn-iron transition hover:bg-white hover:text-finn-black"
-                    aria-label="Back to how it works"
-                >
-                    <ArrowLeft aria-hidden="true" className="h-5 w-5" />
-                </button>
-
-                <button
-                    type="button"
-                    disabled={priorities.length < MIN_PRIORITIES}
-                    onClick={onNext}
-                    className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-finn-accent-blue px-8 text-sm font-black text-white shadow-md transition hover:bg-finn-highlight-navy disabled:cursor-not-allowed disabled:bg-finn-cotton disabled:text-finn-iron"
-                >
-                    Next: how you drive
-                    <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                </button>
-            </div>
         </div>
     );
 }

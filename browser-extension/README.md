@@ -33,6 +33,6 @@ Load unpacked from `.output/chrome-mv3` via `chrome://extensions` → Developer 
 | `lib/onboarding.ts` | whether the reader has been shown the setup flow, and how far they got |
 | `lib/stored-data.ts` | the one list of what the extension stores, and how to delete it |
 | `lib/car-labels.ts` | how a configuration and its coverage are named on every surface |
-| `lib/demo-cars.ts` | three invented cars the setup flow's worked example runs on |
+| `lib/demo-cars.ts` | three invented cars the setup flow's mock listing and worked example run on |
 | `lib/types.ts` | `FinnApiConfig` → `FinnCar` → `PinnedFinnCar` |
 | `lib/helpers.ts` | the German → internal field mapping |

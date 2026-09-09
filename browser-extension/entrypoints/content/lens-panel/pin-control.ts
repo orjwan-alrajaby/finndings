@@ -8,6 +8,7 @@ import {
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { buildCarUrl } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/utils";
 import { setPinButtonPinnedState } from "../creators/PinButton";
+import { PIN_BUTTON_HOOK } from "@/lib/card-controls";
 
 /**
  * Pinning the car the panel is about, from the panel.
@@ -47,7 +48,7 @@ function urlFor(car: PinnedFinnCar): string {
 /** Keeps the card's own pin in step with what the panel just did. */
 function syncCardButton(id: number, pinned: boolean): void {
   const button = cardForCar(id)?.querySelector<HTMLButtonElement>(
-    ".finn-lens-add-car-btn",
+    `.${PIN_BUTTON_HOOK}`,
   );
 
   if (button) setPinButtonPinnedState(button, pinned);
