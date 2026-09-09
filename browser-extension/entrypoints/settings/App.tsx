@@ -3,9 +3,9 @@ import { useEffect, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
     ArrowLeft,
-    Bookmark,
     GraduationCap,
-    RotateCw,
+    Pin,
+    RotateCcw,
     Scale,
 } from "lucide-react";
 import { NavButton, PageHeader } from "@/components/PageHeader";
@@ -262,7 +262,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         />
 
         <NavButton
-          icon={<Bookmark aria-hidden="true" className="h-4 w-4" />}
+          icon={<Pin aria-hidden="true" className="h-4 w-4" />}
           label="Pinned cars"
           onClick={() => void openBrowserTab("OPEN_PINS_PAGE")}
         />
@@ -299,7 +299,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
               <GraduationCap aria-hidden="true" className="h-3.5 w-3.5" /> Setup guide
             </button>
             <button type="button" onClick={() => setRestoreOpen(true)} className="inline-flex items-center gap-1.5 text-xs font-bold text-finn-iron hover:text-finn-black">
-              <RotateCw aria-hidden="true" className="h-3.5 w-3.5" /> Restore defaults
+              <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" /> Restore defaults
             </button>
           </div>
         </div>

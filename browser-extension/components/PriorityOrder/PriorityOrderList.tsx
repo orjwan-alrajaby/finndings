@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Menu, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { InfoButton } from "@/components/PriorityInfo";
@@ -104,7 +104,7 @@ export function PriorityOrderList({
                                 dragging === id ? "opacity-50" : "",
                             ].join(" ")}
                         >
-                            <Menu
+                            <GripVertical
                                 className="h-4 w-4 shrink-0 text-finn-iron/50"
                                 aria-hidden="true"
                             />

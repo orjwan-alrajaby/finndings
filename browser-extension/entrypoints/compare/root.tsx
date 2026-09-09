@@ -1,6 +1,6 @@
 import "@/assets/tailwind.css";
 import { useEffect, useState } from "react";
-import { Bookmark, Settings, SlidersHorizontal, Sparkles } from "lucide-react";
+import { Pin, Settings, SlidersHorizontal, Sparkles } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
@@ -155,7 +155,7 @@ export default function CompareTab({
           />
 
           <NavButton
-            icon={<Bookmark aria-hidden="true" className="h-4 w-4" />}
+            icon={<Pin aria-hidden="true" className="h-4 w-4" />}
             label="Pinned cars"
             onClick={onManagePins}
           />

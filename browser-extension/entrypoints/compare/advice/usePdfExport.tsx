@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, RotateCw } from "lucide-react";
+import { Download, LoaderCircle } from "lucide-react";
 
 import {
     advicePdfOptions,
@@ -82,7 +82,7 @@ export function ExportButton({
         >
             {exporting ? (
                 <>
-                    <RotateCw
+                    <LoaderCircle
                         aria-hidden="true"
                         className="h-4 w-4 animate-spin"
                     />

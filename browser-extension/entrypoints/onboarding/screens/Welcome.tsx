@@ -1,4 +1,4 @@
-import { Check, EyeOff, Globe, Scale } from "lucide-react";
+import { Check, EyeOff, Globe, Unlink } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { withFinnLinks } from "@/components/FinnLink";
@@ -171,7 +171,7 @@ export function Welcome() {
                 />
 
                 <Point
-                    icon={<Scale aria-hidden="true" className="h-5 w-5" />}
+                    icon={<Unlink aria-hidden="true" className="h-5 w-5" />}
                     title="Unofficial"
                     body={withFinnLinks(
                         "Lens is not affiliated with FINN. It reads what finn.com already shows you and reasons about it.",

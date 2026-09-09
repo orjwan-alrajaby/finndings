@@ -1,4 +1,4 @@
-import { Bookmark, ExternalLink } from "lucide-react";
+import { ExternalLink, Pin } from "lucide-react";
 
 import { FINN_BASE_URL } from "@/lib/constants";
 import { FinnLink } from "@/components/FinnLink";
@@ -8,7 +8,7 @@ export function NothingPinned() {
     return (
         <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 text-center shadow-sm">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-finn-pale-blue text-finn-accent-blue">
-                <Bookmark aria-hidden="true" className="h-7 w-7" />
+                <Pin aria-hidden="true" className="h-7 w-7" />
             </span>
 
             <h2 className="mt-5 text-2xl font-black text-finn-black">

@@ -1,4 +1,4 @@
-import { ExternalLink, Swords } from "lucide-react";
+import { ArrowLeftRight, ExternalLink } from "lucide-react";
 import type { PinnedFinnCar } from "@/lib/types";
 import type { CostAnalysis } from "@/lib/reasoning-engine/types";
 import type { ChallengeReasoning } from "@/lib/reasoning-engine/narrative";
@@ -47,7 +47,10 @@ export function ChallengeHero({
             <div className="flex flex-col-reverse lg:flex-row">
                 <div className="p-6 sm:p-8 lg:flex-1/2">
                     <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white ring-1 ring-white/10">
-                        <Swords aria-hidden="true" className="h-4 w-4 text-finn-accent-blue" />
+                        <ArrowLeftRight
+                            aria-hidden="true"
+                            className="h-4 w-4 text-finn-accent-blue"
+                        />
                         In the hot seat, against {winnerName}
                     </div>
 

@@ -1,4 +1,4 @@
-import { Bookmark, Cog, ExternalLink, Scale } from "lucide-react";
+import { ExternalLink, Pin, Scale, Settings } from "lucide-react";
 import * as RadixTabs from "@radix-ui/react-tabs";
 import { ActionButton } from "./ActionButton";
 import { CarPreviewCard } from "./CarPreviewCard";
@@ -136,7 +136,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     <ActionButton
                         title="Manage Pinned Cars"
                         description="See everything you pinned, read how each one suits you, and unpin what you're done with."
-                        icon={<Bookmark aria-hidden="true" className="h-5 w-5" />}
+                        icon={<Pin aria-hidden="true" className="h-5 w-5" />}
                         disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_PINS_PAGE")}
                         accent={accent}
@@ -144,7 +144,7 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                     <ActionButton
                         title="Go To Settings"
                         description="Set your priorities, what counts inside each one, and your driving assumptions."
-                        icon={<Cog aria-hidden="true" className="h-5 w-5" />}
+                        icon={<Settings aria-hidden="true" className="h-5 w-5" />}
                         /*
                          * Never gated on pinned cars. Settings is where a reader
                          * tells Lens what they care about, and it is what the
