@@ -26,6 +26,7 @@ import {
 import { FINN_BASE_URL } from "@/lib/constants";
 import { FinnLink } from "@/components/FinnLink";
 import Logo from "/icon/128.png";
+import { BRAND_IDLE_SPIN } from "@/lib/brand-spinner";
 
 import { SCREEN_ORDER, type OnboardingScreen } from "./types";
 import { ProgressRail } from "./components/ProgressRail";
@@ -336,7 +337,7 @@ export default function OnboardingPage() {
                                     src={Logo}
                                     alt=""
                                     aria-hidden="true"
-                                    className="h-6 w-6 shrink-0 object-contain"
+                                    className={`h-6 w-6 shrink-0 object-contain ${BRAND_IDLE_SPIN}`}
                                 />
 
                                 <span className="hidden text-xs font-black uppercase tracking-[0.16em] text-finn-accent-blue sm:inline">

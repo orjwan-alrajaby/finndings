@@ -10,6 +10,7 @@
 
 import { LENS_PANEL_ICONS } from "./icons";
 import {
+  BRAND_IDLE_SPIN,
   SPINNER_ANIMATION,
   SPINNER_CENTRE,
   SPINNER_HUB,
@@ -214,7 +215,11 @@ export function spinner(className: string): SVGElement {
  * names Lens in its own accessible name — the badge's `aria-label`, the
  * panel's heading — so a second announcement here would only repeat it.
  */
-export function brandMark(size: number, className = ""): HTMLElement {
+export function brandMark(
+  size: number,
+  className = "",
+  { idle = false }: { idle?: boolean } = {},
+): HTMLElement {
   const disc = document.createElement("span");
   const img = document.createElement("img");
 
@@ -257,6 +262,21 @@ export function brandMark(size: number, className = ""): HTMLElement {
        and the badge is on FINN's page, and neither can rely on a class here. */
     "box-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
   ].join(";");
+
+  /*
+   * Turning over slowly, where the mark stands alone.
+   *
+   * The icon is a wheel, and a wheel at rest in a product about cars is a
+   * wheel that looks stuck. `idle` is opt-in rather than the default for one
+   * reason: the same mark is drawn on every fit badge, and a listing page
+   * carries forty of them — forty things rotating on somebody else's site is
+   * not personality, it is an infestation. The panel's own header is a single
+   * mark on a surface that is already ours, so it gets it.
+   *
+   * Only the artwork turns, never the white disc under it. A rotating disc is
+   * indistinguishable from a still one and its shadow would swing.
+   */
+  if (idle) img.className = BRAND_IDLE_SPIN;
 
   img.style.cssText = [
     `width:${inner}px`,

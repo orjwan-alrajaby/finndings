@@ -7,6 +7,7 @@ import {
     type FitLevel,
 } from "@/lib/reasoning-engine/fit";
 import Logo from "/icon/128.png";
+import { BRAND_IDLE_SPIN } from "@/lib/brand-spinner";
 
 export { CarSilhouette } from "@/components/CarSilhouette";
 
@@ -50,7 +51,7 @@ export function BrandDisc({
                 src={Logo}
                 alt=""
                 aria-hidden="true"
-                className="block object-contain"
+                className={`block object-contain ${BRAND_IDLE_SPIN}`}
                 style={{ width: inner, height: inner }}
             />
         </span>

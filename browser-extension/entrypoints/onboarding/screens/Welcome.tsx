@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { withFinnLinks } from "@/components/FinnLink";
 import Logo from "/icon/128.png";
+import { BRAND_IDLE_SPIN } from "@/lib/brand-spinner";
 
 import { SCREEN_ORDER, SCREEN_PROMISE, type OnboardingScreen } from "../types";
 
@@ -44,7 +45,7 @@ export function Welcome() {
                     <img
                         src={Logo}
                         alt=""
-                        className="h-20 w-20 object-contain"
+                        className={`h-20 w-20 object-contain ${BRAND_IDLE_SPIN}`}
                     />
                 </div>
 

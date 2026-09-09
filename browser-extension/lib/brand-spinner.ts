@@ -70,3 +70,21 @@ export const SPINNER_HUB = { radius: 8.99, fill: "#0072EA" } as const;
  */
 export const SPINNER_ANIMATION =
   "animate-spin motion-reduce:[animation-duration:3s]";
+
+/**
+ * The mark turning over when nothing is happening.
+ *
+ * Fourteen seconds a revolution, which is slow enough that a reader notices it
+ * has moved rather than watching it move — the difference between a wheel
+ * idling and a wheel working. It shares `animate-spin`'s keyframes and only
+ * lengthens them, so the same mark speeding up to `SPINNER_ANIMATION` when
+ * something is loading is one gesture at two speeds rather than two
+ * animations.
+ *
+ * Stopped outright under `prefers-reduced-motion`, where the loader merely
+ * slows. That asymmetry is the point of the preference: a loading indicator
+ * still has something to say and has to keep saying it, while perpetual motion
+ * on an idle page is exactly the thing being asked for less of.
+ */
+export const BRAND_IDLE_SPIN =
+  "animate-spin [animation-duration:14s] motion-reduce:animate-none";

@@ -104,15 +104,42 @@ function message(
  */
 function loadingState(carName?: string): DocumentFragment {
   return fragment([
-    el("div", { class: "flex items-center gap-3 px-5 py-6" }, [
-      spinner("h-4 w-4 text-finn-black/70"),
-      el("p", {
-        class: "text-[13px] text-finn-iron",
-        text: carName
-          ? `Loading ${carName} data…`
-          : "Reading this car…",
-      }),
-    ]),
+    el(
+      "div",
+      {
+        class: [
+          "flex h-full min-h-80 flex-col items-center justify-center",
+          "gap-5 px-8 text-center",
+        ].join(" "),
+      },
+      [
+        /*
+         * Full weight, not a tint. It was drawn at 70% black, which on the
+         * panel's white made it look like a disabled control rather than a
+         * working one — the wheel is the mark, and a faded mark reads as
+         * something switched off.
+         */
+        spinner("h-16 w-16 text-finn-black"),
+
+        el("div", {}, [
+          el("p", {
+            class: "text-[15px] font-black leading-6 text-finn-black",
+            text: carName ? `Reading ${carName}…` : "Reading this car…",
+          }),
+
+          /*
+           * What the wait is actually for. The panel is doing two things a
+           * reader cannot see — finding what FINN published about this car,
+           * then measuring it against their own priorities — and naming them
+           * is the difference between a pause and a stall.
+           */
+          el("p", {
+            class: "mt-1.5 text-[12px] leading-5 text-finn-iron",
+            text: "Finding what FINN published about it, then measuring that against your priorities.",
+          }),
+        ]),
+      ],
+    ),
   ]);
 }
 
@@ -379,7 +406,7 @@ async function build(request: PanelRequest): Promise<Panel> {
          furniture, in a row that already ends in two controls; as a 28px disc
          it is the first thing in the panel, which is what a reader arriving
          from FINN's own page needs it to be. */
-      brandMark(28),
+      brandMark(28, "", { idle: true }),
       el("div", { class: "min-w-0 flex-1" }, [title]),
       el("button", {
         class: [

@@ -6,6 +6,7 @@ import { LoadingScreen } from "@/components/Spinner";
 import { GettingStarted } from "./components/GettingStarted";
 import { GoToFinnSection } from "./components/GoToFinnSection";
 import Logo from "/icon/128.png";
+import { BRAND_IDLE_SPIN } from "@/lib/brand-spinner";
 import Tabs from "./components/Tabs";
 import { MetricCard } from "./components/MetricCard";
 import type { PinnedFinnCar } from "@/lib/types";
@@ -161,7 +162,11 @@ function App() {
         <header className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
-              <img src={Logo} alt="Finn Lens logo" className="h-11 w-11 object-contain" />
+              <img
+                src={Logo}
+                alt="Finn Lens logo"
+                className={`h-11 w-11 object-contain ${BRAND_IDLE_SPIN}`}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
