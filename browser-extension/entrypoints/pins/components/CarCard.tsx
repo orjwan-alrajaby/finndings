@@ -37,6 +37,7 @@ export function CarCard({
     selected,
     checked,
     selecting,
+    subject,
     onOpen,
     onToggleChecked,
     onUnpin,
@@ -60,6 +61,15 @@ export function CarCard({
      * checkboxes on screen to be read.
      */
     selecting: boolean;
+    /**
+     * True when this card is the heading of the reading beside it rather than
+     * a way in to one.
+     *
+     * It stops being a control: pressing it could only re-open the car it is
+     * already showing, and offering to read what is open on the same screen
+     * is a dead pixel with a hover state.
+     */
+    subject?: boolean;
     onOpen: () => void;
     onToggleChecked: () => void;
     onUnpin: () => void;
@@ -91,13 +101,12 @@ export function CarCard({
               * *this is a selection*, but it is a mark now rather than the
               * one live pixel on the card.
               */}
-            <button
-                type="button"
+            <Face
+                subject={subject}
                 onClick={selecting ? onToggleChecked : onOpen}
-                aria-pressed={selecting ? checked : undefined}
-                aria-current={!selecting && selected ? "true" : undefined}
-                aria-label={selecting ? `Select ${car.name}` : undefined}
-                className="flex flex-1 flex-col text-left"
+                pressed={selecting ? checked : undefined}
+                current={!selecting && selected}
+                label={selecting ? `Select ${car.name}` : undefined}
             >
                 <span className="relative block aspect-5/3 overflow-hidden bg-finn-pale-blue">
                     {car.images?.thumbnail ? (
@@ -195,7 +204,7 @@ export function CarCard({
                         ) : null}
                     </span>
                 </span>
-            </button>
+            </Face>
 
             {/*
               * The rail, along the foot rather than down the side. It is
@@ -206,12 +215,16 @@ export function CarCard({
               */}
             {!selecting && (
                 <span className="flex items-center gap-1 border-t border-finn-cotton px-2 py-1.5">
-                    <RailButton
-                        label={`View ${car.name}`}
-                        onClick={onOpen}
-                        icon={<Eye aria-hidden="true" className="h-4 w-4" />}
-                        text="Read it"
-                    />
+                    {/* Not offered on the card that heads the reading: the
+                        answer is already open beside it. */}
+                    {!subject && (
+                        <RailButton
+                            label={`View ${car.name}`}
+                            onClick={onOpen}
+                            icon={<Eye aria-hidden="true" className="h-4 w-4" />}
+                            text="Read it"
+                        />
+                    )}
 
                     {/*
                       * Only rendered when the car actually has a page. Cars
@@ -268,6 +281,46 @@ function RailButton({
         >
             {icon}
             {text}
+        </button>
+    );
+}
+
+/**
+ * The card's face: a button where pressing it does something, a plain box
+ * where it would not.
+ *
+ * One shape, two elements, so the card itself does not have to know which it
+ * is in three separate places.
+ */
+function Face({
+    subject,
+    onClick,
+    pressed,
+    current,
+    label,
+    children,
+}: {
+    subject?: boolean;
+    onClick: () => void;
+    pressed?: boolean;
+    current: boolean;
+    label?: string;
+    children: React.ReactNode;
+}) {
+    const className = "flex flex-1 flex-col text-left";
+
+    if (subject) return <div className={className}>{children}</div>;
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={pressed}
+            aria-current={current ? "true" : undefined}
+            aria-label={label}
+            className={className}
+        >
+            {children}
         </button>
     );
 }

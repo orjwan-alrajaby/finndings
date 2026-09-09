@@ -200,8 +200,11 @@ comparison the page exists to support.
 Two views, and `openId` is the whole of the state that separates them. On the board the set
 has the full width and carries the controls that act on a set — sort by pinned date, fit,
 price or name, and tick cards for a bulk unpin. Opening a car steps into the reading: the
-cards fold to a column beside the analysis, the board's controls go, and a sticky row under
-the page bar carries the way back. Selecting is board-only and ends when a car is opened,
+board's controls go, a sticky row under the page bar carries the way back, and the only card
+left is the one the analysis is about — stuck beside it, so the photograph, the band and the
+price stay answerable through five screens of reasoning. It stops being a control there
+(`subject`), because pressing it could only re-open what is already open. Leaving returns the
+board to the scroll position it was left at. Selecting is board-only and ends when a car is opened,
 which is what fixes the trap the two used to share — while picking cars off, a click on a
 card ticks it rather than navigating away from the job the reader had just asked for. Every
 removal is confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also listens for it, so

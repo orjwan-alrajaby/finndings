@@ -148,6 +148,23 @@ export default function PinsPage() {
      */
     const reading = useRef<HTMLElement>(null);
 
+    /**
+     * Where the board was when the reader stepped off it.
+     *
+     * Coming back is a return, not an arrival: they were part way down a grid,
+     * opened one car out of it, and want the grid again — most likely to open
+     * the one next to it. Landing them at the top would make every second car
+     * they read cost a scroll back to where they already were.
+     *
+     * It happened to work without this, because removing a five-page analysis
+     * makes the page short enough that the browser clamps the scroll near the
+     * top. That is not a behaviour, it is an accident of one set with three
+     * cars in it, and it goes the other way on a board long enough to hold
+     * the old position.
+     */
+    const boardScroll = useRef(0);
+    const wasReading = useRef(false);
+
     useEffect(() => {
         if (openId == null) return;
 
@@ -161,15 +178,22 @@ export default function PinsPage() {
 
         if (top >= HEADER - 8 && top <= HEADER + 200) return;
 
-        node.scrollIntoView({
-            /* The system setting, honoured here rather than in CSS: there is
-               no media query that reaches a scrollIntoView option. */
-            behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-                .matches
-                ? "auto"
-                : "smooth",
-            block: "start",
-        });
+        node.scrollIntoView({ behavior: scrollBehaviour(), block: "start" });
+    }, [openId]);
+
+    /* And back to where the board was, when the reader leaves the reading. */
+    useEffect(() => {
+        if (openId != null) {
+            wasReading.current = true;
+
+            return;
+        }
+
+        if (!wasReading.current) return;
+
+        wasReading.current = false;
+
+        window.scrollTo({ top: boardScroll.current, behavior: scrollBehaviour() });
     }, [openId]);
 
     /*
@@ -206,6 +230,7 @@ export default function PinsPage() {
      * to a board the reader had stopped looking at. Stepping in ends it.
      */
     const openCar = (id: number) => {
+        boardScroll.current = window.scrollY;
         stopSelecting();
         setOpenId(id);
     };
@@ -336,8 +361,8 @@ export default function PinsPage() {
                                     <strong className="font-black text-finn-black">
                                         {open.name}
                                     </strong>
-                                    . Pick another on the left, or go back to
-                                    sort and thin out the set.
+                                    . Go back for another car, or to sort and
+                                    thin out the set.
                                 </p>
                             </div>
                         )}
@@ -393,15 +418,29 @@ export default function PinsPage() {
                                     </div>
                                 )}
 
+                                {/*
+                                  * One card in the reading, and it travels.
+                                  *
+                                  * The column used to carry the whole set
+                                  * beside the analysis, which made the left
+                                  * half a second copy of the board the reader
+                                  * had just left — and scrolled away within a
+                                  * screen of a reading that runs to several.
+                                  * What belongs beside an analysis is the car
+                                  * it is about, kept in view for as long as
+                                  * the reading takes: the photograph, the
+                                  * band and the price stay answerable while
+                                  * the reasoning goes past.
+                                  */}
                                 <ul
                                     className={[
                                         "grid gap-4",
                                         open
-                                            ? ""
+                                            ? "lg:sticky lg:top-32"
                                             : "sm:grid-cols-2 xl:grid-cols-3",
                                     ].join(" ")}
                                 >
-                                    {sorted.map((car) => (
+                                    {(open ? [open] : sorted).map((car) => (
                                         <CarCard
                                             key={car.id}
                                             car={car}
@@ -420,6 +459,7 @@ export default function PinsPage() {
                                             selected={car.id === openId}
                                             checked={checked.includes(car.id)}
                                             selecting={selecting}
+                                            subject={car.id === openId}
                                             onOpen={() =>
                                                 openCar(car.id)
                                             }
@@ -466,4 +506,14 @@ export default function PinsPage() {
             </main>
         </Tooltip.Provider>
     );
+}
+
+/**
+ * The system setting, honoured here rather than in CSS: there is no media
+ * query that reaches a `scrollIntoView` or `scrollTo` option.
+ */
+function scrollBehaviour(): ScrollBehavior {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
 }
