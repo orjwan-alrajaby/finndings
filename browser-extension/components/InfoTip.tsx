@@ -53,7 +53,15 @@ export function Tip({
                     collisionPadding={12}
                     onPointerDownOutside={() => setPinned(false)}
                     onEscapeKeyDown={() => setPinned(false)}
-                    className="z-50 max-w-[260px] rounded-xl bg-finn-black px-3 py-2.5 text-[11px] leading-4 text-white shadow-lg"
+                    /*
+                     * Above everything, because a tooltip is by definition
+                     * the thing most recently asked for. At `z-50` it was
+                     * below two surfaces that can contain one — the priority
+                     * panel is `z-[61]` and the setup flow's bars are `z-60`
+                     * — and both portal to the same body, so an explanation
+                     * opened from inside either simply rendered behind it.
+                     */
+                    className="z-[70] max-w-[260px] rounded-xl bg-finn-black px-3 py-2.5 text-[11px] leading-4 text-white shadow-lg"
                 >
                     <p className="font-black">{subject}</p>
                     <p className="mt-1 text-white/80">{children}</p>

@@ -2,6 +2,7 @@ import { createContext, useContext, useSyncExternalStore } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Info, X } from "lucide-react";
 
+import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { getCategory } from "@/lib/reasoning-engine";
 import { FEATURES } from "@/lib/reasoning-engine/constants";
@@ -305,14 +306,48 @@ function PriorityBody({ id }: { id: CategoryId }) {
                         </p>
                     ) : (
                         <ul className="flex flex-wrap gap-1.5">
-                            {features.map((feature) => (
-                                <li
-                                    key={feature}
-                                    className="rounded-full bg-finn-cotton px-2.5 py-1 text-[11px] font-bold text-finn-black"
-                                >
-                                    {FEATURES[feature].label}
-                                </li>
-                            ))}
+                            {features.map((feature) => {
+                                const meta = FEATURES[feature];
+
+                                return (
+                                    <li
+                                        key={feature}
+                                        className="inline-flex items-center gap-1 rounded-full bg-finn-cotton px-2.5 py-1 text-[11px] font-bold text-finn-black"
+                                    >
+                                        {meta.label}
+
+                                        {/*
+                                          * Every one of these carries its own
+                                          * "i", the way a feature chip does
+                                          * everywhere else in the app.
+                                          *
+                                          * This panel exists to answer "what
+                                          * is this and what does it look at",
+                                          * and it was answering the second
+                                          * half with fifteen more terms of
+                                          * jargon — "rear cross-traffic
+                                          * alert", "tyre pressure monitoring"
+                                          * — and no way to ask about any of
+                                          * them. A reader who does not know
+                                          * what a thing is cannot judge
+                                          * whether the priority counting it
+                                          * is the priority they want, which
+                                          * is the only decision this panel is
+                                          * open to support.
+                                          *
+                                          * The text was written long ago and
+                                          * is already on every one of these
+                                          * rows in `FEATURES`; it was simply
+                                          * never put in front of anyone here.
+                                          */}
+                                        {meta.explanation && (
+                                            <InfoTip subject={meta.label}>
+                                                {meta.explanation}
+                                            </InfoTip>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </Block>
