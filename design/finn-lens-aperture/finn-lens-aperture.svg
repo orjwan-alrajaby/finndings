@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<title>FINN Lens - aperture</title>
+<desc>Six-blade iris with a centred FINN Accent Blue circle.</desc>
+  <circle cx="128" cy="128" r="101.4" fill="#191919"/>
+  <g stroke="#F8F8F8" stroke-width="6.6" stroke-linecap="butt">
+  <line x1="128" y1="92" x2="195.97" y2="52.76"/>
+  <line x1="159.18" y1="110" x2="227.15" y2="149.24"/>
+  <line x1="159.18" y1="146" x2="159.18" y2="224.49"/>
+  <line x1="128" y1="164" x2="60.03" y2="203.24"/>
+  <line x1="96.82" y1="146" x2="28.85" y2="106.76"/>
+  <line x1="96.82" y1="110" x2="96.82" y2="31.51"/>
+  </g>
+  <polygon points="128,92 159.18,110 159.18,146 128,164 96.82,146 96.82,110" fill="#F8F8F8"/>
+  <circle cx="128" cy="128" r="17.4" fill="#0072EA"/>
+  <circle cx="128" cy="128" r="114.3" fill="none" stroke="#191919" stroke-width="11.4"/>
+</svg>
