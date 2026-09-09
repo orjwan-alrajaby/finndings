@@ -1,5 +1,5 @@
 import "@/assets/tailwind.css";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { Scale, Settings, X } from "lucide-react";
 
@@ -129,6 +129,48 @@ export default function PinsPage() {
 
     const open = sorted.find((car) => car.id === openId) ?? null;
     const openAnalysis = open ? (analyses.get(open.id) ?? null) : null;
+
+    /**
+     * The reading, brought to the top when it changes underneath the reader.
+     *
+     * A full analysis runs to several screens, so a reader who has scrolled
+     * into the middle of one and then picks a different car off the rail gets
+     * the new car's reading — opened at whatever paragraph the old one had
+     * reached. Nothing about the page moves, so the change reads as a glitch
+     * rather than as an answer. Below `lg` the panel stacks under the list
+     * instead, and there the same click leaves the reading off the bottom of
+     * the screen entirely.
+     *
+     * The guard is what keeps this from fighting the reader: if the top of
+     * the reading is already sitting in the band just under the sticky bar,
+     * the page is where it should be and nothing moves. It only scrolls when
+     * the answer is somewhere the reader is not looking.
+     */
+    const reading = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        if (openId == null) return;
+
+        const node = reading.current;
+
+        if (!node) return;
+
+        /* The sticky page bar, plus enough air to read as a top edge. */
+        const HEADER = 96;
+        const { top } = node.getBoundingClientRect();
+
+        if (top >= HEADER - 8 && top <= HEADER + 200) return;
+
+        node.scrollIntoView({
+            /* The system setting, honoured here rather than in CSS: there is
+               no media query that reaches a scrollIntoView option. */
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+                .matches
+                ? "auto"
+                : "smooth",
+            block: "start",
+        });
+    }, [openId]);
 
     /*
      * Worked out once for the set rather than once per card: "cheapest" and
@@ -341,7 +383,10 @@ export default function PinsPage() {
                             </section>
 
                             {openAnalysis && (
-                                <section className="min-w-0">
+                                <section
+                                    ref={reading}
+                                    className="min-w-0 scroll-mt-24"
+                                >
                                     <div className="lg:sticky lg:top-24">
                                         <div className="mb-3 flex items-center justify-between gap-3">
                                             <h2 className="min-w-0 truncate text-sm font-black text-finn-black">
