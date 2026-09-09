@@ -1,7 +1,7 @@
 import "@/assets/tailwind.css";
 import { useEffect, useMemo, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { Scale, Settings } from "lucide-react";
+import { Scale, Settings, X } from "lucide-react";
 
 import { FitAnalysisView } from "@/components/FitAnalysisView";
 import { NavButton, PageHeader } from "@/components/PageHeader";
@@ -19,12 +19,17 @@ import { loadPinnedCars, unpinCars } from "@/lib/stored-data";
 import type { PinnedFinnCar } from "@/lib/types";
 import { openBrowserTab } from "@/lib/utils";
 
-import { CarRow } from "./components/CarRow";
-import { NothingOpen, NothingPinned } from "./components/EmptyStates";
+import { CarCard } from "./components/CarCard";
+import { NothingPinned } from "./components/EmptyStates";
 import { SetSummary } from "./components/SetSummary";
 import { Toolbar } from "./components/Toolbar";
 import { UnpinDialog } from "./components/UnpinDialog";
-import { sortCars, type SortKey } from "./utils/sorting";
+import {
+    bestMatch,
+    cheapestPrice,
+    sortCars,
+    type SortKey,
+} from "./utils/sorting";
 
 /**
  * The pinned cars, as something the reader owns rather than something that
@@ -125,6 +130,26 @@ export default function PinsPage() {
     const open = sorted.find((car) => car.id === openId) ?? null;
     const openAnalysis = open ? (analyses.get(open.id) ?? null) : null;
 
+    /*
+     * Worked out once for the set rather than once per card: "cheapest" and
+     * "ahead" are claims about the whole board, and a card cannot answer
+     * either by looking at itself.
+     */
+    const leader = useMemo(
+        () => bestMatch(cars ?? [], analyses),
+        [cars, analyses],
+    );
+
+    const floor = useMemo(() => cheapestPrice(cars ?? []), [cars]);
+
+    const gapFor = (car: PinnedFinnCar): number | null => {
+        const price = car.pricing?.customerMonthly?.price;
+
+        if (!price || !floor) return null;
+
+        return price - floor.price;
+    };
+
     /* Leaving selection mode drops the selection with it. */
     const stopSelecting = () => {
         setSelecting(false);
@@ -188,25 +213,12 @@ export default function PinsPage() {
                 </PageHeader>
 
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-                    <header className="mb-6">
-                        <h1 className="text-3xl font-black tracking-tight">
-                            Pinned cars
-                        </h1>
-
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-finn-iron">
-                            Everything you kept while browsing. Open one to see
-                            how it does against your priorities, or unpin what
-                            you're no longer weighing up — what's left here is
-                            exactly what Lens compares.
-                        </p>
-                    </header>
-
                     {cars.length > 0 && (
                         <SetSummary cars={cars} analyses={analyses} />
                     )}
 
                     {!configured && cars.length > 0 && (
-                        <div className="mb-4">
+                        <div className="mt-4">
                             <UsingDefaultsNotice
                                 onPersonalise={() =>
                                     void openBrowserTab(
@@ -220,39 +232,82 @@ export default function PinsPage() {
                     {cars.length === 0 ? (
                         <NothingPinned />
                     ) : (
-                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                        /*
+                         * The reading only takes a column once there is one.
+                         *
+                         * This was a fixed two-column split, so on a page
+                         * where nothing had been opened yet — which is every
+                         * first visit — half the width was a dashed box
+                         * explaining what would appear there. The set now
+                         * fills the page until a car is opened, and the grid
+                         * folds to a single rail beside the reading when one
+                         * is.
+                         */
+                        <div
+                            className={[
+                                "mt-6 grid gap-6",
+                                open
+                                    ? "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]"
+                                    : "",
+                            ].join(" ")}
+                        >
                             <section className="min-w-0">
-                                <Toolbar
-                                    total={cars.length}
-                                    checked={checked}
-                                    selecting={selecting}
-                                    sort={sort}
-                                    onSort={setSort}
-                                    onStartSelecting={() =>
-                                        setSelecting(true)
-                                    }
-                                    onStopSelecting={stopSelecting}
-                                    onSelectAll={() =>
-                                        setChecked(
-                                            checked.length === cars.length
-                                                ? []
-                                                : cars.map((car) => car.id),
-                                        )
-                                    }
-                                    onUnpinChecked={() =>
-                                        setConfirming(checked)
-                                    }
-                                />
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                                    <h2 className="text-sm font-black text-finn-black">
+                                        {open
+                                            ? "Your set"
+                                            : `Your set · ${cars.length}`}
+                                    </h2>
 
-                                <ul className="mt-3 flex flex-col gap-2.5">
+                                    <Toolbar
+                                        total={cars.length}
+                                        checked={checked}
+                                        selecting={selecting}
+                                        sort={sort}
+                                        onSort={setSort}
+                                        onStartSelecting={() =>
+                                            setSelecting(true)
+                                        }
+                                        onStopSelecting={stopSelecting}
+                                        onSelectAll={() =>
+                                            setChecked(
+                                                checked.length === cars.length
+                                                    ? []
+                                                    : cars.map(
+                                                          (car) => car.id,
+                                                      ),
+                                            )
+                                        }
+                                        onUnpinChecked={() =>
+                                            setConfirming(checked)
+                                        }
+                                    />
+                                </div>
+
+                                <ul
+                                    className={[
+                                        "grid gap-4",
+                                        open
+                                            ? ""
+                                            : "sm:grid-cols-2 xl:grid-cols-3",
+                                    ].join(" ")}
+                                >
                                     {sorted.map((car) => (
-                                        <CarRow
+                                        <CarCard
                                             key={car.id}
                                             car={car}
                                             band={
                                                 analyses.get(car.id)
                                                     ?.overall ?? null
                                             }
+                                            leading={car.id === leader?.car.id}
+                                            cheapest={
+                                                car.pricing?.customerMonthly
+                                                    ?.price != null &&
+                                                car.pricing.customerMonthly
+                                                    .price === floor?.price
+                                            }
+                                            priceGap={gapFor(car)}
                                             selected={car.id === openId}
                                             checked={checked.includes(car.id)}
                                             selecting={selecting}
@@ -285,19 +340,33 @@ export default function PinsPage() {
                                 </ul>
                             </section>
 
-                            <section className="min-w-0">
-                                <div className="lg:sticky lg:top-24">
-                                    {openAnalysis ? (
+                            {openAnalysis && (
+                                <section className="min-w-0">
+                                    <div className="lg:sticky lg:top-24">
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <h2 className="min-w-0 truncate text-sm font-black text-finn-black">
+                                                {open?.name}
+                                            </h2>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenId(null)}
+                                                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold text-finn-iron transition hover:bg-white hover:text-finn-black"
+                                            >
+                                                <X
+                                                    aria-hidden="true"
+                                                    className="h-3.5 w-3.5"
+                                                />
+                                                Close the reading
+                                            </button>
+                                        </div>
+
                                         <FitAnalysisView
                                             analysis={openAnalysis}
                                         />
-                                    ) : (
-                                        <NothingOpen
-                                            configured={configured}
-                                        />
-                                    )}
-                                </div>
-                            </section>
+                                    </div>
+                                </section>
+                            )}
                         </div>
                     )}
                 </div>

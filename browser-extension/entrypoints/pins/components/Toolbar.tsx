@@ -6,6 +6,12 @@ import { SORTS, type SortKey } from "../utils/sorting";
 /**
  * Two bars in one slot, because they are two different jobs.
  *
+ * At rest it is bare controls sitting beside the section's heading — it used
+ * to be a white card above the list, which on a page of white cards was one
+ * more box competing with the cars. While the reader is picking cars off it
+ * becomes a black bar and takes the whole row, because that is a mode and a
+ * mode should look like one.
+ *
  * Ordinarily the reader is arranging the list; while they are picking cars
  * off, the only things that matter are how many they have picked and the two
  * ways out. Showing both at once is how a toolbar ends up with six controls
@@ -34,7 +40,7 @@ export function Toolbar({
 }) {
     if (selecting) {
         return (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-finn-black px-4 py-3 text-white shadow-sm">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3 rounded-full bg-finn-black px-4 py-2 text-white shadow-sm">
                 <div className="flex items-center gap-3">
                     <p className="text-xs font-black">
                         {checked.length === 0
@@ -79,7 +85,7 @@ export function Toolbar({
     }
 
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-white px-3 py-2.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
             {/*
               * Segmented rather than a dropdown. Four options that change
               * what the reader is looking at should be four things they can

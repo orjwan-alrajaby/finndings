@@ -57,6 +57,15 @@ export function BandChip({
             className={[
                 "inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5",
                 "text-[11px] font-black",
+                /*
+                 * A hairline of white, the same one the badge on finn.com
+                 * carries and for the same reason: `finn-fit-strong-pale` is
+                 * the identical #eaf4ff as `finn-pale-blue`, which is the
+                 * ground every photograph in this product now sits on. Without
+                 * an edge the strong band's chip loses its body and leaves its
+                 * label floating. See `FIT_BADGE_BASE`.
+                 */
+                "ring-1 ring-white",
                 band.chipClass,
             ].join(" ")}
         >

@@ -8,6 +8,8 @@ import {
 } from "@/lib/reasoning-engine/fit";
 import Logo from "/icon/128.png";
 
+export { CarSilhouette } from "@/components/CarSilhouette";
+
 /**
  * The pieces the mocks are built out of, kept in one file so a change to the
  * real control has one place to land here.
@@ -210,65 +212,5 @@ export function Marker({
                 index
             )}
         </span>
-    );
-}
-
-/**
- * A car, drawn rather than photographed.
- *
- * FINN's cards carry a studio photograph of the actual car, and the three
- * cars on this screen do not exist — so a photograph is the one thing this
- * mock must not have. A drawing reads as "a car goes here" without ever
- * being mistaken for a listing.
- *
- * **Drawn to be seen.** It was first stroked in `finn-cotton` on a
- * `finn-snow` ground, which is a 1.04:1 contrast ratio — technically a car,
- * visually an empty grey rectangle, and an empty rectangle is what a card
- * whose photo failed to load looks like. It now carries a filled body under
- * a darker outline, on the slightly deeper ground the photo block sets, so
- * it is legible at card size without competing with the two controls sitting
- * on top of it, which are the things the reader is actually here to find.
- */
-export function CarSilhouette({ className = "" }: { className?: string }) {
-    return (
-        <svg
-            aria-hidden="true"
-            viewBox="0 0 120 48"
-            fill="none"
-            className={className}
-        >
-            {/* The body, filled first so the outline reads as its edge. */}
-            <path
-                d="M10 34v-8a4 4 0 0 1 3-3.9l12-3 10-8.6A8 8 0 0 1 40.2 8h26.5a8 8 0 0 1 5 1.8l13.5 11 15.8 3.4a5 5 0 0 1 4 4.9V34Z"
-                fill="currentColor"
-                fillOpacity="0.16"
-            />
-
-            <path
-                d="M8 34h104M14 34a6 6 0 1 0 12 0 6 6 0 1 0-12 0M94 34a6 6 0 1 0 12 0 6 6 0 1 0-12 0"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-
-            <path
-                d="M10 34v-8a4 4 0 0 1 3-3.9l12-3 10-8.6A8 8 0 0 1 40.2 8h26.5a8 8 0 0 1 5 1.8l13.5 11 15.8 3.4a5 5 0 0 1 4 4.9V34"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-
-            {/* The door line and the glasshouse, so it reads as a car rather
-                than a wedge. */}
-            <path
-                d="M38 11.5v9.8m-14 0h58"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                opacity="0.6"
-            />
-        </svg>
     );
 }

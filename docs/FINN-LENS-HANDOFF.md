@@ -188,11 +188,18 @@ retires itself once all three are done, and can be dismissed by hand.
 
 **Pinned cars page (`entrypoints/pins/`).** The whole pinned set, which nothing else showed:
 the compare flow ranked it and gave no way to change it, the popup showed three, and the pin
-button on finn.com could only unpin a car from the page it was pinned on. Rows carry the
-car, its fit band and its price; the panel beside them is the full analysis of whichever is
-open. Sort by pinned date, fit, price or name; tick rows for a bulk unpin; every removal is
-confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also listens for it, so a pin made
-on finn.com while it is open lands without a reload.
+button on finn.com could only unpin a car from the page it was pinned on.
+
+It opens on a navy banner that says where the shortlist stands in a sentence — which car
+leads, which is cheapest, what the gap between them is — built from the same analyses
+everything below is. Under it the set is a grid of cards: the photograph on the pale blue
+ground the panel and the setup flow's mock also use, the fit band in the corner the badge
+occupies on finn.com, and every price stated against the cheapest in the set, which is the
+comparison the page exists to support. The reading takes a column only once a car is opened;
+before that the grid has the width, rather than half the page being a dashed box explaining
+what would appear there. Sort by pinned date, fit, price or name; tick cards for a bulk
+unpin; every removal is confirmed and broadcasts `PINNED_CARS_UPDATED`. The page also
+listens for it, so a pin made on finn.com while it is open lands without a reload.
 
 Scoring is no longer gated on `hasSavedLensSettings()` — Lens ships defaults, so there is
 always something honest to say. The flag now decides whether the page shows

@@ -25,7 +25,7 @@ Load unpacked from `.output/chrome-mv3` via `chrome://extensions` → Developer 
 | `entrypoints/content/` | pin buttons, card badges, the in-page analysis panel |
 | `entrypoints/popup/` | page status, recent pins, the getting-started checklist, actions |
 | `entrypoints/onboarding/` | the five-screen setup flow, opened once on install |
-| `entrypoints/pins/` | the pinned set — read one against your settings, unpin, sort |
+| `entrypoints/pins/` | the pinned set as a board — where it stands, then a card each |
 | `entrypoints/compare/` | the four-step flow (React + Zustand) |
 | `entrypoints/settings/` | priorities, profiles, driving assumptions, and your stored data |
 | `components/FitAnalysisView/` | one car judged against your settings, in React |
