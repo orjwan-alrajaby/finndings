@@ -174,6 +174,10 @@ written — feature picks, profile toggles and the default profile are left alon
 returning reader's configuration is not replaced by whatever the flow was holding. Skip is
 on every screen, saves nothing, and is recorded separately from finishing.
 
+The priority panel (`components/PriorityInfo.tsx`) is `fixed` and reaches the foot of the
+window, so it stops above whatever the page has reserved there — `--finn-lens-bottom-gutter`,
+0 by default and published by the setup flow from its action stripe's measured height.
+
 `lib/onboarding.ts` owns the one storage key (`finnLensOnboarding`: `completedAt`,
 `skippedAt`, `seenAdvice`, `checklistDismissed`). `needsOnboarding()` is false if any of
 finished, skipped, or `hasSavedLensSettings()` — that last conjunct is what stops the flow

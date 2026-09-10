@@ -1,5 +1,5 @@
 import "@/assets/tailwind.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 import { LoadingScreen } from "@/components/Spinner";
@@ -87,6 +87,50 @@ export default function OnboardingPage() {
      * worked, which is all the header needs to decide whether the way on is
      * open. See `screens/Tour`.
      */
+    /**
+     * The action stripe's height, published for anything else that reaches
+     * the foot of the window.
+     *
+     * The priority panel is `fixed` and full height, so without this it laid
+     * itself over the stripe and killed the controls underneath — a press
+     * landed on the panel, the control did nothing, and the panel stayed put.
+     * Measured rather than assumed because the bar wraps on a narrow window
+     * and grows a row whenever the way forward is shut.
+     */
+    const stripe = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const node = stripe.current;
+
+        if (!node) return;
+
+        const publish = () => {
+            document.documentElement.style.setProperty(
+                "--finn-lens-bottom-gutter",
+                `${node.offsetHeight}px`,
+            );
+        };
+
+        publish();
+
+        const observer = new ResizeObserver(publish);
+
+        observer.observe(node);
+
+        return () => {
+            observer.disconnect();
+            document.documentElement.style.removeProperty(
+                "--finn-lens-bottom-gutter",
+            );
+        };
+        /*
+         * Keyed on `loading`, not empty. The first render of this page is the
+         * "Getting things ready…" screen, which has no stripe on it — an
+         * effect that ran once on mount found no node, gave up, and never
+         * looked again, so the gutter stayed at zero for the whole session.
+         */
+    }, [loading]);
+
     const [tourTried, setTourTried] = useState(0);
     const [tourTotal, setTourTotal] = useState(3);
 
@@ -402,6 +446,7 @@ export default function OnboardingPage() {
                 </footer>
 
                 <ActionBar
+                    ref={stripe}
                     onBack={nav?.onBack ?? null}
                     onSkip={() => void skip()}
                     next={

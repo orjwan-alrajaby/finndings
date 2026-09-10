@@ -199,14 +199,33 @@ function InfoPanel({
 
     /* Portalled — see `InfoPanelContainer` for where to, and why. */
     return (
+        /*
+         * No `Dialog.Overlay`. There was one, dimming the page behind — and
+         * it had never rendered a pixel: Radix returns null from the overlay
+         * whenever the dialog is `modal={false}`, which this one deliberately
+         * is. Leaving it in was a scrim in the source that nobody had ever
+         * seen on screen.
+         */
         <Dialog.Portal container={container ?? undefined}>
-            <Dialog.Overlay className="fixed inset-0 z-[60] bg-finn-black/20" />
-
             <Dialog.Content
                 /* Its body is the description; there is no separate line. */
                 aria-describedby={undefined}
                 className={[
-                    "fixed right-0 top-0 z-[61] flex h-screen w-full max-w-96 flex-col",
+                    /*
+                     * Stops above whatever the page has reserved at its foot
+                     * rather than running the full height of the window.
+                     *
+                     * The setup flow pins its Back / Skip / forward controls
+                     * across the bottom, and a full-height panel sat on top
+                     * of them: they were not merely hidden, they were dead —
+                     * a press landed on the panel, so the control did nothing
+                     * and the panel did not close either, which read as the
+                     * thing refusing to go away. See `--finn-lens-bottom-
+                     * gutter`, which is 0 on every page that reserves
+                     * nothing.
+                     */
+                    "fixed right-0 top-0 bottom-[var(--finn-lens-bottom-gutter)]",
+                    "z-[61] flex w-full max-w-96 flex-col",
                     "border-l border-finn-cotton bg-white shadow-2xl outline-none",
                 ].join(" ")}
             >
