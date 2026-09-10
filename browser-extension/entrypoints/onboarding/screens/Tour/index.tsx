@@ -46,11 +46,14 @@ const TOUR_ORDER: Control[] = ["pin", "badge", "toolbar"];
 /**
  * How long the tour holds still after a step is worked, in milliseconds.
  *
- * Long enough for the press and its result to read as cause and effect,
- * short enough not to read as a wait at all — the bubble moving in the same
- * frame as the click would look like it had teleported rather than followed.
+ * Long enough for the press and its result to read as cause and effect, and
+ * for the button's "Done" to be read rather than glimpsed — the bubble moving
+ * in the same frame as the click would look like it had teleported rather
+ * than followed. Short enough that it is still an answer and not a wait: the
+ * old 1400, and 2600 on the drawer, were paying for a tidy-up that no longer
+ * happens.
  */
-const STEP_BEAT = 300;
+const STEP_BEAT = 600;
 
 /**
  * Whether there is room beside the mock for the tour's bubbles.
@@ -399,10 +402,31 @@ export function Tour({
     };
 
     const openPanel = (id: number) => {
-        markTried("badge");
         setPopupOpen(false);
         setOpenId(id);
     };
+
+    /**
+     * Closing the drawer is the second half of the step, not the end of it.
+     *
+     * Opening it used to be the whole thing, so the tour ticked the step and
+     * moved on while the reasoning was still sliding in — the reader was
+     * congratulated for arriving somewhere they had not read a word of, and
+     * the next bubble appeared over the top of it. Asking them to close it
+     * means they have to have *been* there: the drawer stays for exactly as
+     * long as they want it, and the step ends when they are finished with it
+     * rather than when the animation is.
+     *
+     * Guarded on something actually being open, so the undo in `backStep` —
+     * which also closes the drawer — cannot tick the step it is trying to
+     * put back.
+     */
+    const closePanel = useCallback(() => {
+        if (openId == null) return;
+
+        markTried("badge");
+        setOpenId(null);
+    }, [openId, markTried]);
 
     const toggleMenu = () => {
         markTried("toolbar");
@@ -485,12 +509,16 @@ export function Tour({
                         costs you a month, and which of your priorities it answers.
                     </>
                 ),
-                prompt: "The glowing pill, bottom left. It opens Lens's reasoning beside the page.",
+                prompt:
+                    openId != null
+                        ? "That is the reasoning, in full. Close it when you have had a look."
+                        : "The glowing pill, bottom left. It opens Lens's reasoning beside the page.",
                 arrow: "top-left",
                 calloutClass: "absolute top-full left-0 mt-3",
-                actionLabel: openId != null ? "Close the panel" : "Open the panel",
+                actionLabel:
+                    openId != null ? "Close the panel" : "Open the panel",
                 onAction: () => {
-                    if (openId != null) setOpenId(null);
+                    if (openId != null) closePanel();
                     else if (first) openPanel(first.id);
                 },
             },
@@ -713,7 +741,7 @@ export function Tour({
                     {openId != null && analyses.get(openId) && (
                         <MockPanel
                             analysis={analyses.get(openId)!}
-                            onClose={() => setOpenId(null)}
+                            onClose={closePanel}
                         />
                     )}
                 </BrowserFrame>

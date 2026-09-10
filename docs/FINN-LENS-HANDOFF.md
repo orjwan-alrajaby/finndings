@@ -109,8 +109,9 @@ unaffected: it leaves the whole flow, from every screen, at every point. Five sc
 does with your data, and what the remaining four screens will ask for; a working copy of a
 finn.com listing page carrying the real pin button, the real verdict pill and the real
 toolbar button, all of them pressable (`screens/Tour/`) — working one is the only way its
-guided tour moves forward and it moves a beat later rather than a second and a half, because
-it no longer clears the stage on the way past; its Back undoes the step it lands on so it can
+guided tour moves forward — and the drawer step is not over until the reader closes the
+drawer, so it lasts exactly as long as they want it to — moving on a beat later rather than a
+second and a half, because it no longer clears the stage on the way past; its Back undoes the step it lands on so it can
 be done again, and skipping the guide scrolls to the cards that carry the same three jobs; your priorities (the shared
 `PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
 a worked example. That last screen runs the real `buildRecommendation` +
