@@ -230,7 +230,16 @@ export function Tour({
     const [tourAt, setTourAt] = useState<number | null>(0);
 
     const touring = wide && tourAt != null;
-    const tourControl = tourAt == null ? null : TOUR_ORDER[tourAt];
+
+    /*
+     * Null on the closing note, which stands one past the end of the order
+     * and is about the tour rather than about any control in it.
+     */
+    const tourControl =
+        tourAt == null ? null : (TOUR_ORDER[tourAt] ?? null);
+
+    /** The tour has walked its three and is saying so. */
+    const finishing = touring && tourAt === TOUR_ORDER.length;
 
     /**
      * Out of the guided tour, and down to where the work still is.
@@ -321,13 +330,7 @@ export function Tour({
      * the reader has asked for it.
      */
     const nextStep = useCallback(() => {
-        setTourAt((at) => {
-            if (at == null) return null;
-
-            const next = at + 1;
-
-            return next >= TOUR_ORDER.length ? null : next;
-        });
+        setTourAt((at) => (at == null ? null : at + 1));
     }, []);
 
     useEffect(() => {
@@ -631,8 +634,8 @@ export function Tour({
 
         return (
             <Callout
-                index={at}
-                total={TOUR_ORDER.length}
+                eyebrow={`Step ${at + 1} of ${TOUR_ORDER.length}`}
+                label={`Tour, step ${at + 1} of ${TOUR_ORDER.length}`}
                 title={step.title}
                 prompt={step.prompt}
                 arrow={step.arrow}
@@ -647,6 +650,31 @@ export function Tour({
             />
         );
     };
+
+    /**
+     * The curtain call, which is not a step.
+     *
+     * The tour used to stop by disappearing: the reader closed the menu and
+     * the guide was simply gone, with nothing to say whether that was the end
+     * or a glitch. It ends by saying so instead — one note, no step count
+     * because there is no fourth step, no Skip because there is nothing left
+     * to skip, and no tail because it is about the tour rather than about any
+     * control on the page. Dismissing it lifts the scrim with it.
+     *
+     * Only the guided tour gets one. A reader who skipped and worked the
+     * three controls from the cards was never being walked anywhere, so there
+     * is no walk to close.
+     */
+    const closingNote = finishing ? (
+        <Callout
+            eyebrow="Tour complete"
+            label="Tour complete"
+            title="That is all three"
+            prompt="You pinned a car, read what Lens made of it, and found the button everything else lives behind."
+            className="absolute top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2"
+            action={{ label: "Got it", onClick: () => setTourAt(null) }}
+        />
+    ) : null;
 
     const allTried = tried.length === steps.length;
 
@@ -717,7 +745,7 @@ export function Tour({
                     lensSpotlit={touring && tourControl === "toolbar"}
                     lensStatus={statusOf("toolbar")}
                     scrim={touring}
-                    callout={calloutFor("toolbar")}
+                    callout={closingNote ?? calloutFor("toolbar")}
                     onLensClick={toggleMenu}
                     popover={
                         popupOpen ? (

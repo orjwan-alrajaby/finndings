@@ -114,7 +114,9 @@ closes what they opened, so each lasts exactly as long as they want it to — mo
 later rather than a second and a half, because it no longer clears the stage on the way past.
 The menu step's bubble starts in the page's top-right corner and drops to sit under the menu
 when the menu takes that corner, staying inside the frame and keeping its size
-(`MENU_CLEARANCE`); its Back undoes the step it lands on so it can
+(`MENU_CLEARANCE`). Working the third control brings up a closing note rather than ending the
+tour outright — one past the end of `TOUR_ORDER`, no step count, no Skip, no tail — and
+dismissing that is what lifts the scrim; its Back undoes the step it lands on so it can
 be done again, and skipping the guide scrolls to the cards that carry the same three jobs; your priorities (the shared
 `PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
 a worked example. That last screen runs the real `buildRecommendation` +

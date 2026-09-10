@@ -41,35 +41,44 @@ const ARROW_POSITION: Record<CalloutArrow, string> = {
 };
 
 export function Callout({
-    index,
-    total,
+    eyebrow,
+    label,
     title,
     prompt,
     arrow,
     className,
     action,
-    done,
+    done = false,
     onSkip,
     onBack,
 }: {
-    index: number;
-    total: number;
+    /** The small line above the title: "Step 2 of 3", or "Tour complete". */
+    eyebrow: string;
+    /** How the whole bubble is announced. */
+    label: string;
     title: string;
     /** One line telling the reader what to do, not what the thing is. */
     prompt: string;
-    arrow: CalloutArrow;
+    /**
+     * Which way the tail points, or none at all.
+     *
+     * Omitted by the closing note, which is about the tour rather than about
+     * any one control — a tail there would be pointing at nothing.
+     */
+    arrow?: CalloutArrow;
     /** Where the caller wants it, relative to the control it belongs to. */
     className: string;
     action: { label: string; onClick: () => void };
     /** True once this step's control has been worked at least once. */
-    done: boolean;
-    onSkip: () => void;
+    done?: boolean;
+    /** Omitted where there is no tour left to skip. */
+    onSkip?: () => void;
     onBack?: () => void;
 }) {
     return (
         <div
             role="group"
-            aria-label={`Tour, step ${index + 1} of ${total}`}
+            aria-label={label}
             className={[
                 "z-50 w-[290px] rounded-[20px] p-4 text-left",
                 "bg-finn-highlight-navy text-white",
@@ -83,20 +92,23 @@ export function Callout({
             {/* The tail. A rotated square, so it takes the bubble's own
                 background and ring and needs no second colour to keep in
                 step with it. */}
-            <span
-                aria-hidden="true"
-                className={[
-                    "absolute h-4 w-4 rotate-45 rounded-[3px]",
-                    "bg-finn-highlight-navy ring-4 ring-white/25",
-                    ARROW_POSITION[arrow],
-                ].join(" ")}
-            />
+            {arrow && (
+                <span
+                    aria-hidden="true"
+                    className={[
+                        "absolute h-4 w-4 rotate-45 rounded-[3px]",
+                        "bg-finn-highlight-navy ring-4 ring-white/25",
+                        ARROW_POSITION[arrow],
+                    ].join(" ")}
+                />
+            )}
 
             <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-pale-blue">
-                    Step {index + 1} of {total}
+                    {eyebrow}
                 </p>
 
+                {onSkip && (
                 <button
                     type="button"
                     onClick={onSkip}
@@ -105,6 +117,7 @@ export function Callout({
                     <X aria-hidden="true" className="h-3 w-3" />
                     Skip the tour
                 </button>
+                )}
             </div>
 
             <p className="mt-1.5 text-sm font-black leading-5 text-white">
