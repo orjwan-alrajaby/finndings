@@ -1,4 +1,4 @@
-import { ArrowRight, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 /**
  * The bubble that hangs off the control being talked about.
@@ -50,7 +50,6 @@ export function Callout({
     action,
     done,
     onSkip,
-    onNext,
     onBack,
 }: {
     index: number;
@@ -65,7 +64,6 @@ export function Callout({
     /** True once this step's control has been worked at least once. */
     done: boolean;
     onSkip: () => void;
-    onNext: () => void;
     onBack?: () => void;
 }) {
     return (
@@ -121,45 +119,57 @@ export function Callout({
               * `finn-lens-beckon` rather than `finn-lens-attention`: a tour
               * step is an instruction the reader may read, look away from and
               * come back to, and a prompt that has already stopped by the time
-              * they look back has failed at the only job it had. It stops on
-              * its own the moment the control has been worked.
+              * they look back has failed at the only job it had.
+              *
+              * Once the control has been worked the button is spent: it stops
+              * asking, says so, and goes dead. It used to flip to the reverse
+              * action — "Pin the first car" becoming "Unpin it again" — which
+              * offered to undo the thing the reader had just been congratulated
+              * for, on a button that was about to disappear underneath them as
+              * the tour moved on. A step that is done needs no further
+              * prompting of any kind.
               */}
             <button
                 type="button"
                 onClick={action.onClick}
+                disabled={done}
                 className={[
-                    "mt-3 inline-flex h-9 w-full items-center justify-center",
+                    "mt-3 inline-flex h-9 w-full items-center justify-center gap-1.5",
                     "rounded-full px-4 text-[11px] font-black transition-colors",
                     done
-                        ? "bg-white/15 text-finn-pale-blue"
+                        ? "cursor-default bg-white/15 text-finn-pale-blue"
                         : "finn-lens-beckon-light bg-white text-finn-highlight-navy hover:bg-finn-pale-blue",
                 ].join(" ")}
             >
-                {action.label}
+                {done ? (
+                    <>
+                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                        Done
+                    </>
+                ) : (
+                    action.label
+                )}
             </button>
 
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/15 pt-3">
-                {onBack ? (
+            {/*
+              * Back, and nothing else. There is no Next: the way on is the
+              * button above, and the step is only over once the control it
+              * points at has actually been worked — see the tour's own
+              * advance. A forward control beside it would be a way to walk
+              * the whole tour without touching anything it is about.
+              */}
+            {onBack && (
+                <div className="mt-3 border-t border-white/15 pt-3">
                     <button
                         type="button"
                         onClick={onBack}
                         className="rounded-full px-2 py-1 text-[11px] font-bold text-white/70 transition hover:text-white"
                     >
-                        ‹ Back
+                        ‹ Back, and let me try that again
                     </button>
-                ) : (
-                    <span />
-                )}
+                </div>
+            )}
 
-                <button
-                    type="button"
-                    onClick={onNext}
-                    className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-black text-white transition hover:bg-white/25"
-                >
-                    {index + 1 === total ? "Finish" : "Next"}
-                    <ArrowRight aria-hidden="true" className="h-3 w-3" />
-                </button>
-            </div>
         </div>
     );
 }

@@ -108,7 +108,9 @@ forward is held shut — until all three of its controls have been worked. `Skip
 unaffected: it leaves the whole flow, from every screen, at every point. Five screens: what Lens is, what it
 does with your data, and what the remaining four screens will ask for; a working copy of a
 finn.com listing page carrying the real pin button, the real verdict pill and the real
-toolbar button, all of them pressable (`screens/Tour/`); your priorities (the shared
+toolbar button, all of them pressable (`screens/Tour/`) — working one is the only way its
+guided tour moves forward, its Back undoes the step it lands on so it can be done again, and
+skipping the guide scrolls to the cards that carry the same three jobs; your priorities (the shared
 `PriorityOrder` control, profiles offered as explained cards); your driving assumptions; and
 a worked example. That last screen runs the real `buildRecommendation` +
 `buildAdviceNarrative` over three invented cars from `lib/demo-cars.ts` against the order

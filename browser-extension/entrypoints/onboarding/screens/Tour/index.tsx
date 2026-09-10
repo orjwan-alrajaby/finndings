@@ -182,19 +182,25 @@ export function Tour({
     const [focus, setFocus] = useState<Control | null>(null);
 
     /**
-     * The controls the reader has worked at least once.
+     * The controls the reader has worked.
      *
-     * Deliberately not the same thing as the controls' current state. A step
-     * is done when it has been *understood*, and a reader who pins a car and
-     * then unpins it has understood pinning — marking that step unfinished
-     * again would be the screen telling somebody who just used a control
-     * twice that they have not used it. So this only ever grows.
+     * Not the same thing as the controls' current *state*: a reader who pins
+     * a car and then unpins it has still understood pinning, so idly working
+     * a control twice does not un-finish its step.
+     *
+     * The one thing that does take a step back off the list is the reader
+     * asking for it — pressing Back in the tour. That is not idle use, it is
+     * "let me try that again", and a step you have gone back to see should be
+     * a step you can do rather than one already ticked.
      *
      * It is also fed by the mock itself, not only by the buttons underneath:
-     * pressing the real pin up in the frame is the step, and the paragraph's
+     * pressing the real pin up in the frame is the step, and the bubble's
      * button is a convenience for a reader who would rather be shown.
      */
     const [tried, setTried] = useState<Control[]>([]);
+
+    /* The car every step's own button acts on. */
+    const first = cars[0];
 
     /**
      * Which step the tour is standing on, or null once it is out of the way.
@@ -210,7 +216,31 @@ export function Tour({
     const touring = wide && tourAt != null;
     const tourControl = tourAt == null ? null : TOUR_ORDER[tourAt];
 
-    const leaveTour = useCallback(() => setTourAt(null), []);
+    /**
+     * Out of the guided tour, and down to where the work still is.
+     *
+     * Skipping puts the bubbles away; it does not put the three controls
+     * away, and it cannot — the way off this screen is still shut until all
+     * three have been worked. A reader who skipped and was left staring at
+     * the same browser mock with no bubbles on it had been given no idea
+     * what to do instead, and the cards that answer that are below the fold.
+     *
+     * So the page takes them there. It is the same courtesy the paragraph
+     * buttons already do in the other direction.
+     */
+    const stepCards = useRef<HTMLDivElement>(null);
+
+    const leaveTour = useCallback(() => {
+        setTourAt(null);
+
+        stepCards.current?.scrollIntoView({
+            behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
+                .matches
+                ? "auto"
+                : "smooth",
+            block: "start",
+        });
+    }, []);
 
     /**
      * On to the next step, with the stage cleared behind us.
@@ -224,6 +254,40 @@ export function Tour({
      * artefact is the reader's now, and closing it as a parting gesture would
      * undo the thing they were just asked to do.
      */
+    /**
+     * Back a step, and that step undone.
+     *
+     * A reader who presses Back is not navigating, they are asking to try
+     * something again — so the step they land on is taken off the finished
+     * list and whatever it did is put back the way it was: the pin comes out,
+     * the drawer closes, the menu shuts. Landing on a step already ticked,
+     * with its button spent and the tour poised to skip straight past it
+     * again, would answer the request with a shrug.
+     *
+     * `pinnedIds` is set directly rather than through `togglePin`, because
+     * that raises the toast — and a confirmation that a car has been unpinned
+     * is a thing the reader did not ask for and did not do.
+     */
+    const backStep = useCallback(
+        (to: number) => {
+            const control = TOUR_ORDER[to];
+
+            if (!control) return;
+
+            setTried((current) => current.filter((id) => id !== control));
+
+            if (control === "pin" && first) {
+                setPinnedIds((ids) => ids.filter((id) => id !== first.id));
+            }
+
+            if (control === "badge") setOpenId(null);
+            if (control === "toolbar") setPopupOpen(false);
+
+            setTourAt(to);
+        },
+        [first],
+    );
+
     const nextStep = useCallback(() => {
         setTourAt((at) => {
             if (at == null) return null;
@@ -254,16 +318,24 @@ export function Tour({
         pinned: boolean;
     } | null>(null);
 
-    const first = cars[0];
-
     /**
      * Move on once the reader has done the thing, not the instant they do it.
      *
-     * The whole point of a step is the result — the pin filling, the drawer
-     * arriving, the menu dropping — so the bubble stays put long enough for
-     * that to be seen, marks itself done, and then gets out of the way. A tour
-     * that advanced on the click would replace the thing it just asked the
-     * reader to look at.
+     * Doing the thing is the *only* way on now — the bubble has no Next. A
+     * tour whose forward control can be pressed without working the thing it
+     * points at is a tour that can be clicked through without learning
+     * anything, and this one is the gate on the whole screen, so being
+     * click-through-able made the gate a formality.
+     *
+     * The delay is what makes each step land. The point of a step is its
+     * result — the pin filling, the drawer arriving, the menu dropping — so
+     * the bubble stays put long enough for that to be seen, marks itself
+     * done, and then gets out of the way. Advancing on the click would
+     * replace the thing it had just asked the reader to look at.
+     *
+     * The drawer waits longer than the other two. A toast and a short menu
+     * are read in a glance; four sections of reasoning arriving beside the
+     * page deserve more than a blink before the tour tidies them away.
      */
     useEffect(() => {
         if (tourAt == null) return;
@@ -272,17 +344,10 @@ export function Tour({
 
         if (!control || !tried.includes(control)) return;
 
-        /*
-         * Except the drawer. The other two steps leave something that is read
-         * in a glance — a toast, a short menu — so moving on after a beat is
-         * a courtesy. The drawer is four sections of reasoning, and a tour
-         * that swept it away while the reader was still in the second
-         * paragraph would be taking back the thing it just gave them. That
-         * step waits for Next.
-         */
-        if (control === "badge") return;
-
-        const timer = window.setTimeout(nextStep, 1400);
+        const timer = window.setTimeout(
+            nextStep,
+            control === "badge" ? 2600 : 1400,
+        );
 
         return () => window.clearTimeout(timer);
     }, [tourAt, tried, nextStep]);
@@ -489,8 +554,7 @@ export function Tour({
                     onClick: step.onAction,
                 }}
                 onSkip={leaveTour}
-                onNext={nextStep}
-                onBack={at > 0 ? () => setTourAt(at - 1) : undefined}
+                onBack={at > 0 ? () => backStep(at - 1) : undefined}
             />
         );
     };
@@ -665,7 +729,7 @@ export function Tour({
                 )}
             </div>
 
-            <div className="mt-7">
+            <div ref={stepCards} className="mt-7 scroll-mt-28">
                 <StepRail
                     statuses={steps.map((step) => statusOf(step.id))}
                     focused={
