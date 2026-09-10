@@ -357,7 +357,14 @@ export function Tour({
 
         if (!control || !tried.includes(control)) return;
 
-        const timer = window.setTimeout(nextStep, STEP_BEAT);
+        /*
+         * No beat on the last step. There is nothing to move on to, so the
+         * only thing a delay could do is hold the scrim up over a page whose
+         * guide has already gone.
+         */
+        const last = tourAt === TOUR_ORDER.length - 1;
+
+        const timer = window.setTimeout(nextStep, last ? 0 : STEP_BEAT);
 
         return () => window.clearTimeout(timer);
     }, [tourAt, tried, nextStep]);
@@ -552,13 +559,19 @@ export function Tour({
                  * overlap of two white cards reads as a bug rather than a tour.
                  */
                 /*
-                 * Shifted clear of whatever is already in that corner — the
-                 * menu this step opens, and now the drawer the step before it
-                 * left behind, since the tour no longer closes it on the way
-                 * past. Both live at the right edge of the page.
+                 * Shifted clear of a drawer, and only a drawer.
+                 *
+                 * It used to move for the menu as well, which was the one
+                 * corner it could never usefully move for: opening the menu
+                 * *is* this step, so the shift fired at the exact moment the
+                 * bubble was about to be dismissed — and `transition-all`
+                 * dutifully animated it across the frame before it vanished.
+                 * The reader pressed the last button and watched the guide
+                 * slide away sideways. It is gone in the same render now; see
+                 * `calloutFor`.
                  */
                 calloutClass:
-                    popupOpen || openId != null
+                    openId != null
                         ? "absolute top-4 right-[23rem] transition-all"
                         : "absolute top-4 right-4 transition-all",
                 actionLabel: popupOpen ? "Close the menu" : "Open the Lens menu",
@@ -580,6 +593,16 @@ export function Tour({
         const step = steps.find((candidate) => candidate.id === control);
 
         if (!step || tourAt !== at || !wide) return null;
+
+        /*
+         * The last step, once worked, draws nothing at all. Every other step
+         * spends a beat showing "Done" on its way to the next one; this one
+         * has no next one, so the beat would be the guide lingering over a
+         * tour that is already over.
+         */
+        if (at === TOUR_ORDER.length - 1 && tried.includes(control)) {
+            return null;
+        }
 
         return (
             <Callout
