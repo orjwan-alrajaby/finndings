@@ -1,6 +1,7 @@
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 
+import { InfoTip } from "@/components/InfoTip";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type {
     ContractType,
@@ -76,7 +77,7 @@ export function DrivingAssumptions({
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <AssumptionInput
                     label="Monthly budget"
-                    hint="Optional. The most you want to spend per month in total, including running costs — the one figure here that decides which cars are eligible at all. Leave it blank and every car you pinned stays in the running."
+                    explanation="The most you want to spend per month all in — the subscription plus the running costs Lens works out below. It is the only figure here that changes which cars you see rather than what one costs: Lens recommends a car only if it can confirm it fits. Optional, and leaving it blank keeps every car you pinned in the running."
                     unit="€/month"
                     value={preferences.monthlyBudget}
                     step={50}
@@ -87,8 +88,15 @@ export function DrivingAssumptions({
                 />
 
                 <AssumptionInput
-                    label="How much do you drive?"
-                    hint={`Approximately how many kilometres in a typical month? An estimate is fine — you can change this later. FINN includes ${FINN_INCLUDED_MONTHLY_KM} km/month.`}
+                    /*
+                     * Named rather than asked. It was "How much do you
+                     * drive?", which the "i" beside it turned into "What is
+                     * How much do you drive??" — and it was the only label of
+                     * the six that was a question. The question itself is
+                     * still the first thing the explanation says.
+                     */
+                    label="Monthly distance"
+                    explanation={`Roughly how many kilometres you cover in a typical month — an estimate is fine. Everything Lens works out about energy is scaled by it, and FINN includes ${FINN_INCLUDED_MONTHLY_KM} km/month, so anything past that is charged at the car's own price per extra kilometre.`}
                     unit="km/month"
                     value={preferences.monthlyKm}
                     step={100}
@@ -97,6 +105,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Petrol"
+                    explanation="What a litre costs you at the pump. Lens applies it to petrol cars, and to plug-in hybrids — FINN publishes one combined figure for those, so the whole of it is priced as fuel."
                     unit="€/L"
                     value={preferences.petrolPrice}
                     step={0.01}
@@ -105,6 +114,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Diesel"
+                    explanation="What a litre costs you at the pump. Used for diesel cars only — if you are not looking at any, this one changes nothing."
                     unit="€/L"
                     value={preferences.dieselPrice}
                     step={0.01}
@@ -113,6 +123,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Electricity"
+                    explanation="What you pay for a kilowatt-hour where you usually charge. Used for electric cars only, against the car's own consumption figure — public fast charging costs more than this, so an estimate built on home charging is the optimistic one."
                     unit="€/kWh"
                     value={preferences.electricityPrice}
                     step={0.01}
@@ -158,12 +169,11 @@ function ContractTypeToggle({
 }) {
     return (
         <div>
-            <span
+            <FieldLabel
                 id="contract-type-label"
-                className="text-xs font-bold text-finn-black"
-            >
-                Contract type
-            </span>
+                label="Contract type"
+                explanation="Whether you would take the car privately or through a business. FINN advertises a different monthly price for each, and this picks which of the two Lens costs every car on — nothing else about the recommendation changes."
+            />
 
             {/*
               * A toggle group rather than two `aria-pressed` buttons under a
@@ -219,9 +229,63 @@ function ContractTypeToggle({
  * are descriptions: read out after the name, in that order, which is the
  * order a sighted reader meets them in too.
  */
+/**
+ * A field's name with its explanation attached.
+ *
+ * Every one of these figures is asked for in two or three words — "Petrol",
+ * "Electricity" — and none of them says what it is *for*. Two of the six used
+ * to carry a sentence of prose underneath and the other four carried nothing,
+ * which left the form looking as though the explained ones were the tricky
+ * ones and the rest were self-evident. They are not: what Lens does with a
+ * diesel price depends on whether any diesel car is in the comparison, and
+ * the budget is the only figure on the panel that changes which cars a reader
+ * is shown at all.
+ *
+ * So the explanation goes behind an "i" on every field instead, which is
+ * where this app puts explanations everywhere else — the feature chips, the
+ * priority rows — and the panel is six labelled fields rather than a wall of
+ * grey small print. `InfoTip` opens on hover and pins on click, so a sentence
+ * this long can actually be read.
+ */
+function FieldLabel({
+    htmlFor,
+    id,
+    label,
+    explanation,
+}: {
+    /**
+     * The input this names. Omitted for the contract type, which is a group
+     * of two controls rather than one — a `label` pointing at a group names
+     * nothing, so that one names itself through `id` and the group's own
+     * `aria-labelledby`.
+     */
+    htmlFor?: string;
+    id?: string;
+    label: string;
+    explanation: ReactNode;
+}) {
+    const text = "text-xs font-bold text-finn-black";
+
+    return (
+        <div className="flex items-center gap-1">
+            {htmlFor ? (
+                <label htmlFor={htmlFor} className={text}>
+                    {label}
+                </label>
+            ) : (
+                <span id={id} className={text}>
+                    {label}
+                </span>
+            )}
+
+            <InfoTip subject={label}>{explanation}</InfoTip>
+        </div>
+    );
+}
+
 function AssumptionInput({
     label,
-    hint,
+    explanation,
     unit,
     value,
     step,
@@ -230,7 +294,7 @@ function AssumptionInput({
     onChange,
 }: {
     label: string;
-    hint?: string;
+    explanation: ReactNode;
     unit: string;
     value: number;
     step: number;
@@ -243,12 +307,11 @@ function AssumptionInput({
 
     return (
         <div>
-            <label
+            <FieldLabel
                 htmlFor={`${id}-field`}
-                className="text-xs font-bold text-finn-black"
-            >
-                {label}
-            </label>
+                label={label}
+                explanation={explanation}
+            />
 
             <div className="mt-1 flex items-center rounded-2xl bg-finn-pale-blue px-3 shadow-sm">
                 <input
@@ -261,12 +324,7 @@ function AssumptionInput({
                     onChange={(event) =>
                         onChange(Number(event.target.value) || 0)
                     }
-                    aria-describedby={[
-                        `${id}-unit`,
-                        hint ? `${id}-hint` : "",
-                    ]
-                        .filter(Boolean)
-                        .join(" ")}
+                    aria-describedby={`${id}-unit`}
                     className={[
                         "h-11 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none",
                         // line below removes the number input's default HTML up/down arrows
@@ -278,15 +336,6 @@ function AssumptionInput({
                     {unit}
                 </span>
             </div>
-
-            {hint && (
-                <p
-                    id={`${id}-hint`}
-                    className="mt-1 text-[11px] leading-4 text-finn-iron"
-                >
-                    {hint}
-                </p>
-            )}
         </div>
     );
 }
