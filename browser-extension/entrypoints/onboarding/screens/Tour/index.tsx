@@ -44,6 +44,15 @@ type Control = CardControl | "toolbar";
 const TOUR_ORDER: Control[] = ["pin", "badge", "toolbar"];
 
 /**
+ * How long the tour holds still after a step is worked, in milliseconds.
+ *
+ * Long enough for the press and its result to read as cause and effect,
+ * short enough not to read as a wait at all — the bubble moving in the same
+ * frame as the click would look like it had teleported rather than followed.
+ */
+const STEP_BEAT = 300;
+
+/**
  * Whether there is room beside the mock for the tour's bubbles.
  *
  * The coach marks hang off the sides of a card inside a three-column listing,
@@ -243,18 +252,6 @@ export function Tour({
     }, []);
 
     /**
-     * On to the next step, with the stage cleared behind us.
-     *
-     * Each step leaves something on screen — a drawer, a menu — and the next
-     * step's bubble wants the corner it is standing in. Without this, moving
-     * from the drawer to the toolbar dropped the bubble straight on top of
-     * the drawer it had just asked the reader to open.
-     *
-     * Nothing is cleared on the way *out* of the tour: the last step's
-     * artefact is the reader's now, and closing it as a parting gesture would
-     * undo the thing they were just asked to do.
-     */
-    /**
      * Back a step, and that step undone.
      *
      * A reader who presses Back is not navigating, they are asking to try
@@ -263,6 +260,9 @@ export function Tour({
      * the drawer closes, the menu shuts. Landing on a step already ticked,
      * with its button spent and the tour poised to skip straight past it
      * again, would answer the request with a shrug.
+     *
+     * This is the only thing that puts the stage back. Going forwards leaves
+     * everything where it is — see `nextStep`.
      *
      * `pinnedIds` is set directly rather than through `togglePin`, because
      * that raises the toast — and a confirmation that a car has been unpinned
@@ -288,18 +288,30 @@ export function Tour({
         [first],
     );
 
+    /**
+     * On to the next step, leaving everything the last one made.
+     *
+     * It used to clear the stage on the way through — closing the drawer,
+     * shutting the menu — so that the next bubble had the corner it wanted.
+     * That is what the pause was for: the tour had to hold still long enough
+     * for the reader to see a result it was about to take away, which meant
+     * every step ended in a second and a half of nothing happening. The wait
+     * was paying for the tidying.
+     *
+     * So it does not tidy. The pin stays filled, the drawer stays open, and
+     * the next bubble moves aside for them instead — the reader keeps
+     * everything they have made, and the mock ends the tour showing all three
+     * of the things Lens does at once, which is a better picture than an
+     * empty page anyway. Only `backStep` puts anything back, because there
+     * the reader has asked for it.
+     */
     const nextStep = useCallback(() => {
         setTourAt((at) => {
             if (at == null) return null;
 
             const next = at + 1;
 
-            if (next >= TOUR_ORDER.length) return null;
-
-            setOpenId(null);
-            setPopupOpen(false);
-
-            return next;
+            return next >= TOUR_ORDER.length ? null : next;
         });
     }, []);
 
@@ -319,23 +331,21 @@ export function Tour({
     } | null>(null);
 
     /**
-     * Move on once the reader has done the thing, not the instant they do it.
+     * Move on the moment the reader has done the thing.
      *
-     * Doing the thing is the *only* way on now — the bubble has no Next. A
-     * tour whose forward control can be pressed without working the thing it
-     * points at is a tour that can be clicked through without learning
-     * anything, and this one is the gate on the whole screen, so being
-     * click-through-able made the gate a formality.
+     * Doing the thing is the only way the tour advances — the bubble has no
+     * Next. A tour whose forward control can be pressed without working the
+     * thing it points at is a tour that can be clicked through without
+     * learning anything, and this one is the gate on the whole screen, so
+     * being click-through-able made the gate a formality.
      *
-     * The delay is what makes each step land. The point of a step is its
-     * result — the pin filling, the drawer arriving, the menu dropping — so
-     * the bubble stays put long enough for that to be seen, marks itself
-     * done, and then gets out of the way. Advancing on the click would
-     * replace the thing it had just asked the reader to look at.
-     *
-     * The drawer waits longer than the other two. A toast and a short menu
-     * are read in a glance; four sections of reasoning arriving beside the
-     * page deserve more than a blink before the tour tidies them away.
+     * The beat is a beat and not a wait. It was 1.4 seconds, and 2.6 on the
+     * drawer, because the tour used to sweep each result away as it moved and
+     * had to leave it up long enough to be seen first; now that nothing is
+     * swept away, all the delay has to do is let the eye register that the
+     * press caused something. `STEP_BEAT` is under the threshold where people
+     * start experiencing a pause as waiting, so the tour reads as answering
+     * rather than as thinking.
      */
     useEffect(() => {
         if (tourAt == null) return;
@@ -344,14 +354,10 @@ export function Tour({
 
         if (!control || !tried.includes(control)) return;
 
-        const timer = window.setTimeout(
-            nextStep,
-            control === "badge" ? 2600 : 1400,
-        );
+        const timer = window.setTimeout(nextStep, STEP_BEAT);
 
         return () => window.clearTimeout(timer);
     }, [tourAt, tried, nextStep]);
-
 
     /*
      * The toast goes away on its own, because the real one does.
@@ -517,9 +523,16 @@ export function Tour({
                  * the menu drops into exactly the same corner. A one-second
                  * overlap of two white cards reads as a bug rather than a tour.
                  */
-                calloutClass: popupOpen
-                    ? "absolute top-4 right-[17rem] transition-all"
-                    : "absolute top-4 right-4 transition-all",
+                /*
+                 * Shifted clear of whatever is already in that corner — the
+                 * menu this step opens, and now the drawer the step before it
+                 * left behind, since the tour no longer closes it on the way
+                 * past. Both live at the right edge of the page.
+                 */
+                calloutClass:
+                    popupOpen || openId != null
+                        ? "absolute top-4 right-[23rem] transition-all"
+                        : "absolute top-4 right-4 transition-all",
                 actionLabel: popupOpen ? "Close the menu" : "Open the Lens menu",
                 onAction: toggleMenu,
             },
