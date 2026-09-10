@@ -22,7 +22,11 @@ import type {
 } from "@/lib/reasoning-engine/types";
 import { demoCars } from "@/lib/demo-cars";
 
-import { BrowserFrame, LensPopover } from "./BrowserFrame";
+import {
+    BrowserFrame,
+    LensPopover,
+    MENU_CLEARANCE,
+} from "./BrowserFrame";
 import { Callout, type CalloutArrow } from "./Callout";
 import { BADGE_WHERE, PIN_WHERE } from "./copy";
 import { ContinuingRow, MockCard, type CardControl } from "./MockCard";
@@ -283,8 +287,16 @@ export function Tour({
                 setPinnedIds((ids) => ids.filter((id) => id !== first.id));
             }
 
-            if (control === "badge") setOpenId(null);
-            if (control === "toolbar") setPopupOpen(false);
+            /*
+             * Both closed, not just the one belonging to the step being
+             * landed on. Going back from a half-finished step leaves its
+             * drawer or menu standing — and since a step now ends on the
+             * *close*, arriving back at it later with the thing already open
+             * would start it half-done, on a bubble asking the reader to
+             * close something they had not opened this time round.
+             */
+            setOpenId(null);
+            setPopupOpen(false);
 
             setTourAt(to);
         },
@@ -573,35 +585,29 @@ export function Tour({
                 prompt: popupOpen
                     ? "That is everything Lens can do from here. Close it and the tour is done."
                     : "Up in the toolbar, next to the address bar. That button is Lens itself.",
-                arrow: popupOpen ? "outside-right" : "top-right",
+                arrow: "top-right",
                 /*
-                 * It starts where it has always started — the page's top-right
-                 * corner, beside the button it is pointing at — and steps out
-                 * of the browser when the menu opens.
+                 * It stands beside the toolbar button, and drops to sit under
+                 * the menu when the menu takes that corner.
                  *
-                 * That corner is the one place this bubble cannot share. The
-                 * menu drops into it, so the bubble has to leave the moment it
-                 * is opened; sliding *left* across the frame to do it was the
-                 * thing that read as being flung out of the way. Leaving the
-                 * frame is a shorter and more legible move: it goes to the
-                 * margin beside the browser and points back at the toolbar
-                 * from there.
+                 * Three arrangements were tried before this one and each
+                 * failed the same way: the corner the bubble wants is the
+                 * corner the menu drops into, so any answer that keeps the
+                 * bubble at the top has to move it *sideways*. Left, across
+                 * the frame, read as being flung out of the way; right, into
+                 * the page's margin, fitted on a wide monitor and on a 1440
+                 * one put the bubble hard against the edge of the screen with
+                 * its corner clipped — and it had to shrink to get even that
+                 * far, so it changed size as it went.
                  *
-                 * Where there is no margin to go to — a 1440px window has
-                 * about 250px beside the frame, a 1280px one has 168 — it goes
-                 * up instead, above the frame, pointing down. `1420px` is
-                 * where the narrowed bubble and its gap actually fit; below
-                 * it, out to the right would push the page into horizontal
-                 * scroll. The tail switches on the same breakpoint.
+                 * Down is the move that was available all along. It stays in
+                 * the frame, stays the same width, and lands where a thing
+                 * explaining a menu belongs: directly under it, pointing back
+                 * up at it with the tail it already had. See `MENU_CLEARANCE`
+                 * for where the menu ends.
                  */
                 calloutClass: popupOpen
-                    ? [
-                          "absolute z-50 transition-all",
-                          "bottom-full right-0 mb-3",
-                          "min-[1420px]:bottom-auto min-[1420px]:right-auto",
-                          "min-[1420px]:top-14 min-[1420px]:left-full",
-                          "min-[1420px]:mb-0 min-[1420px]:ml-3 min-[1420px]:w-60",
-                      ].join(" ")
+                    ? `absolute right-4 z-50 transition-all ${MENU_CLEARANCE}`
                     : "absolute top-4 right-4 z-50 transition-all",
                 actionLabel: popupOpen ? "Close the menu" : "Open the Lens menu",
                 onAction: toggleMenu,
@@ -704,20 +710,14 @@ export function Tour({
                 </p>
             </div>
 
-            {/*
-              * `relative`, because the toolbar step's bubble hangs off the
-              * top of the browser rather than sitting inside it — see that
-              * step's `calloutClass`.
-              */}
-            <div ref={stage} className="relative mt-5 scroll-mt-24">
-                {calloutFor("toolbar")}
-
+            <div ref={stage} className="mt-5 scroll-mt-24">
                 <BrowserFrame
                     lensFocused={focus === "toolbar"}
                     lensOpen={popupOpen}
                     lensSpotlit={touring && tourControl === "toolbar"}
                     lensStatus={statusOf("toolbar")}
                     scrim={touring}
+                    callout={calloutFor("toolbar")}
                     onLensClick={toggleMenu}
                     popover={
                         popupOpen ? (

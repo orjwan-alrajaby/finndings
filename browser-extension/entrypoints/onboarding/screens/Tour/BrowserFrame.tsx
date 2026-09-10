@@ -56,6 +56,7 @@ export function BrowserFrame({
     lensOpen,
     onLensClick,
     popover,
+    callout,
     lensSpotlit,
     lensStatus = "upcoming",
     scrim,
@@ -67,6 +68,15 @@ export function BrowserFrame({
     onLensClick: () => void;
     /** The popup replica, shown hanging under the button when open. */
     popover?: ReactNode;
+    /**
+     * The tour's bubble for the menu step, drawn over the page.
+     *
+     * Inside the frame rather than beside it. It lived in the margin for a
+     * while, which fitted on a wide monitor and on a 1440 one put it hard
+     * against the edge of the screen with its own corner clipped off — the
+     * page had run out of room and the bubble was the thing paying for it.
+     */
+    callout?: ReactNode;
     /** True while the tour is standing on the toolbar button. */
     lensSpotlit?: boolean;
     /** How far the reader has got with the toolbar step. */
@@ -218,6 +228,8 @@ export function BrowserFrame({
                         className="absolute inset-0 z-20 bg-finn-black/45"
                     />
                 )}
+
+                {callout}
             </div>
         </div>
     );
@@ -231,6 +243,21 @@ export function BrowserFrame({
  * pages — so the replica lists exactly those and nothing invented. See
  * `entrypoints/popup/`.
  */
+/**
+ * How far down the page the open menu reaches, as a Tailwind top offset.
+ *
+ * The menu hangs from the toolbar and the tour's bubble has to clear it, and
+ * the two are drawn by different components — so the number lives here, next
+ * to the thing it measures. Add a row to the menu below and this moves with
+ * it.
+ *
+ * `mt-2` under a toolbar whose icons end a few pixels above the page, plus a
+ * `p-3` card of a header, a status line and three rows, comes to a little
+ * under 200px. `top-52` is 208, which leaves the bubble a clear gap rather
+ * than butting it against the menu's shadow.
+ */
+export const MENU_CLEARANCE = "top-52";
+
 export function LensPopover({ pinnedCount }: { pinnedCount: number }) {
     return (
         <div className="absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-finn-cotton">
