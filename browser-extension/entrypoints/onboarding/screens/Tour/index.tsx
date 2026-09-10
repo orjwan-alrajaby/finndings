@@ -357,14 +357,7 @@ export function Tour({
 
         if (!control || !tried.includes(control)) return;
 
-        /*
-         * No beat on the last step. There is nothing to move on to, so the
-         * only thing a delay could do is hold the scrim up over a page whose
-         * guide has already gone.
-         */
-        const last = tourAt === TOUR_ORDER.length - 1;
-
-        const timer = window.setTimeout(nextStep, last ? 0 : STEP_BEAT);
+        const timer = window.setTimeout(nextStep, STEP_BEAT);
 
         return () => window.clearTimeout(timer);
     }, [tourAt, tried, nextStep]);
@@ -435,10 +428,36 @@ export function Tour({
         setOpenId(null);
     }, [openId, markTried]);
 
-    const toggleMenu = () => {
+    /**
+     * The menu opens, and the step ends when the reader is finished with it.
+     *
+     * The same shape as the drawer: opening it used to be the whole step, so
+     * the tour ticked itself off and vanished while the menu was still
+     * dropping — the reader pressed the last button and the guide answered by
+     * leaving, before they had seen what they had opened. Closing it is the
+     * other half, and until then the bubble stays put saying so.
+     *
+     * Opening also clears the drawer, because the menu drops into the space a
+     * drawer occupies. That close is raw rather than `closePanel`: it is the
+     * page making room, not the reader finishing with the drawer, and it must
+     * not tick a step nobody worked.
+     */
+    const closeMenu = useCallback(() => {
+        if (!popupOpen) return;
+
         markTried("toolbar");
+        setPopupOpen(false);
+    }, [popupOpen, markTried]);
+
+    const toggleMenu = () => {
+        if (popupOpen) {
+            closeMenu();
+
+            return;
+        }
+
         setOpenId(null);
-        setPopupOpen((open) => !open);
+        setPopupOpen(true);
     };
 
     /**
@@ -551,29 +570,28 @@ export function Tour({
                         the toolbar.
                     </>
                 ),
-                prompt: "Up in the toolbar, next to the address bar. That button is Lens itself.",
-                arrow: "top-right",
+                prompt: popupOpen
+                    ? "That is everything Lens can do from here. Close it and the tour is done."
+                    : "Up in the toolbar, next to the address bar. That button is Lens itself.",
+                arrow: "bottom-right",
                 /*
-                 * It shifts left when the menu it is asking for is open, because
-                 * the menu drops into exactly the same corner. A one-second
-                 * overlap of two white cards reads as a bug rather than a tour.
-                 */
-                /*
-                 * Shifted clear of a drawer, and only a drawer.
+                 * Above the browser, not inside it — and it never moves.
                  *
-                 * It used to move for the menu as well, which was the one
-                 * corner it could never usefully move for: opening the menu
-                 * *is* this step, so the shift fired at the exact moment the
-                 * bubble was about to be dismissed — and `transition-all`
-                 * dutifully animated it across the frame before it vanished.
-                 * The reader pressed the last button and watched the guide
-                 * slide away sideways. It is gone in the same render now; see
-                 * `calloutFor`.
+                 * This bubble used to stand in the page's top-right corner
+                 * and shuffle sideways whenever anything else wanted that
+                 * corner. Which was constantly: the drawer lives there, and
+                 * so does the menu *this step opens*. So the last thing the
+                 * reader did in the tour was press a button and watch the
+                 * guide slide across the frame to get out of its own way.
+                 *
+                 * No arrangement inside the browser avoids that, because the
+                 * two things it must not cover are both at the right-hand
+                 * edge. So it leaves the browser: it hangs off the top of the
+                 * frame, clear of anything the page can put underneath it,
+                 * and points down at the toolbar button from there. One
+                 * position, held for the whole step, whatever opens.
                  */
-                calloutClass:
-                    openId != null
-                        ? "absolute top-4 right-[23rem] transition-all"
-                        : "absolute top-4 right-4 transition-all",
+                calloutClass: "absolute right-0 bottom-full z-50 mb-3",
                 actionLabel: popupOpen ? "Close the menu" : "Open the Lens menu",
                 onAction: toggleMenu,
             },
@@ -593,16 +611,6 @@ export function Tour({
         const step = steps.find((candidate) => candidate.id === control);
 
         if (!step || tourAt !== at || !wide) return null;
-
-        /*
-         * The last step, once worked, draws nothing at all. Every other step
-         * spends a beat showing "Done" on its way to the next one; this one
-         * has no next one, so the beat would be the guide lingering over a
-         * tour that is already over.
-         */
-        if (at === TOUR_ORDER.length - 1 && tried.includes(control)) {
-            return null;
-        }
 
         return (
             <Callout
@@ -685,14 +693,20 @@ export function Tour({
                 </p>
             </div>
 
-            <div ref={stage} className="mt-5 scroll-mt-24">
+            {/*
+              * `relative`, because the toolbar step's bubble hangs off the
+              * top of the browser rather than sitting inside it — see that
+              * step's `calloutClass`.
+              */}
+            <div ref={stage} className="relative mt-5 scroll-mt-24">
+                {calloutFor("toolbar")}
+
                 <BrowserFrame
                     lensFocused={focus === "toolbar"}
                     lensOpen={popupOpen}
                     lensSpotlit={touring && tourControl === "toolbar"}
                     lensStatus={statusOf("toolbar")}
                     scrim={touring}
-                    callout={calloutFor("toolbar")}
                     onLensClick={toggleMenu}
                     popover={
                         popupOpen ? (

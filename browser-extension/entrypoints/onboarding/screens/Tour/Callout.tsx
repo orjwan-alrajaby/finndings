@@ -31,13 +31,20 @@ import { Check, X } from "lucide-react";
  */
 
 /** Which edge the little tail sits on, and therefore what it points at. */
-export type CalloutArrow = "left" | "top-left" | "top-right";
+export type CalloutArrow =
+    | "left"
+    | "top-left"
+    | "top-right"
+    | "bottom-right";
 
 const ARROW_POSITION: Record<CalloutArrow, string> = {
     /* Pointing left, at something immediately beside it. */
     left: "top-7 -left-2",
     "top-left": "-top-2 left-7",
     "top-right": "-top-2 right-7",
+    /* Pointing down, at something below it — the toolbar button, from a
+       bubble that sits clear above the whole browser. */
+    "bottom-right": "-bottom-2 right-7",
 };
 
 export function Callout({

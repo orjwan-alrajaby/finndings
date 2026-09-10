@@ -59,7 +59,6 @@ export function BrowserFrame({
     lensSpotlit,
     lensStatus = "upcoming",
     scrim,
-    callout,
 }: {
     children: ReactNode;
     /** True while the reader is reading the paragraph about the toolbar. */
@@ -80,8 +79,6 @@ export function BrowserFrame({
      * target behind a curtain.
      */
     scrim?: boolean;
-    /** The tour's bubble for the toolbar step, which lives over the page. */
-    callout?: ReactNode;
 }) {
     return (
         <div
@@ -221,8 +218,6 @@ export function BrowserFrame({
                         className="absolute inset-0 z-20 bg-finn-black/45"
                     />
                 )}
-
-                {callout}
             </div>
         </div>
     );
