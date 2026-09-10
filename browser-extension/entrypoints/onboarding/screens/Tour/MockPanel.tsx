@@ -51,8 +51,10 @@ export function MockPanel({
                 "absolute inset-y-0 right-0 z-40 flex w-full max-w-[320px]",
                 "flex-col overflow-hidden border-l border-finn-cotton bg-white",
                 "shadow-[-10px_0_30px_rgba(0,0,0,0.14)]",
-                /* The compare page's own drawer animation, and its
-                   reduced-motion opt-out with it. */
+                /* The real drawers' slide, and its reduced-motion opt-out
+                   with it. Only the animation: this one is drawn inside the
+                   browser mock, so it is absolute where they are fixed and
+                   cannot take the shared shell. */
                 "finn-lens-drawer",
             ].join(" ")}
         >

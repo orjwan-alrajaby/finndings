@@ -58,8 +58,9 @@ export function Tip({
                      * the thing most recently asked for. At `z-50` it was
                      * below two surfaces that can contain one — the priority
                      * panel is `z-[61]` and the setup flow's bars are `z-60`
-                     * — and both portal to the same body, so an explanation
-                     * opened from inside either simply rendered behind it.
+                     * and `z-[62]` — and both portal to the same body, so an
+                     * explanation opened from inside either simply rendered
+                     * behind it.
                      */
                     className="z-[70] max-w-[260px] rounded-xl bg-finn-black px-3 py-2.5 text-[11px] leading-4 text-white shadow-lg"
                 >

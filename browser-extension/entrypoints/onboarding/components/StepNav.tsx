@@ -27,20 +27,10 @@ import { ArrowLeft, ArrowRight, Lock } from "lucide-react";
 export const ACTION_BAR_CLEARANCE = "pb-40 md:pb-32";
 
 export function ActionBar({
-    ref,
     onBack,
     onSkip,
     next,
 }: {
-    /**
-     * So the page can measure how much of the window's foot this takes.
-     *
-     * Anything else that reaches the bottom edge has to stop above it — see
-     * `--finn-lens-bottom-gutter` — and the height is not a constant: the bar
-     * wraps on a narrow window and grows a second row whenever the way
-     * forward is shut.
-     */
-    ref?: React.Ref<HTMLDivElement>;
     /** Null on the first screen, which has nothing behind it. */
     onBack: (() => void) | null;
     onSkip: () => void;
@@ -49,8 +39,12 @@ export function ActionBar({
 }) {
     return (
         <div
-            ref={ref}
-            className="fixed inset-x-0 bottom-0 z-60 border-t border-finn-cotton bg-white shadow-[0_-10px_30px_-18px_rgba(0,0,0,0.35)]"
+            /*
+             * Above the priority panel, which is `z-[61]`, so that panel
+             * passes behind this stripe rather than over the controls. See
+             * `components/PriorityInfo.tsx`.
+             */
+            className="fixed inset-x-0 bottom-0 z-[62] border-t border-finn-cotton bg-white shadow-[0_-10px_30px_-18px_rgba(0,0,0,0.35)]"
         >
             {next?.blockedBecause && (
                 <StepNavBlock reason={next.blockedBecause} />

@@ -37,24 +37,6 @@
    LICENSE.txt beside the files is Inter's OFL.
 ======================================== */
 
-/* ========================================
-   BOTTOM GUTTER
-   How much of the window's foot is already spoken for.
-
-   The setup flow pins an action stripe across the bottom of the screen, and
-   anything else that reaches the bottom edge — the priority panel, which is
-   `fixed` and full height — has to stop above it or it covers the controls.
-   The panel is shared with three pages that have no stripe at all, so the
-   number cannot live in the panel: the page publishes what it has reserved,
-   and the panel reads it.
-
-   Zero here so every page that reserves nothing needs to say nothing.
-======================================== */
-
-:root {
-  --finn-lens-bottom-gutter: 0px;
-}
-
 @font-face {
   font-family: "Inter Variable";
   font-style: normal;
@@ -427,11 +409,15 @@
 
 /* ========================================
    DRAWER
-   The compare page's Adjust panel, opened and closed by Radix's dialog.
-   Radix stamps `data-state` on the overlay and the panel and holds both in
-   the tree until their animations finish, so the two keyframes below are all
-   the movement this needs — no transition classes, and nothing to keep in
-   step with the open flag in React.
+   Every right-hand sheet in the product: the compare page's Adjust panel,
+   the priority panel that explains one row of it, and the mock of both on
+   the setup tour. They come in from the right edge and go back out the same
+   way. See `components/drawer.ts` for the shell they share.
+
+   Radix stamps `data-state` on the panel and on any scrim, and holds both in
+   the tree until their animations finish, so the keyframes below are all the
+   movement this needs — no transition classes, and nothing to keep in step
+   with the open flag in React.
 ======================================== */
 
 @keyframes finn-lens-drawer-in {

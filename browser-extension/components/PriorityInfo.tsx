@@ -2,6 +2,7 @@ import { createContext, useContext, useSyncExternalStore } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Info, X } from "lucide-react";
 
+import { DRAWER_SHELL } from "@/components/drawer";
 import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { getCategory } from "@/lib/reasoning-engine";
@@ -211,22 +212,28 @@ function InfoPanel({
                 /* Its body is the description; there is no separate line. */
                 aria-describedby={undefined}
                 className={[
+                    DRAWER_SHELL,
                     /*
-                     * Stops above whatever the page has reserved at its foot
-                     * rather than running the full height of the window.
+                     * Between the setup flow's two bars: above its sticky
+                     * header at `z-60`, below the stripe of controls it pins
+                     * across the foot at `z-[62]`.
                      *
-                     * The setup flow pins its Back / Skip / forward controls
-                     * across the bottom, and a full-height panel sat on top
-                     * of them: they were not merely hidden, they were dead —
-                     * a press landed on the panel, so the control did nothing
-                     * and the panel did not close either, which read as the
-                     * thing refusing to go away. See `--finn-lens-bottom-
-                     * gutter`, which is 0 on every page that reserves
-                     * nothing.
+                     * The panel used to be over both, and the controls
+                     * underneath were not merely hidden but dead — a press
+                     * landed on the panel, so the control did nothing and the
+                     * panel did not close either, which read as the thing
+                     * refusing to go away. Passing behind the stripe fixes
+                     * both at once: the controls stay live, and a press on one
+                     * closes the panel the way any press outside does. Its own
+                     * shadow goes with it, which is what it was for — a drawer
+                     * stopping short of the bottom edge has a lit line under
+                     * it that belongs to nothing.
+                     *
+                     * It has to stay above the header, though: it is full
+                     * height, and a panel passing under that one loses its own
+                     * title and the button that closes it.
                      */
-                    "fixed right-0 top-0 bottom-[var(--finn-lens-bottom-gutter)]",
-                    "z-[61] flex w-full max-w-96 flex-col",
-                    "border-l border-finn-cotton bg-white shadow-2xl outline-none",
+                    "z-[61] max-w-96 bg-white",
                 ].join(" ")}
             >
                 {subject.kind === "profile" ? (

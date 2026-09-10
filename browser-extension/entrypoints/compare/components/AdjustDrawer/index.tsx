@@ -7,6 +7,7 @@ import type {
     CategoryId,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
+import { DRAWER_SHELL } from "@/components/drawer";
 import { InfoPanelContainer } from "@/components/PriorityInfo";
 import { SaveControl } from "@/components/SaveControl";
 
@@ -150,10 +151,8 @@ export function AdjustDrawer({
                     ref={setContent}
                     aria-describedby="adjust-drawer-purpose"
                     className={[
-                        "finn-lens-drawer",
-                        "fixed inset-y-0 right-0 z-50 flex w-full flex-col",
-                        "max-w-[min(100vw,46rem)]",
-                        "border-l border-finn-cotton bg-finn-snow shadow-2xl outline-none",
+                        DRAWER_SHELL,
+                        "z-50 max-w-[min(100vw,46rem)] bg-finn-snow",
                     ].join(" ")}
                 >
                     <InfoPanelContainer.Provider value={content}>
