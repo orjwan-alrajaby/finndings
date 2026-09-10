@@ -573,25 +573,36 @@ export function Tour({
                 prompt: popupOpen
                     ? "That is everything Lens can do from here. Close it and the tour is done."
                     : "Up in the toolbar, next to the address bar. That button is Lens itself.",
-                arrow: "bottom-right",
+                arrow: popupOpen ? "outside-right" : "top-right",
                 /*
-                 * Above the browser, not inside it — and it never moves.
+                 * It starts where it has always started — the page's top-right
+                 * corner, beside the button it is pointing at — and steps out
+                 * of the browser when the menu opens.
                  *
-                 * This bubble used to stand in the page's top-right corner
-                 * and shuffle sideways whenever anything else wanted that
-                 * corner. Which was constantly: the drawer lives there, and
-                 * so does the menu *this step opens*. So the last thing the
-                 * reader did in the tour was press a button and watch the
-                 * guide slide across the frame to get out of its own way.
+                 * That corner is the one place this bubble cannot share. The
+                 * menu drops into it, so the bubble has to leave the moment it
+                 * is opened; sliding *left* across the frame to do it was the
+                 * thing that read as being flung out of the way. Leaving the
+                 * frame is a shorter and more legible move: it goes to the
+                 * margin beside the browser and points back at the toolbar
+                 * from there.
                  *
-                 * No arrangement inside the browser avoids that, because the
-                 * two things it must not cover are both at the right-hand
-                 * edge. So it leaves the browser: it hangs off the top of the
-                 * frame, clear of anything the page can put underneath it,
-                 * and points down at the toolbar button from there. One
-                 * position, held for the whole step, whatever opens.
+                 * Where there is no margin to go to — a 1440px window has
+                 * about 250px beside the frame, a 1280px one has 168 — it goes
+                 * up instead, above the frame, pointing down. `1420px` is
+                 * where the narrowed bubble and its gap actually fit; below
+                 * it, out to the right would push the page into horizontal
+                 * scroll. The tail switches on the same breakpoint.
                  */
-                calloutClass: "absolute right-0 bottom-full z-50 mb-3",
+                calloutClass: popupOpen
+                    ? [
+                          "absolute z-50 transition-all",
+                          "bottom-full right-0 mb-3",
+                          "min-[1420px]:bottom-auto min-[1420px]:right-auto",
+                          "min-[1420px]:top-14 min-[1420px]:left-full",
+                          "min-[1420px]:mb-0 min-[1420px]:ml-3 min-[1420px]:w-60",
+                      ].join(" ")
+                    : "absolute top-4 right-4 z-50 transition-all",
                 actionLabel: popupOpen ? "Close the menu" : "Open the Lens menu",
                 onAction: toggleMenu,
             },
