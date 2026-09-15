@@ -1,7 +1,11 @@
 import type { HeadToHead, PriorityBreakdown } from "./types";
 
 import { featurePhrase } from "./scoring";
-import { classifyTotalGap, isEffectivelyLevel } from "./narrative/magnitude";
+import {
+  classifyTotalGap,
+  comparableMeasurements,
+  isEffectivelyLevel,
+} from "./narrative/magnitude";
 import {
   inSentence,
   joinCapped,
@@ -54,7 +58,12 @@ function whatSeparates(
   const mine = breakdown.numeric;
   const other = versus.numeric;
 
-  if (mine && other && mine.value !== other.value) {
+  if (
+    mine &&
+    other &&
+    comparableMeasurements(mine, other) &&
+    mine.value !== other.value
+  ) {
     const ahead = mine.lowerIsBetter
       ? mine.value < other.value
       : mine.value > other.value;

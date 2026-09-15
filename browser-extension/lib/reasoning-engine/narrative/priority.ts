@@ -22,6 +22,7 @@ import {
 import {
   classifyMeasurementGap,
   classifyScoreGap,
+  comparableMeasurements,
   isEffectivelyLevel,
 } from "./magnitude";
 
@@ -365,7 +366,9 @@ function describeStanding(
    * three grams of CO₂ apart is a tie however far the normalised scores drift.
    */
   const level = runnerUp
-    ? scoredMeasurement != null && runnerUp.numeric != null
+    ? scoredMeasurement != null &&
+      runnerUp.numeric != null &&
+      comparableMeasurements(scoredMeasurement, runnerUp.numeric)
       ? isEffectivelyLevel(
           classifyMeasurementGap(
             scoredMeasurement.value,

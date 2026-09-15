@@ -7,7 +7,12 @@ import type {
 
 import { featurePhrase } from "../scoring";
 import { formatEUR } from "../format";
-import { classifyMonthlyCostGap, classifyScoreGap, isNoticeable } from "./magnitude";
+import {
+  classifyMonthlyCostGap,
+  classifyScoreGap,
+  comparableMeasurements,
+  isNoticeable,
+} from "./magnitude";
 import {
   inSentence,
   joinCapped,
@@ -114,7 +119,12 @@ function whatSeparates(
   const mine = breakdown.numeric;
   const other = versus.numeric;
 
-  if (mine && other && mine.value !== other.value) {
+  if (
+    mine &&
+    other &&
+    comparableMeasurements(mine, other) &&
+    mine.value !== other.value
+  ) {
     const subjectAhead = mine.lowerIsBetter
       ? mine.value < other.value
       : mine.value > other.value;

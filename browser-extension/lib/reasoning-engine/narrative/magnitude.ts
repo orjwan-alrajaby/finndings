@@ -39,6 +39,22 @@ export function classifyScoreGap(difference: number): Magnitude {
 }
 
 /**
+ * Whether two cars' figures measure the same quantity, and so can be compared.
+ *
+ * Not a given within one priority. Long distance is scored on electric range
+ * for a car that publishes one and on consumption otherwise, and consumption
+ * is litres for a combustion car and kilowatt-hours for an electric one — so
+ * two cars' figures under the same heading can be 450 km and 6.5 L/100km.
+ * Ordering those, or quoting one "against" the other, is nonsense.
+ */
+export function comparableMeasurements(
+  a: { label: string; unit: string },
+  b: { label: string; unit: string },
+): boolean {
+  return a.label === b.label && a.unit === b.unit;
+}
+
+/**
  * Measurements — boot litres, CO₂, range — are judged proportionally, because
  * 50 litres means something different at 300 L than at 1,600 L.
  */

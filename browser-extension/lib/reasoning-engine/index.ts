@@ -60,7 +60,12 @@ import {
 } from "./scoring";
 
 import { explainHeadToHead } from "./explain";
-import { classifyMeasurementGap, classifyMonthlyCostGap, isNoticeable } from "./narrative/magnitude";
+import {
+  classifyMeasurementGap,
+  classifyMonthlyCostGap,
+  comparableMeasurements,
+  isNoticeable,
+} from "./narrative/magnitude";
 import { formatEUR } from "./format";
 
 /* -------------------------------------------------------------------------- */
@@ -595,7 +600,7 @@ function alternativeHook(
     const theirs = scores.find((item) => item.vehicleId === winner.id)
       ?.details[priority]?.numeric;
 
-    if (!mine || !theirs) continue;
+    if (!mine || !theirs || !comparableMeasurements(mine, theirs)) continue;
 
     const ahead = mine.lowerIsBetter
       ? mine.value < theirs.value

@@ -15,7 +15,11 @@ import type {
 import { AVAILABLE_CATEGORY_FEATURES } from "../constants";
 import { formatEUR } from "../format";
 import { featureFact } from "./facts";
-import { classifyMonthlyCostGap, isNoticeable } from "./magnitude";
+import {
+  classifyMonthlyCostGap,
+  comparableMeasurements,
+  isNoticeable,
+} from "./magnitude";
 import {
   inSentence,
   joinCapped,
@@ -241,7 +245,23 @@ function priorityDeficit(
    * against 491 L" tells the reader what they're giving up, where a score
    * only tells them that they're giving something up.
    */
-  const measured = reasoning.measurements.find((fact) => fact.scored);
+  const scored = reasoning.measurements.find((fact) => fact.scored);
+
+  /*
+   * Only when the rival's figure is the same quantity and genuinely better.
+   * A leader in a category that averages a measurement with equipment can
+   * lead on the equipment while having the smaller boot, and "has the better
+   * boot space: 400 L against this car's 500 L" is then a false statement.
+   */
+  const measured =
+    scored &&
+    behind.numeric &&
+    comparableMeasurements(scored, behind.numeric) &&
+    (scored.lowerIsBetter
+      ? behind.numeric.value < scored.value
+      : behind.numeric.value > scored.value)
+      ? scored
+      : null;
 
   const gained = featureGap(
     evaluation.vehicle,

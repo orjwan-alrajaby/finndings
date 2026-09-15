@@ -21,6 +21,7 @@ import { formatNumber } from "../format";
 import {
   classifyMeasurementGap,
   classifyScoreGap,
+  comparableMeasurements,
   isEffectivelyLevel,
 } from "./magnitude";
 
@@ -226,7 +227,12 @@ export function measurementFacts(
   const scored = breakdown.numeric;
 
   if (scored) {
-    const rivalNumeric = breakdown.versus?.numeric ?? null;
+    /* Only a figure of the same kind is the rival's version of this one. */
+    const rivalNumeric =
+      breakdown.versus?.numeric &&
+      comparableMeasurements(scored, breakdown.versus.numeric)
+        ? breakdown.versus.numeric
+        : null;
 
     facts.push({
       label: scored.label,
@@ -264,7 +270,8 @@ export function measurementFacts(
       ? [
           ...supportingMeasurements(breakdown.priority, rival),
           ...(scored ? [] : headlineMeasurements(breakdown.priority, rival)),
-        ].find((item) => item.label === supporting.label)?.value ?? null
+        ].find((item) => comparableMeasurements(item, supporting))?.value ??
+        null
       : null;
 
     const display = supporting.unit
