@@ -132,7 +132,11 @@ export function Preview({
                 </p>
             </div>
 
-            <LineUp cars={cars} winnerId={result?.recommendation.winner.id} />
+            <LineUp
+                cars={cars}
+                winnerId={result?.recommendation.winner.id}
+                contractType={preferences.contractType}
+            />
 
             {result ? (
                 <MiniAdvice

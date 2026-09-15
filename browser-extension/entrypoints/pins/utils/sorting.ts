@@ -1,4 +1,6 @@
+import { advertisedMonthlyPrice } from "@/lib/reasoning-engine";
 import type { FitAnalysis } from "@/lib/reasoning-engine/fit";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
 /**
@@ -28,16 +30,21 @@ const FIT_ORDER = ["strong", "good", "partial", "limited", "unknown"];
  * analysed, which is what happens before the reader has configured Lens —
  * sorting by a band nobody has been shown would be ordering the list by a
  * secret.
+ *
+ * "Cheapest" orders by the price for the reader's own contract — the one the
+ * cards show — so a business reader's list is never sorted by private prices
+ * it doesn't display. Cars with no published price go last.
  */
 export function sortCars(
     cars: PinnedFinnCar[],
     key: SortKey,
     analyses: Map<number, FitAnalysis>,
+    contractType: ContractType = "private",
 ): PinnedFinnCar[] {
     const next = [...cars];
 
     const priceOf = (car: PinnedFinnCar) =>
-        car.pricing?.customerMonthly?.price || Number.POSITIVE_INFINITY;
+        advertisedMonthlyPrice(car, contractType) ?? Number.POSITIVE_INFINITY;
 
     const rankOf = (car: PinnedFinnCar) => {
         const level = analyses.get(car.id)?.overall.level;
@@ -87,18 +94,19 @@ export function bestMatch(
     return best;
 }
 
-/** The lowest published subscription price in the set. */
+/** The lowest published subscription price in the set, for one contract. */
 export function cheapestPrice(
     cars: PinnedFinnCar[],
-): { price: number; name: string } | null {
-    let cheapest: { price: number; name: string } | null = null;
+    contractType: ContractType = "private",
+): { id: number; price: number; name: string } | null {
+    let cheapest: { id: number; price: number; name: string } | null = null;
 
     for (const car of cars) {
-        const price = car.pricing?.customerMonthly?.price;
+        const price = advertisedMonthlyPrice(car, contractType);
 
         if (!price) continue;
         if (!cheapest || price < cheapest.price) {
-            cheapest = { price, name: car.name };
+            cheapest = { id: car.id, price, name: car.name };
         }
     }
 

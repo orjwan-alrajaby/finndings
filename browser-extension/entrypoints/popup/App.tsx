@@ -11,6 +11,8 @@ import Tabs from "./components/Tabs";
 import { MetricCard } from "./components/MetricCard";
 import type { PinnedFinnCar } from "@/lib/types";
 import { openBrowserTab } from "@/lib/utils";
+import { loadLensSettings } from "@/lib/reasoning-engine";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 
 async function checkIfActiveTabIsFinn() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
@@ -45,6 +47,8 @@ type AppState = {
   isFinnPage: boolean;
   detectedCarsCount: number;
   pinnedCars: Record<number, PinnedFinnCar>;
+  /** Which of FINN's two prices the pinned previews quote. */
+  contractType: ContractType;
 };
 
 function App() {
@@ -53,6 +57,7 @@ function App() {
     isFinnPage: false,
     detectedCarsCount: 0,
     pinnedCars: {},
+    contractType: "private",
   });
 
   useEffect(() => {
@@ -92,6 +97,16 @@ function App() {
     };
 
     browser.runtime.onMessage.addListener(handleRuntimeMessage);
+
+    void loadLensSettings()
+      .then(({ preferences }) => {
+        if (alive) {
+          setState((prev) => ({ ...prev, contractType: preferences.contractType }));
+        }
+      })
+      .catch(() => {
+        // Left on the private price, which is the one FINN shows by default.
+      });
 
     (async () => {
       try {
@@ -283,6 +298,7 @@ function App() {
           <Tabs
             pinnedCount={pinnedCarsCount}
             pinnedCars={state.pinnedCars}
+            contractType={state.contractType}
             accent={hasPinned}
           />
 

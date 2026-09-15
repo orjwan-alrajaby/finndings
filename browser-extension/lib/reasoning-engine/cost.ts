@@ -1,7 +1,8 @@
-import type { PinnedFinnCar } from "@/lib/types";
+import type { FinnCar, PinnedFinnCar } from "@/lib/types";
 import type {
   BudgetPartition,
   BudgetStatus,
+  ContractType,
   CostAnalysis,
   CostBreakdown,
   CostFact,
@@ -24,23 +25,33 @@ const isPositive = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
 /**
- * Picks the advertised monthly price for the contract the user is evaluating.
+ * FINN's advertised monthly price for one contract, or null when FINN didn't
+ * publish one.
  *
- * There is no per-vehicle contract field in the FINN data, so the user's
- * `contractType` preference is what decides. Nothing else about the
- * recommendation branches on it.
+ * There is no per-vehicle contract field in the FINN data, so the reader's
+ * `contractType` preference is what decides. Exported because every surface
+ * that quotes a car's price — the pinned cards, the popup, a configuration's
+ * spec line — has to quote the same one the bill is built on, or the page
+ * shows a private price above a business total.
  */
-function subscriptionPrice(
-  vehicle: PinnedFinnCar,
-  preferences: LensPreferences,
+export function advertisedMonthlyPrice(
+  vehicle: Pick<FinnCar, "pricing">,
+  contractType: ContractType,
 ): number | null {
   const price =
-    preferences.contractType === "business"
+    contractType === "business"
       ? vehicle.pricing?.businessMonthly?.price
       : vehicle.pricing?.customerMonthly?.price;
 
   // extractPricing falls back to 0 for an absent price, so 0 means "not supplied".
   return isPositive(price) ? price : null;
+}
+
+function subscriptionPrice(
+  vehicle: PinnedFinnCar,
+  preferences: LensPreferences,
+): number | null {
+  return advertisedMonthlyPrice(vehicle, preferences.contractType);
 }
 
 /**

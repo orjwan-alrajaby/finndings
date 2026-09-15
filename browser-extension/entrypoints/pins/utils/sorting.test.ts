@@ -18,13 +18,19 @@ import { bestMatch, cheapestPrice, sortCars } from "./sorting";
 
 function car(
     id: number,
-    over: { name?: string; price?: number; pinnedAt?: string } = {},
+    over: {
+        name?: string;
+        price?: number;
+        businessPrice?: number;
+        pinnedAt?: string;
+    } = {},
 ): PinnedFinnCar {
     return {
         ...makeCar({
             id,
             name: over.name ?? `Car ${id}`,
             customerMonthly: over.price ?? 500,
+            businessMonthly: over.businessPrice ?? 420,
         }),
         pinnedAt: over.pinnedAt ?? "",
     };
@@ -66,6 +72,25 @@ describe("sortCars", () => {
     it("sorts by price and by name", () => {
         expect(ids(sortCars(cars, "price", new Map()))).toEqual([2, 3, 1]);
         expect(ids(sortCars(cars, "name", new Map()))).toEqual([2, 3, 1]);
+    });
+
+    it("sorts by the price for the reader's own contract", () => {
+        /* Private order is 2, 3, 1; business prices run the other way. */
+        const mixed = [
+            car(1, { price: 700, businessPrice: 300 }),
+            car(2, { price: 500, businessPrice: 650 }),
+            car(3, { price: 600, businessPrice: 400 }),
+        ];
+
+        expect(ids(sortCars(mixed, "price", new Map(), "business"))).toEqual([
+            1, 3, 2,
+        ]);
+    });
+
+    it("puts a car with no published price last when sorting by price", () => {
+        const withUnpriced = [car(4, { price: 0 }), ...cars];
+
+        expect(ids(sortCars(withUnpriced, "price", new Map())).at(-1)).toBe(4);
     });
 
     it("sorts by fit, strongest first", () => {
@@ -123,7 +148,19 @@ describe("cheapestPrice", () => {
             car(2, { name: "Aster", price: 450 }),
         ]);
 
-        expect(cheapest).toEqual({ price: 450, name: "Aster" });
+        expect(cheapest).toEqual({ id: 2, price: 450, name: "Aster" });
+    });
+
+    it("reads the business price for a business reader", () => {
+        const cheapest = cheapestPrice(
+            [
+                car(1, { name: "Zephyr", price: 700, businessPrice: 380 }),
+                car(2, { name: "Aster", price: 450, businessPrice: 410 }),
+            ],
+            "business",
+        );
+
+        expect(cheapest).toEqual({ id: 1, price: 380, name: "Zephyr" });
     });
 
     it("is null when nothing is priced", () => {

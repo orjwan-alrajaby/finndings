@@ -2,9 +2,14 @@ import { Check, ExternalLink, Eye, Trash2 } from "lucide-react";
 
 import { CarSilhouette } from "@/components/CarSilhouette";
 import { BandChip } from "@/components/FitAnalysisView/parts";
-import { configurationDetail, configurationName } from "@/lib/car-labels";
+import {
+    configurationDetail,
+    configurationName,
+    perMonth,
+} from "@/lib/car-labels";
 import type { FitBand } from "@/lib/reasoning-engine/fit";
-import { formatEUR } from "@/lib/reasoning-engine";
+import { advertisedMonthlyPrice, formatEUR } from "@/lib/reasoning-engine";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
 /**
@@ -34,6 +39,7 @@ export function CarCard({
     leading,
     cheapest,
     priceGap,
+    contractType,
     selected,
     checked,
     selecting,
@@ -51,6 +57,8 @@ export function CarCard({
     cheapest: boolean;
     /** What this costs over the cheapest, in euros. Null when either is unknown. */
     priceGap: number | null;
+    /** Which of FINN's two prices to show: the reader's own contract. */
+    contractType: ContractType;
     /** True when this is the car whose analysis is open. */
     selected: boolean;
     /** True when it is ticked for a bulk unpin. */
@@ -74,7 +82,7 @@ export function CarCard({
     onToggleChecked: () => void;
     onUnpin: () => void;
 }) {
-    const price = car.pricing?.customerMonthly?.price;
+    const price = advertisedMonthlyPrice(car, contractType);
 
     return (
         <li
@@ -184,7 +192,7 @@ export function CarCard({
                             <span className="text-lg font-black text-finn-black tabular-nums">
                                 {formatEUR(price)}
                                 <span className="text-[11px] font-bold text-finn-iron">
-                                    /mo
+                                    {perMonth(contractType)}
                                 </span>
                             </span>
                         ) : (

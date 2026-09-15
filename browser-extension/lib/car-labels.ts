@@ -1,5 +1,10 @@
-import { formatEUR, formatNumber } from "@/lib/reasoning-engine";
+import {
+    advertisedMonthlyPrice,
+    formatEUR,
+    formatNumber,
+} from "@/lib/reasoning-engine";
 import type { FitPriority } from "@/lib/reasoning-engine/fit";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
 
 /**
@@ -27,6 +32,19 @@ export function configurationName(car: FinnCar): string {
     return named || car.engine || `Configuration ${car.id}`;
 }
 
+/**
+ * What follows a monthly price: "/mo", or "/mo · business".
+ *
+ * FINN advertises two prices for every car and every Lens price is the one
+ * for the contract the reader chose. The private price is the one FINN shows
+ * by default, so it needs no label; the business one does, or a reader
+ * comparing it with the price on FINN's own listing sees two numbers for one
+ * car and no reason why.
+ */
+export function perMonth(contractType: ContractType): string {
+    return contractType === "business" ? "/mo · business" : "/mo";
+}
+
 /** The figures a reader tells configurations apart by. */
 export function configurationDetail(
     car: FinnCar,
@@ -34,7 +52,13 @@ export function configurationDetail(
         withPrice = true,
         withPower = true,
         withFuel = true,
+        contractType = "private",
     }: {
+        /**
+         * Whose price "from €…/mo" quotes. Pass the reader's own wherever the
+         * line sits beside a cost built on it, so the two can't disagree.
+         */
+        contractType?: ContractType;
         /**
          * Drop the price where the surface already shows it. The pinned list
          * gives every car its price in its own column, and repeating it inside
@@ -72,13 +96,15 @@ export function configurationDetail(
             ? `${formatNumber(Number(car.electric.range))} km range`
             : null;
 
-    const price = car.pricing?.customerMonthly?.price;
+    const price = advertisedMonthlyPrice(car, contractType);
 
     return [
         withPower && car.power?.inHp ? `${car.power.inHp} PS` : null,
         withFuel ? car.fuelType : null,
         range,
-        withPrice && price ? `from ${formatEUR(price)}/mo` : null,
+        withPrice && price
+            ? `from ${formatEUR(price)}${perMonth(contractType)}`
+            : null,
     ]
         .filter(Boolean)
         .join(" · ");

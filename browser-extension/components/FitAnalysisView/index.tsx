@@ -58,6 +58,7 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
                             {configurationDetail(vehicle, {
                                 withPower: false,
                                 withFuel: false,
+                                contractType: analysis.preferences.contractType,
                             })}
                         </p>
                     </div>

@@ -1,6 +1,7 @@
 import { configurationDetail, configurationName } from "@/lib/car-labels";
 import { demoCarSummary } from "@/lib/demo-cars";
-import { formatEUR } from "@/lib/reasoning-engine";
+import { advertisedMonthlyPrice, formatEUR } from "@/lib/reasoning-engine";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
 /**
@@ -13,8 +14,11 @@ import type { PinnedFinnCar } from "@/lib/types";
 export function LineUp({
     cars,
     winnerId,
+    contractType,
 }: {
     cars: PinnedFinnCar[];
+    /** The contract set on the driving screen, whose price the advice bills. */
+    contractType: ContractType;
     /** Marked, so the argument that follows starts from a known place. */
     winnerId?: number;
 }) {
@@ -27,6 +31,7 @@ export function LineUp({
             <div className="grid gap-3 sm:grid-cols-3">
                 {cars.map((car) => {
                     const winner = car.id === winnerId;
+                    const price = advertisedMonthlyPrice(car, contractType);
 
                     return (
                         <div
@@ -53,7 +58,8 @@ export function LineUp({
                             </p>
 
                             <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                                {configurationDetail(car)}
+                                {/* The price has its own line below. */}
+                                {configurationDetail(car, { withPrice: false })}
                             </p>
 
                             <p className="mt-2 text-[11px] leading-4 text-finn-iron">
@@ -90,12 +96,16 @@ export function LineUp({
                                 )}
                             </dl>
 
-                            <p className="mt-2.5 text-xs font-black text-finn-black">
-                                {formatEUR(car.pricing.customerMonthly.price)}
-                                <span className="font-bold text-finn-iron">
-                                    /mo subscription
-                                </span>
-                            </p>
+                            {price != null && (
+                                <p className="mt-2.5 text-xs font-black text-finn-black">
+                                    {formatEUR(price)}
+                                    <span className="font-bold text-finn-iron">
+                                        {contractType === "business"
+                                            ? "/mo business subscription"
+                                            : "/mo subscription"}
+                                    </span>
+                                </p>
+                            )}
                         </div>
                     );
                 })}

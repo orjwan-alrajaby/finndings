@@ -9,14 +9,18 @@ import {
     sortAndSlicePinnedCars,
 } from "@/lib/utils";
 import type { PinnedFinnCar } from "@/lib/types";
+import { advertisedMonthlyPrice } from "@/lib/reasoning-engine";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 
 type TabsType = {
     pinnedCount: number;
     pinnedCars: Record<number, PinnedFinnCar>;
+    /** Which of FINN's two prices the previews quote. */
+    contractType: ContractType;
     accent?: boolean;
 };
 
-function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
+function Tabs({ pinnedCount, pinnedCars, contractType, accent }: TabsType) {
     return (
         <RadixTabs.Root
             defaultValue="pinned"
@@ -77,10 +81,10 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                                          */
                                         key={car.id}
                                         name={car.name}
-                                        price={car.pricing?.customerMonthly?.price}
+                                        price={advertisedMonthlyPrice(car, contractType)}
+                                        contractType={contractType}
                                         url={car?.url}
                                         imgUrl={car?.images?.thumbnail}
-                                        period={"month"}
                                         pinnedAt={calculateTimeAgo(car.pinnedAt)}
                                         accent={accent}
                                     />

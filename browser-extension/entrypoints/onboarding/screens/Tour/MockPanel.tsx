@@ -101,6 +101,7 @@ export function MockPanel({
                         {configurationDetail(vehicle, {
                             withPower: false,
                             withFuel: false,
+                            contractType: analysis.preferences.contractType,
                         })}
                     </p>
                 </div>

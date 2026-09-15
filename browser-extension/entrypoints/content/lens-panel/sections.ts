@@ -540,6 +540,7 @@ function fitHeader(analysis: FitAnalysis): HTMLElement {
         text: configurationDetail(vehicle, {
           withPower: false,
           withFuel: false,
+          contractType: analysis.preferences.contractType,
         }),
       }),
 

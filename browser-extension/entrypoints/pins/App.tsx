@@ -7,6 +7,7 @@ import { FitAnalysisView } from "@/components/FitAnalysisView";
 import { PageHeader } from "@/components/PageHeader";
 import { UsingDefaultsNotice } from "@/components/UsingDefaultsNotice";
 import {
+    advertisedMonthlyPrice,
     hasSavedLensSettings,
     loadLensSettings,
 } from "@/lib/reasoning-engine";
@@ -65,7 +66,7 @@ export default function PinsPage() {
     };
 
     useEffect(() => {
-        void (async () => {
+        const readSettings = async () => {
             const [saved, isConfigured] = await Promise.all([
                 loadLensSettings(),
                 hasSavedLensSettings().catch(() => false),
@@ -73,9 +74,32 @@ export default function PinsPage() {
 
             setSettings(saved);
             setConfigured(isConfigured);
+        };
 
+        void (async () => {
+            await readSettings();
             await refresh();
         })();
+
+        /*
+         * Settings saved in another tab reach this one. Every band on the
+         * board and every price on it — which contract's price, since
+         * business and private differ — is a reading of them, and a board
+         * left on the old ones disagrees with the Settings page the reader
+         * has just closed.
+         */
+        const onStorageChanged = (
+            changes: Record<string, unknown>,
+            areaName: string,
+        ) => {
+            if (areaName !== "local") return;
+
+            if (SETTINGS_KEYS.some((key) => key in changes)) {
+                void readSettings();
+            }
+        };
+
+        browser.storage.onChanged.addListener(onStorageChanged);
 
         /*
          * The set can change under this page — a pin on finn.com, or a
@@ -90,8 +114,15 @@ export default function PinsPage() {
 
         return () => {
             browser.runtime.onMessage.removeListener(listener);
+            browser.storage.onChanged.removeListener(onStorageChanged);
         };
     }, []);
+
+    /*
+     * Which of FINN's two prices every figure on this page quotes: the one
+     * for the reader's own contract, which is also what the analysis bills.
+     */
+    const contractType = settings?.preferences.contractType ?? "private";
 
     /*
      * Every car analysed once, and reused by both the list and the open
@@ -123,8 +154,8 @@ export default function PinsPage() {
     }, [cars, settings]);
 
     const sorted = useMemo(
-        () => (cars ? sortCars(cars, sort, analyses) : []),
-        [cars, sort, analyses],
+        () => (cars ? sortCars(cars, sort, analyses, contractType) : []),
+        [cars, sort, analyses, contractType],
     );
 
     const open = sorted.find((car) => car.id === openId) ?? null;
@@ -206,10 +237,13 @@ export default function PinsPage() {
         [cars, analyses],
     );
 
-    const floor = useMemo(() => cheapestPrice(cars ?? []), [cars]);
+    const floor = useMemo(
+        () => cheapestPrice(cars ?? [], contractType),
+        [cars, contractType],
+    );
 
     const gapFor = (car: PinnedFinnCar): number | null => {
-        const price = car.pricing?.customerMonthly?.price;
+        const price = advertisedMonthlyPrice(car, contractType);
 
         if (!price || !floor) return null;
 
@@ -309,7 +343,11 @@ export default function PinsPage() {
 
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
                     {cars.length > 0 && (
-                        <SetSummary cars={cars} analyses={analyses} />
+                        <SetSummary
+                            cars={cars}
+                            analyses={analyses}
+                            contractType={contractType}
+                        />
                     )}
 
                     {!configured && cars.length > 0 && (
@@ -465,11 +503,13 @@ export default function PinsPage() {
                                                     ?.overall ?? null
                                             }
                                             leading={car.id === leader?.car.id}
+                                            contractType={contractType}
                                             cheapest={
-                                                car.pricing?.customerMonthly
-                                                    ?.price != null &&
-                                                car.pricing.customerMonthly
-                                                    .price === floor?.price
+                                                floor != null &&
+                                                advertisedMonthlyPrice(
+                                                    car,
+                                                    contractType,
+                                                ) === floor.price
                                             }
                                             priceGap={gapFor(car)}
                                             selected={car.id === openId}
@@ -538,6 +578,13 @@ export default function PinsPage() {
  * height, all three move together.
  */
 const STUCK = 152;
+
+/** The stored settings a band or a price on this page is read from. */
+const SETTINGS_KEYS = [
+    "finnLensPreferences",
+    "finnLensPriorities",
+    "finnLensCategoryFeatures",
+];
 
 /**
  * The system setting, honoured here rather than in CSS: there is no media

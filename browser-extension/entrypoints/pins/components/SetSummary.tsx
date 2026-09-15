@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
-import { formatEUR } from "@/lib/reasoning-engine";
+import { perMonth } from "@/lib/car-labels";
+import { advertisedMonthlyPrice, formatEUR } from "@/lib/reasoning-engine";
 import type { FitAnalysis } from "@/lib/reasoning-engine/fit";
+import type { ContractType } from "@/lib/reasoning-engine/types";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { bestMatch, cheapestPrice } from "../utils/sorting";
@@ -31,19 +33,22 @@ import { bestMatch, cheapestPrice } from "../utils/sorting";
 export function SetSummary({
     cars,
     analyses,
+    contractType,
 }: {
     cars: PinnedFinnCar[];
     analyses: Map<number, FitAnalysis>;
+    /** Which of FINN's two prices "cheapest" is measured on. */
+    contractType: ContractType;
 }) {
     const best = bestMatch(cars, analyses);
-    const cheapest = cheapestPrice(cars);
+    const cheapest = cheapestPrice(cars, contractType);
 
     return (
         <section className="overflow-hidden rounded-[28px] bg-finn-highlight-navy px-6 py-6 text-white sm:px-8 sm:py-7">
             <h1 className="text-3xl font-black tracking-tight">Pinned cars</h1>
 
             <p className="mt-2.5 max-w-2xl text-sm leading-6 text-white/75">
-                {standing(cars, best, cheapest)}
+                {standing(cars, best, cheapest, contractType)}
             </p>
 
             <dl className="mt-6 grid gap-x-8 gap-y-4 border-t border-white/15 pt-5 sm:grid-cols-3">
@@ -71,7 +76,9 @@ export function SetSummary({
                 <Figure
                     label="Cheapest"
                     value={
-                        cheapest ? `${formatEUR(cheapest.price)}/mo` : "—"
+                        cheapest
+                            ? `${formatEUR(cheapest.price)}${perMonth(contractType)}`
+                            : "—"
                     }
                     detail={cheapest?.name ?? "No prices published"}
                 />
@@ -94,6 +101,7 @@ function standing(
     cars: PinnedFinnCar[],
     best: ReturnType<typeof bestMatch>,
     cheapest: ReturnType<typeof cheapestPrice>,
+    contractType: ContractType,
 ): ReactNode {
     if (cars.length === 1) {
         return "One car kept. Pin a second and Lens can tell you which of them fits you better — and what the difference costs.";
@@ -103,7 +111,7 @@ function standing(
         return "Everything you kept while browsing. FINN has published no equipment for these yet, so there is nothing to rank them on — the prices below are still yours to compare.";
     }
 
-    const leaderPrice = best.car.pricing?.customerMonthly?.price;
+    const leaderPrice = advertisedMonthlyPrice(best.car, contractType);
     const gap =
         leaderPrice && cheapest ? leaderPrice - cheapest.price : null;
 
@@ -123,9 +131,9 @@ function standing(
                     more than {cheapest?.name}, the cheapest of the{" "}
                     {cars.length}.
                 </>
-            ) : (
+            ) : gap != null ? (
                 <> It is also the cheapest of the {cars.length}.</>
-            )}
+            ) : null}
         </>
     );
 }

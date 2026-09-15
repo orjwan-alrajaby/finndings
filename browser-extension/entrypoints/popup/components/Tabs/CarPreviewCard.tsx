@@ -1,5 +1,9 @@
 import { ChevronRight } from "lucide-react";
 
+import { perMonth } from "@/lib/car-labels";
+import { formatEUR } from "@/lib/reasoning-engine";
+import type { ContractType } from "@/lib/reasoning-engine/types";
+
 /**
  * One pinned car, in the popup's list.
  *
@@ -17,15 +21,19 @@ import { ChevronRight } from "lucide-react";
 export function CarPreviewCard({
     name,
     price,
-    period,
+    contractType,
     url,
     imgUrl,
     pinnedAt,
     accent,
 }: {
     name: string;
-    price: number;
-    period: string;
+    /**
+     * FINN's price for the reader's contract. Null when FINN published none
+     * for it, which is said rather than printed as €0.
+     */
+    price: number | null;
+    contractType: ContractType;
     /** Absent for cars FINN never gave us a page for. */
     url?: string;
     imgUrl: string;
@@ -60,14 +68,18 @@ export function CarPreviewCard({
                     {name}
                 </h4>
 
-                <p className="mt-0.5 font-mono text-xs font-bold text-finn-black">
-                    €{price?.toLocaleString("en-GB")}
-                    {period ? (
-                        <span className="font-sans font-normal text-finn-iron">{` / ${period}`}</span>
-                    ) : (
-                        ""
-                    )}
-                </p>
+                {price != null ? (
+                    <p className="mt-0.5 font-mono text-xs font-bold text-finn-black">
+                        {formatEUR(price)}
+                        <span className="font-sans font-normal text-finn-iron">
+                            {perMonth(contractType)}
+                        </span>
+                    </p>
+                ) : (
+                    <p className="mt-0.5 text-xs text-finn-iron">
+                        Price not published
+                    </p>
+                )}
 
                 <p className="mt-0.5 text-[11px] text-finn-iron">
                     pinned {pinnedAt}

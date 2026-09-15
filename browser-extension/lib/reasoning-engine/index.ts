@@ -73,6 +73,7 @@ import { formatEUR } from "./format";
 /* -------------------------------------------------------------------------- */
 
 export {
+  advertisedMonthlyPrice,
   buildCostAnalysis,
   calculateCost,
   partitionByBudget,
