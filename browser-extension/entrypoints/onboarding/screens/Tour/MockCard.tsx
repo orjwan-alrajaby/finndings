@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { RefObject } from "react";
 import { Pin } from "lucide-react";
 
 import {
@@ -12,16 +12,7 @@ import { formatEUR } from "@/lib/reasoning-engine";
 import type { FitLevel } from "@/lib/reasoning-engine/fit";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import {
-    BrandDisc,
-    CarSilhouette,
-    FitMeter,
-    Marker,
-    type StepStatus,
-} from "./parts";
-
-/** Which of the card's two Lens controls is being pointed at. */
-export type CardControl = "pin" | "badge";
+import { BrandDisc, CarSilhouette, FitMeter } from "./parts";
 
 /**
  * One of FINN's listing cards, with Lens on it, doing what it really does.
@@ -60,10 +51,8 @@ export function MockCard({
     open,
     onTogglePin,
     onOpenPanel,
-    markers,
-    focus,
-    spotlight,
-    callout,
+    pinRef,
+    badgeRef,
 }: {
     car: PinnedFinnCar;
     /** null while the reader has chosen no priorities — the neutral pill. */
@@ -75,75 +64,38 @@ export function MockCard({
     onTogglePin: () => void;
     onOpenPanel: () => void;
     /**
-     * The state of each numbered mark, on the one card that carries them.
-     *
-     * Absent on the other cards: they show the controls, unlabelled, to say
-     * that these appear on every listing rather than on this one.
+     * Handed to the one card the guide walks, so its two controls are things
+     * the guide can point at. Absent on the other two, which are here to say
+     * that these controls are on every listing rather than on this one.
      */
-    markers?: { pin: StepStatus; badge: StepStatus };
-    /** The control the reader is currently reading about, if any. */
-    focus?: CardControl | null;
-    /**
-     * The control the tour is standing on, if this is the card it is standing
-     * on. Lifts the whole card clear of the tour's scrim and sets the named
-     * control glowing until it has been worked.
-     */
-    spotlight?: CardControl | null;
-    /** The tour's bubble, which positions itself against the photo block. */
-    callout?: ReactNode;
+    pinRef?: RefObject<HTMLButtonElement | null>;
+    badgeRef?: RefObject<HTMLButtonElement | null>;
 }) {
     const price = car.pricing?.customerMonthly?.price;
     const was = car.pricing?.customerMonthly?.oldPrice;
 
-    const ring = (control: CardControl) =>
-        [
-            focus === control
-                ? "ring-4 ring-finn-accent-blue/40 ring-offset-2 ring-offset-white"
-                : "",
-            /* The halo that does not stop until the control has been used —
-               see `finn-lens-beckon`. This is the tour pointing. */
-            spotlight === control ? "finn-lens-beckon" : "",
-        ].join(" ");
-
     return (
         <article
             className={[
-                /*
-                 * The padding is constant and the plate is not, so the tour
-                 * can light a card without anything on the row moving.
-                 */
+                /* The padding is constant and the plate is not, so the open
+                   card can be lifted without anything on the row moving. */
                 "relative flex flex-col rounded-[18px] p-2 transition",
-                spotlight
-                    ? /* Above the tour's scrim, and given a ground of its own
-                         while it is up there — a chromeless card lifted over a
-                         scrim would show the dimmed page straight through its
-                         own text. */
-                      "z-30 bg-white shadow-[0_16px_40px_-12px_rgba(0,0,0,0.35)]"
-                    : "",
                 open ? "bg-white shadow-md ring-1 ring-finn-accent-blue/40" : "",
             ].join(" ")}
         >
             {/*
               * The photograph's block, and the only positioned thing here:
               * `cardPhoto` finds this on the real page and `anchor` makes sure
-              * it can hold an absolutely positioned child. Both controls and
-              * both markers hang off it.
+              * it can hold an absolutely positioned child. Both controls hang
+              * off it.
               */}
             <div className="relative">
                 <div className="relative aspect-5/3 min-h-[120px] overflow-hidden rounded bg-finn-pale-blue">
                     <CarSilhouette className="absolute inset-0 m-auto h-auto w-[78%] text-finn-accent-blue/30" />
                 </div>
 
-                {markers && (
-                    <Marker
-                        index={1}
-                        status={markers.pin}
-                        focused={focus === "pin"}
-                        className="-top-2.5 -right-2.5"
-                    />
-                )}
-
                 <button
+                    ref={pinRef}
                     type="button"
                     onClick={onTogglePin}
                     aria-pressed={pinned}
@@ -152,9 +104,7 @@ export function MockCard({
                             ? `Remove ${car.name} from comparison`
                             : `Pin ${car.name} for comparison`
                     }
-                    className={[pinButtonClasses(pinned), ring("pin")].join(
-                        " ",
-                    )}
+                    className={pinButtonClasses(pinned)}
                 >
                     <Pin
                         aria-hidden="true"
@@ -162,16 +112,8 @@ export function MockCard({
                     />
                 </button>
 
-                {markers && (
-                    <Marker
-                        index={2}
-                        status={markers.badge}
-                        focused={focus === "badge"}
-                        className="-bottom-2.5 -left-2.5"
-                    />
-                )}
-
                 <button
+                    ref={badgeRef}
                     type="button"
                     onClick={onOpenPanel}
                     aria-label={
@@ -182,7 +124,6 @@ export function MockCard({
                     className={[
                         FIT_BADGE_BASE,
                         fitBadgeStateClass(level),
-                        ring("badge"),
                     ].join(" ")}
                 >
                     <BrandDisc size={16} />
@@ -201,13 +142,6 @@ export function MockCard({
                     </span>
                 </button>
 
-                {/*
-                  * Hung on the photo block rather than on the card, because
-                  * the photo block is what both controls are pinned to — so
-                  * "just to the right of here" and "just below here" are the
-                  * pin and the pill without either position being measured.
-                  */}
-                {callout}
             </div>
 
             {/* FINN's own text block: no panel, no rule, just a grid. */}

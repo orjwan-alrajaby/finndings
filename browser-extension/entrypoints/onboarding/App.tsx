@@ -79,22 +79,6 @@ export default function OnboardingPage() {
             DEFAULT_CATEGORY_FEATURES,
         );
 
-    /**
-     * How far through the tour on screen two the reader has got.
-     *
-     * The screen owns the idea; this owns the door. Nothing here knows what a
-     * "control" is — only that there are three of them and how many have been
-     * worked, which is all the header needs to decide whether the way on is
-     * open. See `screens/Tour`.
-     */
-    const [tourTried, setTourTried] = useState(0);
-    const [tourTotal, setTourTotal] = useState(3);
-
-    const onTourProgress = useCallback((tried: number, total: number) => {
-        setTourTried(tried);
-        setTourTotal(total);
-    }, []);
-
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(false);
 
@@ -224,30 +208,19 @@ export default function OnboardingPage() {
         }
 
         if (screen === "tour") {
-            const left = tourTotal - tourTried;
-
+            /*
+             * Nothing held shut here any more.
+             *
+             * This screen used to count the controls the reader had worked and
+             * keep the way on locked until all three were done, which turned a
+             * demonstration into a toll gate and contradicted the rule the rest
+             * of the flow keeps — that setup is a courtesy. The guide is a
+             * guide: read it, skip it, replay it, carry on.
+             */
             return {
                 onBack: () => step(-1),
                 label: "Set up my ranking",
                 onNext: () => step(1),
-                /*
-                 * The one place this flow holds a door shut, and it does it
-                 * with the count rather than a scolding: the reader can see
-                 * exactly what is outstanding and the screen behind is already
-                 * pointing at it. `Skip setup` still leaves — that is the
-                 * whole flow's escape and it is not this screen's to take
-                 * away.
-                 */
-                blockedBecause:
-                    left > 0
-                        ? `Try all three marked controls above to carry on — ${tourTried} of ${tourTotal} done.`
-                        : undefined,
-                /*
-                 * The moment the third control is worked, this is the only
-                 * thing left to do — and the reader's eyes are down on the
-                 * mock, not up here. It goes on asking until they come.
-                 */
-                urging: left === 0,
             };
         }
 
@@ -359,7 +332,6 @@ export default function OnboardingPage() {
                             priorities={priorities}
                             preferences={preferences}
                             categoryFeatures={categoryFeatures}
-                            onProgress={onTourProgress}
                         />
                     )}
 

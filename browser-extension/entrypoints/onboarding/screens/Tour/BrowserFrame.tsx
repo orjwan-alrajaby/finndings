@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -12,7 +12,7 @@ import {
     X,
 } from "lucide-react";
 
-import { BrandDisc, Marker, type StepStatus } from "./parts";
+import { BrandDisc } from "./parts";
 
 /**
  * A browser, drawn around the mock so the controls have somewhere to be.
@@ -33,8 +33,8 @@ import { BrandDisc, Marker, type StepStatus } from "./parts";
  * before the address bar. Every one of those is inert. They are here to be
  * recognised, not used.
  *
- * The one exception is the Lens button, which is the third annotated control
- * rather than chrome: it is where every other surface of this product is
+ * The one exception is the Lens button, which is the third of the controls
+ * the guide walks rather than chrome: it is where every other surface of this product is
  * reached from, and a reader who finishes setup without knowing that has an
  * extension they can only find by accident.
  *
@@ -52,43 +52,18 @@ const TAB_STRIP = "#e3e5e8";
 
 export function BrowserFrame({
     children,
-    lensFocused,
     lensOpen,
+    lensRef,
     onLensClick,
     popover,
-    callout,
-    lensSpotlit,
-    lensStatus = "upcoming",
-    scrim,
 }: {
     children: ReactNode;
-    /** True while the reader is reading the paragraph about the toolbar. */
-    lensFocused?: boolean;
     lensOpen?: boolean;
+    /** Handed in so the guide's last step has something to point at. */
+    lensRef?: RefObject<HTMLButtonElement | null>;
     onLensClick: () => void;
     /** The popup replica, shown hanging under the button when open. */
     popover?: ReactNode;
-    /**
-     * The tour's bubble for the menu step, drawn over the page.
-     *
-     * Inside the frame rather than beside it. It lived in the margin for a
-     * while, which fitted on a wide monitor and on a 1440 one put it hard
-     * against the edge of the screen with its own corner clipped off — the
-     * page had run out of room and the bubble was the thing paying for it.
-     */
-    callout?: ReactNode;
-    /** True while the tour is standing on the toolbar button. */
-    lensSpotlit?: boolean;
-    /** How far the reader has got with the toolbar step. */
-    lensStatus?: StepStatus;
-    /**
-     * Dims the page while the tour is running.
-     *
-     * Only the page — never the chrome. The toolbar is where step three's
-     * control lives, and a scrim that covered it would put the tour's own
-     * target behind a curtain.
-     */
-    scrim?: boolean;
 }) {
     return (
         <div
@@ -179,35 +154,20 @@ export function BrowserFrame({
                         className="h-4 w-4 text-finn-iron/50"
                     />
 
-                    <span className="relative">
-                        {/* Below the button rather than over it. A marker on
-                            top of the mark hides the one thing a reader has
-                            to learn to recognise. */}
-                        <Marker
-                            index={3}
-                            status={lensStatus}
-                            focused={lensFocused}
-                            className="-right-2 -bottom-2"
-                        />
-
-                        <button
-                            type="button"
-                            onClick={onLensClick}
-                            aria-expanded={lensOpen}
-                            aria-label="Finn Lens, example toolbar button"
-                            className={[
-                                "flex h-8 w-8 items-center justify-center rounded-lg",
-                                "transition hover:bg-finn-cotton",
-                                lensOpen ? "bg-finn-cotton" : "",
-                                lensFocused
-                                    ? "ring-4 ring-finn-accent-blue/40"
-                                    : "",
-                                lensSpotlit ? "finn-lens-beckon" : "",
-                            ].join(" ")}
-                        >
-                            <BrandDisc size={22} />
-                        </button>
-                    </span>
+                    <button
+                        ref={lensRef}
+                        type="button"
+                        onClick={onLensClick}
+                        aria-expanded={lensOpen}
+                        aria-label="Finn Lens, example toolbar button"
+                        className={[
+                            "flex h-8 w-8 items-center justify-center rounded-lg",
+                            "transition hover:bg-finn-cotton",
+                            lensOpen ? "bg-finn-cotton" : "",
+                        ].join(" ")}
+                    >
+                        <BrandDisc size={22} />
+                    </button>
 
                     {popover}
                 </div>
@@ -221,15 +181,6 @@ export function BrowserFrame({
               */}
             <div className="relative max-h-[520px] overflow-hidden bg-finn-snow">
                 {children}
-
-                {scrim && (
-                    <div
-                        aria-hidden="true"
-                        className="absolute inset-0 z-20 bg-finn-black/45"
-                    />
-                )}
-
-                {callout}
             </div>
         </div>
     );
@@ -243,21 +194,6 @@ export function BrowserFrame({
  * pages — so the replica lists exactly those and nothing invented. See
  * `entrypoints/popup/`.
  */
-/**
- * How far down the page the open menu reaches, as a Tailwind top offset.
- *
- * The menu hangs from the toolbar and the tour's bubble has to clear it, and
- * the two are drawn by different components — so the number lives here, next
- * to the thing it measures. Add a row to the menu below and this moves with
- * it.
- *
- * `mt-2` under a toolbar whose icons end a few pixels above the page, plus a
- * `p-3` card of a header, a status line and three rows, comes to a little
- * under 200px. `top-52` is 208, which leaves the bubble a clear gap rather
- * than butting it against the menu's shadow.
- */
-export const MENU_CLEARANCE = "top-52";
-
 export function LensPopover({ pinnedCount }: { pinnedCount: number }) {
     return (
         <div className="absolute top-full right-0 z-50 mt-2 w-60 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-finn-cotton">

@@ -27,6 +27,8 @@
     "@radix-ui/react-toggle-group": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@tailwindcss/postcss": "^4.3.3",
+    "@tour-kit/core": "^2.1.0",
+    "@tour-kit/react": "^2.1.0",
     "html2canvas-pro": "^2.4.1",
     "lucide-react": "^1.41.0",
     "postcss": "^8.5.26",
