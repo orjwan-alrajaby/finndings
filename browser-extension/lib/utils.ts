@@ -76,7 +76,14 @@ export function addTimeToDate(
  * means the message never landed. That is worth a toast rather than a
  * silence: the reader pressed something and nothing happened.
  */
-export const openBrowserTab = async (actionType: ActionType) => {
+export const openBrowserTab = async (
+  actionType: ActionType,
+  /**
+   * The pinned car to open the breakdown of, for `OPEN_PINS_PAGE`. Ignored
+   * by every other page.
+   */
+  options: { carId?: number } = {},
+) => {
   const PAGE_NAME: Record<ActionType, string> = {
     OPEN_COMPARE_PAGE: "compare",
     OPEN_SETTINGS_PAGE: "settings",
@@ -85,7 +92,7 @@ export const openBrowserTab = async (actionType: ActionType) => {
   };
 
   try {
-    await browser.runtime.sendMessage({ type: actionType });
+    await browser.runtime.sendMessage({ type: actionType, ...options });
   } catch {
     toast.error(
       `Something went wrong. Couldn't open the "${PAGE_NAME[actionType]}" page.`,

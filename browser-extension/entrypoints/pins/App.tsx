@@ -1,10 +1,10 @@
 import "@/assets/tailwind.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowLeft, Scale, Settings } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { FitAnalysisView } from "@/components/FitAnalysisView";
-import { NavButton, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { UsingDefaultsNotice } from "@/components/UsingDefaultsNotice";
 import {
     hasSavedLensSettings,
@@ -235,6 +235,40 @@ export default function PinsPage() {
         setOpenId(id);
     };
 
+    /*
+     * Sent here to read one car — the compare page does this when only one
+     * is pinned, since there is nothing to rank yet. The car arrives as
+     * `#car=<id>`, on a fresh tab or on this one already open, and the hash
+     * is cleared once read so that a reload lands back on the board and the
+     * same request made again is still a change.
+     */
+    useEffect(() => {
+        if (cars === null) return;
+
+        const openRequested = () => {
+            const match = /^#car=(\d+)$/.exec(window.location.hash);
+
+            if (!match) return;
+
+            history.replaceState(
+                null,
+                "",
+                window.location.pathname + window.location.search,
+            );
+
+            const id = Number(match[1]);
+
+            if (cars.some((car) => car.id === id)) openCar(id);
+        };
+
+        openRequested();
+        window.addEventListener("hashchange", openRequested);
+
+        return () => {
+            window.removeEventListener("hashchange", openRequested);
+        };
+    }, [cars]);
+
     const remove = async (ids: number[]) => {
         await unpinCars(ids);
 
@@ -266,30 +300,12 @@ export default function PinsPage() {
     return (
         <Tooltip.Provider delayDuration={250}>
             <main className="min-h-screen bg-finn-snow text-finn-black">
-                <PageHeader>
-                    <NavButton
-                        icon={<Scale aria-hidden="true" className="h-4 w-4" />}
-                        label="See my recommendation"
-                        variant="primary"
-                        onClick={() =>
-                            void openBrowserTab("OPEN_COMPARE_PAGE")
-                        }
-                        disabled={cars.length < 2}
-                        title={
-                            cars.length < 2
-                                ? "Pin at least two cars and Lens can rank them"
-                                : undefined
-                        }
-                    />
-
-                    <NavButton
-                        icon={<Settings aria-hidden="true" className="h-4 w-4" />}
-                        label="Settings"
-                        onClick={() =>
-                            void openBrowserTab("OPEN_SETTINGS_PAGE")
-                        }
-                    />
-                </PageHeader>
+                {/*
+                  * One car is enough to go on to the recommendation: the
+                  * compare page has something to say about a lone car too.
+                  * Only an empty set has nothing behind the link.
+                  */}
+                <PageHeader current="pins" pinnedCount={cars.length} />
 
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
                     {cars.length > 0 && (

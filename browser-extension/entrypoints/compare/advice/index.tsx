@@ -1,4 +1,7 @@
+import { Sparkles } from "lucide-react";
+
 import type { PinnedFinnCar } from "@/lib/types";
+import { EmptyState } from "@/components/EmptyState";
 import { FinnLink } from "@/components/FinnLink";
 import { adviceFileName } from "@/lib/advice-pdf";
 
@@ -7,6 +10,7 @@ import { AdviceSidebar } from "./components/AdviceSidebar";
 import { BudgetNotice } from "./components/BudgetNotice";
 import { CostAnalysis } from "./components/CostAnalysis";
 import { EnergyUse } from "./components/EnergyUse";
+import { ExportMasthead } from "./components/ExportMasthead";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
 import { ExportButton, usePdfExport } from "./usePdfExport";
@@ -61,18 +65,15 @@ export function Advice({
 
     if (!advice) {
         return (
-            <div className="px-4 py-12 text-center text-finn-black">
-                <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
-                    <h1 className="text-2xl font-black">
-                        Nothing to evaluate yet
-                    </h1>
-
-                    <p className="mt-2 text-sm leading-6 text-finn-iron">
-                        Pin a few cars on <FinnLink /> and Finn Lens will
-                        compare them here.
-                    </p>
-                </div>
-            </div>
+            <EmptyState
+                icon={<Sparkles aria-hidden="true" className="h-7 w-7" />}
+                title="Nothing to evaluate yet"
+            >
+                <p className="mt-2 text-sm leading-6 text-finn-iron">
+                    Pin a few cars on <FinnLink /> and Finn Lens will compare
+                    them here.
+                </p>
+            </EmptyState>
         );
     }
 
@@ -93,6 +94,8 @@ export function Advice({
             data-exporting={exporting || undefined}
             className="w-full"
         >
+            <ExportMasthead />
+
             <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">

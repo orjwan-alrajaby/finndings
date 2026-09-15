@@ -13,7 +13,17 @@ export default defineBackground(() => {
       void openOrFocusNewPage("/onboarding.html");
     }
     else if (req.type === "OPEN_PINS_PAGE") {
-      void openOrFocusNewPage("/pins.html");
+      /*
+       * A car to open is carried in the hash rather than the query: the pins
+       * tab may already be open, and changing only the hash of an open tab
+       * tells the page without reloading it.
+       */
+      const carId = Number(req.carId);
+
+      void openOrFocusNewPage(
+        "/pins.html",
+        Number.isInteger(carId) && carId > 0 ? `#car=${carId}` : undefined,
+      );
     }
   });
 
@@ -45,7 +55,11 @@ export default defineBackground(() => {
  * Opens compare page if it doesn't exist.
  * Otherwise focuses existing compare tab.
  */
-async function openOrFocusNewPage(url: PublicPath) {
+async function openOrFocusNewPage(
+  url: PublicPath,
+  /** Appended to the page's URL, and set on an existing tab too. */
+  hash?: string,
+) {
   /**
    * Extension page URL.
    *
@@ -76,6 +90,12 @@ async function openOrFocusNewPage(url: PublicPath) {
       existingTab.id,
       {
         active: true,
+        /*
+         * Only the hash changes, so the page stays loaded and hears about
+         * it through `hashchange`. The query above still finds the tab
+         * whatever hash it has, since URL patterns ignore fragments.
+         */
+        ...(hash ? { url: `${comparePageUrl}${hash}` } : {}),
       }
     );
 
@@ -94,6 +114,6 @@ async function openOrFocusNewPage(url: PublicPath) {
    * Otherwise create fresh compare page.
    */
   await browser.tabs.create({
-    url: comparePageUrl,
+    url: `${comparePageUrl}${hash ?? ""}`,
   });
 }

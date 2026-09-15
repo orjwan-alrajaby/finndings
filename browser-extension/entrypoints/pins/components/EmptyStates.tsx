@@ -1,20 +1,16 @@
 import { ExternalLink, Pin } from "lucide-react";
 
 import { FINN_BASE_URL } from "@/lib/constants";
+import { EmptyState } from "@/components/EmptyState";
 import { FinnLink } from "@/components/FinnLink";
 
 /** The whole page, before anything has been pinned. */
 export function NothingPinned() {
     return (
-        <div className="mx-auto max-w-xl rounded-[28px] bg-white p-8 text-center shadow-sm">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-finn-pale-blue text-finn-accent-blue">
-                <Pin aria-hidden="true" className="h-7 w-7" />
-            </span>
-
-            <h2 className="mt-5 text-2xl font-black text-finn-black">
-                Nothing pinned yet
-            </h2>
-
+        <EmptyState
+            icon={<Pin aria-hidden="true" className="h-7 w-7" />}
+            title="Nothing pinned yet"
+        >
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
                 Lens adds a pin button to every car on <FinnLink />. Pin the ones
                 you're weighing up and they collect here, ready to compare.
@@ -29,6 +25,6 @@ export function NothingPinned() {
                 Open finn.com
                 <ExternalLink aria-hidden="true" className="h-4 w-4" />
             </a>
-        </div>
+        </EmptyState>
     );
 }

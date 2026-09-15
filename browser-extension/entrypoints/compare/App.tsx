@@ -14,7 +14,13 @@ async function getPinnedCars(): Promise<PinnedFinnCar[]> {
 }
 
 export default function ReviewOrCompare() {
-  const [cars, setCars] = useState<PinnedFinnCar[]>([]);
+  /*
+   * null, not an empty array, until storage has answered. Starting empty
+   * meant every visit opened on "Nothing to compare yet" for a frame or
+   * two before the pinned cars arrived — the page telling the reader they
+   * had pinned nothing, and then contradicting itself.
+   */
+  const [cars, setCars] = useState<PinnedFinnCar[] | null>(null);
 
   const refreshCars = async () => {
     const pinnedCars = await getPinnedCars();
@@ -40,13 +46,18 @@ export default function ReviewOrCompare() {
     };
   }, []);
 
+  /*
+   * No wrapper element of its own. This used to render a `<main>` around the
+   * page, which already draws one — two nested `<main>`s, so a screen reader
+   * asked for the page's main landmark got a choice of two. The shell, the
+   * bar and the ground all belong to `CompareTab`, in one place, the way the
+   * pinned-cars and settings pages have theirs.
+   */
   return (
-    <main className="min-h-screen bg-white">
-      <CompareTab
-        cars={cars}
-        onSettings={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
-        onManagePins={() => openBrowserTab("OPEN_PINS_PAGE")}
-      />
-    </main>
+    <CompareTab
+      cars={cars}
+      onSettings={() => openBrowserTab("OPEN_SETTINGS_PAGE")}
+      onReadCar={(carId) => openBrowserTab("OPEN_PINS_PAGE", { carId })}
+    />
   );
 }

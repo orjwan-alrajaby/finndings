@@ -1,4 +1,7 @@
+import { Scale } from "lucide-react";
+
 import type { PinnedFinnCar } from "@/lib/types";
+import { EmptyState } from "@/components/EmptyState";
 import { FinnLink } from "@/components/FinnLink";
 import { challengeFileName } from "@/lib/advice-pdf";
 
@@ -7,6 +10,7 @@ import { ChallengeHero } from "./components/ChallengeHero";
 import { ChallengePicker } from "./components/ChallengePicker";
 import { CostAnalysis } from "./components/CostAnalysis";
 import { EnergyUse } from "./components/EnergyUse";
+import { ExportMasthead } from "./components/ExportMasthead";
 import { HotSeatComparison } from "./components/HotSeatComparison";
 import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
@@ -96,6 +100,8 @@ export function Challenge({
             data-exporting={exporting || undefined}
             className="w-full"
         >
+            <ExportMasthead />
+
             <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-finn-accent-blue">
@@ -254,14 +260,11 @@ function Empty({
     children: React.ReactNode;
 }) {
     return (
-        <div className="px-4 py-12 text-center text-finn-black">
-            <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
-                <h1 className="text-2xl font-black">{title}</h1>
-
-                <p className="mt-2 text-sm leading-6 text-finn-iron">
-                    {children}
-                </p>
-            </div>
-        </div>
+        <EmptyState
+            icon={<Scale aria-hidden="true" className="h-7 w-7" />}
+            title={title}
+        >
+            <p className="mt-2 text-sm leading-6 text-finn-iron">{children}</p>
+        </EmptyState>
     );
 }

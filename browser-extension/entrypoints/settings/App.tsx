@@ -4,9 +4,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import {
     ArrowLeft,
     GraduationCap,
-    Pin,
     RotateCcw,
-    Scale,
 } from "lucide-react";
 import { NavButton, PageHeader } from "@/components/PageHeader";
 import { LoadingScreen } from "@/components/Spinner";
@@ -41,7 +39,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SaveControl } from "@/components/SaveControl";
 import { getProfileIssues } from "./utils/PriorityValidation";
 import { stableStringify } from "@/lib/stable-stringify";
-import type { StoredDataGroupId } from "@/lib/stored-data";
+import { loadPinnedCars, type StoredDataGroupId } from "@/lib/stored-data";
 import { openBrowserTab } from "@/lib/utils";
 
 export default function SettingsPage({ onBack }: { onBack?: () => void }) {
@@ -67,6 +65,27 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * unsure whether they did is the one thing this page must not do.
    */
   const [persisted, setPersisted] = useState<string | null>(null);
+
+  /*
+   * Only to know whether the header's Recommendation link has anything behind it.
+   * Kept current, since a car pinned on finn.com — or the set deleted from
+   * the Data tab — can change the answer while this page is open.
+   */
+  const [pinnedCount, setPinnedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    const countPins = async () => setPinnedCount((await loadPinnedCars()).length);
+
+    void countPins();
+
+    const listener = (message: { type?: string }) => {
+      if (message.type === "PINNED_CARS_UPDATED") void countPins();
+    };
+
+    browser.runtime.onMessage.addListener(listener);
+
+    return () => browser.runtime.onMessage.removeListener(listener);
+  }, []);
 
   useEffect(() => {
     loadLensSettings().then((settings) => {
@@ -156,6 +175,9 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * it is holding.
    */
   const handleDataCleared = (groups: StoredDataGroupId[]) => {
+    /* This page never hears its own PINNED_CARS_UPDATED, so it is told here. */
+    if (groups.includes("pinnedCars")) setPinnedCount(0);
+
     if (!groups.includes("settings")) return;
 
     for (const p of priorityDefinitions) {
@@ -243,7 +265,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         * competing for the top of the window would cost more than the
         * consistency is worth.
         */}
-      <PageHeader sticky={false}>
+      <PageHeader current="settings" pinnedCount={pinnedCount} sticky={false}>
         {onBack && (
           <NavButton
             icon={<ArrowLeft aria-hidden="true" className="h-4 w-4" />}
@@ -251,18 +273,6 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
             onClick={onBack}
           />
         )}
-
-        <NavButton
-          icon={<Scale aria-hidden="true" className="h-4 w-4" />}
-          label="See my recommendation"
-          onClick={() => void openBrowserTab("OPEN_COMPARE_PAGE")}
-        />
-
-        <NavButton
-          icon={<Pin aria-hidden="true" className="h-4 w-4" />}
-          label="Pinned cars"
-          onClick={() => void openBrowserTab("OPEN_PINS_PAGE")}
-        />
       </PageHeader>
 
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
@@ -341,11 +351,25 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       <ConfirmDialog
         open={restoreOpen}
         onOpenChange={setRestoreOpen}
+        eyebrow="All settings"
         title="Restore default settings?"
         confirmLabel="Restore defaults"
         tone="danger"
         onConfirm={handleRestoreDefaults}
-        description="This resets priorities, features, which profiles are enabled, the default profile, and driving assumptions to Finn Lens's factory configuration. Any custom priorities or edits you've made will be lost. This can't be undone."
+        description={
+          <>
+            <p>
+              This puts your priorities, the features you raised, which
+              profiles are switched on, the one Lens starts you on, and your
+              driving assumptions back to how Finn Lens ships.
+            </p>
+
+            <p className="mt-3">
+              Any custom priorities or edits you've made will be lost, and it
+              can't be undone.
+            </p>
+          </>
+        }
       />
     </main>
     </Tooltip.Provider>

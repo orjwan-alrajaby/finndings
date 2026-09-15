@@ -1,12 +1,13 @@
 import "@/assets/tailwind.css";
-import { useEffect, useState } from "react";
-import { Pin, Settings, SlidersHorizontal, Sparkles } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
 import type { PinnedFinnCar } from "@/lib/types";
+import { EmptyState } from "@/components/EmptyState";
 import { FinnLink } from "@/components/FinnLink";
 import { NavButton, PageHeader } from "@/components/PageHeader";
-import { LoadingScreen } from "@/components/Spinner";
+import { Spinner } from "@/components/Spinner";
 
 import { AdjustDrawer } from "./components/AdjustDrawer";
 import { Advice } from "./advice";
@@ -31,11 +32,13 @@ import { useCompareStore } from "./store";
 export default function CompareTab({
   cars,
   onSettings,
-  onManagePins,
+  onReadCar,
 }: {
-  cars: PinnedFinnCar[];
+  /** null until the pinned set has been read — distinct from none pinned. */
+  cars: PinnedFinnCar[] | null;
   onSettings: () => void;
-  onManagePins: () => void;
+  /** Opens the pinned-cars page with this car's breakdown already open. */
+  onReadCar: (carId: number) => void;
 }) {
   const loadSettings = useCompareStore((state) => state.loadSettings);
   const settingsLoaded = useCompareStore((state) => state.settingsLoaded);
@@ -63,159 +66,182 @@ export default function CompareTab({
     void loadSettings();
   }, [loadSettings]);
 
-  if (cars.length === 0) {
-    return (
-      <div className="min-h-screen bg-white px-4 py-12 text-center">
-        <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-finn-accent-blue">
-            <Sparkles aria-hidden="true" className="h-7 w-7" />
-          </div>
-
-          <h1 className="mt-5 text-2xl font-black text-finn-black">
-            Nothing to compare yet
-          </h1>
-
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
-            Pin a few cars on <FinnLink /> first. Finn Lens will
-            automatically include every pinned car here.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const [onlyCar] = cars;
-
-  if (cars.length === 1 && onlyCar) {
-    return (
-      <div className="min-h-screen bg-white px-4 py-12 text-center">
-        <div className="mx-auto max-w-xl rounded-[28px] bg-finn-pale-blue p-8">
-          <img
-            src={onlyCar.images.thumbnail}
-            alt={onlyCar.name}
-            className="mx-auto h-32 w-52 rounded-2xl object-cover"
-          />
-
-          <h1 className="mt-5 text-2xl font-black text-finn-black">
-            One car is pinned
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-finn-iron">
-            Keep browsing and pin another car. Finn Lens compares
-            the full pinned set automatically — there is no
-            separate selection step.
-          </p>
-
-          {/*
-            * The one car can still be read on its own, which is the only
-            * useful thing to offer someone who cannot compare yet.
-            */}
-          <button
-            type="button"
-            onClick={onManagePins}
-            className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-finn-accent-blue px-5 text-xs font-black text-white shadow-sm transition hover:bg-finn-highlight-navy"
-          >
-            See how this one suits you
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   /*
-   * Held until the saved answers have actually been read. A recommendation
-   * built from the defaults, replaced a tick later by one built from the
-   * reader's own settings, is a wrong answer shown confidently.
+   * Which of the page's states is on screen. All three are drawn inside the
+   * same shell below rather than returned early from here, which is the point
+   * of splitting them out: a reader who opens the page with nothing pinned
+   * used to get a bare card on white — no bar, no mark, and no way on to the
+   * pinned cars or the settings, which are the only two things that could
+   * have helped them. The page looked like a different product in exactly the
+   * state where the reader most needed to recognise it.
    */
-  if (!settingsLoaded) {
-    return (
-      <LoadingScreen className="min-h-screen bg-white">
-        Reading your settings…
-      </LoadingScreen>
-    );
-  }
+  const [onlyCar] = cars ?? [];
+  const canCompare = (cars?.length ?? 0) >= 2;
+  const ready = canCompare && settingsLoaded;
 
   return (
     <Tooltip.Provider delayDuration={350}>
-      <main className="min-h-screen bg-white text-finn-black">
+      {/*
+        * Snow, not white — the ground the pinned-cars and settings pages use.
+        * This page was the odd one out, and it cost more than consistency:
+        * nearly everything on it is a white card, and a white card on a white
+        * page is held up by its shadow alone. On snow the cards separate, and
+        * the empty state can be the same card every other page uses.
+        *
+        * The exported PDF is unaffected — it paints its own white ground (see
+        * `advicePdfOptions`), because a document is not a screen.
+        */}
+      <main className="min-h-screen bg-finn-snow text-finn-black">
+        <PageHeader current="compare">
+          {/*
+            * Only once there is a recommendation to argue with. The drawer
+            * edits the answers this page reasons from, and offered over an
+            * empty page it invites the reader to tune the inputs to a result
+            * that does not exist yet — the wizard-before-the-answer mistake
+            * this page was built to undo, in miniature.
+            */}
+          {ready && (
+            <NavButton
+              icon={<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />}
+              label="Adjust my answers"
+              onClick={() => setAdjusting((was) => !was)}
+              active={adjusting}
+              expanded={adjusting}
+            />
+          )}
+        </PageHeader>
+
         {/*
           * The page keeps its full width, and there is no wrapper around it
           * any more. It used to give up 27rem to the drawer, which squeezed
           * the advice into a column too narrow to read while the reader
           * worked in one too narrow to work in; the drawer overlays it now.
           */}
-        <PageHeader>
-          <NavButton
-            icon={<SlidersHorizontal aria-hidden="true" className="h-4 w-4" />}
-            label="Adjust my answers"
-            onClick={() => setAdjusting((was) => !was)}
-            active={adjusting}
-            expanded={adjusting}
-          />
-
-          <NavButton
-            icon={<Pin aria-hidden="true" className="h-4 w-4" />}
-            label="Pinned cars"
-            onClick={onManagePins}
-          />
-
-          <NavButton
-            icon={<Settings aria-hidden="true" className="h-4 w-4" />}
-            label="Settings"
-            onClick={onSettings}
-          />
-        </PageHeader>
-
         <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-          {/*
-            * Two readings of one set of answers, and the tabs say which is
-            * which before either is read. Above the page rather than inside
-            * it, because they switch the whole subject — a control that
-            * changed the page from under its own heading is what this split
-            * was undoing.
-            */}
-          <div
-            role="tablist"
-            aria-label="Advice views"
-            className="finn-lens-screen-only mb-6 inline-flex rounded-full bg-finn-cotton p-1"
-          >
-            <ViewTab
-              id="advice"
-              current={view}
-              onSelect={setView}
-              label="The recommendation"
-            />
+          {cars === null ? (
+            <Loading>Reading your pinned cars…</Loading>
+          ) : cars.length === 0 ? (
+            <EmptyState
+              icon={<Sparkles aria-hidden="true" className="h-7 w-7" />}
+              title="Nothing to compare yet"
+            >
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-finn-iron">
+                Pin a few cars on <FinnLink /> first. Finn Lens will
+                automatically include every pinned car here.
+              </p>
+            </EmptyState>
+          ) : !canCompare && onlyCar ? (
+            <EmptyState
+              media={
+                <img
+                  src={onlyCar.images.thumbnail}
+                  alt={onlyCar.name}
+                  className="mx-auto h-32 w-52 rounded-2xl object-cover"
+                />
+              }
+              title="One car is pinned"
+            >
+              <p className="mt-2 text-sm leading-6 text-finn-iron">
+                Keep browsing and pin another car. Finn Lens compares the full
+                pinned set automatically — there is no separate selection step.
+              </p>
 
-            <ViewTab
-              id="challenge"
-              current={view}
-              onSelect={setView}
-              label="Challenge it"
-            />
-          </div>
-
-          {view === "advice" ? (
-            <Advice
-              cars={cars}
-              onAdjust={() => setAdjusting(true)}
-              onChallenge={() => setView("challenge")}
-            />
+              {/*
+                * The one car can still be read on its own, which is the only
+                * useful thing to offer someone who cannot compare yet — so
+                * this goes straight to its breakdown, not to the board.
+                */}
+              <button
+                type="button"
+                onClick={() => onReadCar(onlyCar.id)}
+                className="mt-5 inline-flex h-11 items-center gap-2 rounded-full bg-finn-accent-blue px-5 text-xs font-black text-white shadow-sm transition hover:bg-finn-highlight-navy"
+              >
+                See how this one suits you
+              </button>
+            </EmptyState>
+          ) : !settingsLoaded ? (
+            /*
+             * Held until the saved answers have actually been read. A
+             * recommendation built from the defaults, replaced a tick later by
+             * one built from the reader's own settings, is a wrong answer
+             * shown confidently.
+             */
+            <Loading>Reading your settings…</Loading>
           ) : (
-            <Challenge
-              cars={cars}
-              onAdjust={() => setAdjusting(true)}
-              onBack={() => setView("advice")}
-            />
+            <>
+              {/*
+                * Two readings of one set of answers, and the tabs say which is
+                * which before either is read. Above the page rather than inside
+                * it, because they switch the whole subject — a control that
+                * changed the page from under its own heading is what this split
+                * was undoing.
+                */}
+              <div
+                role="tablist"
+                aria-label="Advice views"
+                className="finn-lens-screen-only mb-6 inline-flex rounded-full bg-finn-cotton p-1"
+              >
+                <ViewTab
+                  id="advice"
+                  current={view}
+                  onSelect={setView}
+                  label="The recommendation"
+                />
+
+                <ViewTab
+                  id="challenge"
+                  current={view}
+                  onSelect={setView}
+                  label="Challenge it"
+                />
+              </div>
+
+              {view === "advice" ? (
+                <Advice
+                  cars={cars}
+                  onAdjust={() => setAdjusting(true)}
+                  onChallenge={() => setView("challenge")}
+                />
+              ) : (
+                <Challenge
+                  cars={cars}
+                  onAdjust={() => setAdjusting(true)}
+                  onBack={() => setView("advice")}
+                />
+              )}
+            </>
           )}
         </div>
 
-        <AdjustDrawer
-          open={adjusting}
-          onOpenChange={setAdjusting}
-          onSettings={onSettings}
-        />
+        {ready && (
+          <AdjustDrawer
+            open={adjusting}
+            onOpenChange={setAdjusting}
+            onSettings={onSettings}
+          />
+        )}
       </main>
     </Tooltip.Provider>
+  );
+}
+
+/**
+ * Waiting, inside the page rather than instead of it.
+ *
+ * `LoadingScreen` is a whole-window `<main>`, which is right for a page that
+ * has not drawn its bar yet and wrong here: the bar is already up, and
+ * replacing the page with a centred spinner would take the mark and the exits
+ * away for as long as storage takes to answer.
+ */
+function Loading({ children }: { children: ReactNode }) {
+  return (
+    <p
+      role="status"
+      className="flex items-center justify-center gap-3 py-20 text-sm text-finn-iron"
+    >
+      <Spinner className="h-5 w-5 text-finn-black/70" />
+      {children}
+    </p>
   );
 }
 

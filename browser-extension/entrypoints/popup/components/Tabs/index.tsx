@@ -116,20 +116,20 @@ function Tabs({ pinnedCount, pinnedCars, accent }: TabsType) {
                       * walk through any more: with two cars pinned Lens has
                       * everything it needs, so the button offers the answer.
                       *
-                      * Two, not one, because that is the point at which the
-                      * label stops being a promise — a single pinned car
-                      * lands on "pin another one", which is not a
-                      * recommendation.
+                      * Off only when nothing is pinned. A single car has no
+                      * ranking yet, but the page it lands on leads straight
+                      * to how that one car suits the reader, which is still
+                      * an answer worth the click.
                       */}
                     <ActionButton
                         title="See my recommendation"
                         description={
                             pinnedCount === 1
-                                ? "Pin one more car and Lens can rank them for you."
+                                ? "See how your pinned car suits you. Pin another and Lens can rank them."
                                 : "One car, the reasons for it, and what it really costs."
                         }
                         icon={<Scale aria-hidden="true" className="h-5 w-5" />}
-                        disabled={pinnedCount < 2}
+                        disabled={!pinnedCount}
                         onClick={() => openBrowserTab("OPEN_COMPARE_PAGE")}
                         accent={accent}
                     />

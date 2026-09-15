@@ -219,10 +219,11 @@ export function CarCard({
                         answer is already open beside it. */}
                     {!subject && (
                         <RailButton
-                            label={`View ${car.name}`}
+                            /* Asked the way finn.com's own badges ask it. */
+                            label={`How does ${car.name} fit me?`}
                             onClick={onOpen}
                             icon={<Eye aria-hidden="true" className="h-4 w-4" />}
-                            text="Read it"
+                            text="How does this fit me?"
                         />
                     )}
 
@@ -277,7 +278,7 @@ function RailButton({
             onClick={onClick}
             aria-label={label}
             title={label}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold text-finn-iron transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
+            className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-bold text-finn-iron transition hover:bg-finn-pale-blue hover:text-finn-accent-blue"
         >
             {icon}
             {text}
