@@ -440,14 +440,17 @@
 /* ========================================
    DRAWER
    Every right-hand sheet in the product: the compare page's Adjust panel,
-   the priority panel that explains one row of it, and the mock of both on
-   the setup tour. They come in from the right edge and go back out the same
-   way. See `components/drawer.ts` for the shell they share.
+   the priority panel that explains one row of it, the mock of both on the
+   setup tour, and the in-page panel over finn.com. They come in from the
+   right edge and go back out the same way. See `components/drawer.ts` for
+   the shell the React ones share.
 
    Radix stamps `data-state` on the panel and on any scrim, and holds both in
    the tree until their animations finish, so the keyframes below are all the
    movement this needs — no transition classes, and nothing to keep in step
-   with the open flag in React.
+   with the open flag in React. The in-page panel has no Radix, so
+   `lens-panel/panel.ts` stamps `data-state` itself and holds its host on the
+   page until the slide-out ends.
 ======================================== */
 
 @keyframes finn-lens-drawer-in {

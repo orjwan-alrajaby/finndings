@@ -50,10 +50,23 @@ const WATCHED_KEYS = [
 interface Panel {
   /** Point an already-open panel at a different car. */
   show: (request: PanelRequest) => void;
+  /** Slides it out, then takes it off the page. */
   destroy: () => void;
+  /** Takes it off the page now, mid-slide or not. */
+  remove: () => void;
 }
 
 let open: Panel | null = null;
+
+/** A panel still sliding out, so opening another can clear it at once. */
+let closing: Panel | null = null;
+
+/**
+ * The longest the slide-out can take before the host goes regardless: the
+ * DRAWER block's 200ms, with room for a busy page. `animationend` is what
+ * normally ends it, but a tab in the background may never fire one.
+ */
+const SLIDE_OUT_MAX_MS = 400;
 
 /* -------------------------------------------------------------------------- */
 /* States                                                                     */
@@ -429,10 +442,19 @@ async function build(request: PanelRequest): Promise<Panel> {
    * reader is meant to be reading FINN's page alongside this. A labelled
    * complementary region is what this actually is.
    */
+  /*
+   * Slides in from the right edge and back out the same way, like every other
+   * drawer in the product: `finn-lens-drawer` keyed on `data-state`, from the
+   * DRAWER block in `assets/tailwind.css` — the same timing, the same easing
+   * and the same reduced-motion opt-out as the compare page's Adjust panel.
+   * The stylesheet is in the shadow root before the host reaches the page, so
+   * the slide-in runs from the first frame.
+   */
   const drawer = el(
     "div",
     {
       class: [
+        "finn-lens-drawer",
         "absolute inset-0 flex flex-col",
         "bg-white shadow-[-8px_0_24px_rgba(0,0,0,0.08)]",
         "border-l border-finn-cotton",
@@ -441,6 +463,7 @@ async function build(request: PanelRequest): Promise<Panel> {
       attrs: {
         role: "complementary",
         "aria-labelledby": "finn-lens-title",
+        "data-state": "open",
       },
     },
     [bar, scroller, dock],
@@ -510,6 +533,8 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   browser.storage.onChanged.addListener(onStorageChanged);
 
+  const remove = () => host.remove();
+
   const destroy = () => {
     browser.storage.onChanged.removeListener(onStorageChanged);
     window.removeEventListener("keydown", onKeyDown, true);
@@ -518,7 +543,26 @@ async function build(request: PanelRequest): Promise<Panel> {
     /* The card gets its own colour back. */
     clearHighlight();
 
-    host.remove();
+    /*
+     * Out the way it came, and off the page once it has gone. Nothing in it
+     * can be clicked on the way out: the reader has already said they are
+     * done with it, and a stray click on a panel that is leaving would act
+     * on a car they have closed.
+     */
+    drawer.style.pointerEvents = "none";
+    drawer.setAttribute("data-state", "closed");
+
+    /* No slide to wait for: the reader asked for less movement, or the styles never loaded. */
+    if (getComputedStyle(drawer).animationName === "none") {
+      remove();
+      return;
+    }
+
+    /* Its own slide only: `animationend` bubbles, and the spinner inside it animates too. */
+    drawer.addEventListener("animationend", (event) => {
+      if (event.target === drawer) remove();
+    });
+    window.setTimeout(remove, SLIDE_OUT_MAX_MS);
   };
 
   void render(scroller, dock, retry, current);
@@ -526,7 +570,7 @@ async function build(request: PanelRequest): Promise<Panel> {
   document.body.append(host);
   closeButton.focus();
 
-  return { show, destroy };
+  return { show, destroy, remove };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -546,6 +590,10 @@ export async function openPanel(request: PanelRequest): Promise<void> {
     return;
   }
 
+  /* One still sliding out goes at once, so two never overlap on the page. */
+  closing?.remove();
+  closing = null;
+
   opener = document.activeElement;
 
   open = await build(request);
@@ -554,8 +602,11 @@ export async function openPanel(request: PanelRequest): Promise<void> {
 export function closePanel(): void {
   if (!open) return;
 
-  open.destroy();
+  const leaving = open;
+
   open = null;
+  closing = leaving;
+  leaving.destroy();
 
   if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
 
