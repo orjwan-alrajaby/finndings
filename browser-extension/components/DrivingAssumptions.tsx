@@ -11,6 +11,30 @@ import type {
 type NumericField = Exclude<keyof LensPreferences, "contractType">;
 
 /**
+ * What each driving figure is for, written from what the cost engine actually
+ * does with it rather than from its label.
+ *
+ * One copy, because the same six figures are asked for in three places — the
+ * setup flow, the compare drawer and the settings page — and an explanation
+ * that says one thing in the drawer and another in settings is worse than
+ * none.
+ */
+export const DRIVING_EXPLANATIONS: Record<keyof LensPreferences, string> = {
+    monthlyBudget:
+        "The most you want to spend per month all in — the subscription plus the running costs Lens works out below. It is the only figure here that changes which cars you see rather than what one costs: Lens recommends a car only if it can confirm it fits. Optional, and leaving it blank keeps every car you pinned in the running.",
+    monthlyKm:
+        `Roughly how many kilometres you cover in a typical month — an estimate is fine. Everything Lens works out about energy is scaled by it, and FINN includes ${FINN_INCLUDED_MONTHLY_KM} km/month, so anything past that is charged at the car's own price per extra kilometre.`,
+    petrolPrice:
+        "What a litre costs you at the pump. Lens applies it to petrol cars, and to plug-in hybrids — FINN publishes one combined figure for those, so the whole of it is priced as fuel.",
+    dieselPrice:
+        "What a litre costs you at the pump. Used for diesel cars only — if you are not looking at any, this one changes nothing.",
+    electricityPrice:
+        "What you pay for a kilowatt-hour where you usually charge. Used for electric cars only, against the car's own consumption figure — public fast charging costs more than this, so an estimate built on home charging is the optimistic one.",
+    contractType:
+        "Whether you would take the car privately or through a business. FINN advertises a different monthly price for each, and this picks which of the two Lens costs every car on — nothing else about the recommendation changes.",
+};
+
+/**
  * The fields behind every cost estimate Lens makes.
  *
  * Every field here arrives with a working value, so this is a panel to
@@ -77,7 +101,7 @@ export function DrivingAssumptions({
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <AssumptionInput
                     label="Monthly budget"
-                    explanation="The most you want to spend per month all in — the subscription plus the running costs Lens works out below. It is the only figure here that changes which cars you see rather than what one costs: Lens recommends a car only if it can confirm it fits. Optional, and leaving it blank keeps every car you pinned in the running."
+                    explanation={DRIVING_EXPLANATIONS.monthlyBudget}
                     unit="€/month"
                     value={preferences.monthlyBudget}
                     step={50}
@@ -96,7 +120,7 @@ export function DrivingAssumptions({
                      * still the first thing the explanation says.
                      */
                     label="Monthly distance"
-                    explanation={`Roughly how many kilometres you cover in a typical month — an estimate is fine. Everything Lens works out about energy is scaled by it, and FINN includes ${FINN_INCLUDED_MONTHLY_KM} km/month, so anything past that is charged at the car's own price per extra kilometre.`}
+                    explanation={DRIVING_EXPLANATIONS.monthlyKm}
                     unit="km/month"
                     value={preferences.monthlyKm}
                     step={100}
@@ -105,7 +129,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Petrol"
-                    explanation="What a litre costs you at the pump. Lens applies it to petrol cars, and to plug-in hybrids — FINN publishes one combined figure for those, so the whole of it is priced as fuel."
+                    explanation={DRIVING_EXPLANATIONS.petrolPrice}
                     unit="€/L"
                     value={preferences.petrolPrice}
                     step={0.01}
@@ -114,7 +138,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Diesel"
-                    explanation="What a litre costs you at the pump. Used for diesel cars only — if you are not looking at any, this one changes nothing."
+                    explanation={DRIVING_EXPLANATIONS.dieselPrice}
                     unit="€/L"
                     value={preferences.dieselPrice}
                     step={0.01}
@@ -123,7 +147,7 @@ export function DrivingAssumptions({
 
                 <AssumptionInput
                     label="Electricity"
-                    explanation="What you pay for a kilowatt-hour where you usually charge. Used for electric cars only, against the car's own consumption figure — public fast charging costs more than this, so an estimate built on home charging is the optimistic one."
+                    explanation={DRIVING_EXPLANATIONS.electricityPrice}
                     unit="€/kWh"
                     value={preferences.electricityPrice}
                     step={0.01}
@@ -172,7 +196,7 @@ function ContractTypeToggle({
             <FieldLabel
                 id="contract-type-label"
                 label="Contract type"
-                explanation="Whether you would take the car privately or through a business. FINN advertises a different monthly price for each, and this picks which of the two Lens costs every car on — nothing else about the recommendation changes."
+                explanation={DRIVING_EXPLANATIONS.contractType}
             />
 
             {/*
@@ -247,7 +271,7 @@ function ContractTypeToggle({
  * grey small print. `InfoTip` opens on hover and pins on click, so a sentence
  * this long can actually be read.
  */
-function FieldLabel({
+export function FieldLabel({
     htmlFor,
     id,
     label,

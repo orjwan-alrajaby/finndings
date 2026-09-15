@@ -1,3 +1,4 @@
+import { DRIVING_EXPLANATIONS, FieldLabel } from "@/components/DrivingAssumptions";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type { ContractType, LensPreferences } from "@/lib/reasoning-engine/types";
 import { Section } from "../components/primitives";
@@ -14,7 +15,6 @@ interface Field {
     label: string;
     unit: string;
     step: string;
-    hint: string;
     /**
      * Shown blank at 0, because 0 means "not set" rather than "zero euros".
      * Only the budget is optional; the rest are assumptions Lens has to have a
@@ -30,20 +30,19 @@ const FIELDS: Field[] = [
         label: "Monthly budget",
         unit: "€/month",
         step: "50",
-        hint: "Optional. The most you want to spend per month in total, including running costs. Leave it blank and no car is ruled out on price.",
         optional: true,
         placeholder: "No limit",
     },
     {
         key: "monthlyKm",
-        label: "Monthly mileage",
+        /* Matches the setup flow and the compare drawer. */
+        label: "Monthly distance",
         unit: "km/month",
         step: "100",
-        hint: "Roughly how far you drive in a typical month. An estimate is fine.",
     },
-    { key: "petrolPrice", label: "Petrol price", unit: "€/L", step: "0.01", hint: "" },
-    { key: "dieselPrice", label: "Diesel price", unit: "€/L", step: "0.01", hint: "" },
-    { key: "electricityPrice", label: "Electricity price", unit: "€/kWh", step: "0.01", hint: "" },
+    { key: "petrolPrice", label: "Petrol price", unit: "€/L", step: "0.01" },
+    { key: "dieselPrice", label: "Diesel price", unit: "€/L", step: "0.01" },
+    { key: "electricityPrice", label: "Electricity price", unit: "€/kWh", step: "0.01" },
 ];
 
 const CONTRACT_OPTIONS: [ContractType, string, string][] = [
@@ -58,33 +57,37 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
             description="These describe you, not FINN — how far you actually drive, what fuel or electricity costs where you live, and what you're willing to spend. Finn Lens can't know this on its own, so estimates are only as good as what you enter here."
         >
             <div className="grid gap-4 sm:grid-cols-2">
-                {FIELDS.map(({ key, label, unit, step, hint, optional, placeholder }) => (
-                    <label key={key}>
-                        <span className="text-xs font-bold text-finn-black">{label}</span>
+                {/*
+                  * The explanations sit behind an "i" on each label, as they
+                  * do in the setup flow and the compare drawer — the label no
+                  * longer wraps the input, so the "i" is a button of its own
+                  * rather than something that also focuses the field.
+                  */}
+                {FIELDS.map(({ key, label, unit, step, optional, placeholder }) => (
+                    <div key={key}>
+                        <FieldLabel htmlFor={`driving-${key}`} label={label} explanation={DRIVING_EXPLANATIONS[key]} />
                         <div className="mt-1 flex rounded-2xl bg-finn-snow px-3">
                             <input
+                                id={`driving-${key}`}
                                 type="number"
                                 min="0"
                                 step={step}
                                 placeholder={placeholder}
                                 value={optional && preferences[key] === 0 ? "" : preferences[key]}
                                 onChange={(event) => onChange({ ...preferences, [key]: Number(event.target.value) || 0 })}
+                                aria-describedby={`driving-${key}-unit`}
                                 className="h-12 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none"
                             />
-                            <span className="flex items-center text-xs text-finn-iron">{unit}</span>
+                            <span id={`driving-${key}-unit`} className="flex items-center text-xs text-finn-iron">{unit}</span>
                         </div>
-                        {hint && <span className="mt-1 block text-[11px] leading-4 text-finn-iron">{hint}</span>}
-                    </label>
+                    </div>
                 ))}
             </div>
 
             <div className="mt-5">
-                <p className="text-xs font-bold text-finn-black">Contract type</p>
-                <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                    Which price Lens should use when it works out what a car costs you.
-                </p>
+                <FieldLabel id="driving-contract-type" label="Contract type" explanation={DRIVING_EXPLANATIONS.contractType} />
 
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div role="group" aria-labelledby="driving-contract-type" className="mt-2 grid gap-2 sm:grid-cols-2">
                     {CONTRACT_OPTIONS.map(([value, label, description]) => {
                         const active = preferences.contractType === value;
 
@@ -113,16 +116,16 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                 <p>
                     FINN's subscription currently includes{" "}
                     <strong className="text-finn-black">{FINN_INCLUDED_MONTHLY_KM} km/month</strong>. Anything you drive beyond
-                    that is charged at the car's own extra-kilometre price, which FINN supplies per vehicle. That's a FINN fact,
-                    not an estimate of your driving — your monthly mileage above is what drives the cost estimates.
+                    that is charged at the car's own price per extra kilometre, which FINN publishes for each car. That part
+                    comes from FINN rather than from us — it's your monthly mileage above that decides the cost estimates.
                 </p>
                 <p>
                     The default prices above reflect typical German-market fuel and electricity costs. Adjust them to your own
                     market if you're comparing elsewhere.
                 </p>
                 <p>
-                    Finn Lens also doesn't know your charging setup (home vs public, tariff), so electricity cost is estimated
-                    from the single price above rather than a mixed charging model.
+                    If you charge at home sometimes and at a public charger other times, you'll be paying two different prices.
+                    Lens has no way of knowing the split, so it works out electricity costs from the one price you set above.
                 </p>
                 <p>
                     Your budget is a limit, not a preference you rank. Lens won't reward a car for being cheap or penalise it for
