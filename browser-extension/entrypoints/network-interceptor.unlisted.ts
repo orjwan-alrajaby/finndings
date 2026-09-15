@@ -7,7 +7,9 @@ export default defineUnlistedScript(() => {
     const response = await originalFetch(...args);
 
     try {
-      const url = String(args[0]);
+      /* A `Request` stringifies as "[object Request]"; its URL is on `.url`. */
+      const url =
+        args[0] instanceof Request ? args[0].url : String(args[0]);
 
       if (url.includes("/api/cars")) {
         const json = await response.clone().json();
