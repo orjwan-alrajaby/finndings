@@ -212,6 +212,14 @@ async function render(
   dock: HTMLElement,
   retry: () => void,
   request: PanelRequest,
+  /**
+   * False once a newer render has started or the panel has closed. Every
+   * await below can outlast a click on the next card — waiting for a car is
+   * up to `CAR_WAIT_MS` and then a request to FINN — and a render that
+   * resumed regardless would paint the previous car over the one the reader
+   * just asked about, or mark a card on a page whose panel has gone.
+   */
+  isCurrent: () => boolean,
 ): Promise<void> {
   empty(into);
   /*
@@ -243,6 +251,8 @@ async function render(
   } catch (error) {
     console.error("[FinnLens] couldn't read your settings", error);
 
+    if (!isCurrent()) return;
+
     empty(into);
     into.append(
       message(
@@ -263,10 +273,14 @@ async function render(
    * never sent us is fetched outright, the way the pin button has always
    * fetched it. See `resolveCar`.
    */
+  if (!isCurrent()) return;
+
   const car = await resolveCar(request.carId, {
     waitMs: CAR_WAIT_MS,
     fetchIfMissing: true,
   });
+
+  if (!isCurrent()) return;
 
   if (!car) {
     empty(into);
@@ -285,6 +299,8 @@ async function render(
   }
 
   const settings = await loadLensSettings();
+
+  if (!isCurrent()) return;
 
   /* Marked, not scrolled to: the card is already under the reader's cursor. */
   highlightConfiguration(car.id);
@@ -511,7 +527,14 @@ async function build(request: PanelRequest): Promise<Panel> {
    */
   let current = request;
 
-  const retry = () => void render(scroller, dock, retry, current);
+  /* Bumped by every render and by closing; see `render`'s `isCurrent`. */
+  let generation = 0;
+
+  const retry = () => {
+    const mine = (generation += 1);
+
+    void render(scroller, dock, retry, current, () => mine === generation);
+  };
 
   const show = (next: PanelRequest) => {
     current = next;
@@ -536,6 +559,8 @@ async function build(request: PanelRequest): Promise<Panel> {
   const remove = () => host.remove();
 
   const destroy = () => {
+    generation += 1;
+
     browser.storage.onChanged.removeListener(onStorageChanged);
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("resize", onResize);
@@ -565,7 +590,7 @@ async function build(request: PanelRequest): Promise<Panel> {
     window.setTimeout(remove, SLIDE_OUT_MAX_MS);
   };
 
-  void render(scroller, dock, retry, current);
+  retry();
 
   document.body.append(host);
   closeButton.focus();
@@ -579,6 +604,16 @@ async function build(request: PanelRequest): Promise<Panel> {
 
 let opener: Element | null = null;
 
+/**
+ * A panel still being built — `build` waits for the stylesheet — and what has
+ * been asked of it in the meantime. Without these a second click in that
+ * window built a second panel on top of the first, and a close (Escape, or a
+ * navigation) did nothing, so the panel appeared after the reader had left.
+ */
+let building: Promise<void> | null = null;
+let queued: PanelRequest | null = null;
+let cancelled = false;
+
 export async function openPanel(request: PanelRequest): Promise<void> {
   /*
    * An open panel is pointed at the new car rather than left showing the old
@@ -590,17 +625,47 @@ export async function openPanel(request: PanelRequest): Promise<void> {
     return;
   }
 
+  /* The latest click wins once the panel is up, and reopens a cancelled one. */
+  if (building) {
+    queued = request;
+    cancelled = false;
+    return building;
+  }
+
   /* One still sliding out goes at once, so two never overlap on the page. */
   closing?.remove();
   closing = null;
 
   opener = document.activeElement;
 
-  open = await build(request);
+  building = (async () => {
+    try {
+      const panel = await build(request);
+
+      if (cancelled) {
+        panel.destroy();
+        panel.remove();
+        return;
+      }
+
+      open = panel;
+
+      if (queued) panel.show(queued);
+    } finally {
+      building = null;
+      queued = null;
+      cancelled = false;
+    }
+  })();
+
+  return building;
 }
 
 export function closePanel(): void {
-  if (!open) return;
+  if (!open) {
+    if (building) cancelled = true;
+    return;
+  }
 
   const leaving = open;
 
