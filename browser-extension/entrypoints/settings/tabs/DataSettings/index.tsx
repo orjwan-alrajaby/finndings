@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RotateCw, Trash2, TriangleAlert } from "lucide-react";
+import { CircleDashed, RotateCw, Trash2, TriangleAlert } from "lucide-react";
 
 import {
     ALL_STORED_DATA_GROUPS,
@@ -53,13 +53,55 @@ export function DataSettings({
     const [justCleared, setJustCleared] =
         useState<StoredDataGroupId[] | null>(null);
 
+    const [rechecking, setRechecking] = useState(false);
+    const [recheckResult, setRecheckResult] = useState<string[] | null>(null);
+
     const refresh = async () => {
-        setCounts(await summariseStoredData());
+        const next = await summariseStoredData();
+
+        setCounts(next);
+
+        /*
+         * A group that has emptied since it was ticked — deleted from
+         * another tab, say — can't be deleted again, and leaving it ticked
+         * would count it in the button and list it in the dialog.
+         */
+        setSelected((current) =>
+            current.filter(
+                (id) => next.find((count) => count.id === id)?.present,
+            ),
+        );
+
+        return next;
     };
 
     useEffect(() => {
         void refresh();
     }, []);
+
+    /*
+     * Rereading storage is invisible when nothing moved, so the result is
+     * said out loud either way: which groups changed, or that none did.
+     */
+    const recheck = async () => {
+        const before = counts;
+
+        setRechecking(true);
+        setRecheckResult(null);
+        setJustCleared(null);
+
+        try {
+            const [after] = await Promise.all([
+                refresh(),
+                /* Long enough for the spin to register as having happened. */
+                new Promise((resolve) => setTimeout(resolve, 400)),
+            ]);
+
+            setRecheckResult(describeChanges(before, after));
+        } finally {
+            setRechecking(false);
+        }
+    };
 
     const countFor = (id: StoredDataGroupId) =>
         counts?.find((count) => count.id === id);
@@ -67,8 +109,17 @@ export function DataSettings({
     /* Nothing stored is nothing to delete — the box stays off and unusable. */
     const anythingStored = counts?.some((count) => count.present) ?? false;
 
+    const selectable = ALL_STORED_DATA_GROUPS.filter(
+        (id) => countFor(id)?.present ?? false,
+    );
+
+    const everythingSelected =
+        selectable.length > 0 &&
+        selectable.every((id) => selected.includes(id));
+
     const toggle = (id: StoredDataGroupId) => {
         setJustCleared(null);
+        setRecheckResult(null);
 
         setSelected((current) =>
             current.includes(id)
@@ -77,14 +128,11 @@ export function DataSettings({
         );
     };
 
-    const selectAll = () => {
+    const toggleAll = () => {
         setJustCleared(null);
+        setRecheckResult(null);
 
-        setSelected(
-            ALL_STORED_DATA_GROUPS.filter(
-                (id) => countFor(id)?.present ?? false,
-            ),
-        );
+        setSelected(everythingSelected ? [] : selectable);
     };
 
     const confirm = async () => {
@@ -146,11 +194,11 @@ export function DataSettings({
 
                             <button
                                 type="button"
-                                onClick={selectAll}
+                                onClick={toggleAll}
                                 disabled={!anythingStored}
                                 className="text-[11px] font-bold text-finn-accent-blue underline-offset-2 transition hover:underline disabled:cursor-not-allowed disabled:text-finn-iron/40 disabled:no-underline"
                             >
-                                Select everything
+                                {selectAllLabel(anythingStored, everythingSelected)}
                             </button>
                         </div>
 
@@ -158,28 +206,37 @@ export function DataSettings({
                             {STORED_DATA_GROUPS.map((group) => {
                                 const count = countFor(group.id);
                                 const checked = selected.includes(group.id);
+                                const empty = !count?.present;
 
                                 return (
                                     <label
                                         key={group.id}
                                         className={[
-                                            "flex cursor-pointer items-start gap-3 rounded-[22px] p-4 transition",
-                                            checked
-                                                ? "bg-finn-error/5 shadow-[0_0_0_2px] shadow-finn-error/40"
-                                                : count?.present
-                                                    ? "bg-finn-snow hover:bg-finn-cotton/60"
-                                                    : "bg-finn-snow/60",
+                                            "flex items-start gap-3 rounded-[22px] p-4 transition",
+                                            rowTone(checked, empty),
                                         ].join(" ")}
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            disabled={!count?.present}
-                                            onChange={() =>
-                                                toggle(group.id)
-                                            }
-                                            className="mt-0.5 h-4 w-4 shrink-0 accent-finn-error disabled:cursor-not-allowed"
-                                        />
+                                        {/*
+                                         * An empty group gets a marker, not a
+                                         * greyed-out checkbox: a disabled box
+                                         * reads as "broken", when the truth
+                                         * is there is simply nothing to take.
+                                         */}
+                                        {empty ? (
+                                            <CircleDashed
+                                                aria-hidden="true"
+                                                className="mt-0.5 h-4 w-4 shrink-0 text-finn-iron/50"
+                                            />
+                                        ) : (
+                                            <input
+                                                type="checkbox"
+                                                checked={checked}
+                                                onChange={() =>
+                                                    toggle(group.id)
+                                                }
+                                                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-finn-error"
+                                            />
+                                        )}
 
                                         <span className="min-w-0 flex-1">
                                             <span className="flex flex-wrap items-center gap-2">
@@ -204,6 +261,13 @@ export function DataSettings({
                                                     group.description,
                                                 )}
                                             </span>
+
+                                            {empty && (
+                                                <span className="mt-2 block text-[11px] font-bold leading-4 text-finn-iron/80">
+                                                    Nothing is stored here, so
+                                                    there's nothing to delete.
+                                                </span>
+                                            )}
 
                                             {checked && (
                                                 <span className="mt-2 flex items-start gap-1.5 text-[11px] font-bold leading-4 text-finn-error">
@@ -252,12 +316,35 @@ export function DataSettings({
 
                             <button
                                 type="button"
-                                onClick={() => void refresh()}
-                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black"
+                                onClick={() => void recheck()}
+                                disabled={rechecking}
+                                title="Read storage again, in case something changed in another tab"
+                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black disabled:cursor-wait"
                             >
-                                <RotateCw aria-hidden="true" className="h-3.5 w-3.5" />
-                                Recheck
+                                <RotateCw
+                                    aria-hidden="true"
+                                    className={[
+                                        "h-3.5 w-3.5",
+                                        rechecking ? "animate-spin" : "",
+                                    ].join(" ")}
+                                />
+                                {rechecking ? "Checking…" : "Recheck"}
                             </button>
+
+                            {recheckResult && (
+                                <output className="text-[11px] leading-4 text-finn-iron">
+                                    {recheckResult.length === 0 ? (
+                                        "Checked just now — nothing has changed."
+                                    ) : (
+                                        <>
+                                            <strong className="font-black text-finn-black">
+                                                Updated.
+                                            </strong>{" "}
+                                            {recheckResult.join("; ")}
+                                        </>
+                                    )}
+                                </output>
+                            )}
                         </div>
                     </>
                 )}
@@ -266,6 +353,7 @@ export function DataSettings({
             <ConfirmDialog
                 open={confirming}
                 onOpenChange={setConfirming}
+                eyebrow="Stored data"
                 title={
                     selected.length === STORED_DATA_GROUPS.length
                         ? "Delete everything Finn Lens has stored?"
@@ -298,6 +386,32 @@ export function DataSettings({
             />
         </>
     );
+}
+
+function rowTone(checked: boolean, empty: boolean): string {
+    if (checked) return "cursor-pointer bg-finn-error/5 shadow-[0_0_0_2px] shadow-finn-error/40";
+    if (empty) return "cursor-default bg-finn-snow/60";
+    return "cursor-pointer bg-finn-snow hover:bg-finn-cotton/60";
+}
+
+function selectAllLabel(anythingStored: boolean, everythingSelected: boolean): string {
+    if (!anythingStored) return "Nothing stored to select";
+    return everythingSelected ? "Unselect everything" : "Select everything";
+}
+
+/** "Pinned cars: 2 cars → 3 cars", one per group whose summary moved. */
+function describeChanges(
+    before: StoredDataCount[] | null,
+    after: StoredDataCount[],
+): string[] {
+    return STORED_DATA_GROUPS.flatMap((group) => {
+        const was = before?.find((count) => count.id === group.id)?.summary;
+        const now = after.find((count) => count.id === group.id)?.summary;
+
+        return was === now
+            ? []
+            : [`${group.label}: ${was ?? "—"} → ${now ?? "—"}`];
+    });
 }
 
 /** "Your settings and pinned cars are gone." — named, so it's checkable. */

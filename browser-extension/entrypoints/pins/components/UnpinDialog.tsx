@@ -28,6 +28,7 @@ export function UnpinDialog({
             onOpenChange={(next) => {
                 if (!next) onCancel();
             }}
+            eyebrow="Pinned cars"
             title={many ? `Unpin ${ids?.length} cars?` : "Unpin this car?"}
             confirmLabel={many ? `Unpin ${ids?.length}` : "Unpin"}
             tone="danger"
@@ -40,7 +41,7 @@ export function UnpinDialog({
                             : "This car leaves your comparison and Lens stops ranking it."}
                     </p>
 
-                    <p className="mt-2">
+                    <p className="mt-3">
                         Nothing happens on <FinnLink /> — you can pin{" "}
                         {many ? "them" : "it"} again from the listing at any
                         time.
