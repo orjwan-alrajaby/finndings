@@ -483,6 +483,24 @@ describe("describeFit", () => {
     );
 
     expect(line).toMatch(/hasn't supplied an equipment list/);
+    expect(line).toMatch(/nothing to check your priorities against/);
+  });
+
+  /*
+   * A priority judged on figures survives a missing equipment list, and the
+   * page shows its full result. The headline used to say there was nothing to
+   * check the reader's priorities against while that result sat below it.
+   */
+  it("names the priority still judged when the equipment list is missing", () => {
+    const car = makeCar({ id: 1, features: [], co2: 120 });
+
+    const line = describeFit(
+      buildFitAnalysis(car, ["safetyAssistance", "environmental"], prefs()),
+    );
+
+    expect(line).toMatch(/hasn't supplied an equipment list/);
+    expect(line).toMatch(/most of your priorities have nothing to check against/);
+    expect(line).toMatch(/environmental impact is judged on the car's own figures/i);
   });
 });
 

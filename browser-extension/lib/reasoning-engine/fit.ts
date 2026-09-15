@@ -536,6 +536,15 @@ function describeStrengths(
 /* Copy                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/** The priorities named in a sentence: "Practicality", "A and B", "A, B and C". */
+function joinLabels(priorities: FitPriority[]): string {
+  const labels = priorities.map((item) => phraseLabel(item.label));
+
+  if (labels.length === 1) return labels[0] as string;
+
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
 /**
  * What the headline band is a claim about.
  *
@@ -546,6 +555,25 @@ function describeStrengths(
  */
 export function describeFit(analysis: FitAnalysis): string {
   if (analysis.overall.level === "unknown") {
+    /*
+     * A priority scored on the car's own figures survives a missing equipment
+     * list — `toFitPriority` keeps its band and its sentences — so a flat
+     * "there's nothing to check your priorities against" was contradicted by
+     * the environmental result sitting a few centimetres below it on the same
+     * screen. The exception is named where there is one.
+     */
+    const judged = analysis.priorities.filter(
+      (item) => item.band.level !== "unknown",
+    );
+
+    if (judged.length) {
+      return sentence(
+        "FINN hasn't supplied an equipment list for this car, so most of your",
+        `priorities have nothing to check against — ${joinLabels(judged)}`,
+        `${judged.length === 1 ? "is" : "are"} judged on the car's own figures instead`,
+      );
+    }
+
     return sentence(
       "FINN hasn't supplied an equipment list for this car, so there's nothing",
       "to check your priorities against",
