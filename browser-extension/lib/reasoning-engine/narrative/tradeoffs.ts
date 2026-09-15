@@ -193,9 +193,19 @@ function whyItStillWon(
 
   /* The budget narrowed the field; that is the honest account. */
   if (evaluation.rank > 1 && context.budget.budget != null) {
+    /*
+     * Picked from the cars whose cost couldn't be confirmed when none was
+     * confirmed to fit, and "fits your budget" is not something to say of one.
+     */
+    const confirmed =
+      context.costs[evaluation.vehicle.id]?.budgetStatus === "within";
+
     return sentence(
       "It's still the recommendation because it's the strongest car you pinned",
-      "that fits your budget — not because this gap doesn't matter",
+      confirmed
+        ? "that fits your budget"
+        : "that isn't already over your budget",
+      "— not because this gap doesn't matter",
     );
   }
 

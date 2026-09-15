@@ -15,8 +15,9 @@ import {
 import { makeCar, prefs } from "./test-fixtures";
 
 /**
- * Claims the prose makes about two cars' figures that used to be false in
- * cases the ranking itself handled correctly.
+ * Claims the prose makes about two cars' figures, and budget claims it makes
+ * about the recommendation, that used to be false in cases the ranking itself
+ * handled correctly.
  */
 
 /* -------------------------------------------------------------------------- */
@@ -111,6 +112,60 @@ describe("a category leader with the worse figure", () => {
 
     for (const tradeoff of narrative.tradeoffs) {
       expect(tradeoff.evidence).not.toMatch(/better boot space/);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Budget claims                                                              */
+/* -------------------------------------------------------------------------- */
+
+describe("what is said about the budget", () => {
+  const safety = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
+
+  it("doesn't blame the budget for passing over a car when the recommendation is over it too", () => {
+    const strong = makeCar({ id: 1, name: "Strong", customerMonthly: 900, features: [...safety] });
+    const weak = makeCar({ id: 2, name: "Weak", customerMonthly: 900, featuresSupplied: true });
+
+    const recommendation = buildRecommendation(
+      [strong, weak],
+      ["safetyAssistance"],
+      prefs({ monthlyBudget: 100 }),
+    )!;
+
+    expect(recommendation.isFallback).toBe(true);
+
+    const evaluation = evaluateChallenger(weak, recommendation);
+    const challenge = reasonAboutChallenge(evaluation, recommendation.context);
+
+    expect(challenge?.verdict).not.toMatch(/hard limit/);
+  });
+
+  it("doesn't say an unconfirmed recommendation fits the budget", () => {
+    /* Top scorer over the budget; the next car can't be fully costed. */
+    const over = makeCar({ id: 1, name: "Over", customerMonthly: 2000, features: [...safety] });
+    const unconfirmed = makeCar({ id: 2, name: "Unconfirmed", customerMonthly: 400, extraKmPrice: null, featuresSupplied: true });
+
+    const recommendation = buildRecommendation(
+      [over, unconfirmed],
+      ["safetyAssistance"],
+      prefs({ monthlyBudget: 1000, monthlyKm: 1000 }),
+    )!;
+
+    expect(recommendation.winner.id).toBe(unconfirmed.id);
+    expect(recommendation.evaluation.rank).toBe(2);
+
+    const narrative = buildAdviceNarrative(
+      recommendation.evaluation,
+      recommendation.context,
+      recommendation.alternatives,
+    );
+
+    expect(narrative.verdict.headline).not.toMatch(/fits/);
+    expect(narrative.verdict.budgetNote ?? "").not.toMatch(/does fit/);
+
+    for (const tradeoff of narrative.tradeoffs) {
+      expect(tradeoff.sentences.join(" ")).not.toMatch(/fits your budget/);
     }
   });
 });

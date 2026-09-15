@@ -178,8 +178,25 @@ function describeBudgetOverride(
   return sentence(
     problem.replace(/\.$/, ""),
     `— so ${evaluation.vehicle.name} is the strongest car you pinned`,
-    `that does fit`,
+    fitsConfirmed(evaluation, context)
+      ? "that does fit"
+      : "that isn't already over it, though part of its own cost couldn't be estimated either",
   );
+}
+
+/**
+ * Whether the recommendation itself is confirmed to fit the budget.
+ *
+ * Not implied by being recommended over a higher scorer: with nothing
+ * confirmed to fit, the winner comes from the cars whose cost couldn't be
+ * worked out, and saying it "fits" would be the claim the budget model exists
+ * to refuse.
+ */
+function fitsConfirmed(
+  evaluation: VehicleEvaluation,
+  context: ReasoningContext,
+): boolean {
+  return context.costs[evaluation.vehicle.id]?.budgetStatus === "within";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -319,8 +336,10 @@ export function reasonAboutVerdict(
   const headline =
     evaluation.rank > 1 && budget != null
       ? sentence(
-          `${name} is the strongest match for what you told us that also fits`,
-          `your ${formatEUR(budget)}/month budget`,
+          `${name} is the strongest match for what you told us that`,
+          fitsConfirmed(evaluation, context)
+            ? `also fits your ${formatEUR(budget)}/month budget`
+            : `isn't already over your ${formatEUR(budget)}/month budget`,
         )
       : sentence(`${name} is the strongest match for what you told us`);
 

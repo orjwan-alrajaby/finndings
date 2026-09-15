@@ -309,9 +309,22 @@ function describeVerdict(
   gains: ChallengeLine[],
 ): string {
   const cost = context.costs[evaluation.vehicle.id];
+  const winnerId = evaluation.comparison?.other.vehicleId;
+  const winnerStatus =
+    winnerId == null ? undefined : context.costs[winnerId]?.budgetStatus;
   const totalDifference = evaluation.comparison?.totalDifference ?? 0;
 
-  if (cost?.budgetStatus === "over" && context.budget.budget != null) {
+  /*
+   * The budget is only the reason when it treated the two differently. With
+   * nothing confirmed to fit, the recommendation can be over the budget or
+   * unconfirmed itself, and blaming the budget for passing over this car
+   * would be blaming it for something it did to both.
+   */
+  if (
+    cost?.budgetStatus === "over" &&
+    context.budget.budget != null &&
+    winnerStatus !== "over"
+  ) {
     return sentence(
       `That's why ${winnerName} is the recommendation and this isn't:`,
       `your budget is a hard limit, and ${challengerName} is over it`,
@@ -321,7 +334,7 @@ function describeVerdict(
     );
   }
 
-  if (cost?.budgetStatus === "unknown") {
+  if (cost?.budgetStatus === "unknown" && winnerStatus === "within") {
     return sentence(
       `${winnerName} is the recommendation because its cost could be confirmed`,
       `to fit your budget and ${challengerName}'s couldn't`,
