@@ -14,6 +14,7 @@ import type { PinnedFinnCar } from "@/lib/types";
  */
 
 let storage: Record<string, unknown>;
+let messages: unknown[];
 let document: Document;
 
 /**
@@ -63,6 +64,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
   storage = {};
+  messages = [];
 
   const { document: page, window } = parseHTML(
     `<!doctype html><html><body>
@@ -79,6 +81,11 @@ beforeEach(() => {
       location: { href: "https://www.finn.com/de-DE/subscribe/byd" },
     }),
     browser: {
+      runtime: {
+        sendMessage: async (message: unknown) => {
+          messages.push(message);
+        },
+      },
       storage: {
         local: {
           get: async (keys: string | string[]) =>
@@ -141,6 +148,38 @@ describe("pinControl", () => {
     await settle();
 
     expect(pinned()[36933]?.url).toContain("selected_config=36933");
+  });
+
+  it("pins the card's link even though the panel filled in the page's URL", async () => {
+    /*
+     * What `resolveCar` actually hands the panel for a car it isn't holding
+     * pinned: the page the reader is on, with the config named on it. On a
+     * listing that is the listing, not the car.
+     */
+    const button = pinControl(
+      car({
+        url: "https://www.finn.com/de-DE/subscribe/byd?selected_config=36933",
+        pinnedAt: "",
+      }),
+    );
+    await settle();
+
+    button.click();
+    await settle();
+
+    expect(pinned()[36933]?.url).toBe(
+      "https://www.finn.com/de-DE/models/byd/dolphin?selected_config=36933",
+    );
+  });
+
+  it("tells the other extension pages the pinned set changed", async () => {
+    const button = pinControl(car());
+    await settle();
+
+    button.click();
+    await settle();
+
+    expect(messages).toContainEqual({ type: "PINNED_CARS_UPDATED" });
   });
 
   it("leaves the card's own button telling the truth", async () => {

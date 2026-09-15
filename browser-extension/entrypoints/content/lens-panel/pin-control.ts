@@ -36,13 +36,32 @@ import { PIN_BUTTON_HOOK } from "@/lib/card-controls";
  * named on it is the best available answer.
  */
 function urlFor(car: PinnedFinnCar): string {
-  if (car.url) return car.url;
+  /*
+   * Only a pinned car's own URL is trusted outright. A car resolved from the
+   * browsing cache arrives with the *current page's* URL filled in (see
+   * `asEvaluatable`), so taking that first pinned a listing page rather than
+   * the car whenever the panel was opened from a list.
+   */
+  if (car.pinnedAt && car.url) return car.url;
 
   const link = cardForCar(car.id)?.querySelector<HTMLAnchorElement>(
     "a[href]",
   );
 
-  return link?.href ?? buildCarUrl(window.location.href, car.id);
+  if (link?.href) return link.href;
+
+  return car.url || buildCarUrl(window.location.href, car.id);
+}
+
+/**
+ * Tells the Compare tab, the pinned-cars page and Settings that the set
+ * changed. They listen for this rather than for storage, and the card's pin
+ * button already sends it; a pin from here used to leave them stale.
+ */
+function announcePinnedCarsChanged(): void {
+  void browser.runtime
+    .sendMessage({ type: "PINNED_CARS_UPDATED" })
+    .catch(() => {});
 }
 
 /** Keeps the card's own pin in step with what the panel just did. */
@@ -211,6 +230,7 @@ export function pinControl(car: PinnedFinnCar): HTMLElement {
 
       syncCardButton(car.id, pinned);
       paint();
+      announcePinnedCarsChanged();
     } catch (error) {
       console.error("[FinnLens] couldn't change what's pinned", error);
     } finally {
