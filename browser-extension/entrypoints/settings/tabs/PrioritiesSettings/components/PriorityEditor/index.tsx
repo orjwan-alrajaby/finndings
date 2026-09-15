@@ -86,6 +86,23 @@ export function PriorityEditor({
         feature: FeatureId,
         importance: FeatureImportance,
     ) => {
+        /*
+         * Raising a feature from standard arrives as two calls — toggle it in,
+         * then set its level — and both are computed from this render's
+         * `features`. The second used to map over a list the first feature
+         * was never in, and since it lands last it wrote the old list back:
+         * pressing "Highly" on a standard feature in Settings did nothing.
+         * Adding it here when it is missing makes the second call complete on
+         * its own, so whichever order they land in, the answer is right.
+         */
+        if (!features.some((item) => item.key === feature)) {
+            if (features.length >= MAX_FEATURES_PER_CATEGORY) return;
+
+            onChange([...features, { key: feature, importance }]);
+
+            return;
+        }
+
         onChange(
             features.map((item) =>
                 item.key === feature ? { ...item, importance } : item,
