@@ -33,18 +33,28 @@ async function handlePinButtonClick(
   anchorElement: HTMLElement,
   button: HTMLButtonElement
 ) {
-  pinQueue = pinQueue.then(() => doHandlePinButtonClick(event, anchorElement, button));
+  /*
+   * Now, while the event is still being dispatched. Called from inside the
+   * queue it lands after a pin already in flight has finished, by which time
+   * FINN's card link has had the click and the page has navigated away.
+   */
+  event.preventDefault();
+  event.stopPropagation();
+
+  /* A pin that throws must not leave every later click waiting behind it. */
+  pinQueue = pinQueue
+    .then(() => doHandlePinButtonClick(anchorElement, button))
+    .catch((error: unknown) => {
+      console.error("Failed to pin/unpin car:", error);
+    });
+
   return pinQueue;
 }
 
 async function doHandlePinButtonClick(
-  event: MouseEvent,
   anchorElement: HTMLElement,
   button: HTMLButtonElement
 ) {
-  event.preventDefault();
-  event.stopPropagation();
-
   const context = getPageContext(anchorElement);
   const carConfigId = resolveCarConfigId(anchorElement, context);
 

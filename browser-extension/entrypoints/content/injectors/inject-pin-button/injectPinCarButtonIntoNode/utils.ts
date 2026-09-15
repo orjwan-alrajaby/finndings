@@ -1,7 +1,12 @@
 import {createToast} from "../../../creators/Toast";
 import type { ToastType, ToastCarDetails } from "../../../types.dom";
 
-const CONFIG_ID_PATTERN = /\d{5}/;
+/*
+ * Five digits or more. Today's ids are five, but `\d{5}` would silently drop
+ * a sixth — while `cardConfigId` reads the whole run, so the pin and the
+ * badge on one card would name different cars.
+ */
+const CONFIG_ID_PATTERN = /\d{5,}/;
 
 export function extractConfigId(inputValue: string): number | null {
   const match = inputValue.match(CONFIG_ID_PATTERN);
