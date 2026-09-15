@@ -10,7 +10,7 @@ import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { FEATURE_IMPORTANCE, IMPORTANCE_LEVELS } from "@/lib/reasoning-engine/constants";
-import { analysisBody } from "./sections";
+import { analysisBody, closeInfoTip } from "./sections";
 
 /**
  * The panel's priorities, as disclosures that start open.
@@ -356,7 +356,24 @@ describe("chip explanations", () => {
     first!.click();
     first!.click();
 
-    expect(tipFor(first!)?.classList.contains("hidden")).toBe(true);
+    /* Taken off the panel, so closed tips can't collect in the shadow root. */
+    expect(tipFor(first!)).toBeNull();
+    expect(first!.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  /*
+   * The panel redraws when settings change, and a tip lives outside the
+   * content that is replaced. Left open, it floated on over the new reading.
+   */
+  it("can be closed from outside, as the panel does before it redraws", () => {
+    const [first] = infoButtons();
+
+    first!.click();
+    expect(tipFor(first!)).not.toBeNull();
+
+    closeInfoTip();
+
+    expect(tipFor(first!)).toBeNull();
     expect(first!.getAttribute("aria-expanded")).toBe("false");
   });
 });

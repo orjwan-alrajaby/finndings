@@ -188,6 +188,18 @@ let infoIds = 0;
 
 let closeOpenTip: (() => void) | null = null;
 
+/**
+ * Closes whichever "i" tooltip is open, if one is.
+ *
+ * For the panel to call before it redraws or closes. A tip lives on the
+ * shadow root, outside the content a render replaces, so one left open would
+ * float on over the next car — and keep its listeners on FINN's document
+ * after the panel has gone.
+ */
+export function closeInfoTip(): void {
+  closeOpenTip?.();
+}
+
 function infoTip(options: {
   /** What the button is called, for a screen reader: the question it answers. */
   label: string;
@@ -238,6 +250,13 @@ function infoTip(options: {
 
   let hovered = false;
   let pinned = false;
+
+  /*
+   * The root the scroll listener went on. Asked again at close, a button the
+   * panel has since thrown away reports its own detached subtree instead,
+   * and the listener was never taken off the root that has it.
+   */
+  let openedOn: ParentNode | null = null;
 
   /* The shadow root in the panel; the detached tree in a test; the body on a page. */
   const rootOf = (): ParentNode => {
@@ -291,6 +310,8 @@ function infoTip(options: {
 
     const root = rootOf();
 
+    openedOn = root;
+
     if (!tip.parentNode) root.append(tip);
 
     tip.classList.remove("hidden");
@@ -322,11 +343,13 @@ function infoTip(options: {
 
     if (closeOpenTip === close) closeOpenTip = null;
 
-    const root = rootOf();
+    /* Off the panel rather than hidden on it, so closed tips don't pile up. */
+    tip.remove();
 
     button.ownerDocument.removeEventListener("pointerdown", onOutside, true);
     button.ownerDocument.removeEventListener("keydown", onKey, true);
-    root.removeEventListener("scroll", place, true);
+    openedOn?.removeEventListener("scroll", place, true);
+    openedOn = null;
   }
 
   const sync = () => (pinned || hovered ? open() : close());

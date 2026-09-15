@@ -12,7 +12,7 @@ import {
 } from "./dom";
 import { hasRoomBeside, PANEL_WIDTH } from "./panel-width";
 import { clearHighlight, highlightConfiguration } from "./highlight";
-import { analysisBody, defaultsNotice } from "./sections";
+import { analysisBody, closeInfoTip, defaultsNotice } from "./sections";
 import { pinControl } from "./pin-control";
 import { resolveCar } from "./currentCar";
 
@@ -221,6 +221,7 @@ async function render(
    */
   isCurrent: () => boolean,
 ): Promise<void> {
+  closeInfoTip();
   empty(into);
   /*
    * Emptied on every render, and filled again only once there is a car to pin.
@@ -560,6 +561,8 @@ async function build(request: PanelRequest): Promise<Panel> {
 
   const destroy = () => {
     generation += 1;
+
+    closeInfoTip();
 
     browser.storage.onChanged.removeListener(onStorageChanged);
     window.removeEventListener("keydown", onKeyDown, true);
