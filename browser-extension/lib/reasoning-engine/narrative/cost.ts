@@ -198,8 +198,9 @@ export function reasonAboutCost(
     describeComposition(subject, context.preferences.monthlyKm),
     unknowns.length
       ? sentence(
-          `We couldn't work out ${unknowns.join(" or ")}, so the real figure is higher`,
-          "than the number above — we've left it out rather than counting it as zero",
+          `We couldn't work out ${unknowns.join(" or ")}, so the real cost is higher`,
+          `than the ${formatEUR(subject.total)}/month above`,
+          "— we've left it out rather than counting it as zero",
         )
       : null,
     rival ? describeAgainst(subject, rival, "rival") : null,

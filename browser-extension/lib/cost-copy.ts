@@ -1,5 +1,11 @@
 import type { FitAnalysis } from "./reasoning-engine/fit";
-import type { CostAnalysis, CostLine } from "./reasoning-engine/types";
+import type {
+  ContractType,
+  CostAnalysis,
+  CostFactSource,
+  CostLine,
+} from "./reasoning-engine/types";
+import type { FuelType } from "./types";
 import { classifyMonthlyCostGap } from "./reasoning-engine/narrative/magnitude";
 
 import { formatEUR, formatKm } from "./reasoning-engine";
@@ -221,4 +227,79 @@ export function compareCosts(
       : compare("total", "Total a month", null, null);
 
   return [...lines, totals];
+}
+
+/* -------------------------------------------------------------------------- */
+/* The bill, as it is drawn                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The mark beside a line of the bill.
+ *
+ * Named rather than drawn, for the reason the environmental table's rows are:
+ * the panel draws from its own copied set of shapes and React from lucide, and
+ * neither surface should be the one deciding what the energy line looks like.
+ *
+ * A receipt for what FINN charges, a road for the kilometres past the ones the
+ * contract includes, and for energy the same mark that car's consumption
+ * carries in "How much it uses" — so the pump in the bill and the pump in the
+ * section below it are plainly the same fact, priced and then measured.
+ */
+export type CostIcon = "receipt" | "fuel" | "zap" | "route";
+
+export function costIcon(line: CostLine, fuelType: FuelType | null | undefined): CostIcon {
+  if (line.id === "subscription") return "receipt";
+  if (line.id === "excessMileage") return "route";
+
+  return fuelType === "Electric" ? "zap" : "fuel";
+}
+
+/**
+ * Where a number came from, said in three words.
+ *
+ * Every line of the bill is one of three things, and which one changes what a
+ * reader should do about it: FINN's own charge is a fact about the contract,
+ * an estimate is ours to be wrong about, and a setting is theirs to change.
+ * Worth a line under each label rather than a footnote at the bottom.
+ */
+export const COST_SOURCE_LABEL: Record<CostFactSource, string> = {
+  finn: "FINN charges this",
+  estimate: "Lens estimate",
+  user: "Your setting",
+};
+
+/**
+ * The same three, in colour, on the circle the line's mark sits in.
+ *
+ * Blue for FINN's own figures, navy for ours, plain cotton for the reader's —
+ * the tints the advice page already tags its cost facts with, so a reader who
+ * has seen that page reads the same three colours to mean the same three
+ * things here. Never green or red: this says where a number came from, not
+ * whether it is good news.
+ */
+export const COST_SOURCE_TONE: Record<CostFactSource, string> = {
+  finn: "bg-finn-pale-blue text-finn-accent-blue",
+  estimate: "bg-finn-highlight-navy/10 text-finn-highlight-navy",
+  user: "bg-finn-cotton text-finn-black",
+};
+
+/**
+ * Which contract the subscription price is being read on, for a pill beside
+ * that line of the bill.
+ *
+ * FINN advertises two prices for the same car and Lens shows one of them —
+ * whichever the reader picked in settings. Which one is not a detail: the
+ * business price is the one without VAT, and a reader seeing the wrong one has
+ * every figure below it wrong by a fifth. It was said only inside the line's
+ * explanation, where a reader has to go looking for it to find out that the
+ * total rests on an assumption they may not remember making.
+ *
+ * Null on every other line, because they are the same either way — the
+ * decision about which line carries it belongs here rather than in each of the
+ * two renderers.
+ */
+export function contractTag(line: CostLine, contract: ContractType): string | null {
+  if (line.id !== "subscription") return null;
+
+  return contract === "business" ? "Business" : "Private";
 }

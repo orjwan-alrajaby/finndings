@@ -25,6 +25,7 @@ import {
 import { formatNumber } from "./format";
 import {
   assessEnvironment,
+  assessEnvironmentOrGaps,
   type EnvironmentalAssessment,
 } from "./environmental";
 
@@ -473,7 +474,17 @@ export function categoryDetail(
     featureScore,
     numericScore: numeric?.score ?? null,
     numeric: numeric?.evidence ?? null,
-    environmental: numeric?.environmental ?? null,
+    /*
+     * Carried even when there is no CO₂ figure to score. The priority stays
+     * unscored and reads "Not enough data", but the reader can still be told
+     * exactly what FINN didn't publish, and shown what it did (fuel use),
+     * instead of the environmental result vanishing. With neither figure
+     * published it still carries what the car runs on, so the table can
+     * show that fuel's reference.
+     */
+    environmental:
+      numeric?.environmental ??
+      (category === "environmental" ? assessEnvironmentOrGaps(vehicle) : null),
     hasEvidence: featureScore != null || numeric != null,
   };
 }

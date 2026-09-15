@@ -1,349 +1,207 @@
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-
-import {
-    describeEmissionsVersusEfficiency,
-    describeEnvironment,
-    environmentalTags,
-    type EnvironmentalAssessment,
-    type EnvironmentalTag,
-} from "@/lib/reasoning-engine/environmental";
-import { formatNumber } from "@/lib/reasoning-engine/format";
-import { EnvironmentalMethod } from "@/components/EnvironmentalMethod";
-import { ExportTable, type ExportRow } from "@/components/ExportTable";
+import { BandChip } from "@/components/FitAnalysisView/parts";
+import { ComparisonTable } from "@/components/ComparisonTable";
+import { readEnvironment, type EnvironmentReading } from "@/lib/environment-copy";
+import type { EnvironmentalAssessment } from "@/lib/reasoning-engine/environmental";
+import type { FitBand } from "@/lib/reasoning-engine/fit";
+import { ROW_TONE } from "@/lib/row-tone";
+import { goToUsage } from "@/lib/usage-anchor";
 
 /**
- * The environmental reading, in the order a reader needs it.
+ * The environmental result, in the order a reader asks for it.
  *
- * Every surface that showed this priority used to open on how the judgement is
- * made and close on what the car actually is: six method cards, then a table of
- * bare figures, and the interpretation nowhere. That is the wrong way round.
- * Somebody looking at a car wants the result first, the numbers behind it
- * second, what those numbers mean together third, the limits fourth — and the
- * method only if they go looking for it.
+ *   1. the verdict       what the figure means in plain words, the figure
+ *                        itself in one sentence, and — where this is the only
+ *                        place carrying them — the number, the class and the
+ *                        match. Somebody who knows nothing about cars can stop
+ *                        here and be right about this car.
+ *   2. the plug-in note  only for a plug-in hybrid, and above the table it
+ *                        changes how to read
+ *   3. the table         this car's CO₂ against the FINN Lens benchmark, with a
+ *                        bar for the relationship between the two figures,
+ *                        the class pill beside the row's name, an "i" at its
+ *                        far right, and a disclaimer
+ *   4. the meaning       where the car lands against the comparison point, and
+ *                        why that is the match it got
+ *   5. the usage line    for a petrol or diesel car, that its fuel use goes
+ *                        with this result, and where to find it
  *
- * So the order here is fixed and the same everywhere:
+ * The reordering is the point. This used to open with a paragraph carrying the
+ * figure, the comparison and the conclusion at once, which meant the section's
+ * plainest fact arrived welded to two claims about how FINN Lens scores things.
  *
- *   1. what this car is        — the emissions result, in words
- *   2. what it's tagged with   — powertrain, class, emissions, efficiency,
- *                                each one tappable for "says who?"
- *   3. what it's built on      — the two figures
- *   4. what they mean together — where emissions and efficiency disagree
- *   5. what it doesn't cover   — the caveats this car actually needs
- *   6. how it's worked out     — folded away
+ * How the priority is worked out is not here, and not because it doesn't
+ * matter: it is a question about the reader's own setup rather than about the
+ * car in front of them, and it is answered in full where the priority is set
+ * — `EnvironmentalMethod`, in the settings editor and the compare drawer.
+ * Carried here as well, it put six notes on the regulation under every car a
+ * reader looked at.
  *
- * `concise` stops after the caveat, for the Advice page where this is one
- * priority among five. `detailed` runs the whole thing, for a drawer opened
- * about one car.
+ * Every word comes from `readEnvironment`, which the in-page panel's
+ * `impactBreakdown` reads too; this file only lays it out, in the table
+ * `ComparisonTable` draws for this section and for "How much it uses".
  */
 export function EnvironmentalResult({
     assessment,
-    variant = "detailed",
+    band,
+    showHeadline = false,
+    roomy = false,
 }: {
-    assessment: EnvironmentalAssessment;
-    variant?: "concise" | "detailed";
-}) {
-    const { co2, efficiency, missing } = assessment;
-    const detailed = variant === "detailed";
-
-    const tags = environmentalTags(assessment);
-
-    const interpretation = detailed
-        ? describeEmissionsVersusEfficiency(assessment)
-        : null;
-
-    /*
-     * One caveat on the Advice page, all of them in the drawer. They are
-     * ordered most-specific-first in the engine, so the one that survives the
-     * cut is the one about this kind of car rather than the one every car
-     * carries.
+    /**
+     * Null when FINN published nothing this priority can use; the result
+     * then says so rather than disappearing.
      */
-    const caveats = detailed
-        ? assessment.caveats
-        : assessment.caveats.slice(0, 1);
+    assessment: EnvironmentalAssessment | null;
+    /** The priority's own band, as the engine produced it. */
+    band: FitBand;
+    /**
+     * The CO₂ number and the band, above the answer. Off where the host's
+     * header already carries them, as the panel's and the pinned card's do.
+     */
+    showHeadline?: boolean;
+    /** The advice page's larger reading size. */
+    roomy?: boolean;
+}) {
+    const reading = readEnvironment(assessment, band);
+
+    const body = roomy
+        ? "text-sm leading-6 text-finn-black"
+        : "text-[13px] leading-5 text-finn-black";
 
     return (
-        <div className="mt-3 flex flex-col gap-3">
-            {/* 1. The result. */}
-            <p className="text-[13px] leading-5 text-finn-black">
-                {describeEnvironment(assessment)}
-            </p>
+        /*
+          * gap-4 rather than gap-3. Four things sit here — the answer, the
+          * evidence, the reasoning and the method — and at three they read as
+          * one undifferentiated column of boxes.
+          */
+        <div className="@container mt-3 flex flex-col gap-4">
+            <Verdict
+                reading={reading}
+                band={band}
+                showHeadline={showHeadline}
+                roomy={roomy}
+            />
 
-            {/* 2. What it's tagged with, and where each tag comes from. */}
-            <TagRow tags={tags} />
-
-            {/* 3. The figures the tags are read off. */}
-            {(co2 || efficiency) && (
-                <dl className="grid gap-1.5 sm:grid-cols-2">
-                    {co2 && (
-                        <Readout
-                            label="CO₂ while driving"
-                            value={`${formatNumber(co2.gPerKm)} g/km`}
-                            meaning="Measured under the EU's official test"
-                        />
-                    )}
-
-                    {efficiency && (
-                        <Readout
-                            label="Energy it uses"
-                            value={efficiency.display}
-                            meaning={`${efficiency.typical} for this kind of car`}
-                        />
-                    )}
-
-                    {/*
-                      * A plug-in hybrid's consumption is shown and not
-                      * graded. One blended figure covering two energy
-                      * sources has no cohort to be frugal within, and FINN
-                      * publishes no separate electric consumption to build
-                      * one from.
-                      */}
-                    {!efficiency &&
-                        assessment.powertrain === "Plug-in Hybrid" && (
-                            <Readout
-                                label="Energy it uses"
-                                value="One combined figure"
-                                meaning="FINN publishes a single blended number for plug-in hybrids, which can't be compared with either petrol or electric cars."
-                            />
-                        )}
-                </dl>
-            )}
-
-            {/* 4. What the two figures mean when read together. */}
-            {interpretation && (
-                <div className="rounded-2xl bg-finn-pale-blue px-3 py-2.5">
-                    <p className="text-[12px] font-black text-finn-black">
-                        {interpretation.heading}
+            {reading.note && (
+                <div className="rounded-[20px] bg-finn-warning-lift/60 px-4 py-3.5">
+                    <p className="text-[12px] font-black text-finn-warning-ink">
+                        {reading.note.title}
                     </p>
 
-                    <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                        {interpretation.body}
+                    <p className="mt-1.5 text-[12px] leading-[18px] text-finn-warning-ink/90">
+                        {reading.note.body}
                     </p>
                 </div>
             )}
 
-            {/* 5. What it can't tell you. Kept, but after the answer. */}
-            {caveats.length > 0 && (
-                <div className="flex flex-col gap-1">
-                    {caveats.map((caveat) => (
-                        <p
-                            key={caveat}
-                            className="text-[11px] leading-4 text-finn-iron"
-                        >
-                            {caveat}
-                        </p>
-                    ))}
-                </div>
-            )}
+            <ComparisonTable reading={reading} />
 
-            {missing.length > 0 && (
-                <p className="text-[11px] leading-4 text-finn-iron">
-                    FINN doesn't publish {listOf(missing)} for this car, so
-                    that part is left out rather than guessed.
+            {reading.meaning.map((line) => (
+                <p key={line} className={body}>
+                    {line}
+                </p>
+            ))}
+
+            {/*
+              * Where fuel use meets this result, last and quieter: a pointer to
+              * "How much it uses" rather than a second copy of it, with its
+              * last words taking the reader there.
+              */}
+            {reading.usage && (
+                <p
+                    data-usage=""
+                    className={
+                        roomy
+                            ? "text-[13px] leading-5 text-finn-iron"
+                            : "text-[12px] leading-[18px] text-finn-iron"
+                    }
+                >
+                    {`${reading.usage.text} `}
+                    <button
+                        type="button"
+                        data-usage-link=""
+                        onClick={(event) => goToUsage(event.currentTarget)}
+                        className="cursor-pointer font-bold text-finn-accent-blue underline underline-offset-2 hover:text-finn-highlight-navy"
+                    >
+                        {reading.usage.section}
+                    </button>
+                    {"."}
                 </p>
             )}
-
-            {/* 6. The method, for whoever wants to check it. */}
-            {detailed && <MethodDisclosure />}
         </div>
     );
 }
 
-/** A figure and, next to it, what that figure means. */
-function Readout({
-    label,
-    value,
-    meaning,
+/**
+ * The answer, before any of the working, and the largest thing on the screen.
+ *
+ * A filled card on the tone's own pale ground: the reading in words set as a
+ * heading — "Moderate emissions" — over one plain sentence, with the figure,
+ * the class and the match on a quiet line above. Green, amber, orange or red
+ * before a word of it is read, so a reader who has never seen a g/km figure
+ * has the answer from its colour and its largest line.
+ *
+ * No coloured edge. The card is already a field of the tone, and a 4px rule
+ * down the side of a filled card is the visual language of a documentation
+ * callout — which is the thing this section was trying to stop being.
+ *
+ * The figure, the class and the match appear only where this component is the
+ * only thing carrying them: inside the in-page panel and the pinned car's card
+ * the priority header above has already said the number and the band, and the
+ * class pill is on the CO₂ card below.
+ */
+function Verdict({
+    reading,
+    band,
+    showHeadline,
+    roomy,
 }: {
-    label: string;
-    value: string;
-    meaning: string;
+    reading: EnvironmentReading;
+    band: FitBand;
+    showHeadline: boolean;
+    roomy: boolean;
 }) {
-    return (
-        <div className="rounded-xl bg-finn-cotton px-3 py-2">
-            <dt className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                {label}
-            </dt>
-
-            <dd>
-                <span className="block text-sm font-black text-finn-black">
-                    {value}
-                </span>
-
-                <span className="mt-0.5 block text-[11px] leading-4 text-finn-iron">
-                    {meaning}
-                </span>
-            </dd>
-        </div>
-    );
-}
-
-/**
- * The method, closed.
- *
- * It used to be six cards sitting open above the car's own result, which meant
- * the first thing a reader met was a defence of the model rather than an
- * answer about the car. Nothing has been removed — it is one click away, and
- * the label says plainly what is behind it.
- */
-function MethodDisclosure() {
-    const [open, setOpen] = useState(false);
+    const tone = ROW_TONE[reading.verdict.tone];
 
     return (
-        <div>
-            <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpen((was) => !was)}
-                className="flex items-center gap-1 text-[11px] font-black text-finn-accent-blue"
-            >
-                How Finn Lens works this out
-
-                <ChevronDown
-                    aria-hidden="true"
-                    className={[
-                        "h-3.5 w-3.5 transition-transform",
-                        open ? "rotate-180" : "",
-                    ].join(" ")}
-                />
-            </button>
-
-            {open && (
-                <div className="mt-2">
-                    <EnvironmentalMethod />
-                </div>
-            )}
-        </div>
-    );
-}
-
-/**
- * The labels, each one a question the reader can ask.
- *
- * "Above-average emissions" and "Moderately efficient" both invite the same
- * question — average by whose reckoning, efficient against what? — and the
- * answers are genuinely different in kind: the class letter is set in law, the
- * emissions average is an observation with no legal force, and the consumption
- * benchmark is derived here because none is published. None of that belongs in
- * the reader's way, and all of it belongs one tap from the claim it justifies.
- *
- * One open at a time: this is a footnote, not a second article.
- */
-function TagRow({ tags }: { tags: EnvironmentalTag[] }) {
-    const [openId, setOpenId] = useState<string | null>(null);
-
-    if (tags.length === 0) return null;
-
-    const open = tags.find((tag) => tag.id === openId) ?? null;
-
-    return (
-        <div>
-            {/*
-              * Tappable on screen, where one open footnote at a time is the
-              * whole point of the design. In an exported file none of them
-              * can be opened, so every answer is spelled out below instead.
-              */}
-            <div className="finn-lens-screen-only flex flex-wrap gap-1.5">
-                {tags.map((tag) => (
-                    <button
-                        key={tag.id}
-                        type="button"
-                        aria-expanded={tag.id === openId}
-                        onClick={() =>
-                            setOpenId((was) =>
-                                was === tag.id ? null : tag.id,
-                            )
-                        }
-                        className={[
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-1",
-                            "text-[11px] font-black transition",
-                            TAG_CLASS[tag.tone],
-                            tag.id === openId
-                                ? "ring-2 ring-finn-accent-blue/40"
-                                : "",
-                        ].join(" ")}
-                    >
-                        {tag.label}
-
-                        <span
-                            aria-hidden="true"
-                            className="grid h-3.5 w-3.5 place-items-center rounded-full border border-current text-[8px] leading-none opacity-70"
-                        >
-                            i
+        <div
+            className={`rounded-[22px] ${tone.ground} ${roomy ? "px-5 py-5" : "px-4 py-4"}`}
+        >
+            {showHeadline && (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                    {reading.headline && (
+                        <span className="text-[15px] font-black tabular-nums text-finn-black">
+                            {reading.headline}
                         </span>
-                    </button>
-                ))}
-            </div>
+                    )}
 
-            {open && (
-                <div className="finn-lens-screen-only mt-2 rounded-2xl bg-finn-cotton px-3 py-2.5">
-                    <p className="text-[12px] font-black text-finn-black">
-                        {open.title}
-                    </p>
+                    {reading.rating && (
+                        <span
+                            className={`inline-flex items-center rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-black ${ROW_TONE[reading.rating.tone].ink}`}
+                        >
+                            {reading.rating.label}
+                        </span>
+                    )}
 
-                    <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                        {open.body}
-                    </p>
+                    <BandChip level={band.level} label={band.label} compact />
                 </div>
             )}
 
-            <ExportTable
-                caption="What this car is tagged with, and where each tag comes from"
-                subjectHeading="Tag · how it reads"
-                detailHeading="Says who?"
-                rows={tags.map(exportRow)}
-            />
+            {/*
+              * The plain words, at heading size. Tightened tracking because
+              * `font-black` at this size sets loose, and these are two or
+              * three words that have to read as one object.
+              */}
+            <p
+                className={`font-black tracking-[-0.015em] ${tone.ink} ${roomy ? "text-[24px] leading-7" : "text-[18px] leading-6"}`}
+            >
+                {reading.verdict.words}
+            </p>
+
+            <p
+                className={`mt-2 ${roomy ? "text-sm leading-6" : "text-[13px] leading-5"} text-finn-black/85`}
+            >
+                {reading.verdict.plain}
+            </p>
         </div>
     );
-}
-
-/**
- * A tag with its footnote already unfolded.
- *
- * The "how it reads" line is the tag's tone said in words. On screen the
- * colour carries it and the reader has the other chips beside it for scale;
- * on a printed sheet, where a row may be read alone and possibly in grey,
- * the colour cannot be the only thing saying whether this is the good answer
- * or the poor one.
- */
-const TAG_STANDING: Record<EnvironmentalTag["tone"], string> = {
-    positive: "The strong answer",
-    caution: "Worth weighing",
-    neutral: "Neither good nor bad",
-};
-
-function exportRow(tag: EnvironmentalTag): ExportRow {
-    return {
-        key: tag.id,
-        tone: tag.tone,
-        subject: tag.label,
-        standing: TAG_STANDING[tag.tone],
-        detail: (
-            <>
-                <span className="block font-black text-finn-black">
-                    {tag.title}
-                </span>
-
-                <span className="mt-0.5 block text-finn-iron">{tag.body}</span>
-            </>
-        ),
-    };
-}
-
-/**
- * Coloured by what the label says, so cars separate in a list before they are
- * read. Deliberately not a red-to-green scale: this measures one quantity, and
- * traffic lights would read as a verdict on the car.
- */
-const TAG_CLASS: Record<EnvironmentalTag["tone"], string> = {
-    positive: "bg-finn-pale-blue text-finn-accent-blue",
-    neutral: "bg-finn-cotton text-finn-iron",
-    caution: "bg-finn-warning/10 text-finn-warning",
-};
-
-/** "its CO₂ figure and what it consumes". */
-function listOf(items: string[]): string {
-    if (items.length <= 1) return items[0] ?? "";
-
-    return `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
 }

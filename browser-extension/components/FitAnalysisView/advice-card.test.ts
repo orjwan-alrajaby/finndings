@@ -83,7 +83,7 @@ describe("the advice card says what the panel says", () => {
   it("keeps the estimate disclaimer with the estimates", () => {
     const text = card({ id: 4, consumption: 6 });
 
-    const disclaimer = at(text, "These numbers are estimates");
+    const disclaimer = at(text, "Every figure in this bill is an estimate");
     const priorities = at(text, "Your priority #1");
 
     expect(disclaimer).toBeGreaterThanOrEqual(0);
@@ -93,8 +93,24 @@ describe("the advice card says what the panel says", () => {
   it("grades consumption for a car whose reader never ranked the environment", () => {
     const text = card({ id: 5, fuelType: "Petrol", consumption: 4 });
 
-    expect(text).toContain("Highly efficient");
-    expect(text).toContain("WLTP");
+    expect(text).toContain("Very low fuel use");
+    /* The unit in words and the test caveat, as one explanation behind the car's "i". */
+    expect(text).toContain("L/100km tells you how much fuel a car uses to travel 100 kilometres");
+    expect(text).toContain(
+      "The figure comes from the official EU test, which makes it useful for comparing cars. Real-world use is usually higher",
+    );
+    expect(text).not.toMatch(/WLTP|combustion|carbon content/);
+  });
+
+  it("names the consumption reference as FINN Lens's, as the panel does", () => {
+    const text = card({ id: 12, fuelType: "Petrol", consumption: 5.5 });
+
+    expect(text).toContain("This car consumes 5.5 litres of petrol per 100 km");
+    expect(text).toContain("FINN Lens benchmark");
+    expect(text).toContain("FINN Lens's comparison point, not an official average");
+    expect(text).toContain("so its fuel use is broadly in line with the benchmark");
+    expect(text).toContain("Where does the FINN Lens benchmark come from?");
+    expect(text).not.toMatch(/typical for its kind|too close to call/i);
   });
 
   it("moves the fuel type beside the judgement it governs", () => {

@@ -116,7 +116,7 @@ export function ExportTable({
                         <div
                             key={row.key}
                             className={[
-                                "grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-x-4 rounded-r-xl border-l-4 py-2.5 pl-3 pr-3",
+                                "grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-x-4 border-l-4 py-2.5 pl-3 pr-3",
                                 tone.edge,
                                 tone.ground,
                             ].join(" ")}

@@ -8,6 +8,7 @@ import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { EnvironmentalResult } from "@/components/EnvironmentalResult";
+import { classifyFit } from "@/lib/reasoning-engine/fit";
 import { ExportTable, type ExportRow } from "@/components/ExportTable";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 
@@ -84,7 +85,12 @@ export function PrioritySection({
           */
         <section className="rounded-[22px] bg-white p-5 sm:p-6">
             <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-finn-accent-blue">
+                {/*
+                  * Hidden on a phone. At 390px this column cost every
+                  * priority 48px of a card that is barely 300px wide, and
+                  * the rank and name above the text say the same thing.
+                  */}
+                <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-finn-pale-blue text-finn-accent-blue sm:flex">
                     <PriorityIcon name={reasoning.icon} className="h-5 w-5" />
                 </div>
 
@@ -119,10 +125,15 @@ export function PrioritySection({
                       * other priority is explained by the feature lists
                       * below, so the generic path is right for them.
                       */}
-                    {reasoning.environmental ? (
+                    {reasoning.priority === "environmental" ? (
                         <EnvironmentalResult
                             assessment={reasoning.environmental}
-                            variant="concise"
+                            band={classifyFit(
+                                reasoning.score,
+                                reasoning.hasEvidence,
+                            )}
+                            showHeadline
+                            roomy
                         />
                     ) : (
                         <>

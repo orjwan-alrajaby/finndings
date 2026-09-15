@@ -16,12 +16,22 @@ import {
 export function Section({
     title,
     children,
+    anchor,
 }: {
     title: string;
     children: React.ReactNode;
+    /** `data-section`, for a link elsewhere on the card to scroll to. */
+    anchor?: string;
 }) {
     return (
-        <section className="border-t border-finn-cotton px-5 py-4">
+        <section
+            data-section={anchor}
+            /*
+              * Clear of the pins page's two sticky bars when scrolled to; see
+              * `STUCK` in `pins/App.tsx`.
+              */
+            className={`border-t border-finn-cotton px-5 py-4 ${anchor ? "scroll-mt-38 outline-none" : ""}`}
+        >
             <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
                 {title}
             </h3>

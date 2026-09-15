@@ -2,13 +2,17 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDown } from "lucide-react";
 
 import { EnvironmentalResult } from "@/components/EnvironmentalResult";
-import {
-    FeatureChip,
-    type FeatureChipTone,
-} from "@/components/FeatureChip";
+import { FactRow, FactTable } from "@/components/FactTable";
+import { FeatureChip } from "@/components/FeatureChip";
+import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { describeCoverage } from "@/lib/car-labels";
-import type { FitFeature, FitPriority } from "@/lib/reasoning-engine/fit";
+import {
+    featureGroupsOf,
+    type FeatureGroup,
+    type InfluenceBand,
+} from "@/lib/feature-copy";
+import type { FitPriority } from "@/lib/reasoning-engine/fit";
 
 import { BandChip } from "./parts";
 
@@ -88,8 +92,11 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
                       * the same reading, three surfaces, three different
                       * amounts of it. There is one renderer now.
                       */}
-                    {priority.impact ? (
-                        <EnvironmentalResult assessment={priority.impact} />
+                    {priority.priority === "environmental" ? (
+                        <EnvironmentalResult
+                            assessment={priority.impact}
+                            band={priority.band}
+                        />
                     ) : (
                         priority.sentences.length > 0 && (
                             <div className="flex flex-col gap-1.5">
@@ -116,7 +123,7 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
                       * only place the figures appear, so it stays.
                       */}
                     {priority.measurements.length > 0 &&
-                        !priority.impact &&
+                        priority.priority !== "environmental" &&
                         priority.sentences.length === 0 && (
                         <dl className="flex flex-wrap gap-x-4 gap-y-1">
                             {priority.measurements.map((fact) => (
@@ -133,7 +140,8 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
                         </dl>
                     )}
 
-                    {!priority.hasEvidence && (
+                    {!priority.hasEvidence &&
+                        priority.priority !== "environmental" && (
                         <p className="text-[12px] leading-[18px] text-finn-iron">
                             FINN's data doesn't carry anything we can judge
                             this priority on for this car.
@@ -146,135 +154,111 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
 }
 
 /**
- * What the car has and hasn't, in this priority, in four groups.
+ * What the car has and hasn't, in this priority, in the five groups
+ * `featureGroupsOf` sorts it into.
  *
- * The same four the in-page panel and the Advice page draw, in the same
- * order, because they answer four different questions: what you asked for and
- * got, what you asked for and didn't, what else counted and it has, and what
- * else counted and it hasn't.
+ * One table rather than five soft grey boxes. Each group is a row edged in the
+ * colour of its answer — blue for a pick the car meets, red for one it
+ * misses, green for equipment that counted anyway, grey for the rest — which
+ * is the same edge the environmental result and "How much it uses" use, and it
+ * carries the distinction the grouping exists to make before a word is read.
  *
- * Each is its own block rather than a heading over a list. Four labels of the
- * same size, a line apart, are read as one long list with words in it — the
- * distinction the grouping exists to make was being lost in the layout that
- * carried it.
+ * The panel's twin is `featureGroups` in `lens-panel/sections.ts`; the five
+ * titles and their colours are decided in `lib/feature-copy` so the two
+ * surfaces can't drift on which question they are answering.
  */
 function FeatureGroups({ priority }: { priority: FitPriority }) {
-    const has = (feature: FitFeature) => feature.state === "present";
-    const hasnt = (feature: FitFeature) => feature.state === "absent";
-    const unknown = (feature: FitFeature) => feature.state === "unknown";
+    const groups = featureGroupsOf(priority);
 
-    const asked = priority.picked;
-    const rest = priority.alsoCounted;
-
-    if (asked.length === 0 && rest.length === 0) return null;
+    if (!groups.length) return null;
 
     return (
-        <div className="flex flex-col gap-2.5">
-            <FeatureGroup
-                title="You gave extra influence, and it has"
-                features={asked.filter(has)}
-                mark="present"
-                picked
-            />
-
-            <FeatureGroup
-                title="You gave extra influence, but it doesn't have"
-                features={asked.filter(hasnt)}
-                mark="absent"
-                picked
-            />
-
-            <FeatureGroup
-                title={
-                    asked.length ? "Also counted here, and it has" : "It has"
-                }
-                features={rest.filter(has)}
-                mark="present"
-            />
-
-            <FeatureGroup
-                title={
-                    asked.length
-                        ? "Also counted here, but it doesn't have"
-                        : "It doesn't have"
-                }
-                features={rest.filter(hasnt)}
-                mark="absent"
-            />
-
-            <FeatureGroup
-                title="FINN didn't say either way"
-                features={[...asked, ...rest].filter(unknown)}
-                mark="unknown"
-            />
-        </div>
+        <FactTable>
+            {groups.map((group) => (
+                <Group key={group.id} group={group} />
+            ))}
+        </FactTable>
     );
 }
 
-/** The mark on a group's label, in the colour its answer already uses. */
-const GROUP_MARK: Record<FitFeature["state"], string> = {
-    present: "bg-finn-influence-emerald",
-    absent: "bg-finn-warning",
-    unknown: "bg-finn-iron",
-};
-
-/**
- * The chip's colour: what the car does about this, and whether the reader
- * asked for it.
- *
- * A pick the car is missing is the loudest thing in the group and gets the
- * warning tint; the same gap in equipment nobody asked about is a fact, not a
- * problem, and stays quiet.
- */
-function toneFor(feature: FitFeature, picked: boolean): FeatureChipTone {
-    if (feature.state === "present") return picked ? "present" : "quiet";
-    if (feature.state === "absent" && picked) return "missing";
-
-    return "quiet";
-}
-
-function FeatureGroup({
-    title,
-    features,
-    mark,
-    picked = false,
-}: {
-    title: string;
-    features: FitFeature[];
-    mark: FitFeature["state"];
-    /** Whether these are the reader's own picks, which sets the accent. */
-    picked?: boolean;
-}) {
-    if (!features.length) return null;
-
+function Group({ group }: { group: FeatureGroup }) {
     return (
-        <div className="rounded-xl bg-finn-snow px-3 py-2.5">
-            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron">
-                <span
-                    aria-hidden="true"
-                    className={[
-                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                        GROUP_MARK[mark],
-                    ].join(" ")}
-                />
-
-                <span>
-                    {title} ({features.length})
-                </span>
+        /* A row carrying three headings and three clouds of chips needs more
+           room than one carrying a label and a line of them. */
+        <FactRow
+            tone={group.tone}
+            data-group={group.id}
+            className={`px-3.5 ${group.bands ? "py-4" : "py-3"}`}
+        >
+            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron">
+                {group.title} ({group.features.length})
             </p>
 
             {/*
-              * Chips, the way the Advice page draws the same facts. A column
+              * The picks the car hasn't got are sorted under the level the
+              * reader gave each one; every other group is one cloud of chips.
+              * Chips, the way the Advice page draws the same facts — a column
               * of ticks and crosses read as a form; these read as the things
               * themselves, and a dozen fit where six rows did.
               */}
+            {group.bands ? (
+                /*
+                  * Room to breathe. Three headings, three clouds of chips and
+                  * the group's own title at 10px were stacked a few pixels
+                  * apart, which read as one block of small type rather than as
+                  * four things — and the grouping is the whole point of it.
+                  */
+                <div className="mt-3.5 flex flex-col gap-4">
+                    {group.bands.map((band) => (
+                        <Band key={band.level} band={band} struck={group.struck} />
+                    ))}
+                </div>
+            ) : (
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {group.features.map((feature) => (
+                        <FeatureChip
+                            key={feature.key}
+                            fact={feature}
+                            tone={group.chip}
+                            struck={group.struck}
+                        />
+                    ))}
+                </div>
+            )}
+        </FactRow>
+    );
+}
+
+/**
+ * One level of influence, and the picks the car is missing at that level.
+ *
+ * The heading says the level in the picker's own words and the "i" beside it
+ * says what the level actually does to the result — which is the question a
+ * reader has at exactly this moment, having just been told the car misses
+ * something they called highly influential. The chips take the level's colour,
+ * so the three bands are told apart before they are read.
+ */
+function Band({ band, struck }: { band: InfluenceBand; struck: boolean }) {
+    return (
+        <div data-band={band.level}>
+            <p
+                className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.1em] ${band.accent}`}
+            >
+                <span>
+                    {band.title} ({band.features.length})
+                </span>
+
+                <InfoTip subject={band.title}>{band.meaning}</InfoTip>
+            </p>
+
             <div className="mt-2 flex flex-wrap gap-1.5">
-                {features.map((feature) => (
+                {band.features.map((feature) => (
                     <FeatureChip
                         key={feature.key}
                         fact={feature}
-                        tone={toneFor(feature, picked)}
-                        struck={feature.state === "absent"}
+                        tone={band.level}
+                        struck={struck}
+                        withLevel={false}
                     />
                 ))}
             </div>

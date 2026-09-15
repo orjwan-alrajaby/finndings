@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { X } from "lucide-react";
+import { Wallet, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import {
@@ -125,17 +125,27 @@ export function MockPanel({
                 </div>
 
                 <Section title="What it costs you">
-                    <p className="mt-2 flex items-baseline gap-2">
-                        <span className="text-2xl font-black leading-7 text-finn-black tabular-nums">
-                            {formatEUR(cost.breakdown.totalMonthly)}
+                    {/* The wallet the real panel leads this section with. */}
+                    <div className="mt-2 flex items-center gap-3">
+                        <span
+                            aria-hidden="true"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-finn-highlight-navy text-white"
+                        >
+                            <Wallet className="h-5 w-5" />
                         </span>
 
-                        <span className="text-[11px] text-finn-iron">
-                            {cost.breakdown.complete
-                                ? "estimated per month"
-                                : "per month, and incomplete"}
-                        </span>
-                    </p>
+                        <div className="min-w-0">
+                            <p className="text-2xl font-black leading-7 text-finn-black tabular-nums">
+                                {formatEUR(cost.breakdown.totalMonthly)}
+                            </p>
+
+                            <p className="text-[11px] leading-4 text-finn-iron">
+                                {cost.breakdown.complete
+                                    ? "estimated per month"
+                                    : "per month, and incomplete"}
+                            </p>
+                        </div>
+                    </div>
 
                     {gap != null && (
                         <p className="mt-2 inline-flex rounded-full bg-finn-warning-lift px-2.5 py-1 text-[11px] font-bold text-finn-warning-deep">

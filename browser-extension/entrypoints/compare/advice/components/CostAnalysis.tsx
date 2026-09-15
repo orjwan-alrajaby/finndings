@@ -6,7 +6,7 @@ import type {
 } from "@/lib/reasoning-engine/types";
 import type { CostReasoning } from "@/lib/reasoning-engine/narrative";
 import { formatEUR } from "@/lib/reasoning-engine";
-import { compareCosts, type CostComparisonRow } from "@/lib/cost-copy";
+import { compareCosts, COST_SOURCE_TONE, type CostComparisonRow } from "@/lib/cost-copy";
 
 /**
  * Renders the cost breakdown the engine calculated.
@@ -22,18 +22,12 @@ const SOURCE_LABEL: Record<CostFactSource, string> = {
     estimate: "Lens estimate",
 };
 
-const SOURCE_CLASS: Record<CostFactSource, string> = {
-    finn: "bg-finn-pale-blue text-finn-accent-blue",
-    user: "bg-finn-cotton text-finn-black",
-    estimate: "bg-finn-highlight-navy/10 text-finn-highlight-navy",
-};
-
 function SourceTag({ source }: { source: CostFactSource }) {
     return (
         <span
             className={[
                 "rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
-                SOURCE_CLASS[source],
+                COST_SOURCE_TONE[source],
             ].join(" ")}
         >
             {SOURCE_LABEL[source]}

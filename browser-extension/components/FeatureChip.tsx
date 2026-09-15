@@ -1,27 +1,16 @@
 import type { FeatureFact } from "@/lib/reasoning-engine/narrative";
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
+import { FEATURE_CHIP_TONE, type FeatureChipTone } from "@/lib/feature-copy";
 import { InfoTip } from "./InfoTip";
 
-/**
- * What the chip is saying about this feature.
- *
- * `rivalOnly` and `quiet` say the same thing — this counted, but the reader
- * never singled it out — and differ only in what they are drawn on. Cotton
- * disappears on the tinted group cards the fit panel uses, so that surface
- * gets the white one. Same meaning, same weight, legible on both grounds.
- */
-export type FeatureChipTone =
-    | "present"
-    | "missing"
-    | "rivalOnly"
-    | "quiet";
+export type { FeatureChipTone };
 
-const TONE_CLASS: Record<FeatureChipTone, string> = {
-    present: "bg-finn-pale-blue text-finn-highlight-navy",
-    missing: "bg-finn-warning/15 text-finn-warning-deep",
-    rivalOnly: "bg-finn-cotton text-finn-iron",
-    quiet: "bg-white text-finn-iron",
-};
+/*
+ * There used to be a fourth tone, `quiet`, which was cotton's twin in white:
+ * cotton disappeared on the tinted group cards the fit panel drew, so that one
+ * surface needed a chip of its own. The groups are rows of a white table now,
+ * with the colour on the row's edge, and cotton is legible on all of them.
+ */
 
 /**
  * A named feature, with its explanation attached.
@@ -41,6 +30,7 @@ export function FeatureChip({
     fact,
     tone,
     struck,
+    withLevel = true,
 }: {
     fact: FeatureFact;
     tone: FeatureChipTone;
@@ -50,15 +40,24 @@ export function FeatureChip({
      * struck through without being coloured like a problem.
      */
     struck?: boolean;
+    /**
+     * Whether the chip has to say the level itself.
+     *
+     * False where the chips are already sorted under a heading naming it, and
+     * tinted in its colour: a dot and a badge saying the same thing a third
+     * time is noise, not emphasis.
+     */
+    withLevel?: boolean;
 }) {
-    const level = fact.importance ? FEATURE_IMPORTANCE[fact.importance] : null;
+    const level =
+        withLevel && fact.importance ? FEATURE_IMPORTANCE[fact.importance] : null;
     const lineThrough = struck ?? tone === "missing";
 
     return (
         <span
             className={[
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold",
-                TONE_CLASS[tone],
+                FEATURE_CHIP_TONE[tone],
             ].join(" ")}
         >
             {level && (
@@ -75,7 +74,7 @@ export function FeatureChip({
                 {fact.label}
             </span>
 
-            {fact.importance === "high" && (
+            {withLevel && fact.importance === "high" && (
                 <span
                     className="text-[9px] font-black uppercase tracking-wide opacity-70"
                     title="You said this should have the most influence on your decision"

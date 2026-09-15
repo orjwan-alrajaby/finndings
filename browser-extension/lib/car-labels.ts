@@ -99,11 +99,15 @@ export function describeCoverage(priority: FitPriority): string {
      * emissions, not on equipment" said something about Finn Lens instead,
      * in the one place a reader is scanning for the car.
      */
-    if (priority.impact) {
-        return (
-            priority.impact.co2?.display ??
-            "FINN doesn't publish a CO₂ figure for this one"
-        );
+    if (priority.priority === "environmental") {
+        /*
+         * The number only: the class sits in its own pill under this header.
+         * With no published figure, said as such, rather than falling through
+         * to "Equipment not listed", which is about a different priority.
+         */
+        return priority.impact?.co2
+            ? `${formatNumber(priority.impact.co2.gPerKm)} g of CO₂ per km`
+            : "No CO₂ figure published";
     }
 
     if (priority.band.level === "unknown") {

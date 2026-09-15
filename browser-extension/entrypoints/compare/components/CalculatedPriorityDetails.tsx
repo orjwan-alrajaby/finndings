@@ -21,16 +21,20 @@ export function CalculatedPriorityDetails({
 
             {categoryId === "environmental" ? (
                 <div className="mt-2">
-                    <EnvironmentalMethod tone="snow" />
+                    <EnvironmentalMethod />
                 </div>
             ) : (
                 <p className="mt-2 text-xs leading-5 text-finn-iron">
-                    Lens calculates {category.label} automatically from the
-                    vehicle's own data rather than from a feature list.
+                    Lens works {category.label} out from the car's own
+                    published figures rather than from a list of equipment.
                 </p>
             )}
 
-            <div className="mt-4 rounded-2xl bg-white p-3">
+            {/*
+              * A framed note, not a white block. The card this sits in
+              * is already white, so a white fill drew nothing at all.
+              */}
+            <div className="mt-4 rounded-2xl border border-finn-cotton bg-white p-3.5">
                 <p className="text-xs font-black text-finn-black">
                     Nothing to configure here
                 </p>

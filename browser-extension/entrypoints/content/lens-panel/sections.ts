@@ -1,19 +1,31 @@
 import type {
   FitAnalysis,
+  FitBand,
   FitFeature,
   FitLevel,
   FitPriority,
 } from "@/lib/reasoning-engine/fit";
-import type { CostLine } from "@/lib/reasoning-engine/types";
+import type { CostBreakdown, CostLine } from "@/lib/reasoning-engine/types";
 import type { EnvironmentalAssessment } from "@/lib/reasoning-engine/environmental";
+import type { FuelType } from "@/lib/types";
 import {
-  describeEmissionsVersusEfficiency,
-  describeEnvironment,
-  environmentalTags,
-  ENVIRONMENTAL_METHOD,
-  type EnvironmentalTag,
-} from "@/lib/reasoning-engine/environmental";
+  readEnvironment,
+  type ComparisonReading,
+  type EnvironmentFigure,
+  type EnvironmentReading,
+  type EnvironmentRow,
+  type RowRelation,
+  type UsagePointer,
+} from "@/lib/environment-copy";
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
+import { ROW_TONE, type RowTone } from "@/lib/row-tone";
+import {
+  featureGroupsOf,
+  FEATURE_CHIP_TONE,
+  type FeatureGroup,
+  type InfluenceBand,
+} from "@/lib/feature-copy";
+import { readTradeoff } from "@/lib/tradeoff-copy";
 
 import {
   FIT_BANDS,
@@ -23,8 +35,16 @@ import {
 import { FEATURE_IMPORTANCE } from "@/lib/reasoning-engine/constants";
 import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
 import { formatEUR, formatNumber } from "@/lib/reasoning-engine";
-import { advertisedGap, costLead } from "@/lib/cost-copy";
-import { EFFICIENCY_TONE, readUsage } from "@/lib/usage-copy";
+import {
+  advertisedGap,
+  contractTag,
+  costIcon,
+  costLead,
+  COST_SOURCE_LABEL,
+  COST_SOURCE_TONE,
+} from "@/lib/cost-copy";
+import { readUsage } from "@/lib/usage-copy";
+import { goToUsage, USAGE_SECTION } from "@/lib/usage-anchor";
 
 /**
  * The two tone classes for one mark, in the order the stylesheet expects.
@@ -141,69 +161,348 @@ function section(title: string, ...children: (Node | null)[]): HTMLElement {
 }
 
 /**
- * A small "i" that says what something is, without sending the reader away.
+ * The "i" on a feature chip or a cost line: a small button that opens a dark
+ * tooltip beside it. The figures in "How much it uses" and the environmental
+ * table explain themselves in place instead; see `explainedRow`.
  *
- * The Advice page has the same affordance on every feature chip, and the
- * explanations it shows are already carried on the facts the engine produces —
- * they were simply being thrown away here. A reader who doesn't know what
- * rear cross-traffic alert is cannot judge whether missing it matters, which
- * makes the whole list of ticks and crosses harder to act on than it looks.
+ * These used to open a block of text under the row, on the reasoning that a
+ * floating layer would need positioning, portalling and a pointer inside a
+ * 26rem shadow root on a page this panel doesn't own. That pushed every
+ * explanation into the layout, so reading one moved everything beneath it,
+ * and the Advice page and pinned cards, which use a tooltip, behaved
+ * differently from the panel.
  *
- * A disclosure rather than a tooltip. The panel is 26rem wide on a page it
- * doesn't own, these explanations run to a sentence or two, and a floating
- * layer that needs positioning, portalling and a pointer is three problems the
- * answer doesn't need — a line that opens under the row is none of them, and
- * it works the same under a thumb.
+ * So all three problems are handled here once:
+ *
+ * - **Portalling.** The layer is appended to the panel's shadow root, outside
+ *   the scrolling column, so the column can't clip it.
+ * - **Positioning.** It is `position: fixed` and placed from the button's own
+ *   box each time it opens or the column scrolls: above the button where
+ *   there's room, below where there isn't, and kept inside the panel's width.
+ *   The host is fixed with no transform, so fixed means the viewport.
+ * - **Pointer and thumb.** It opens on hover and focus, stays open when
+ *   clicked or tapped, and closes on a second click, Escape, or a tap anywhere
+ *   else. The same behaviour as the React `Tip`, and only one is open at once.
  */
 let infoIds = 0;
 
-function explains(subject: string, explanation: string): {
-  button: HTMLElement;
-  panel: HTMLElement;
-} {
+let closeOpenTip: (() => void) | null = null;
+
+function infoTip(options: {
+  /** What the button is called, for a screen reader: the question it answers. */
+  label: string;
+  /** Bold first line of the tooltip, when there is one. */
+  title: string | null;
+  body: string;
+  buttonClass: string;
+  /** Swapped rather than stacked: with both present, the stylesheet's order wins. */
+  idleClass: string;
+  activeClass: string;
+}): HTMLElement {
   const id = `finn-lens-info-${(infoIds += 1)}`;
 
-  const panel = el("p", {
-    class: "mt-1 hidden rounded-lg bg-white px-2 py-1.5 text-[11px] leading-4 text-finn-iron",
-    attrs: { id },
-    text: explanation,
-  });
+  const tip = el(
+    "div",
+    {
+      class: [
+        "fixed z-10 hidden w-max max-w-[17rem] rounded-xl bg-finn-black px-3 py-2",
+        "text-left shadow-[0_8px_24px_rgba(0,0,0,0.18)]",
+      ].join(" "),
+      attrs: { id, role: "tooltip" },
+    },
+    [
+      options.title
+        ? el("p", { class: "text-[11px] font-black leading-4 text-white", text: options.title })
+        : null,
+      el("p", {
+        class: `${options.title ? "mt-0.5 " : ""}text-[11px] font-normal leading-4 text-white/85`,
+        text: options.body,
+      }),
+    ],
+  );
 
   const button = el(
     "button",
     {
-      class: [
-        "ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center",
-        "rounded-full align-middle text-finn-iron transition-colors",
-        "hover:text-finn-accent-blue",
-      ].join(" "),
+      class: `${options.buttonClass} ${options.idleClass}`,
       attrs: {
         type: "button",
-        "aria-label": `What is ${subject}?`,
+        "aria-label": options.label,
         "aria-expanded": "false",
         "aria-controls": id,
-      },
-      on: {
-        click: (event) => {
-          event.stopPropagation();
-
-          const open = panel.classList.toggle("hidden");
-
-          button.setAttribute("aria-expanded", String(!open));
-          button.classList.toggle("text-finn-accent-blue", !open);
-        },
+        "aria-describedby": id,
       },
     },
     [icon("info", "h-4 w-4")],
   );
 
-  return { button, panel };
+  let hovered = false;
+  let pinned = false;
+
+  /* The shadow root in the panel; the detached tree in a test; the body on a page. */
+  const rootOf = (): ParentNode => {
+    let node: Node = button;
+
+    while (node.parentNode) node = node.parentNode;
+
+    return (node as Document).body ?? (node as unknown as ParentNode);
+  };
+
+  const place = () => {
+    if (typeof window === "undefined" || typeof button.getBoundingClientRect !== "function") return;
+
+    const anchor = button.getBoundingClientRect();
+    const box = tip.getBoundingClientRect();
+
+    if (!box.width) return;
+
+    const host = (rootOf() as unknown as ShadowRoot).host as HTMLElement | undefined;
+    const bounds = host ? host.getBoundingClientRect() : { left: 0, right: window.innerWidth };
+    const edge = 8;
+    const gap = 6;
+
+    const left = Math.max(
+      bounds.left + edge,
+      Math.min(anchor.left + anchor.width / 2 - box.width / 2, bounds.right - edge - box.width),
+    );
+
+    const above = anchor.top - gap - box.height;
+
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(above >= edge ? above : anchor.bottom + gap)}px`;
+  };
+
+  const onOutside = (event: Event) => {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+
+    if (path.includes(button) || path.includes(tip)) return;
+
+    close();
+  };
+
+  const onKey = (event: Event) => {
+    if ((event as KeyboardEvent).key === "Escape") close();
+  };
+
+  function open() {
+    if (closeOpenTip && closeOpenTip !== close) closeOpenTip();
+
+    closeOpenTip = close;
+
+    const root = rootOf();
+
+    if (!tip.parentNode) root.append(tip);
+
+    tip.classList.remove("hidden");
+    button.setAttribute("aria-expanded", "true");
+    button.classList.remove(...options.idleClass.split(" "));
+    button.classList.add(...options.activeClass.split(" "));
+
+    place();
+
+    /*
+     * A tap or a key anywhere, including on the page beside the panel, reaches
+     * the document; it only reaches the shadow root when it lands inside the
+     * panel. Scrolling doesn't cross the shadow boundary, so that one listens
+     * on the root, where the column scrolls.
+     */
+    button.ownerDocument.addEventListener("pointerdown", onOutside, true);
+    button.ownerDocument.addEventListener("keydown", onKey, true);
+    root.addEventListener("scroll", place, true);
+  }
+
+  function close() {
+    hovered = false;
+    pinned = false;
+
+    tip.classList.add("hidden");
+    button.setAttribute("aria-expanded", "false");
+    button.classList.remove(...options.activeClass.split(" "));
+    button.classList.add(...options.idleClass.split(" "));
+
+    if (closeOpenTip === close) closeOpenTip = null;
+
+    const root = rootOf();
+
+    button.ownerDocument.removeEventListener("pointerdown", onOutside, true);
+    button.ownerDocument.removeEventListener("keydown", onKey, true);
+    root.removeEventListener("scroll", place, true);
+  }
+
+  const sync = () => (pinned || hovered ? open() : close());
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    pinned = !pinned;
+    if (!pinned) hovered = false;
+    sync();
+  });
+
+  button.addEventListener("mouseenter", () => {
+    hovered = true;
+    sync();
+  });
+
+  button.addEventListener("mouseleave", () => {
+    hovered = false;
+    sync();
+  });
+
+  button.addEventListener("focus", () => {
+    hovered = true;
+    sync();
+  });
+
+  button.addEventListener("blur", () => {
+    hovered = false;
+    sync();
+  });
+
+  return button;
+}
+
+/** "More about fuel use", leaving "CO₂ while driving" alone. */
+function moreAbout(label: string): string {
+  const second = label.charAt(1);
+
+  return `More about ${second === second.toLowerCase() ? label.charAt(0).toLowerCase() + label.slice(1) : label}`;
+}
+
+/**
+ * A row that explains itself: what it shows, an "i" at the far right where an
+ * accordion's arrow would sit, and the row's explanations under it once the
+ * "i" is clicked. A second click closes it.
+ *
+ * These were tooltips. A tooltip covers whatever is around it, closes when the
+ * pointer drifts, and is a cramped place to read a short paragraph, which is
+ * what these explanations are. Opening them under the row keeps them next to
+ * the numbers they're about.
+ *
+ * The "i" is always at the far right, so every explanation opens from the same
+ * place. A row with nothing to explain keeps the space, so the table's columns
+ * still line up. The React twin is `components/ExplainedRow`.
+ */
+function explainedRow(options: {
+  /** What the row is, for the button's name when it opens more than one answer. */
+  label: string;
+  explanations: { title: string; body: string }[];
+  content: (Node | null)[];
+  rowClass: string;
+  attrs?: Record<string, string>;
+}): HTMLElement {
+  const { explanations } = options;
+  const [only] = explanations;
+  const id = `finn-lens-explain-${(infoIds += 1)}`;
+
+  const idle = "text-finn-iron hover:bg-finn-pale-blue hover:text-finn-accent-blue";
+  const active = "bg-finn-accent-blue text-white";
+
+  const answers = only
+    ? el(
+        "div",
+        {
+          class: "mt-2.5 hidden space-y-2 rounded-xl bg-finn-pale-blue/60 px-3 py-2.5 text-[12px] leading-[18px]",
+          attrs: { id },
+        },
+        /*
+         * The question, only where there is more than one answer to tell
+         * apart. A row with a single explanation has already asked it twice —
+         * as the row's own label, and as the name of the "i" the reader just
+         * clicked — so printing it a third time above the answer is the panel
+         * talking to itself. The React twin is `components/ExplainedRow`.
+         */
+        explanations.map((explanation) =>
+          el("div", {}, [
+            explanations.length > 1
+              ? el("p", { class: "font-black text-finn-black", text: explanation.title })
+              : null,
+            /* A blank line in the body starts a new paragraph. */
+            ...explanation.body.split("\n\n").map((paragraph, index) =>
+              el("p", { class: index > 0 ? "mt-1.5 text-finn-iron" : "text-finn-iron", text: paragraph }),
+            ),
+          ]),
+        ),
+      )
+    : null;
+
+  const toggle = only
+    ? el(
+        "button",
+        {
+          class: `inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${idle}`,
+          attrs: {
+            type: "button",
+            "aria-label": explanations.length === 1 ? only.title : moreAbout(options.label),
+            "aria-expanded": "false",
+            "aria-controls": id,
+          },
+        },
+        [icon("info", "h-4 w-4")],
+      )
+    : el("span", { class: "h-6 w-6 shrink-0", attrs: { "aria-hidden": "true" } });
+
+  if (answers) {
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      const opening = answers.classList.contains("hidden");
+
+      if (opening) answers.classList.remove("hidden");
+      else answers.classList.add("hidden");
+
+      toggle.setAttribute("aria-expanded", String(opening));
+      toggle.classList.remove(...(opening ? idle : active).split(" "));
+      toggle.classList.add(...(opening ? active : idle).split(" "));
+    });
+  }
+
+  return el("div", { class: options.rowClass, attrs: options.attrs ?? {} }, [
+    el("div", { class: "flex items-start gap-2" }, [
+      el("div", { class: "min-w-0 flex-1" }, options.content),
+      toggle,
+    ]),
+    answers,
+  ]);
 }
 
 /** A short line of plain prose, as the engine wrote it. */
 function prose(text: string, tone = "text-finn-black"): HTMLElement {
   return el("p", { class: `text-[13px] leading-5 ${tone}`, text });
 }
+
+/**
+ * The shape every section that reports a list of facts is drawn in: one white
+ * card with a hairline border, its rows divided, each row edged in the colour
+ * of what it says, and an optional line of small print under the last of them.
+ *
+ * The environmental result was the first to use it, "How much it uses" took the
+ * same table so a car's consumption wouldn't look like a different kind of fact
+ * depending on where a reader met it, and the tradeoffs and feature groups use
+ * it now, having been soft grey boxes that said nothing by being grey. The
+ * React twin is `components/FactTable`.
+ */
+function factTable(
+  rows: (Node | null)[],
+  options: { header?: Node | null; source?: string } = {},
+): HTMLElement {
+  /* Square, as the React twin explains: a coloured edge bends round a rounded corner. */
+  return el("div", { class: "overflow-hidden border border-finn-cotton bg-white" }, [
+    options.header ?? null,
+
+    el("div", { class: "divide-y divide-finn-cotton" }, rows),
+
+    options.source
+      ? el("p", {
+          class: "border-t border-finn-cotton px-3.5 py-2 text-[11px] leading-4 text-finn-iron",
+          text: options.source,
+          attrs: { "data-disclaimer": "" },
+        })
+      : null,
+  ]);
+}
+
+/** A row's coloured edge: 4px, in the tone of what the row says. */
+const rowEdge = (tone: RowTone) => `border-l-4 ${ROW_TONE[tone].edge}`;
 
 /* -------------------------------------------------------------------------- */
 /* 1. Overall fit                                                             */
@@ -396,10 +695,13 @@ function prioritySection(priority: FitPriority): HTMLElement {
 
   /*
    * Environmental impact writes its own block, prose included, so that the
-   * result, the figures, the caveats and the method stay in one order that
-   * one piece of code controls. Everything else takes the generic path.
+   * result, the figures and the caveats stay in one order that one piece of
+   * code controls. Keyed on the priority rather than on having an
+   * assessment: a car FINN published no CO₂ figure for still gets the block,
+   * saying there's no data, instead of a generic line or nothing at all.
    */
-  const sentences = priority.impact ? [] : priority.sentences;
+  const environmental = priority.priority === "environmental";
+  const sentences = environmental ? [] : priority.sentences;
 
   const body = el(
     "div",
@@ -418,7 +720,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
           )
         : null,
 
-      priority.impact ? impactBreakdown(priority.impact) : null,
+      environmental ? impactBreakdown(priority.impact, priority.band) : null,
 
       featureGroups(priority),
 
@@ -429,7 +731,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
        * already long. Where there is no sentence (a car FINN sent no equipment
        * list for), this is the only place the figures appear, so it stays.
        */
-      priority.measurements.length && !priority.impact && !sentences.length
+      priority.measurements.length && !environmental && !sentences.length
         ? el(
             "dl",
             { class: "flex flex-wrap gap-x-4 gap-y-1" },
@@ -446,7 +748,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
           )
         : null,
 
-      !priority.hasEvidence
+      !priority.hasEvidence && !environmental
         ? el("p", {
             class: "text-[12px] leading-[18px] text-finn-iron",
             text: "FINN's data doesn't carry anything we can judge this priority on for this car.",
@@ -545,253 +847,298 @@ function prioritySection(priority: FitPriority): HTMLElement {
   ]);
 }
 
-/** One reading, with its figure and what the figure means. */
-function readout(
-  label: string,
-  value: string,
-  meaning: string | null = null,
-): HTMLElement {
-  return el("div", { class: "min-w-0" }, [
-    el("p", {
-      class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
-      text: label,
-    }),
-
-    el("p", {
-      class: "mt-0.5 text-[13px] font-black leading-5 text-finn-black",
-      text: value,
-    }),
-
-    meaning
-      ? el("p", {
-          class: "text-[11px] leading-4 text-finn-iron",
-          text: meaning,
-        })
-      : null,
-  ]);
-}
-
 /**
- * The emissions reading, in the order a reader needs it.
+ * The environmental result, in the order a reader asks for it: the verdict in
+ * plain words, the plug-in hybrid note where it applies, the CO₂ card against
+ * the FINN Lens benchmark, then why that is the match, then — for a petrol or
+ * diesel car — one line on where its fuel use meets the result.
  *
- * This block used to open with "How this is judged" sitting above a table of
- * bare figures, which put the defence of the model in front of the answer
- * about the car. It now runs result → figures → what they mean together →
- * limits → method, and the method is folded away. Nothing was dropped to make
- * room: the caveats are all still here, shortened, below the answer they
- * qualify rather than above it.
+ * The card keeps the class pill beside its name, an "i" at the far right that
+ * opens what its numbers mean, a bar under its two figures, and a short
+ * disclaimer. How much the car uses is its own section, `efficiencySection`. Every word comes from `readEnvironment`;
+ * the React twin is `components/EnvironmentalResult`.
  *
- * The React panel renders the same reading in the same order — see
- * `components/EnvironmentalResult`. This one exists because the in-page panel
- * lives in a shadow root and builds its DOM by hand.
+ * No CO₂ number or band here: the priority's header above already carries both.
  */
-function impactBreakdown(impact: EnvironmentalAssessment): HTMLElement {
-  const method = el(
-    "div",
-    { class: "mt-2 hidden flex-col gap-2" },
-    ENVIRONMENTAL_METHOD.map((note) =>
-      el("div", { class: "rounded-lg bg-white px-2.5 py-2" }, [
-        el("p", {
-          class: "text-[11px] font-black text-finn-black",
-          text: note.heading,
-        }),
-        el("p", {
-          class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-          text: note.body,
-        }),
-      ]),
-    ),
-  );
+function impactBreakdown(impact: EnvironmentalAssessment | null, band: FitBand): HTMLElement {
+  const reading = readEnvironment(impact, band);
 
-  const toggle = el("button", {
-    class: [
-      "mt-3 text-[11px] font-bold text-finn-accent-blue underline-offset-2",
-      "transition-colors hover:underline",
-    ].join(" "),
-    attrs: { type: "button", "aria-expanded": "false" },
-    text: "How Finn Lens works this out",
-    on: {
-      click: () => {
-        const open = method.classList.toggle("hidden");
+  return el("div", { class: "@container flex flex-col gap-4" }, [
+    verdictCard(reading),
 
-        method.classList.toggle("flex", !open);
-        toggle.setAttribute("aria-expanded", String(!open));
-      },
-    },
-  });
-
-  const interpretation = describeEmissionsVersusEfficiency(impact);
-
-  return el("div", { class: "rounded-xl bg-finn-snow p-3" }, [
-    /* 1. What this car is. */
-    el("p", {
-      class: "text-[12px] leading-[18px] text-finn-black",
-      text: describeEnvironment(impact),
-    }),
-
-    /* 2. What it's tagged with, and where each tag comes from. */
-    tagRow(environmentalTags(impact)),
-
-    /* 3. The figures the tags are read off. */
-    el("div", { class: "mt-3 flex flex-col gap-2.5" }, [
-      impact.co2
-        ? readout(
-            "CO₂ while driving",
-            `${formatNumber(impact.co2.gPerKm)} g/km`,
-            "Measured under the EU's official test",
-          )
-        : readout("CO₂ while driving", "Not published by FINN"),
-
-      impact.efficiency
-        ? readout(
-            "Energy it uses",
-            impact.efficiency.display,
-            `${impact.efficiency.typical} for this kind of car`,
-          )
-        : null,
-
-      /*
-       * A plug-in hybrid's consumption is shown and not graded. One weighted
-       * figure covering two energy sources has no cohort to be frugal within,
-       * and FINN publishes no separate electric consumption to build one from.
-       */
-      !impact.efficiency && impact.powertrain === "Plug-in Hybrid"
-        ? readout(
-            "Energy it uses",
-            "One combined figure",
-            "FINN publishes a single blended figure for plug-in hybrids, which can't be compared with either petrol or electric cars on its own.",
-          )
-        : null,
-    ]),
-
-    /* 4. What the two figures mean when read together. */
-    interpretation
-      ? el("div", { class: "mt-3 rounded-lg bg-white px-2.5 py-2" }, [
+    reading.note
+      ? el("div", { class: "rounded-[20px] bg-finn-warning-lift/60 px-4 py-3.5" }, [
           el("p", {
-            class: "text-[11px] font-black text-finn-black",
-            text: interpretation.heading,
+            class: "text-[12px] font-black text-finn-warning-ink",
+            text: reading.note.title,
           }),
           el("p", {
-            class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-            text: interpretation.body,
+            class: "mt-1.5 text-[12px] leading-[18px] text-finn-warning-ink/90",
+            text: reading.note.body,
           }),
         ])
       : null,
 
-    /* 5. What it doesn't cover — after the answer, not before it. */
-    ...impact.caveats.map((caveat) =>
-      el("p", {
-        class: "mt-2.5 text-[11px] leading-4 text-finn-iron",
-        text: caveat,
-      }),
+    comparisonTable(reading),
+
+    ...reading.meaning.map((line) =>
+      el("p", { class: "text-[13px] leading-5 text-finn-black", text: line }),
     ),
 
-    impact.missing.length
+    /*
+     * Where fuel use meets this result: a pointer to "How much it uses", not a
+     * copy, with the section's name scrolling the drawer up to it.
+     */
+    reading.usage ? usagePointer(reading.usage) : null,
+  ]);
+}
+
+/**
+ * The usage line, with its last words as a link that scrolls the drawer up to
+ * "How much it uses". The React twin is in `components/EnvironmentalResult`.
+ */
+function usagePointer(usage: UsagePointer): HTMLElement {
+  return el(
+    "p",
+    { class: "text-[12px] leading-[18px] text-finn-iron", attrs: { "data-usage": "" } },
+    [
+      `${usage.text} `,
+      el("button", {
+        class:
+          "cursor-pointer font-bold text-finn-accent-blue underline underline-offset-2 hover:text-finn-highlight-navy",
+        text: usage.section,
+        attrs: { type: "button", "data-usage-link": "" },
+        on: { click: (event) => goToUsage(event.currentTarget as Element) },
+      }),
+      ".",
+    ],
+  );
+}
+
+/**
+ * The answer, before any of the working, and the largest thing in the section:
+ * the figure read back in words at the size of a heading, over one plain
+ * sentence, on a filled card in the tone's own pale ground.
+ *
+ * No coloured edge. The card is already a field of the tone, and a 4px rule
+ * down the side of a filled card is the visual language of a documentation
+ * callout. The React twin is `Verdict` in `components/EnvironmentalResult`.
+ */
+function verdictCard(reading: EnvironmentReading): HTMLElement {
+  const tone = ROW_TONE[reading.verdict.tone];
+
+  return el("div", { class: `rounded-[22px] ${tone.ground} px-4 py-4` }, [
+    el("p", {
+      class: `text-[18px] font-black leading-6 tracking-[-0.015em] ${tone.ink}`,
+      text: reading.verdict.words,
+    }),
+    el("p", {
+      class: "mt-2 text-[13px] leading-5 text-finn-black/85",
+      text: reading.verdict.plain,
+    }),
+  ]);
+}
+
+/** Lucide shapes, drawn from the panel's generated set. */
+const ROW_ICON: Record<EnvironmentRow["icon"], string> = {
+  co2: "cloud",
+  fuel: "fuel",
+  electricity: "zap",
+};
+
+/** The one micro-caption size, for the two things a figure can be. */
+const CAPTION = "text-[10px] font-black uppercase tracking-[0.12em]";
+
+/**
+ * This car against the FINN Lens benchmark, one card per measure.
+ *
+ * A card each, not rows of a table. What this replaces was a column header
+ * strip reading MEASURE / THIS CAR / FINN LENS BENCHMARK over divided rows
+ * with a 4px edge and five sizes of type in each — a spreadsheet with fine
+ * print, which is what a reader who doesn't know whether 126 g/km is good or
+ * bad least needs. The React twin is `components/ComparisonTable`.
+ */
+function comparisonTable(reading: ComparisonReading): HTMLElement {
+  return el("div", { class: "@container/table flex flex-col gap-2.5" }, [
+    ...reading.rows.map((row, index) =>
+      comparisonCard(row, index === 0 ? reading.rating : null),
+    ),
+
+    reading.source
       ? el("p", {
-          class: "mt-2 text-[11px] leading-4 text-finn-iron",
-          text: `FINN doesn't publish ${impact.missing.join(" or ")} for this car, so that part is left out rather than guessed.`,
+          class: "px-1 text-[11px] leading-4 text-finn-iron",
+          text: reading.source,
+          attrs: { "data-disclaimer": "" },
         })
       : null,
-
-    /* 6. The method, closed. */
-    toggle,
-    method,
   ]);
 }
 
-/**
- * The labels, each one a question the reader can ask.
- *
- * "Above-average emissions" and "Moderately efficient" both invite the same
- * question — average by whose reckoning, efficient against what? — and the
- * answers differ in kind: the class letter is set in law, the emissions
- * average is an observation with no legal force, and the consumption benchmark
- * is derived because none is published. That belongs one tap from the claim it
- * justifies rather than in the reader's way.
- *
- * The React twin is `TagRow` in `components/EnvironmentalResult`.
- */
-function tagRow(tags: EnvironmentalTag[]): HTMLElement | null {
-  if (!tags.length) return null;
+function comparisonCard(row: EnvironmentRow, rating: ComparisonReading["rating"]): HTMLElement {
+  const tone = ROW_TONE[row.tone];
 
-  const panel = el("div", {
-    class: "mt-2 hidden rounded-lg bg-white px-2.5 py-2",
-  });
-
-  const title = el("p", { class: "text-[11px] font-black text-finn-black" });
-
-  const body = el("p", {
-    class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-  });
-
-  panel.append(title, body);
-
-  /* One open at a time: this is a footnote, not a second article. */
-  let openId: string | null = null;
-
-  const chips = tags.map((tag) => {
-    const chip = el("button", {
-      class: [
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1",
-        "text-[11px] font-black transition",
-        TAG_CLASS[tag.tone],
-      ].join(" "),
-      attrs: { type: "button", "aria-expanded": "false" },
-      on: {
-        click: () => {
-          openId = openId === tag.id ? null : tag.id;
-
-          title.textContent = tag.title;
-          body.textContent = tag.body;
-
-          panel.classList.toggle("hidden", openId === null);
-
-          for (const [other, element] of pairs) {
-            const on = other.id === openId;
-
-            element.setAttribute("aria-expanded", String(on));
-            element.classList.toggle("ring-2", on);
-            element.classList.toggle("ring-finn-accent-blue/40", on);
-          }
-        },
-      },
-    });
-
-    chip.append(
-      el("span", { text: tag.label }),
-      el("span", {
-        class: [
-          "grid h-3.5 w-3.5 place-items-center rounded-full border",
-          "border-current text-[8px] leading-none opacity-70",
-        ].join(" "),
-        text: "i",
-        attrs: { "aria-hidden": "true" },
-      }),
-    );
-
-    return chip;
-  });
-
-  const pairs = tags.map(
-    (tag, index) => [tag, chips[index] as HTMLElement] as const,
+  /* Everything this card's numbers can be asked about, in the order they sit. */
+  const explanations = [rating?.info, row.car.info, row.reference.info].filter(
+    (info): info is { title: string; body: string } => info != null,
   );
 
-  return el("div", { class: "mt-3" }, [
-    el("div", { class: "flex flex-wrap gap-1.5" }, chips),
-    panel,
-  ]);
+  return explainedRow({
+    label: row.label,
+    explanations,
+    rowClass: "rounded-[20px] bg-white p-4 ring-1 ring-finn-cotton",
+    /* The tone as data as well as colour, so what a card claims is checkable. */
+    attrs: { "data-row": row.id, "data-tone": row.tone },
+    content: [
+      el("div", { class: "flex flex-wrap items-center gap-x-2 gap-y-1" }, [
+        /*
+         * The measure's own mark, in its own colour, on the colour's palest
+         * ground. Small and quiet: it says which of the two questions this
+         * card answers, and nothing else.
+         */
+        el(
+          "span",
+          { class: `inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${tone.ground}` },
+          [icon(ROW_ICON[row.icon], `h-3.5 w-3.5 ${tone.ink}`)],
+        ),
+
+        el("p", { class: "text-[13px] font-black leading-5 text-finn-black", text: row.label }),
+
+        /*
+         * The class, beside the measure it is a restatement of. It is the CO₂
+         * number said as a letter, so it belongs here and not above the
+         * answer; what the letter means opens from the card's "i".
+         */
+        rating
+          ? el("span", {
+              class: `ml-auto inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-black ${ROW_TONE[rating.tone].pill}`,
+              text: rating.label,
+              attrs: { "data-rating": "" },
+            })
+          : null,
+
+        /*
+         * What it runs on, beside the use it decides the benchmark for — the
+         * same pill the class is on the CO₂ card, in the same place, tinted in
+         * this card's own tone.
+         */
+        row.fuel
+          ? el("span", {
+              class: `ml-auto inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-black ${tone.pill}`,
+              text: row.fuel,
+              attrs: { "data-fuel": "" },
+            })
+          : null,
+      ]),
+
+      el("p", { class: "mt-1 text-[11px] leading-4 text-finn-iron", text: row.note }),
+
+      /*
+       * The two figures bracket the card: this car on the left, the benchmark
+       * hard right, and the bar running between them underneath, so the blue
+       * label sits roughly over the blue notch it names. Stacked and both
+       * left-aligned when the card is too narrow to hold them apart.
+       */
+      el(
+        "div",
+        {
+          class:
+            "mt-3.5 flex flex-col gap-3 @sm/table:flex-row @sm/table:items-start @sm/table:justify-between @sm/table:gap-6",
+        },
+        [
+          comparisonFigure({
+            caption: "This car",
+            captionClass: "text-finn-iron",
+            figure: row.car,
+            valueClass:
+              "text-[20px] font-black leading-6 tracking-[-0.01em] tabular-nums text-finn-black",
+            beside: row.comparison
+              ? el("span", {
+                  class: `text-[12px] font-black leading-5 ${tone.ink}`,
+                  text: row.comparison,
+                })
+              : null,
+          }),
+
+          comparisonFigure({
+            caption: "FINN Lens benchmark",
+            captionClass: "text-finn-accent-blue",
+            figure: row.reference,
+            valueClass: "text-[15px] font-black leading-6 tabular-nums text-finn-accent-blue",
+            class: "@sm/table:shrink-0 @sm/table:text-right",
+          }),
+        ],
+      ),
+
+      row.relation ? relationBar(row.relation, tone.bar) : null,
+    ],
+  });
 }
 
 /**
- * Coloured by what the label says, so cars separate before they are read.
- * Deliberately not a red-to-green scale: this measures one quantity, and
- * traffic lights would read as a verdict on the car.
+ * The two figures as one picture, and the thing the eye should land on.
+ *
+ * The car's figure fills the track in the card's own colour; the benchmark is
+ * notched across it in blue, ringed in white so it stays legible wherever it
+ * lands on the fill. Thick enough to read as a chart rather than as a rule
+ * under the numbers.
+ *
+ * Hidden from a screen reader: both figures and the sentence under the bar are
+ * already in the text. The React twin is `RelationBar` in
+ * `components/ComparisonTable`.
  */
-const TAG_CLASS: Record<EnvironmentalTag["tone"], string> = {
-  positive: "bg-finn-pale-blue text-finn-accent-blue",
-  neutral: "bg-finn-cotton text-finn-iron",
-  caution: "bg-finn-warning/10 text-finn-warning",
-};
+function relationBar(relation: RowRelation, fill: string): HTMLElement {
+  const filled = el("div", { class: `h-2.5 rounded-full ${fill}` });
+  const marker = el("span", {
+    class:
+      "absolute -top-[5px] h-5 w-[3px] -translate-x-1/2 rounded-full bg-finn-accent-blue ring-2 ring-white",
+  });
+
+  filled.style.width = `${relation.car}%`;
+  marker.style.left = `${relation.reference}%`;
+
+  return el("div", { class: "mt-4" }, [
+    el(
+      "div",
+      {
+        class: "relative h-2.5 w-full rounded-full bg-finn-cotton",
+        attrs: { "aria-hidden": "true" },
+      },
+      [filled, marker],
+    ),
+    el("p", {
+      class: "mt-2.5 text-[11px] font-bold leading-4 text-finn-black",
+      text: relation.words,
+    }),
+  ]);
+}
+
+/** A figure: its caption, its value, and what the value means underneath. */
+function comparisonFigure(options: {
+  caption: string;
+  captionClass: string;
+  figure: EnvironmentFigure;
+  valueClass: string;
+  /** The verdict, in words, on the same baseline as the number. */
+  beside?: HTMLElement | null;
+  class?: string;
+}): HTMLElement {
+  const { figure } = options;
+
+  return el("div", { class: `min-w-0 ${options.class ?? ""}` }, [
+    el("p", { class: `${CAPTION} ${options.captionClass}`, text: options.caption }),
+    /*
+     * `justify-end` only bites where the block is right-aligned: the
+     * benchmark's value has to sit against the same edge its caption does.
+     */
+    el("p", { class: "mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 @sm/table:[.text-right_&]:justify-end" }, [
+      el("span", { class: options.valueClass, text: figure.value }),
+      options.beside ?? null,
+    ]),
+    figure.meaning
+      ? el("p", { class: "mt-0.5 text-[11px] leading-4 text-finn-iron", text: figure.meaning })
+      : null,
+  ]);
+}
 
 /**
  * What the car has and hasn't, in this priority, in four groups.
@@ -817,184 +1164,107 @@ const TAG_CLASS: Record<EnvironmentalTag["tone"], string> = {
  * shape of the section is legible before a single word of it is.
  */
 function featureGroups(priority: FitPriority): HTMLElement | null {
-  const has = (feature: FitFeature) => feature.state === "present";
-  const hasnt = (feature: FitFeature) => feature.state === "absent";
-  const unknown = (feature: FitFeature) => feature.state === "unknown";
-
-  const asked = priority.picked;
-  const rest = priority.alsoCounted;
-
-  const groups = [
-    featureGroup(
-      "You gave extra influence, and it has",
-      asked.filter(has),
-      GROUP_TONE.pickedPresent,
-    ),
-    featureGroup(
-      "You gave extra influence, but it doesn't have",
-      asked.filter(hasnt),
-      GROUP_TONE.pickedAbsent,
-    ),
-    featureGroup(
-      asked.length ? "Also counted here, and it has" : "It has",
-      rest.filter(has),
-      GROUP_TONE.present,
-    ),
-    featureGroup(
-      asked.length
-        ? "Also counted here, but it doesn't have"
-        : "It doesn't have",
-      rest.filter(hasnt),
-      GROUP_TONE.absent,
-    ),
-    featureGroup(
-      "FINN didn't say either way",
-      [...asked, ...rest].filter(unknown),
-      GROUP_TONE.unknown,
-    ),
-  ].filter((group): group is HTMLElement => group !== null);
+  const groups = featureGroupsOf(priority);
 
   if (!groups.length) return null;
 
-  return el("div", { class: "flex flex-col gap-2.5" }, groups);
+  return factTable(groups.map(featureGroup));
 }
 
 /**
- * How one group is coloured: its ground, its label, its mark and its chips.
+ * One group of features, as a row of that table.
  *
- * All four together, because they have to agree. The chips were tinted by a
- * two-axis function of their own — picked, and present — which is the same
- * two facts the group is already built from, and on a tinted card the pale
- * blue chip it produced for a met pick vanished into the pale blue block
- * around it. The group decides once, and its chips sit on white so they read
- * on whatever ground it chose.
+ * This was five tinted cards, each with its own ground, label ink, dot and
+ * chip colour — four things to keep in agreement per group, and a pale blue
+ * chip that vanished into the pale blue block around it. The row keeps one
+ * colour, on its edge, and the chips take the tint that goes with it on the
+ * white the row is drawn on.
  *
- * The hues are the Advice page's, for the same facts: blue for what the
- * reader asked for and got, amber for what they asked for and didn't, green
- * for equipment that counted anyway, grey for the rest.
+ * The five titles and their colours come from `lib/feature-copy`, shared with
+ * the pinned car's card so the two surfaces answer the same five questions.
  */
-interface GroupTone {
-  /** The block's ground. */
-  card: string;
-  /** The label's ink, dark enough for 10px on that ground. */
-  label: string;
-  /** The dot beside the label. */
-  mark: string;
-  /** Every chip in the group. */
-  chip: string;
+function featureGroup(group: FeatureGroup): HTMLElement {
+  return el(
+    "div",
+    /* A row carrying three headings and three clouds of chips needs more room
+       than one carrying a label and a line of them. */
+    {
+      class: `${rowEdge(group.tone)} px-3.5 ${group.bands ? "py-4" : "py-3"}`,
+      attrs: { "data-group": group.id },
+    },
+    [
+      el("p", {
+        class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+        text: `${group.title} (${group.features.length})`,
+      }),
+
+      /*
+       * The picks the car hasn't got are sorted under the level the reader
+       * gave each one; every other group is one cloud of chips. Each chip's
+       * "i" opens its own tooltip, so nothing opens under the group.
+       */
+      group.bands
+        ? /*
+           * Room to breathe. Three headings, three clouds of chips and the
+           * group's own title at 10px were stacked a few pixels apart, which
+           * read as one block of small type rather than as four things — and
+           * the grouping is the whole point of it.
+           */
+          el(
+            "div",
+            { class: "mt-3.5 flex flex-col gap-4" },
+            group.bands.map(influenceBand),
+          )
+        : el(
+            "ul",
+            { class: "mt-2.5 flex flex-wrap gap-1.5" },
+            group.features.map((feature) =>
+              /* The chip strikes a missing feature through from its own state. */
+              el("li", {}, [featureChip(feature, FEATURE_CHIP_TONE[group.chip])]),
+            ),
+          ),
+    ],
+  );
 }
 
-const GROUP_TONE = {
-  pickedPresent: {
-    card: "bg-finn-pale-blue",
-    label: "text-finn-highlight-navy",
-    mark: "bg-finn-accent-blue",
-    chip: "bg-white text-finn-highlight-navy",
-  },
-  pickedAbsent: {
-    card: "bg-finn-influence-orange-pale",
-    label: "text-finn-warning-deep",
-    mark: "bg-finn-warning",
-    chip: "bg-white text-finn-warning-deep",
-  },
-  present: {
-    card: "bg-finn-influence-emerald-pale",
-    label: "text-finn-influence-emerald",
-    mark: "bg-finn-influence-emerald",
-    chip: "bg-white text-finn-black",
-  },
-  absent: {
-    card: "bg-finn-cotton",
-    label: "text-finn-iron",
-    mark: "bg-finn-iron",
-    chip: "bg-white text-finn-iron",
-  },
-  unknown: {
-    card: "bg-finn-snow",
-    label: "text-finn-iron",
-    mark: "bg-finn-iron/60",
-    chip: "bg-white text-finn-iron",
-  },
-} as const satisfies Record<string, GroupTone>;
-
-function featureGroup(
-  label: string,
-  features: FitFeature[],
-  tone: GroupTone,
-): HTMLElement | null {
-  if (!features.length) return null;
-
-  /*
-   * One explanation at a time, under the whole group rather than under one
-   * chip. Chips wrap, so there is no "under this one" to open into — and a
-   * floating layer would need positioning, portalling and a pointer inside a
-   * 26rem shadow root that doesn't own the page.
-   */
-  const slot = el("div", {
-    class: "mt-2 hidden rounded-lg bg-white px-2.5 py-2",
-    attrs: { id: `finn-lens-explains-${(infoIds += 1)}` },
-  });
-
-  let openFor: HTMLElement | null = null;
-
-  const close = () => {
-    slot.classList.add("hidden");
-
-    openFor?.setAttribute("aria-expanded", "false");
-    openFor?.classList.remove("text-finn-accent-blue");
-    openFor = null;
-  };
-
-  const explain = (button: HTMLElement, feature: FitFeature) => {
-    if (openFor === button) {
-      close();
-      return;
-    }
-
-    close();
-    empty(slot);
-
-    slot.append(
-      el("p", {
-        class: "text-[11px] font-black text-finn-black",
-        text: feature.label,
-      }),
-      el("p", {
-        class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
-        text: feature.explanation ?? "",
-      }),
-    );
-
-    slot.classList.remove("hidden");
-    button.setAttribute("aria-expanded", "true");
-    button.classList.add("text-finn-accent-blue");
-    openFor = button;
-  };
-
-  return el("div", { class: `rounded-xl px-3 py-2.5 ${tone.card}` }, [
+/**
+ * One level of influence, and the picks the car is missing at that level.
+ *
+ * The heading says the level in the picker's own words and the "i" beside it
+ * says what the level actually does to the result — which is the question a
+ * reader has at exactly this moment, having just been told the car misses
+ * something they called highly influential. The chips take the level's own
+ * colour, so the three bands are told apart before they are read.
+ */
+function influenceBand(band: InfluenceBand): HTMLElement {
+  return el("div", { attrs: { "data-band": band.level } }, [
     el(
       "p",
-      {
-        class: `flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${tone.label}`,
-      },
+      { class: `flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.1em] ${band.accent}` },
       [
-        el("span", {
-          class: `h-1.5 w-1.5 shrink-0 rounded-full ${tone.mark}`,
-          attrs: { "aria-hidden": "true" },
+        el("span", { text: `${band.title} (${band.features.length})` }),
+
+        infoTip({
+          label: `What is ${band.title}?`,
+          title: band.title,
+          body: band.meaning,
+          buttonClass: [
+            "inline-flex h-4 w-4 shrink-0 items-center justify-center",
+            "rounded-full align-middle transition-colors hover:text-finn-accent-blue",
+          ].join(" "),
+          idleClass: "opacity-60",
+          activeClass: "opacity-100",
         }),
-        el("span", { text: `${label} (${features.length})` }),
       ],
     ),
 
     el(
       "ul",
       { class: "mt-2 flex flex-wrap gap-1.5" },
-      features.map((feature) =>
-        el("li", {}, [featureChip(feature, tone.chip, slot.id, explain)]),
+      band.features.map((feature) =>
+        el("li", {}, [featureChip(feature, FEATURE_CHIP_TONE[band.level], false)]),
       ),
     ),
-
-    slot,
   ]);
 }
 
@@ -1012,7 +1282,6 @@ const STATE_LABEL: Record<FitFeature["state"], string> = {
 /* Efficiency                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** How a level colours its chip. Efficiency is good news, not a warning. */
 /** A small coloured label carrying a verdict the text then justifies. */
 function verdictChip(label: string, className: string): HTMLElement {
   return el("span", {
@@ -1035,40 +1304,42 @@ function verdictChip(label: string, className: string): HTMLElement {
  * The reading used to be written only inside the environmental-impact
  * priority, so whether a reader was told a car drinks 9 L/100km depended on
  * whether they had ranked the environment — when it is on their bill every
- * month either way.
+ * month either way. It is always here now, straight after the cost, whether or
+ * not the environment is ranked: the environmental result carries only CO₂,
+ * and says in one line where fuel use meets it.
  *
- * What a car runs on leads, because it is the single fact that decides
- * everything below it: which cohort the figure is measured against, what
- * "typical" means, and whether it can be graded at all. Solid rather than
- * tinted, so it reads as the subject of the section rather than as a second
- * verdict competing with the efficiency chip beside it.
+ * What a car runs on decides which reference the figure is measured against,
+ * in what unit, and whether it can be graded at all. Where there is a table it
+ * is the pill beside the row's name, tinted in the row's tone, as the class is
+ * on the environmental result's CO₂ card; where there isn't, it leads the
+ * section beside the chip standing in for a verdict.
  */
-function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
-  /*
-   * The environmental priority block already covers this ground in full, with
-   * emissions beside it. Saying it twice in one panel would read as a bug.
-   */
-  if (analysis.priorities.some((priority) => priority.impact)) return null;
+function efficiencySection(analysis: FitAnalysis): HTMLElement {
+  const drawn = efficiencyContent(analysis);
 
+  /* What the environmental result's "How much it uses" link scrolls to. */
+  drawn.setAttribute("data-section", USAGE_SECTION);
+  drawn.classList.add("outline-none");
+
+  return drawn;
+}
+
+function efficiencyContent(analysis: FitAnalysis): HTMLElement {
   const reading = readUsage(analysis.vehicle);
 
-  const chips = el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
-    reading.fuel
-      ? verdictChip(reading.fuel, "bg-finn-highlight-navy text-white")
-      : null,
-
-    reading.kind === "graded"
-      ? verdictChip(
-          reading.efficiency.label,
-          EFFICIENCY_TONE[reading.efficiency.level],
-        )
-      : verdictChip(reading.verdict, "bg-finn-cotton text-finn-iron"),
-  ]);
-
+  /*
+   * With no table to carry what it runs on as the row's pill, it leads here,
+   * beside the chip standing in for a verdict.
+   */
   if (reading.kind !== "graded") {
     return section(
       "How much it uses",
-      chips,
+      el("div", { class: "mt-2 flex flex-wrap items-center gap-2" }, [
+        reading.fuel
+          ? verdictChip(reading.fuel, "bg-finn-highlight-navy text-white")
+          : null,
+        verdictChip(reading.verdict, "bg-finn-cotton text-finn-iron"),
+      ]),
       el("p", {
         class: "mt-3 text-[12px] leading-[18px] text-finn-black",
         text: reading.body,
@@ -1076,30 +1347,21 @@ function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
     );
   }
 
-  const { efficiency } = reading;
-
   return section(
     "How much it uses",
-    chips,
-
-    el("div", { class: "mt-3 flex flex-wrap gap-x-8 gap-y-2.5" }, [
-      readout("This car", efficiency.display),
-      readout(
-        "Typical for its kind",
-        efficiency.typical.replace(" is typical", ""),
-      ),
-    ]),
 
     el("p", {
-      class: "mt-3 text-[12px] leading-[18px] text-finn-black",
-      text: efficiency.reasoning,
+      class: "mt-2 text-[12px] leading-[18px] text-finn-black",
+      text: reading.efficiency.reasoning,
     }),
 
-    /* After the answer, not in front of it. */
-    el("p", {
-      class: "mt-2 text-[11px] leading-4 text-finn-iron",
-      text: efficiency.caveat,
-    }),
+    /*
+     * The environmental result's own table, with the one row this section has:
+     * the figure, the FINN Lens benchmark beside it, the verdict in its
+     * colour, what it runs on as the pill beside the row's name, and the test
+     * disclaimer under it. What each number means opens from the row's "i".
+     */
+    el("div", { class: "@container mt-3" }, [comparisonTable(reading.table)]),
   );
 }
 
@@ -1118,42 +1380,32 @@ function efficiencySection(analysis: FitAnalysis): HTMLElement | null {
  * this is — which is also where the chip's own colour comes from now, handed
  * down rather than worked out again from facts the group already knew.
  */
+/**
+ * `withLevel` is false where the chips are already sorted under a heading
+ * naming their level and tinted in its colour: a dot and a badge saying the
+ * same thing a third time is noise, not emphasis.
+ */
 function featureChip(
   feature: FitFeature,
   chipClass: string,
-  slotId: string,
-  onExplain: (button: HTMLElement, feature: FitFeature) => void,
+  withLevel = true,
 ): HTMLElement {
-  const level = feature.importance
-    ? FEATURE_IMPORTANCE[feature.importance]
-    : null;
+  const level =
+    withLevel && feature.importance ? FEATURE_IMPORTANCE[feature.importance] : null;
 
   const info = feature.explanation
-    ? el(
-        "button",
-        {
-          class: [
-            "-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center",
-            "rounded-full align-middle opacity-70 transition-colors",
-            "hover:opacity-100",
-          ].join(" "),
-          attrs: {
-            type: "button",
-            "aria-label": `What is ${feature.label}?`,
-            "aria-expanded": "false",
-            "aria-controls": slotId,
-          },
-        },
-        [icon("info", "h-4 w-4")],
-      )
+    ? infoTip({
+        label: `What is ${feature.label}?`,
+        title: feature.label,
+        body: feature.explanation,
+        buttonClass: [
+          "-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center",
+          "rounded-full align-middle transition-opacity hover:opacity-100",
+        ].join(" "),
+        idleClass: "opacity-70",
+        activeClass: "opacity-100",
+      })
     : null;
-
-  if (info) {
-    info.addEventListener("click", (event) => {
-      event.stopPropagation();
-      onExplain(info, feature);
-    });
-  }
 
   return el(
     "span",
@@ -1184,7 +1436,7 @@ function featureChip(
        * matters most at the top, and writing the level on every chip is the
        * noise the row layout was already making.
        */
-      feature.importance === "high"
+      withLevel && feature.importance === "high"
         ? el("span", {
             class: "text-[10px] font-black opacity-70",
             attrs: {
@@ -1205,45 +1457,86 @@ function featureChip(
 /* 4. Cost                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const SOURCE_LABEL: Record<CostLine["source"], string> = {
-  finn: "FINN charges this",
-  estimate: "Lens estimate",
-  user: "Your setting",
-};
+/**
+ * One line of the bill: its mark, what it is, where the number came from, the
+ * number, and an "i" that opens the engine's account of it under the row.
+ *
+ * The mark sits in a circle tinted by where the number came from, so the three
+ * kinds of figure are told apart at a glance and the colour agrees with the
+ * words under the label rather than replacing them.
+ *
+ * The "i" is the same one "How much it uses" carries, in the same place: at the
+ * far right of the row, opening under it and staying open until it is closed
+ * again. It used to be a tooltip pinned to the label, which covered the row
+ * below it, closed when the pointer drifted, and put a paragraph in a place
+ * meant for a phrase — and it meant the panel had two different affordances
+ * for one idea, a few hundred pixels apart.
+ */
+function costRow(line: CostLine, breakdown: CostBreakdown, fuelType: FuelType | null): HTMLElement {
+  const contract = contractTag(line, breakdown.contractType);
 
-function costRow(line: CostLine): HTMLElement {
-  /*
-   * The engine writes a full account of every line — where the number came
-   * from, which of the reader's assumptions went into it, and why it is
-   * missing when it is. The panel was showing the figure and discarding all
-   * of that.
-   */
-  const info = explains(line.label, line.explanation);
+  return explainedRow({
+    label: line.label,
+    /*
+     * The engine writes a full account of every line — where the number came
+     * from, which of the reader's assumptions went into it, and why it is
+     * missing when it is. Titled as the question it answers, which is also
+     * what the "i" is named for a screen reader.
+     */
+    explanations: [{ title: `What is ${line.label}?`, body: line.explanation }],
+    rowClass: "rounded-2xl bg-finn-snow px-3 py-2.5",
+    attrs: { "data-line": line.id },
+    content: [
+      el("div", { class: "flex items-start gap-3" }, [
+        el(
+          "span",
+          {
+            class: `flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${COST_SOURCE_TONE[line.source]}`,
+            attrs: { "aria-hidden": "true" },
+          },
+          [icon(costIcon(line, fuelType), "h-4 w-4")],
+        ),
 
-  const row = el("div", { class: "flex items-baseline justify-between gap-3 py-1" }, [
-    el("span", { class: "min-w-0" }, [
-      el("span", { class: "block text-[12px] leading-4 text-finn-black" }, [
-        el("span", { text: line.label }),
-        info.button,
+        el("div", { class: "min-w-0 flex-1" }, [
+          el("div", { class: "flex items-baseline justify-between gap-3" }, [
+            el("span", { class: "flex min-w-0 flex-wrap items-center gap-1.5" }, [
+              el("span", {
+                class: "text-[12px] font-bold leading-4 text-finn-black",
+                text: line.label,
+              }),
+
+              /*
+               * Which of FINN's two prices this is, in the tint that means
+               * "you chose this" everywhere else in the bill.
+               */
+              contract
+                ? el("span", {
+                    class: `rounded-full px-2 py-0.5 text-[10px] font-black leading-4 ${COST_SOURCE_TONE.user}`,
+                    text: contract,
+                    attrs: { "data-contract": "" },
+                  })
+                : null,
+            ]),
+
+            el("span", {
+              class: [
+                "shrink-0 text-[13px] font-black tabular-nums",
+                line.available ? "text-finn-black" : "text-finn-iron",
+              ].join(" "),
+              text: line.available && line.amount != null
+                ? formatEUR(line.amount)
+                : "Not available",
+            }),
+          ]),
+
+          el("span", {
+            class: "mt-0.5 block text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
+            text: COST_SOURCE_LABEL[line.source],
+          }),
+        ]),
       ]),
-      el("span", {
-        class: "block text-[10px] leading-4 text-finn-iron",
-        text: SOURCE_LABEL[line.source],
-      }),
-    ]),
-
-    el("span", {
-      class: [
-        "shrink-0 text-[13px] font-bold tabular-nums",
-        line.available ? "text-finn-black" : "text-finn-iron",
-      ].join(" "),
-      text: line.available && line.amount != null
-        ? formatEUR(line.amount)
-        : "Not available",
-    }),
-  ]);
-
-  return el("li", { class: "py-0.5" }, [row, info.panel]);
+    ],
+  });
 }
 
 /**
@@ -1271,38 +1564,70 @@ function costGapChip(analysis: FitAnalysis): HTMLElement | null {
   );
 }
 
+/**
+ * The budget verdict, marked as well as coloured.
+ *
+ * Over a budget the reader set is the one outcome here worth a warning, and it
+ * gets the same triangle the caveats use. Within it gets a tick rather than
+ * nothing, because the sentence is worth reading as an answer — a reader who
+ * set a budget asked this question. An unknown status is not a verdict, so it
+ * is left as plain grey prose with no mark at all.
+ */
+function budgetLine(sentence: string, status: CostBreakdown["budgetStatus"]): HTMLElement {
+  const tone =
+    status === "over"
+      ? "text-finn-influence-red"
+      : status === "unknown"
+        ? "text-finn-iron"
+        : "text-finn-influence-emerald";
+
+  const mark =
+    status === "over" ? "triangle-alert" : status === "unknown" ? null : "circle-check";
+
+  return el("p", { class: `mt-2 flex items-start gap-2 text-[12px] leading-[18px] font-bold ${tone}` }, [
+    mark ? icon(mark, "mt-0.5 h-3.5 w-3.5 shrink-0") : null,
+    el("span", { text: sentence }),
+  ]);
+}
+
 function costSection(analysis: FitAnalysis): HTMLElement {
   const { cost } = analysis;
   const { breakdown } = cost;
-
-  /*
-   * Over budget is the one case worth colouring. Within budget is the ordinary
-   * outcome and does not need congratulating in green every time; unknown is
-   * not a verdict at all.
-   */
-  const budgetTone =
-    breakdown.budgetStatus === "over"
-      ? "text-finn-influence-red"
-      : breakdown.budgetStatus === "unknown"
-        ? "text-finn-iron"
-        : "text-finn-influence-emerald";
 
   const gap = costGapChip(analysis);
 
   return section(
     "What it costs you",
 
-    el("div", { class: "mt-2 flex items-baseline gap-2" }, [
-      el("span", {
-        class: "text-2xl font-black leading-7 text-finn-black tabular-nums",
-        text: formatEUR(breakdown.totalMonthly),
-      }),
-      el("span", {
-        class: "text-[11px] text-finn-iron",
-        text: breakdown.complete
-          ? "estimated per month"
-          : "per month, and incomplete",
-      }),
+    /*
+     * The total, with the mark of the thing it is: a wallet, solid navy, the
+     * way "How much it uses" leads on what a car runs on. It names the
+     * subject of the section rather than passing a verdict on it — the
+     * verdicts here are the amber gap chip and the budget line, and both are
+     * coloured for what they mean.
+     */
+    el("div", { class: "mt-2 flex items-center gap-3" }, [
+      el(
+        "span",
+        {
+          class: "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-finn-highlight-navy text-white",
+          attrs: { "aria-hidden": "true" },
+        },
+        [icon("wallet", "h-5 w-5")],
+      ),
+
+      el("div", { class: "min-w-0" }, [
+        el("p", {
+          class: "text-2xl font-black leading-7 text-finn-black tabular-nums",
+          text: formatEUR(breakdown.totalMonthly),
+        }),
+        el("p", {
+          class: "text-[11px] leading-4 text-finn-iron",
+          text: breakdown.complete
+            ? "estimated per month"
+            : "per month, and incomplete",
+        }),
+      ]),
     ]),
 
     gap
@@ -1314,20 +1639,20 @@ function costSection(analysis: FitAnalysis): HTMLElement {
       text: costLead(analysis),
     }),
 
-    el("ul", { class: "mt-2.5 divide-y divide-finn-cotton" }, cost.lines.map(costRow)),
+    el(
+      "div",
+      { class: "mt-2.5 flex flex-col gap-2" },
+      cost.lines.map((line) => costRow(line, breakdown, analysis.vehicle.fuelType ?? null)),
+    ),
 
-    cost.budgetSentence
-      ? el("p", {
-          class: `mt-2 text-[12px] leading-[18px] font-bold ${budgetTone}`,
-          text: cost.budgetSentence,
-        })
-      : null,
+    cost.budgetSentence ? budgetLine(cost.budgetSentence, breakdown.budgetStatus) : null,
 
+    /* Each caveat marked as one, rather than greyed out with the small print. */
     ...cost.caveats.map((caveat) =>
-      el("p", {
-        class: "mt-2 text-[11px] leading-4 text-finn-iron",
-        text: caveat,
-      }),
+      el("p", { class: "mt-2 flex items-start gap-2 text-[11px] leading-4 text-finn-iron" }, [
+        icon("triangle-alert", "mt-px h-3.5 w-3.5 shrink-0 text-finn-warning-deep"),
+        el("span", { text: caveat }),
+      ]),
     ),
 
     /*
@@ -1350,23 +1675,58 @@ function costSection(analysis: FitAnalysis): HTMLElement {
 /* 5. Tradeoffs                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * One compromise, as a row of the tradeoff table.
+ *
+ * Marked with the priority it costs — the shield for safety, the leaf for the
+ * environment, the wallet for a budget the reader set directly — and edged in
+ * how loudly the engine decided to say it: orange where the loss lands near
+ * the top of their order, amber further down. Red, edge and pill, for
+ * equipment the reader gave extra influence and the car doesn't have, matching
+ * that group in the feature table.
+ *
+ * The React twin is `components/FitAnalysisView/TradeoffRow`.
+ */
 function tradeoffRow(tradeoff: Tradeoff): HTMLElement {
+  const reading = readTradeoff(tradeoff);
+
   return el(
-    "li",
-    { class: "rounded-xl bg-finn-snow px-3 py-2.5" },
+    "div",
+    { class: `${rowEdge(reading.tone)} px-3.5 py-3`, attrs: { "data-tradeoff": tradeoff.kind } },
     [
-      el("p", {
-        class: "text-[12px] font-bold leading-[18px] text-finn-black",
-        text: tradeoff.headline,
-      }),
-      el("p", {
-        class: "mt-1 text-[12px] leading-[18px] text-finn-iron",
-        text: tradeoff.evidence,
-      }),
-      el("p", {
-        class: "mt-1 text-[11px] leading-4 text-finn-iron",
-        text: tradeoff.relevance,
-      }),
+      el("div", { class: "flex items-start gap-2.5" }, [
+        icon(reading.icon, "mt-0.5 h-4 w-4 shrink-0 text-finn-iron"),
+
+        el("div", { class: "min-w-0 flex-1" }, [
+          el("div", { class: "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1" }, [
+            el("p", {
+              class: "text-[12px] font-black leading-[18px] text-finn-black",
+              text: tradeoff.headline,
+            }),
+
+            /*
+             * Which part of their answer this costs, and where they put it. A
+             * compromise on the thing they ranked first is different news from
+             * the same compromise on their fifth, and the row said so only in
+             * the last of its three lines.
+             */
+            el("span", {
+              class: `shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black leading-4 ${ROW_TONE[reading.tone].pill}`,
+              text: reading.pill,
+            }),
+          ]),
+
+          el("p", {
+            class: "mt-0.5 text-[11px] leading-4 text-finn-iron",
+            text: tradeoff.evidence,
+          }),
+
+          el("p", {
+            class: "mt-1 text-[11px] leading-4 text-finn-iron",
+            text: tradeoff.relevance,
+          }),
+        ]),
+      ]),
     ],
   );
 }
@@ -1376,11 +1736,7 @@ function tradeoffsSection(analysis: FitAnalysis): HTMLElement | null {
 
   return section(
     "Things to consider",
-    el(
-      "ul",
-      { class: "mt-2 flex flex-col gap-2" },
-      analysis.tradeoffs.map(tradeoffRow),
-    ),
+    el("div", { class: "mt-2" }, [factTable(analysis.tradeoffs.map(tradeoffRow))]),
   );
 }
 

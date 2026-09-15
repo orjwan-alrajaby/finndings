@@ -3,6 +3,8 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { configurationDetail, configurationName } from "@/lib/car-labels";
 import type { FitAnalysis } from "@/lib/reasoning-engine/fit";
 
+import { FactTable } from "@/components/FactTable";
+
 import { CostSection } from "./CostSection";
 import { PrioritySection } from "./PrioritySection";
 import { BandChip, Section } from "./parts";
@@ -132,13 +134,15 @@ export function FitAnalysisView({ analysis }: { analysis: FitAnalysis }) {
 
             {analysis.tradeoffs.length > 0 && (
                 <Section title="What you'd be accepting">
-                    <div className="mt-2 flex flex-col gap-3">
-                        {analysis.tradeoffs.map((tradeoff) => (
-                            <TradeoffRow
-                                key={tradeoff.headline}
-                                tradeoff={tradeoff}
-                            />
-                        ))}
+                    <div className="mt-2">
+                        <FactTable>
+                            {analysis.tradeoffs.map((tradeoff) => (
+                                <TradeoffRow
+                                    key={tradeoff.headline}
+                                    tradeoff={tradeoff}
+                                />
+                            ))}
+                        </FactTable>
                     </div>
                 </Section>
             )}

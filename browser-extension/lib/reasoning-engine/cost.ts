@@ -421,11 +421,12 @@ function energyLine(breakdown: CostBreakdown): CostLine {
   } else if (energy.reason === "missingConsumption") {
     explanation =
       "FINN hasn't supplied a consumption figure for this car, so we can't estimate what it costs to run. " +
-      "This line is missing from the total rather than counted as €0.";
+      `The ${energy.energyLabel} line is missing from the total rather than counted as €0.`;
   } else {
     explanation =
       `You haven't set a usable ${energy.energyLabel === "electricity" ? "electricity" : "fuel"} price, ` +
-      "so we can't estimate the running cost. This line is missing from the total rather than counted as €0.";
+      "so we can't estimate the running cost. " +
+      `The ${energy.energyLabel} line is missing from the total rather than counted as €0.`;
   }
 
   if (energy.caveat) {
@@ -493,8 +494,8 @@ function excessMileageLine(breakdown: CostBreakdown): CostLine {
     explanation =
       `FINN includes ${formatKm(excessMileage.includedMonthlyKm)}/month and you expect to drive ` +
       `${formatKm(excessMileage.excessKm)} beyond that, but FINN hasn't supplied an ` +
-      "extra-kilometre price for this car. We can't estimate the charge, so it's missing " +
-      "from the total rather than counted as €0.";
+      "extra-kilometre price for this car. We can't estimate the charge, so the extra " +
+      "mileage line is missing from the total rather than counted as €0.";
   }
 
   return {
@@ -557,7 +558,7 @@ export function buildCostAnalysis(
         : "FINN's data doesn't tell us how VAT is treated on business contracts, so we're showing the advertised business price as supplied and not adding or removing anything.",
     caveats,
     disclaimer:
-      "These numbers are estimates based on the vehicle data FINN supplies and the assumptions you've given us. " +
+      "Every figure in this bill is an estimate, built from the data FINN supplies about the car and the assumptions you've given us. " +
       "Your actual cost may differ if you drive more or less, energy prices change, or the contract terms differ.",
   };
 }

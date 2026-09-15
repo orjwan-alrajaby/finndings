@@ -51,6 +51,20 @@ export const PANEL_ICONS = {
      "add"/"done" about an action whose whole vocabulary elsewhere in the
      product is pinning. */
   pin: "pin",
+  /* The environmental result's table: what each row measures. Drawn rather
+     than emoji, because an emoji fog rendered as an empty grey box. */
+  cloud: "cloud",
+  fuel: "fuel",
+  zap: "zap",
+  /* The bill: the total, and what each line of it is. `fuel` and `zap` do
+     double duty on the energy line, so a car's mark is the same shape in the
+     bill as in "How much it uses". */
+  wallet: "wallet",
+  receipt: "receipt",
+  route: "route",
+  /* Verdicts on the total: over a budget the reader set, and within it. */
+  "triangle-alert": "triangle-alert",
+  "circle-check": "circle-check",
 };
 
 export const PANEL_ICON_NAMES = Object.keys(PANEL_ICONS);

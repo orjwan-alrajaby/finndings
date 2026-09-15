@@ -257,6 +257,15 @@
     display: block;
   }
 
+  /*
+     A fold that should simply be open in the file. The environmental result's
+     table and its questions stay mounted while closed, so a capture can lay
+     every answer flat instead of photographing a row of closed headings.
+  */
+  [data-exporting] .finn-lens-reveal-on-export {
+    display: block !important;
+  }
+
   .finn-lens-toast {
     @apply rounded-2xl text-sm text-white shadow-lg relative;
     min-width: 320px;

@@ -1,7 +1,17 @@
+import { Receipt, Route, Fuel, Zap, Wallet, TriangleAlert, CircleCheck } from "lucide-react";
+
 import { formatEUR } from "@/lib/reasoning-engine";
 import type { FitAnalysis } from "@/lib/reasoning-engine/fit";
-import type { CostLine } from "@/lib/reasoning-engine/types";
-import { advertisedGap, costLead } from "@/lib/cost-copy";
+import type { CostBreakdown, CostLine } from "@/lib/reasoning-engine/types";
+import type { FuelType } from "@/lib/types";
+import {
+    advertisedGap,
+    contractTag,
+    costIcon,
+    costLead,
+    COST_SOURCE_LABEL,
+    COST_SOURCE_TONE,
+} from "@/lib/cost-copy";
 
 import { Section } from "./parts";
 
@@ -10,26 +20,19 @@ import { Section } from "./parts";
  *
  * The twin of `costSection` in the in-page panel, reading the same sentences
  * out of `cost-copy` so a reader who meets a car in the panel and again here
- * is told the same thing about it in the same words.
+ * is told the same thing about it in the same words — and drawn in the same
+ * shapes, down to the mark on each line of the bill.
  *
  * The advertised price is quoted only to be contrasted with. What is news is
  * that the reader's own mileage and energy prices turn it into a bigger
  * number, and that gap leads the section.
  */
+
+/** Lucide shapes for the marks `cost-copy` names. */
+const LINE_ICON = { receipt: Receipt, route: Route, fuel: Fuel, zap: Zap } as const;
+
 export function CostSection({ analysis }: { analysis: FitAnalysis }) {
     const { cost } = analysis;
-
-    /*
-     * Over budget is the one case worth colouring red. Within budget is the
-     * ordinary outcome and does not need congratulating every time; unknown is
-     * not a verdict at all.
-     */
-    const budgetTone =
-        cost.breakdown.budgetStatus === "over"
-            ? "text-finn-influence-red"
-            : cost.breakdown.budgetStatus === "unknown"
-              ? "text-finn-iron"
-              : "text-finn-influence-emerald";
 
     const gap = advertisedGap(analysis);
 
@@ -46,17 +49,31 @@ export function CostSection({ analysis }: { analysis: FitAnalysis }) {
               * left on the type rather than removed here: it is engine output
               * with its own tests, and pulling a field out of the analysis is
               * a change to the engine's contract rather than to this card.
+              *
+              * The wallet is solid navy, the way the fuel chip in "How much it
+              * uses" is: it names the subject of the section rather than
+              * passing a verdict on it. The verdicts are the amber gap chip
+              * and the budget line, and both are coloured for what they mean.
               */}
-            <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-black leading-7 text-finn-black tabular-nums">
-                    {formatEUR(cost.breakdown.totalMonthly)}
+            <div className="mt-2 flex items-center gap-3">
+                <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-finn-highlight-navy text-white"
+                >
+                    <Wallet className="h-5 w-5" />
                 </span>
 
-                <span className="text-[11px] text-finn-iron">
-                    {cost.breakdown.complete
-                        ? "estimated per month"
-                        : "per month, and incomplete"}
-                </span>
+                <div className="min-w-0">
+                    <p className="text-2xl font-black leading-7 text-finn-black tabular-nums">
+                        {formatEUR(cost.breakdown.totalMonthly)}
+                    </p>
+
+                    <p className="text-[11px] leading-4 text-finn-iron">
+                        {cost.breakdown.complete
+                            ? "estimated per month"
+                            : "per month, and incomplete"}
+                    </p>
+                </div>
             </div>
 
             {/*
@@ -77,27 +94,37 @@ export function CostSection({ analysis }: { analysis: FitAnalysis }) {
             </p>
 
             {cost.budgetSentence && (
-                <p
-                    className={`mt-2 text-[12px] font-bold leading-[18px] ${budgetTone}`}
-                >
-                    {cost.budgetSentence}
-                </p>
+                <BudgetLine
+                    sentence={cost.budgetSentence}
+                    status={cost.breakdown.budgetStatus}
+                />
             )}
 
             <div className="mt-3 flex flex-col gap-2">
                 {cost.lines.map((line) => (
-                    <CostRow key={line.id} line={line} />
+                    <CostRow
+                        key={line.id}
+                        line={line}
+                        breakdown={cost.breakdown}
+                        fuelType={analysis.vehicle.fuelType ?? null}
+                    />
                 ))}
             </div>
 
+            {/* Each caveat marked as one, rather than greyed out with the small print. */}
             {cost.caveats.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1">
+                <ul className="mt-3 flex flex-col gap-1.5">
                     {cost.caveats.map((caveat) => (
                         <li
                             key={caveat}
-                            className="text-[11px] leading-4 text-finn-iron"
+                            className="flex items-start gap-2 text-[11px] leading-4 text-finn-iron"
                         >
-                            {caveat}
+                            <TriangleAlert
+                                aria-hidden="true"
+                                className="mt-px h-3.5 w-3.5 shrink-0 text-finn-warning-deep"
+                            />
+
+                            <span>{caveat}</span>
                         </li>
                     ))}
                 </ul>
@@ -117,31 +144,118 @@ export function CostSection({ analysis }: { analysis: FitAnalysis }) {
     );
 }
 
-function CostRow({ line }: { line: CostLine }) {
+/**
+ * The budget verdict, marked as well as coloured.
+ *
+ * Over a budget the reader set is the one outcome worth a warning, and it gets
+ * the same triangle the caveats use. Within it gets a tick rather than nothing,
+ * because a reader who set a budget asked this question and the sentence is the
+ * answer. Unknown is not a verdict, so it keeps the grey prose and no mark.
+ */
+function BudgetLine({
+    sentence,
+    status,
+}: {
+    sentence: string;
+    status: FitAnalysis["cost"]["breakdown"]["budgetStatus"];
+}) {
+    const tone =
+        status === "over"
+            ? "text-finn-influence-red"
+            : status === "unknown"
+              ? "text-finn-iron"
+              : "text-finn-influence-emerald";
+
+    const Mark =
+        status === "over"
+            ? TriangleAlert
+            : status === "unknown"
+              ? null
+              : CircleCheck;
+
     return (
-        <div className="rounded-2xl bg-finn-snow px-3.5 py-2.5">
-            <div className="flex items-baseline justify-between gap-3">
-                <p className="text-[12px] font-bold text-finn-black">
-                    {line.label}
+        <p
+            className={`mt-2 flex items-start gap-2 text-[12px] font-bold leading-[18px] ${tone}`}
+        >
+            {Mark && (
+                <Mark aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            )}
+
+            <span>{sentence}</span>
+        </p>
+    );
+}
+
+/**
+ * One line of the bill: its mark, what it is, where the number came from, and
+ * the number.
+ *
+ * The mark sits in a circle tinted by that last question, so the three kinds of
+ * figure are told apart at a glance and the colour agrees with the words under
+ * the label rather than replacing them.
+ */
+function CostRow({
+    line,
+    breakdown,
+    fuelType,
+}: {
+    line: CostLine;
+    breakdown: CostBreakdown;
+    fuelType: FuelType | null;
+}) {
+    const Icon = LINE_ICON[costIcon(line, fuelType)];
+    const contract = contractTag(line, breakdown.contractType);
+
+    return (
+        <div className="flex items-start gap-3 rounded-2xl bg-finn-snow px-3.5 py-2.5">
+            <span
+                aria-hidden="true"
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${COST_SOURCE_TONE[line.source]}`}
+            >
+                <Icon className="h-4 w-4" />
+            </span>
+
+            <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3">
+                    <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-[12px] font-bold text-finn-black">
+                        {line.label}
+
+                        {/*
+                          * Which of FINN's two prices this is, in the tint that
+                          * means "you chose this" everywhere else in the bill.
+                          */}
+                        {contract && (
+                            <span
+                                data-contract=""
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-black leading-4 ${COST_SOURCE_TONE.user}`}
+                            >
+                                {contract}
+                            </span>
+                        )}
+                    </p>
+
+                    <p
+                        className={[
+                            "shrink-0 text-[12px] font-black tabular-nums",
+                            line.available
+                                ? "text-finn-black"
+                                : "text-finn-iron",
+                        ].join(" ")}
+                    >
+                        {line.available && line.amount != null
+                            ? `${formatEUR(line.amount)}/mo`
+                            : "Not known"}
+                    </p>
+                </div>
+
+                <p className="mt-0.5 text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron">
+                    {COST_SOURCE_LABEL[line.source]}
                 </p>
 
-                <p
-                    className={[
-                        "shrink-0 text-[12px] font-black",
-                        line.available
-                            ? "text-finn-black"
-                            : "text-finn-iron",
-                    ].join(" ")}
-                >
-                    {line.available && line.amount != null
-                        ? `${formatEUR(line.amount)}/mo`
-                        : "Not known"}
+                <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                    {line.explanation}
                 </p>
             </div>
-
-            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                {line.explanation}
-            </p>
         </div>
     );
 }

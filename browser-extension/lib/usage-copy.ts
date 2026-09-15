@@ -1,7 +1,12 @@
 import type { FinnCar } from "./types";
-import type { EfficiencyAssessment } from "./reasoning-engine/environmental";
+import type {
+  EfficiencyAssessment,
+  EnvironmentalAssessment,
+} from "./reasoning-engine/environmental";
+import type { ComparisonReading, EnvironmentRow } from "./environment-copy";
 
 import { assessEnvironment } from "./reasoning-engine/environmental";
+import { relationBetween, USE_TONE } from "./environment-copy";
 
 /**
  * How much energy a car uses, decided once for every surface that says it.
@@ -29,9 +34,18 @@ import { assessEnvironment } from "./reasoning-engine/environmental";
 export type UsageReading =
   | {
       kind: "graded";
-      /** What it runs on — the fact that decides the cohort below. */
+      /**
+       * What it runs on — the fact that decides the cohort below. Drawn as
+       * the pill on the table's row rather than above it.
+       */
       fuel: string | null;
       efficiency: EfficiencyAssessment;
+      /**
+       * The figure and its benchmark, in the environmental result's own
+       * colourful table. The same shape and the same colours whether a reader
+       * met this car's consumption here or in that section.
+       */
+      table: ComparisonReading;
     }
   | {
       kind: "ungradable" | "unpublished";
@@ -46,19 +60,30 @@ const UNGRADABLE =
   "petrol it burns and the electricity it charges on, over an assumed pattern " +
   "of charging. There is no petrol car or electric car it can fairly be " +
   "measured against, so we would rather say that than invent a comparison. " +
-  "What it actually costs you comes down to how often you plug it in.";
+  "What a plug-in hybrid actually costs you comes down to how often you plug it in.";
 
 const UNPUBLISHED =
   "FINN doesn't publish a consumption figure for this car, so there is " +
   "nothing to measure it against and we won't guess. Everything else here " +
-  "still stands — this is the one thing we can't tell you.";
+  "still stands — how much it uses is the one thing we can't tell you.";
 
 export function readUsage(vehicle: FinnCar): UsageReading {
   const environment = assessEnvironment(vehicle);
   const fuel = vehicle.fuelType ?? null;
   const efficiency = environment?.efficiency;
 
-  if (efficiency) return { kind: "graded", fuel, efficiency };
+  if (efficiency)
+    return {
+      kind: "graded",
+      fuel,
+      efficiency,
+      table: {
+        rows: [usageRow(efficiency, environment?.powertrain ?? null)],
+        /* Nothing to put beside the row's name: the A–G class is emissions, not use. */
+        rating: null,
+        source: efficiency.disclaimer,
+      },
+    };
 
   if (environment?.powertrain === "Plug-in Hybrid") {
     return {
@@ -77,9 +102,44 @@ export function readUsage(vehicle: FinnCar): UsageReading {
   };
 }
 
-/** How a level colours its chip. Efficiency is good news, not a warning. */
-export const EFFICIENCY_TONE = {
-  high: "bg-finn-influence-emerald-pale text-finn-influence-emerald",
-  moderate: "bg-finn-pale-blue text-finn-accent-blue",
-  low: "bg-finn-warning-lift text-finn-warning-deep",
-} as const;
+/**
+ * The one row that table draws: what this car uses, against the FINN Lens
+ * benchmark for what it runs on.
+ *
+ * The twin of `energyRow` in `environment-copy`, and deliberately not a call
+ * into it: that row sits under the CO₂ row that decides the match, so it is
+ * labelled as context and its benchmark is described in the words of a section
+ * that has just explained where 136 g/km comes from. Here the row *is* the
+ * section, so it names the unit in words under its title and says whose
+ * comparison point the second figure is.
+ */
+function usageRow(
+  efficiency: EfficiencyAssessment,
+  powertrain: EnvironmentalAssessment["powertrain"],
+): EnvironmentRow {
+  const electric = powertrain === "Electric";
+
+  return {
+    id: "energy",
+    icon: electric ? "electricity" : "fuel",
+    label: electric ? "Electricity use" : powertrain ? "Fuel use" : "Energy use",
+    /* What the unit is, in words, for a reader who has never bought a car on it. */
+    note: efficiency.measure,
+    car: {
+      value: efficiency.display,
+      meaning: efficiency.consumes,
+      info: efficiency.meaning,
+    },
+    reference: {
+      value: efficiency.reference,
+      meaning: efficiency.referenceNote,
+      info: efficiency.provenance,
+    },
+    comparison: efficiency.label,
+    /* Beside the row's name, as the environmental table's fuel-use row has it. */
+    fuel: powertrain,
+    /* The same bar the environmental table draws, from the same two figures. */
+    relation: relationBetween(efficiency.value, efficiency.referenceValue),
+    tone: USE_TONE[efficiency.step],
+  };
+}

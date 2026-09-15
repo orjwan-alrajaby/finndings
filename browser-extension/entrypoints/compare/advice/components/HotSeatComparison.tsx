@@ -289,7 +289,7 @@ function Row({ row }: { row: ChallengeLine }) {
     return (
         <div
             className={[
-                "grid gap-x-4 gap-y-2 rounded-r-xl border-l-4 py-3 pl-3 pr-3 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]",
+                "grid gap-x-4 gap-y-2 border-l-4 py-3 pl-3 pr-3 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]",
                 /*
                   * The side is now the row's ground as well as its edge. A
                   * bar alone made the reader trace a thin line down the
