@@ -1,8 +1,8 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
-import { Lock } from "lucide-react";
+import { Info, Lock } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
-import { InfluencePill } from "@/components/InfluencePill";
+import { surfaceTone } from "@/lib/priority-marks";
 
 import {
     FEATURE_IMPORTANCE,
@@ -25,6 +25,24 @@ import type {
  * the way out.
  */
 const STANDARD = "standard";
+
+/** The most any rung weighs, so every rung's meter shares one scale. */
+const STRONGEST = Math.max(
+    ...IMPORTANCE_SCALE.map((level) => FEATURE_IMPORTANCE[level].weight),
+);
+
+/**
+ * A raised card's ground and edge, in its level's hue.
+ *
+ * A wash that fades to white rather than a flat tint: flat pale cards read as
+ * a coloured list, and on a list of fifteen that is noise. The wash says which
+ * ones are raised at a glance and leaves the text sitting on white.
+ */
+const RAISED_CARD: Record<FeatureImportance, string> = {
+    high: "bg-linear-to-r from-finn-influence-red-pale to-white to-50% ring-finn-influence-red/30",
+    medium: "bg-linear-to-r from-finn-influence-orange-pale to-white to-50% ring-finn-influence-orange/30",
+    low: "bg-linear-to-r from-finn-influence-emerald-pale to-white to-50% ring-finn-influence-emerald/30",
+};
 
 /** A priority the user has already given this same feature extra influence in. */
 export interface FeatureElsewhere {
@@ -54,26 +72,34 @@ interface FeatureOptionProps {
  *
  * Every feature in the priority gets one, and every one shows the same
  * four-step control — standard, somewhat, moderately, highly. That is the
- * point of the shape: a reader can see that all fifteen are on the scale and
- * that ten of them are resting on *standard*, which is a far better answer to
- * "what happens to the ones I didn't pick" than any sentence underneath a
- * list of checkboxes.
+ * point of the shape: a reader can see that all of them are on the scale and
+ * that most are resting on *standard*, which is a far better answer to "what
+ * happens to the ones I didn't pick" than any sentence underneath a list of
+ * checkboxes.
  *
- * One tap does both jobs — picking a feature and saying how much it counts —
- * because "not raised" is just the first segment. Nothing appears, nothing
- * moves, and there is no default to correct afterwards.
+ * **A column of weights down the left.** Each card opens on a tile holding its
+ * multiplier — 1× in grey, 2×, 3× and 4× in their level's colour — so the list
+ * can be read top to bottom as "what counts for how much" without looking
+ * inside a single control. The control still says the level; the tile is the
+ * index to it, the way a row number is to a table.
  *
- * Stacked rather than laid out in a line: the name, then what the thing
- * actually is, then the question, then the answer. A single row had to put
- * the explanation behind an "i" for want of anywhere to say it, which asks a
- * reader to already know what a feature is before they can decide how much
- * it should count. The question is written above the buttons for the same
- * reason it was the first time — it is the whole point of the control, and a
- * row of four words is not self-evidently a scale.
+ * **The control is four choices, not four progress bars.** Stretched across a
+ * settings-width card, four full-width meters read as a chart of something
+ * rather than as buttons, with their labels lost in the corners. Each rung is
+ * now a compact button carrying its name, its multiplier, and a meter of
+ * rising bars filled as far as its weight — the same idea, drawn at the size
+ * of a choice. Where the card has room it sits beside the words; where it
+ * doesn't — a phone, or the compare drawer — it runs under them. That is a
+ * container query rather than a breakpoint, because the same card lives in a
+ * wide page and a narrow drawer on the same screen.
+ *
+ * Standard cards are white, not grey. Grey is what a disabled control looks
+ * like, and standard is where most features are meant to sit.
  *
  * Two ways a card can be unavailable, and they are told apart because the
  * reader can act on one and not the other. **At the cap** is this category's
- * own doing and the fix is here: put something back to standard. **Raised
+ * own doing and the fix is here: put something back to standard — said under
+ * the control, not only in a tooltip a touch screen never shows. **Raised
  * elsewhere** is a different category's doing and the fix is there, so the
  * card names the category rather than leaving them to hunt.
  */
@@ -85,81 +111,53 @@ export function FeatureOption({
     onSet,
 }: FeatureOptionProps) {
     const { label, explanation } = FEATURES[feature];
-    const level = importance ? FEATURE_IMPORTANCE[importance] : null;
 
     const elsewhere = raisedElsewhere ?? [];
     const locked = elsewhere.length > 0;
     const blocked = locked || atCap;
 
-    /**
-     * How loudly a card states its level.
-     *
-     * The tint carries it, in the hue of the level, because the whole reason
-     * to raise a feature is that it should be visible at a glance which ones
-     * you did — and five pale cards among fifteen white ones is a glance.
-     * The dot and the name repeat it for anyone who cannot use the hue.
-     */
-    const cardClass = () => {
-        if (level) return level.selectedCardClass;
-
-        return locked ? "bg-white/50" : "bg-finn-iron/10 shadow-sm";
-    };
+    if (locked) {
+        return (
+            <LockedOption
+                label={label}
+                explanation={explanation}
+                elsewhere={elsewhere}
+            />
+        );
+    }
 
     return (
-        <div className={["rounded-2xl p-3 transition drop-shadow-sm", cardClass()].join(" ")}>
-            <div className="flex items-start gap-2.5">
-                {locked ? (
-                    <Lock
-                        aria-hidden
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-finn-iron/50"
-                    />
-                ) : (
-                    <span
-                        aria-hidden
-                        className={[
-                            "mt-1 h-2.5 w-2.5 shrink-0 rounded-full transition",
-                            level ? level.dotClass : STANDARD_INFLUENCE.dotClass,
-                        ].join(" ")}
-                    />
-                )}
+        <div
+            className={[
+                "@container rounded-2xl p-3 ring-1 transition sm:p-3.5",
+                importance
+                    ? `shadow-sm ${RAISED_CARD[importance]}`
+                    : "bg-white shadow-sm ring-black/5",
+            ].join(" ")}
+        >
+            <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-center @2xl:gap-5">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <WeightTile importance={importance} />
 
-                <div className="min-w-0 flex-1 flex flex-col gap-2">
-                    <div className="flex justify-between gap-4">
-                        <span
-                            className={[
-                                "block text-sm leading-5",
-                                nameClass(level, locked),
-                            ].join(" ")}
-                        >
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black leading-5 text-finn-black">
                             {label}
-                        </span>
-                        <InfluencePill importance={importance} />
-                    </div>
-
-                    {/*
-                      * Said here rather than hidden behind an "i". A reader
-                      * deciding how much something should count needs to know
-                      * what it is first, and a tooltip makes that a second
-                      * action taken on a hunch.
-                      */}
-                    {explanation && (
-                        <p className="mt-1 text-[11px] leading-4 text-finn-black">
-                            {explanation}
                         </p>
-                    )}
-                </div>
-            </div>
 
-            {locked ? (
-                <div className="mt-2.5">
-                    <ElsewhereNote elsewhere={elsewhere} />
+                        {/*
+                          * Said here rather than hidden behind an "i". A reader
+                          * deciding how much something should count needs to know
+                          * what it is first.
+                          */}
+                        {explanation && (
+                            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
+                                {explanation}
+                            </p>
+                        )}
+                    </div>
                 </div>
-            ) : (
-                <div className="mt-2.5 rounded-xl bg-white p-2">
-                    <p className="px-0.5 text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                        How much influence does this have?
-                    </p>
 
+                <div className="shrink-0 @2xl:w-88">
                     <RadioGroup.Root
                         value={importance ?? STANDARD}
                         onValueChange={(next) =>
@@ -170,10 +168,7 @@ export function FeatureOption({
                             )
                         }
                         aria-label={`How much influence ${label} has`}
-                        className={[
-                            "mt-2 flex gap-2 rounded-lg border border-finn-iron/15 p-2",
-                            cardClass(),
-                        ].join(" ")}
+                        className="grid grid-cols-4 gap-0.5 rounded-xl bg-finn-snow p-0.5 ring-1 ring-black/5 @xs:gap-1 @xs:p-1"
                     >
                         {/*
                           * Standard first, because that is where every feature
@@ -183,14 +178,18 @@ export function FeatureOption({
                         <Segment
                             value={STANDARD}
                             label={STANDARD_INFLUENCE.label}
+                            weight={STANDARD_INFLUENCE.weight}
                             hint={STANDARD_INFLUENCE.hint}
                             active={importance == null}
-                            activeClass={STANDARD_INFLUENCE.activeClass}
-                            idleClass={STANDARD_INFLUENCE.idleClass}
-                            dotClass={STANDARD_INFLUENCE.dotClass}
-                            /* Its active pill is a light grey, not a solid
-                               hue, so a white dot on it would be no dot. */
-                            activeDotClass="bg-finn-iron/60"
+                            activeClass="bg-white text-finn-black shadow-sm ring-1 ring-black/10"
+                            idleText="text-finn-iron"
+                            barClass="bg-finn-iron/50"
+                            activeBarClass="bg-finn-iron/70"
+                            /* Standard's pressed ground is white, so its unlit
+                               bars need a grey, not the white wash the solid
+                               rungs use — white on white left one lone bar
+                               that read as a dot. */
+                            activeEmptyClass="bg-black/10"
                             /* Never blocked: dropping back to standard is how
                                the reader frees a slot at the cap. */
                             disabled={false}
@@ -204,22 +203,151 @@ export function FeatureOption({
                                     key={option}
                                     value={option}
                                     label={meta.label}
-                                    hint={
-                                        blocked
-                                            ? `You've raised ${MAX_FEATURES_PER_CATEGORY} already — put one back to standard to swap`
-                                            : meta.hint
-                                    }
+                                    weight={meta.weight}
+                                    hint={meta.hint}
                                     active={importance === option}
-                                    activeClass={meta.activeClass}
-                                    idleClass={meta.idleClass}
-                                    dotClass={meta.dotClass}
+                                    activeClass={`${meta.dotClass} text-white shadow-md`}
+                                    idleText={meta.accentTextClass}
+                                    barClass={meta.dotClass}
+                                    activeBarClass="bg-white"
+                                    activeEmptyClass="bg-white/35"
                                     disabled={blocked}
                                 />
                             );
                         })}
                     </RadioGroup.Root>
+
+                    {atCap && (
+                        <p className="mt-1.5 flex items-start gap-1.5 px-1 text-[10px] leading-4 text-finn-iron">
+                            <Info
+                                aria-hidden="true"
+                                className="mt-px h-3 w-3 shrink-0"
+                            />
+                            You've raised {MAX_FEATURES_PER_CATEGORY} already. Set
+                            one back to Standard to raise this instead.
+                        </p>
+                    )}
                 </div>
-            )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * The multiplier this feature carries, as the card's first thing.
+ *
+ * Solid in the level's colour once raised, so the raised few stand out of a
+ * column of grey; a quiet outlined 1× on standard, because standard is a real
+ * weight and not an empty slot.
+ */
+function WeightTile({ importance }: { importance: FeatureImportance | null }) {
+    const meta = importance ? FEATURE_IMPORTANCE[importance] : null;
+
+    return (
+        <span
+            aria-hidden="true"
+            className={[
+                "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl leading-none",
+                meta
+                    ? `${meta.dotClass} text-white shadow-sm`
+                    : "bg-finn-snow text-finn-iron ring-1 ring-black/5",
+            ].join(" ")}
+        >
+            <span className="text-base font-black tabular-nums">
+                {meta?.weight ?? STANDARD_INFLUENCE.weight}×
+            </span>
+
+            <Meter
+                weight={meta?.weight ?? STANDARD_INFLUENCE.weight}
+                filled={meta ? "bg-white" : "bg-finn-iron/50"}
+                empty={meta ? "bg-white/35" : "bg-black/10"}
+                className="mt-1"
+            />
+        </span>
+    );
+}
+
+/**
+ * Rising bars, filled as far as a weight — a signal meter at 1× to 4×.
+ *
+ * Four bars for four rungs, so every meter on the screen has the same outline
+ * and differs only in how much of it is lit. That is the comparison the reader
+ * is making, drawn as the one thing that changes.
+ */
+function Meter({
+    weight,
+    filled,
+    empty,
+    className = "",
+}: {
+    weight: number;
+    filled: string;
+    empty: string;
+    className?: string;
+}) {
+    return (
+        <span
+            aria-hidden="true"
+            className={["flex items-end gap-0.5", className].join(" ")}
+        >
+            {Array.from({ length: STRONGEST }, (_, index) => (
+                <span
+                    key={index}
+                    className={[
+                        "w-0.75 rounded-full",
+                        index < weight ? filled : empty,
+                    ].join(" ")}
+                    style={{ height: `${4 + index * 2}px` }}
+                />
+            ))}
+        </span>
+    );
+}
+
+/**
+ * A feature spoken for under another priority.
+ *
+ * Slimmer than an active card on purpose. Nothing on it can be pressed, and at
+ * full height the locked rows — half a priority, in some — pushed the ones a
+ * reader can act on apart and repeated the same boxed sentence down the page.
+ * It keeps the name, what the feature is, and where it is raised, drawn as
+ * that priority's own chip so the reader can see which card to open.
+ */
+function LockedOption({
+    label,
+    explanation,
+    elsewhere,
+}: {
+    label: string;
+    explanation?: string;
+    elsewhere: FeatureElsewhere[];
+}) {
+    return (
+        <div className="@container rounded-2xl bg-finn-snow p-3 ring-1 ring-black/5">
+            <div className="flex flex-col gap-2.5 @2xl:flex-row @2xl:items-center @2xl:gap-5">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span
+                        aria-hidden="true"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-finn-iron/70 ring-1 ring-black/5"
+                    >
+                        <Lock className="h-4 w-4" />
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black leading-5 text-finn-iron">
+                            {label}
+                        </p>
+
+                        {explanation && (
+                            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron/80">
+                                {explanation}
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <ElsewhereNote elsewhere={elsewhere} />
+            </div>
         </div>
     );
 }
@@ -233,131 +361,136 @@ export function FeatureOption({
  * undo.
  */
 function ElsewhereNote({ elsewhere }: { elsewhere: FeatureElsewhere[] }) {
-    const names = elsewhere.map((item) => item.label);
-
-    const joined =
-        names.length === 1
-            ? names[0]
-            : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
-
     return (
-        <span
-            className="flex shrink-0 items-center gap-1 rounded-lg bg-finn-cotton px-2 py-1 @sm:ml-auto"
-            title={`Raised under ${joined}. A feature counts extra in one priority only — put it back to standard there to raise it here.`}
-        >
-            {/*
-              * One mark per priority the feature is raised under. These were
-              * emoji joined into a single string; drawn icons are elements,
-              * so they are laid out rather than concatenated.
-              */}
-            <span aria-hidden className="flex items-center gap-0.5">
-                {elsewhere.map((item) => (
-                    <PriorityIcon
-                        key={item.label}
-                        name={item.icon}
-                        className="h-3 w-3 text-finn-iron"
-                    />
-                ))}
-            </span>
+        <div className="shrink-0 @2xl:w-88">
+            <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-black text-finn-black">
+                    Raised under
+                </span>
 
-            <span className="text-[10px] font-bold text-finn-iron">
-                Raised under {joined}
-            </span>
-        </span>
+                {/*
+                  * One chip per priority the feature is raised under, in that
+                  * priority's colour, laid out rather than concatenated.
+                  */}
+                {elsewhere.map((item) => {
+                    const tone = surfaceTone(item.icon);
+
+                    return (
+                        <span
+                            key={item.label}
+                            className={[
+                                "inline-flex items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[10px] font-black ring-1",
+                                tone.ground,
+                                tone.edge,
+                                tone.ink,
+                            ].join(" ")}
+                        >
+                            <PriorityIcon
+                                name={item.icon}
+                                className="h-3 w-3 shrink-0"
+                            />
+                            {item.label}
+                        </span>
+                    );
+                })}
+            </div>
+
+            <p className="mt-1 text-[10px] leading-4 text-finn-iron">
+                Set it back to Standard there to raise it here.
+            </p>
+        </div>
     );
 }
 
-/** A raised feature says so in its own name, not only in its background. */
-function nameClass(
-    level: (typeof FEATURE_IMPORTANCE)[FeatureImportance] | null,
-    locked: boolean,
-): string {
-    if (level) return `font-black ${level.accentTextClass}`;
-
-    return locked ? "font-bold text-finn-iron" : "font-bold text-finn-black";
-}
-
-function segmentClass(
-    active: boolean,
-    disabled: boolean,
-    activeClass: string,
-    idleClass: string,
-): string {
-    if (active) return activeClass;
-
-    if (disabled) return "cursor-not-allowed bg-white/60 text-finn-iron/40";
-
-    /*
-     * The hairline is what makes a resting rung look pressable. White on the
-     * panel's own near-white left three of the four options reading as
-     * coloured text on every card that hadn't been raised — which is most of
-     * them, and exactly the reader who needs to see there is a choice here.
-     */
-    return `bg-white ring-1 ring-finn-iron/15 ${idleClass}`;
-}
-
 /**
- * One rung of the scale.
+ * One rung of the scale: its name, its multiplier, and a meter lit as far as
+ * the multiplier.
  *
- * Four of these share the width, so the labels sit under the question rather
- * than crammed against the name — which is what let the words shrink to 10px
- * in the first place.
+ * The meter is what makes four words a scale — the tile at the start of the
+ * card draws the same one — and the "×" says exactly what the meter only
+ * suggests. Colour is the fast read and the words are the real one; both stay
+ * on every state.
  *
- * The dot carries the colour so the label never has to. Colour is the fast
- * read; the words are the real one, and they stay on every state.
- *
- * A Radix radio item rather than a button with `role="radio"` written on it.
- * The hand-rolled version announced itself correctly and then behaved like
- * four separate buttons: every rung took a tab stop, and the arrow keys — the
- * one interaction a radio group promises — did nothing. Radix gives the group
- * a single tab stop, moves the selection with the arrows, and sets
- * `aria-checked` from the value rather than from a prop that could disagree
- * with it.
+ * A Radix radio item rather than a button with `role="radio"` written on it:
+ * the group takes a single tab stop, the arrow keys move the selection, and
+ * `aria-checked` comes from the value rather than from a prop that could
+ * disagree with it.
  */
 function Segment({
     value,
     label,
+    weight,
     hint,
     active,
     activeClass,
-    idleClass,
-    dotClass,
-    activeDotClass = "bg-white",
+    idleText,
+    barClass,
+    activeBarClass,
+    activeEmptyClass,
     disabled,
 }: {
     /** The stored importance this rung sets, or `STANDARD` for the first. */
     value: string;
     label: string;
+    weight: number;
     hint: string;
     active: boolean;
     activeClass: string;
-    idleClass: string;
-    dotClass: string;
-    /** Overridden where the active pill isn't a solid hue. */
-    activeDotClass?: string;
+    /** The label's colour when this rung isn't pressed. */
+    idleText: string;
+    /** The meter's fill when this rung isn't pressed. */
+    barClass: string;
+    /** The meter's fill on the pressed rung, which sits on a solid ground. */
+    activeBarClass: string;
+    /** The unlit bars on the pressed rung — against whatever its ground is. */
+    activeEmptyClass: string;
     disabled: boolean;
 }) {
+    const inert = disabled && !active;
+
     return (
         <RadioGroup.Item
             value={value}
-            disabled={disabled && !active}
+            disabled={inert}
             title={hint}
             className={[
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-1.5 py-1.5",
-                "text-[10px] font-black leading-3 transition",
+                "flex min-w-0 flex-col items-center gap-1 rounded-lg px-0.5 py-1.5 text-center transition @xs:px-1",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-finn-accent-blue/50",
-                segmentClass(active, disabled, activeClass, idleClass),
+                segmentClass(active, inert, idleText),
+                active ? activeClass : "",
             ].join(" ")}
         >
-            <span
-                aria-hidden="true"
-                className={[
-                    "h-2 w-2 shrink-0 rounded-full",
-                    active ? activeDotClass : dotClass,
-                ].join(" ")}
-            />
+            {/* The name gets the whole width, and a hair less tracking on a
+                phone: "Moderately" in a phone-wide card has no room to spare,
+                and cut to "Moderat…" it stops being a word. */}
+            <span className="max-w-full text-[10px] font-black leading-3 tracking-tight @sm:tracking-normal">
+                {label}
+            </span>
 
-            <span className="text-left">{label}</span>
+            <span className="flex items-center gap-1.5">
+                <Meter
+                    weight={weight}
+                    filled={active ? activeBarClass : barClass}
+                    empty={active ? activeEmptyClass : "bg-black/10"}
+                />
+
+                <span
+                    className={[
+                        "text-[10px] font-bold leading-3 tabular-nums",
+                        active ? "opacity-95" : "opacity-75",
+                    ].join(" ")}
+                >
+                    {weight}×
+                </span>
+            </span>
         </RadioGroup.Item>
     );
+}
+
+function segmentClass(active: boolean, inert: boolean, idleText: string): string {
+    if (active) return "";
+
+    if (inert) return "cursor-not-allowed opacity-40";
+
+    return `${idleText} hover:bg-white hover:shadow-sm`;
 }

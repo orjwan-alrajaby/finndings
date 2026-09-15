@@ -11,7 +11,7 @@ import {
     ProfilePresets,
 } from "@/components/PriorityOrder";
 
-import { ListOrdered } from "lucide-react";
+import { ListOrdered, Sparkles } from "lucide-react";
 
 import { DrawerSection, SECTION_TONE } from "./DrawerSection";
 
@@ -47,22 +47,27 @@ export function PriorityOrderSection({
             summary={`${priorities.length} of ${MAX_PRIORITIES} chosen · the top one carries the most`}
         >
             {hasProfiles && (
-                <div className="mb-4 rounded-2xl bg-finn-snow p-3">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-finn-iron">
+                <div className="mb-5 border-b border-finn-cotton pb-5">
+                    <p className="flex items-center gap-1.5 text-xs font-black text-finn-black">
+                        <Sparkles
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-finn-accent-blue"
+                        />
                         Start from a profile
                     </p>
 
-                    <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                    <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
                         A way of driving, written out as an order. It fills
                         the list in — change anything you disagree with.
                     </p>
 
-                    <div className="mt-2.5">
+                    <div className="mt-3">
                         <ProfilePresets
                             profiles={profiles}
                             priorityDefinitions={priorityDefinitions}
                             priorities={priorities}
                             onApply={onChange}
+                            layout="tiles"
                         />
                     </div>
                 </div>

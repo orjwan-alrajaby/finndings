@@ -1,6 +1,16 @@
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { CircleQuestionMark, Sparkles, Undo2 } from "lucide-react";
+import {
+    ChevronDown,
+    CircleQuestionMark,
+    Layers,
+    Lock,
+    ShieldCheck,
+    Sparkles,
+    Undo2,
+    type LucideIcon,
+} from "lucide-react";
 
+import { surfaceTone, type SurfaceTone } from "@/lib/priority-marks";
 import {
     FEATURE_IMPORTANCE,
     IMPORTANCE_SCALE,
@@ -23,6 +33,12 @@ export type PickedElsewhere = Partial<Record<FeatureId, FeatureElsewhere[]>>;
 interface FeatureInfluencePickerProps {
     /** What this priority is called, for the nothing-picked line. */
     categoryLabel: string;
+    /**
+     * The priority's mark name, so the heading and the count wear its colour
+     * inside a card that already does. Only those two — the rows keep their
+     * influence colours, which are the whole point of them.
+     */
+    mark?: string;
     /** What the user has picked out. May legitimately be empty. */
     features: FeatureSelection;
     /** Everything this priority offers, most relevant first. */
@@ -73,6 +89,7 @@ interface FeatureInfluencePickerProps {
  */
 export function FeatureInfluencePicker({
     categoryLabel,
+    mark,
     features,
     availableFeatures,
     rank,
@@ -87,6 +104,7 @@ export function FeatureInfluencePicker({
     );
 
     const atMax = features.length >= MAX_FEATURES_PER_CATEGORY;
+    const tone = mark ? surfaceTone(mark) : null;
 
     /**
      * Move a feature along the scale, in either direction.
@@ -128,7 +146,12 @@ export function FeatureInfluencePicker({
         <div className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-finn-highlight-navy">
+                    <p
+                        className={[
+                            "text-sm font-black",
+                            tone ? tone.ink : "text-finn-highlight-navy",
+                        ].join(" ")}
+                    >
                         What should count for more?
                     </p>
 
@@ -142,16 +165,18 @@ export function FeatureInfluencePicker({
                 <span
                     className={[
                         "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black",
-                        features.length
-                            ? "bg-finn-pale-blue text-finn-accent-blue"
-                            : "bg-finn-cotton text-finn-iron",
+                        !features.length
+                            ? "bg-finn-cotton text-finn-iron"
+                            : tone
+                              ? `ring-1 ${tone.ground} ${tone.edge} ${tone.ink}`
+                              : "bg-finn-pale-blue text-finn-accent-blue",
                     ].join(" ")}
                 >
                     {features.length} of {MAX_FEATURES_PER_CATEGORY} raised
                 </span>
             </div>
 
-            <Explainer categoryLabel={categoryLabel} />
+            <Explainer tone={tone ?? surfaceTone("shield")} />
 
             <div className="flex flex-col gap-3">
                 {rows.map((feature) => (
@@ -206,7 +231,7 @@ export function FeatureInfluencePicker({
                     <span className="text-[10px] leading-4 text-finn-iron/80">
                         {onResetToDefaults && onResetAll
                             ? "Defaults puts back what Lens ships with; all puts everything on standard."
-                            : "This category only."}
+                            : "This priority only."}
                     </span>
                 </div>
             )}
@@ -231,75 +256,211 @@ function isLocked(
  * Everything in here used to be on the screen at all times. It is all still
  * true and still worth saying once — what changed is that saying it every
  * time, above the control, made the control hard to find.
+ *
+ * Folded away, though, it has to be findable, and it was not: a line of small
+ * type on `white/70` inside a white card has no edge at all, so the one place
+ * the scale is explained read as a caption rather than something that opens.
+ * It now sits on the priority's own tint with an edge, a marked tile, and a
+ * pill that says what pressing it does — and what it opens leads with the
+ * multipliers as four tiles, because "4×" is a number a reader should be able
+ * to see rather than find in a sentence.
  */
-function Explainer({ categoryLabel }: { categoryLabel: string }) {
+function Explainer({ tone }: { tone: SurfaceTone }) {
     return (
-        <Collapsible.Root className="overflow-hidden rounded-xl bg-white/70">
-            <Collapsible.Trigger className="group flex w-full items-center gap-2 px-3 py-2 text-left">
-                <CircleQuestionMark
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 shrink-0 text-finn-iron transition-colors group-data-[state=open]:text-finn-black"
-                />
+        <Collapsible.Root
+            /*
+             * A wash rather than a flat tint: the feature rows under it are
+             * flat pale cards in the influence colours, and on an orange
+             * priority a flat orange panel above orange "Moderately" rows read
+             * as one more row. The gradient, the edge and the solid tile make
+             * it a different kind of thing.
+             */
+            className={[
+                "overflow-hidden rounded-2xl bg-white bg-linear-to-r to-white to-70% ring-1 transition-shadow data-[state=open]:shadow-md",
+                tone.wash,
+                tone.edge,
+            ].join(" ")}
+        >
+            <Collapsible.Trigger className="group flex w-full items-center gap-3 px-3 py-2.5 text-left">
+                <span
+                    className={[
+                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
+                        tone.solid,
+                    ].join(" ")}
+                >
+                    <CircleQuestionMark aria-hidden="true" className="h-4 w-4" />
+                </span>
 
-                <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-[11px] font-black text-finn-black">
+                <span className="min-w-0 flex-1">
+                    <span className="block text-xs font-black text-finn-black">
                         How influence works
                     </span>
 
-                    <Scale />
+                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Scale />
+                    </span>
+                </span>
+
+                <span
+                    className={[
+                        "inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[10px] font-black shadow-sm ring-1 transition-colors",
+                        tone.ink,
+                        tone.edge,
+                    ].join(" ")}
+                >
+                    <span className="group-data-[state=open]:hidden">Explain</span>
+                    <span className="hidden group-data-[state=open]:inline">Hide</span>
+                    <ChevronDown
+                        aria-hidden="true"
+                        className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180"
+                    />
                 </span>
             </Collapsible.Trigger>
 
             <Collapsible.Content>
-                <div className="space-y-2 border-t border-finn-snow px-3 py-2.5">
+                <div className="space-y-3 border-t border-black/5 bg-white px-3 py-3">
                     <p className="text-[11px] leading-4 text-finn-iron">
-                        Every feature listed counts when Lens compares cars on{" "}
-                        {categoryLabel.toLowerCase()} — that is{" "}
+                        Every feature in this priority counts toward its
+                        score.{" "}
                         <strong className="font-black text-finn-black">
-                            standard
-                        </strong>
-                        . Raising one means a car that has it gains ground
-                        here and a car missing it gives a little up. Next to a
-                        standard feature,{" "}
-                        <span className={FEATURE_IMPORTANCE.low.accentTextClass}>
-                            {FEATURE_IMPORTANCE.low.label.toLowerCase()}
-                        </span>{" "}
-                        counts about twice as much,{" "}
-                        <span
-                            className={FEATURE_IMPORTANCE.medium.accentTextClass}
-                        >
-                            {FEATURE_IMPORTANCE.medium.label.toLowerCase()}
-                        </span>{" "}
-                        three times and{" "}
-                        <span className={FEATURE_IMPORTANCE.high.accentTextClass}>
-                            {FEATURE_IMPORTANCE.high.label.toLowerCase()}
-                        </span>{" "}
-                        four times — within this priority only.
+                            {STANDARD_INFLUENCE.label}
+                        </strong>{" "}
+                        is the baseline, and raising a feature multiplies its
+                        influence:
                     </p>
 
-                    <p className="text-[11px] leading-4 text-finn-iron">
-                        How much this priority counts against your others is
-                        your priority order, not this. And nothing here is a
-                        requirement: a car can miss one of your raised
-                        features and still be the recommendation, with the gap
-                        named in your advice.
-                    </p>
+                    <Multipliers />
 
-                    <p className="text-[11px] leading-4 text-finn-iron">
-                        A feature can only be raised in one priority. If it is
-                        already raised somewhere else, its row says so — put
-                        it back to standard there to move it here.
-                    </p>
+                    <ul className="space-y-2">
+                        <Rule icon={Layers} tone={tone}>
+                            These levels only affect how features are weighed{" "}
+                            <strong className="font-black text-finn-black">
+                                within this priority
+                            </strong>
+                            . How much the priority itself matters compared
+                            with your other priorities is set by your priority
+                            order.
+                        </Rule>
+
+                        <Rule icon={ShieldCheck} tone={tone}>
+                            Nothing here is a requirement. A car can miss a
+                            raised feature and still be recommended — Lens will
+                            explain the trade-off in your advice.
+                        </Rule>
+
+                        <Rule icon={Lock} tone={tone}>
+                            Each feature can only be raised in one priority. If
+                            it's already raised elsewhere, you'll see that on
+                            its row. Set it back to Standard there if you want
+                            to raise it here.
+                        </Rule>
+                    </ul>
                 </div>
             </Collapsible.Content>
         </Collapsible.Root>
     );
 }
 
+/**
+ * The four levels as four tiles: the dot, the name, the multiplier, and a bar
+ * as long as the multiplier — so "Highly counts four times Standard" is a
+ * shape before it is a sentence.
+ */
+function Multipliers() {
+    const levels = [
+        {
+            key: "standard",
+            label: STANDARD_INFLUENCE.label,
+            weight: STANDARD_INFLUENCE.weight,
+            dot: STANDARD_INFLUENCE.dotClass,
+            text: "text-finn-black",
+        },
+        ...IMPORTANCE_SCALE.map((level) => ({
+            key: level,
+            label: FEATURE_IMPORTANCE[level].label,
+            weight: FEATURE_IMPORTANCE[level].weight,
+            dot: FEATURE_IMPORTANCE[level].dotClass,
+            text: FEATURE_IMPORTANCE[level].accentTextClass,
+        })),
+    ];
+    const strongest = Math.max(...levels.map((level) => level.weight));
+
+    return (
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {levels.map((level) => (
+                <li
+                    key={level.key}
+                    className="rounded-xl bg-white px-2.5 py-2 shadow-sm ring-1 ring-black/5"
+                >
+                    <span className="flex items-center justify-between gap-2">
+                        <span
+                            className={[
+                                "inline-flex items-center gap-1.5 text-[10px] font-black",
+                                level.text,
+                            ].join(" ")}
+                        >
+                            <span
+                                aria-hidden="true"
+                                className={["h-2 w-2 rounded-full", level.dot].join(" ")}
+                            />
+                            {level.label}
+                        </span>
+
+                        <span
+                            className={[
+                                "text-sm font-black tabular-nums",
+                                level.text,
+                            ].join(" ")}
+                        >
+                            {level.weight}×
+                        </span>
+                    </span>
+
+                    <span
+                        aria-hidden="true"
+                        className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-finn-cotton"
+                    >
+                        <span
+                            className={["block h-full rounded-full", level.dot].join(" ")}
+                            style={{ width: `${(level.weight / strongest) * 100}%` }}
+                        />
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+/** One of the explainer's rules, with a mark in the priority's colour. */
+function Rule({
+    icon: Icon,
+    tone,
+    children,
+}: {
+    icon: LucideIcon;
+    tone: SurfaceTone;
+    children: React.ReactNode;
+}) {
+    return (
+        <li className="flex gap-2.5 text-[11px] leading-4 text-finn-iron">
+            <span
+                aria-hidden="true"
+                className={[
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+                    tone.ground,
+                ].join(" ")}
+            >
+                <Icon className={["h-3.5 w-3.5", tone.ink].join(" ")} />
+            </span>
+            <span className="pt-1">{children}</span>
+        </li>
+    );
+}
+
 /** The four rungs as four dots, small enough to sit in a header. */
 function Scale() {
     return (
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="inline-flex items-center gap-1">
                 <span
                     className={[
@@ -361,8 +522,8 @@ function NothingRaised({
     return (
         <p className="rounded-xl bg-white/70 px-3 py-2 text-[11px] leading-4 text-finn-iron">
             {rank === 1 ? `${label} is your top priority. ` : ""}
-            Nothing is raised, so Lens judges this on the category as a whole
-            — all {catalogueSize} systems it covers, each counting the same.
+            Nothing is raised, so Lens judges this on the whole priority
+            — all {catalogueSize} features it covers, each counting the same.
             That is a real answer, not an unfinished one.
         </p>
     );

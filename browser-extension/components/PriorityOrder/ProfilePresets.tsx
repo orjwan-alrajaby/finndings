@@ -1,12 +1,15 @@
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, Sparkles } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { InfoButton } from "@/components/PriorityInfo";
+import { surfaceTone } from "@/lib/priority-marks";
 import type {
     CategoryId,
     PriorityDefinition,
     Profile,
 } from "@/lib/reasoning-engine/types";
+
+import { ProfileOrderChips } from "./ProfileOrderChips";
 
 /**
  * The profiles a reader can actually apply right now.
@@ -65,7 +68,9 @@ export function matchingProfile(
  * The profiles offered as a starting point.
  *
  * `chips` is the compact form for a reader who already knows what a profile
- * is and wants to reach for one. `cards` is for the reader meeting them for
+ * is and wants to reach for one. `tiles` sits between the two: each profile
+ * in its own colour with the marks of the order it sets, compact enough for a
+ * drawer. `cards` is for the reader meeting them for
  * the first time: it spends the space to say who each profile is written
  * for and which five priorities it would put in the list, so choosing one
  * is a decision rather than a guess.
@@ -81,7 +86,7 @@ export function ProfilePresets({
     priorityDefinitions: PriorityDefinition[];
     priorities: CategoryId[];
     onApply: (priorities: CategoryId[]) => void;
-    layout?: "chips" | "cards";
+    layout?: "chips" | "tiles" | "cards";
 }) {
     const definitionOf = (id: CategoryId) =>
         priorityDefinitions.find((definition) => definition.id === id);
@@ -95,6 +100,105 @@ export function ProfilePresets({
         priorityDefinitions,
         priorities,
     );
+
+    if (layout === "tiles") {
+        return (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {applicable.map((profile) => {
+                    const active = profile.id === activeProfile?.id;
+                    const tone = surfaceTone(profile.icon);
+                    const order = profile.priorities
+                        .map((id) => definitionOf(id)?.label ?? id)
+                        .join(", ");
+
+                    return (
+                        /* The "i" sits over the corner, as on the cards: a button cannot hold another. */
+                        <div key={profile.id} className="group relative">
+                            <span className="absolute right-2 top-2 z-10">
+                                <InfoButton
+                                    subject={{ kind: "profile", id: profile.id }}
+                                    label={profile.label}
+                                    profiles={profiles}
+                                    priorityDefinitions={priorityDefinitions}
+                                />
+                            </span>
+
+                            <button
+                                type="button"
+                                onClick={() => onApply([...profile.priorities])}
+                                aria-pressed={active}
+                                className={[
+                                    "flex h-full w-full flex-col gap-2 rounded-2xl p-2.5 text-left transition-all",
+                                    tone.ground,
+                                    active
+                                        ? `ring-2 ${tone.edgeStrong} shadow-sm`
+                                        : `ring-1 ${tone.edge} ${tone.edgeHover} ${tone.groundHover}`,
+                                ].join(" ")}
+                            >
+                                <span className="flex items-center gap-2 pr-5">
+                                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+                                        <PriorityIcon
+                                            name={profile.icon}
+                                            className="h-4.5 w-4.5"
+                                        />
+                                    </span>
+
+                                    <span className="min-w-0">
+                                        <span className="block text-xs font-black leading-4 text-finn-black">
+                                            {profile.label}
+                                        </span>
+
+                                        {active && (
+                                            <span
+                                                className={[
+                                                    "flex items-center gap-1 text-[10px] font-bold leading-4",
+                                                    tone.ink,
+                                                ].join(" ")}
+                                            >
+                                                <CircleCheck
+                                                    aria-hidden="true"
+                                                    className="h-3 w-3 shrink-0"
+                                                />
+                                                In use
+                                            </span>
+                                        )}
+                                    </span>
+                                </span>
+
+                                {/*
+                                  * The order it would set, as the marks the
+                                  * list below is drawn in — so a reader can
+                                  * see "shield, snowflake, bag" and know what
+                                  * they are choosing without opening the "i".
+                                  */}
+                                <span
+                                    aria-hidden="true"
+                                    className="flex items-center gap-1"
+                                >
+                                    {profile.priorities.map((id, index) => (
+                                        <span
+                                            key={id}
+                                            title={`${index + 1}. ${definitionOf(id)?.label ?? id}`}
+                                            className="flex h-5 w-5 items-center justify-center rounded-md bg-white/80"
+                                        >
+                                            <PriorityIcon
+                                                name={definitionOf(id)?.icon ?? "car"}
+                                                className="h-3 w-3"
+                                            />
+                                        </span>
+                                    ))}
+                                </span>
+
+                                <span className="sr-only">
+                                    Sets your order to {order}
+                                </span>
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
 
     if (layout === "chips") {
         return (
@@ -112,7 +216,9 @@ export function ProfilePresets({
                         <span
                             key={profile.id}
                             className={[
-                                "inline-flex items-center gap-1 rounded-full pr-1.5",
+                                /* `group` so the "i" inside can follow the chip's own hover
+                                   colours — see `InfoButton`. */
+                                "group inline-flex items-center gap-1 rounded-full pr-1.5",
                                 "text-[11px] font-bold transition-colors",
                                 /*
                                  * An unapplied profile is an offer, and it
@@ -203,69 +309,101 @@ export function ProfilePresets({
                             />
                         </span>
 
-                        <button
-                            type="button"
-                            onClick={() => onApply([...profile.priorities])}
-                            aria-pressed={active}
-                            className={[
-                                "flex w-full h-full flex-col rounded-[22px] p-4 text-left transition-all",
-                                active
-                                    ? "bg-finn-pale-blue shadow-[0_0_0_2px] shadow-finn-accent-blue"
-                                    : "bg-finn-snow drop-shadow-sm hover:bg-finn-pale-blue/70",
-                            ].join(" ")}
-                        >
-                            <span className="flex items-start gap-3">
-                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white text-finn-accent-blue">
-                                    <PriorityIcon
-                                        name={profile.icon}
-                                        className="h-5 w-5"
-                                    />
-                                </span>
-
-                                <span className="min-w-0 flex-1">
-                                    <span className="flex items-center gap-1.5">
-                                        <span
-                                            className={[
-                                                "text-sm font-black",
-                                                active
-                                                    ? "text-finn-accent-blue"
-                                                    : "text-finn-black",
-                                            ].join(" ")}
-                                        >
-                                            {profile.label}
-                                        </span>
-
-                                        {active && (
-                                            <CircleCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-finn-accent-blue" />
-                                        )}
-                                    </span>
-
-                                    <span className="mt-0.5 block text-[11px] font-bold text-finn-iron">
-                                        {active ? "In use" : "Start from this"}
-                                    </span>
-                                </span>
-                            </span>
-
-                            <span className="mt-3 block text-xs leading-5 text-finn-iron">
-                                {profile.forWhom}
-                            </span>
-
-                            {/* The order it would put in the list, so the label is never taken on trust. */}
-                            <span className="mt-3 flex flex-wrap gap-1">
-                                {profile.priorities.map((id, index) => (
-                                    <span
-                                        key={id}
-                                        className="rounded-full border border-finn-iron/15 bg-white px-2 py-0.5 text-[10px] font-bold text-finn-black"
-                                    >
-                                        {index + 1} ·{" "}
-                                        {definitionOf(id)?.label ?? id}
-                                    </span>
-                                ))}
-                            </span>
-                        </button>
+                        <ProfileCardButton
+                            profile={profile}
+                            active={active}
+                            priorityDefinitions={priorityDefinitions}
+                            onApply={() => onApply([...profile.priorities])}
+                        />
                     </div>
                 );
             })}
         </div>
+    );
+}
+
+/**
+ * One profile, for a reader meeting the profiles for the first time.
+ *
+ * It was a grey card with a framed mark and grey chips — six of them, alike
+ * but for their words, on the screen that is meant to help someone recognise
+ * the way they drive. Each one now wears its own colour: a wash down from the
+ * top, its mark large in a white tile and again as a faint watermark, and the
+ * order it sets in the priorities' own hues. Choosing reads as picking one of
+ * six characters rather than one of six paragraphs.
+ */
+function ProfileCardButton({
+    profile,
+    active,
+    priorityDefinitions,
+    onApply,
+}: {
+    profile: Profile;
+    active: boolean;
+    priorityDefinitions: PriorityDefinition[];
+    onApply: () => void;
+}) {
+    const tone = surfaceTone(profile.icon);
+
+    return (
+        <button
+            type="button"
+            onClick={onApply}
+            aria-pressed={active}
+            className={[
+                "relative flex h-full w-full flex-col overflow-hidden rounded-[22px] bg-white p-4 text-left",
+                "bg-linear-to-b to-white to-60% transition-all duration-200",
+                tone.wash,
+                active
+                    ? `shadow-md ring-2 ${tone.edgeStrong}`
+                    : `shadow-sm ring-1 ${tone.edge} ${tone.edgeHover} hover:-translate-y-0.5 hover:shadow-md`,
+            ].join(" ")}
+        >
+            {/* The mark again, large and faint — decoration, so hidden from everything but the eye. */}
+            <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -bottom-5 -right-5 opacity-10"
+            >
+                <PriorityIcon name={profile.icon} className="h-24 w-24" />
+            </span>
+
+            <span className="relative flex items-center gap-3 pr-6">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <PriorityIcon name={profile.icon} className="h-6 w-6" />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                    <span className="block text-base font-black leading-5 text-finn-black">
+                        {profile.label}
+                    </span>
+
+                    <span
+                        className={[
+                            "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black",
+                            active ? `${tone.solid} text-white` : `bg-white/80 ${tone.ink}`,
+                        ].join(" ")}
+                    >
+                        {active ? (
+                            <CircleCheck aria-hidden="true" className="h-3 w-3" />
+                        ) : (
+                            <Sparkles aria-hidden="true" className="h-3 w-3" />
+                        )}
+                        {active ? "In use" : "Start from this"}
+                    </span>
+                </span>
+            </span>
+
+            <span className="relative mt-3 block text-xs leading-5 text-finn-black/75">
+                {profile.forWhom}
+            </span>
+
+            {/* The order it would put in the list, so the label is never taken on trust. */}
+            <span className="relative mt-auto block pt-3">
+                <ProfileOrderChips
+                    priorities={profile.priorities}
+                    priorityDefinitions={priorityDefinitions}
+                />
+            </span>
+        </button>
     );
 }

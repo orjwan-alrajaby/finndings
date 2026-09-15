@@ -97,6 +97,7 @@ export function PriorityEditor({
         <div className="border-t border-finn-cotton p-4">
             <FeatureInfluencePicker
                 categoryLabel={priority.label}
+                mark={priority.icon}
                 features={features}
                 availableFeatures={availableFeatures}
                 pickedElsewhere={pickedElsewhere}

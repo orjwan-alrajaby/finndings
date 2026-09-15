@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { InfoButton } from "@/components/PriorityInfo";
+import { surfaceTone } from "@/lib/priority-marks";
+import { priorityWeights } from "@/lib/reasoning-engine";
 import {
     MAX_PRIORITIES,
     MIN_PRIORITIES,
@@ -37,6 +39,15 @@ export function PriorityOrderList({
             definition.enabled !== false && !priorities.includes(definition.id),
     );
 
+    /*
+     * The engine's own weights, not a picture of them. "The top one carries
+     * the most" is a sentence a reader has to take on trust; a bar that
+     * shrinks as a priority moves down, labelled with the share the scoring
+     * actually gives it, shows what moving one costs before they do it.
+     */
+    const weights = priorityWeights(priorities);
+    const topWeight = weights[0]?.weight ?? 1;
+
     const atLimit = priorities.length >= MAX_PRIORITIES;
     const atFloor = priorities.length <= MIN_PRIORITIES;
 
@@ -60,10 +71,16 @@ export function PriorityOrderList({
 
     return (
         <>
-            <p className="text-xs font-black text-finn-black">
-                Your order
-                <span className="ml-1.5 font-bold text-finn-iron">
-                    {priorities.length} of {MAX_PRIORITIES}
+            <p className="flex items-baseline justify-between gap-3 text-xs font-black text-finn-black">
+                <span>
+                    Your order
+                    <span className="ml-1.5 font-bold text-finn-iron">
+                        {priorities.length} of {MAX_PRIORITIES}
+                    </span>
+                </span>
+
+                <span className="text-[11px] font-bold text-finn-iron">
+                    % = share of the result
                 </span>
             </p>
 
@@ -71,6 +88,8 @@ export function PriorityOrderList({
                 {priorities.map((id, index) => {
                     const definition = definitionOf(id);
                     const count = categoryFeatures[id]?.length ?? 0;
+                    const tone = surfaceTone(definition?.icon);
+                    const weight = weights[index];
 
                     return (
                         <li
@@ -96,16 +115,16 @@ export function PriorityOrderList({
                                 setDragOver(null);
                             }}
                             className={[
-                                "flex cursor-grab items-center gap-3 rounded-2xl border bg-white",
-                                "px-3 py-2.5 transition-all active:cursor-grabbing",
+                                "flex cursor-grab items-center gap-3 rounded-2xl bg-white",
+                                "px-3 py-2.5 shadow-sm ring-1 transition-all active:cursor-grabbing",
                                 dragOver === id && dragging !== id
-                                    ? "border-finn-accent-blue shadow-[0_0_0_2px_rgba(0,114,234,0.15)]"
-                                    : "border-finn-snow",
+                                    ? "ring-2 ring-finn-accent-blue"
+                                    : tone.edge,
                                 dragging === id ? "opacity-50" : "",
                             ].join(" ")}
                         >
                             <GripVertical
-                                className="h-4 w-4 shrink-0 text-finn-iron/50"
+                                className="hidden h-4 w-4 shrink-0 text-finn-iron/50 sm:block"
                                 aria-hidden="true"
                             />
 
@@ -113,24 +132,27 @@ export function PriorityOrderList({
                                 className={[
                                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
                                     "text-xs font-black text-white",
-                                    index === 0
-                                        ? "bg-finn-accent-blue"
-                                        : "bg-finn-accent-blue/70",
+                                    tone.solid,
                                 ].join(" ")}
                             >
                                 {index + 1}
                             </span>
 
                             {/*
-                              * The same framed mark the feature cards use, at
-                              * the same size. These two lists are the same
-                              * priorities seen from two angles — the order
-                              * they sit in, and what counts inside each one —
-                              * and a mark that changes size between them
-                              * reads as a different kind of thing rather than
-                              * the same one twice.
+                              * The same size of mark the feature cards use.
+                              * These two lists are the same priorities seen
+                              * from two angles — the order they sit in, and
+                              * what counts inside each one — and a mark that
+                              * changes size between them reads as a different
+                              * kind of thing rather than the same one twice.
                               */}
-                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white">
+                            <span
+                                className={[
+                                    "hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 sm:flex",
+                                    tone.ground,
+                                    tone.edge,
+                                ].join(" ")}
+                            >
                                 <PriorityIcon
                                     name={definition?.icon ?? "car"}
                                     className="h-5 w-5"
@@ -138,13 +160,54 @@ export function PriorityOrderList({
                             </span>
 
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-bold text-finn-black">
+                                <span className="block text-sm font-bold leading-5 text-finn-black sm:truncate">
                                     {definition?.label ?? id}
                                 </span>
-                                <span className="block text-[11px] text-finn-iron">
-                                    {count === 0
-                                        ? "Judged on the whole category"
-                                        : `${count} feature${count === 1 ? "" : "s"} raised`}
+
+                                <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                    {weight && (
+                                        <span className="flex items-center gap-2">
+                                            <span
+                                                aria-hidden="true"
+                                                className={[
+                                                    "h-1.5 w-16 overflow-hidden rounded-full sm:w-24",
+                                                    tone.track,
+                                                ].join(" ")}
+                                            >
+                                                <span
+                                                    className={[
+                                                        "block h-full rounded-full transition-[width] duration-300",
+                                                        tone.bar,
+                                                    ].join(" ")}
+                                                    style={{
+                                                        width: `${(weight.weight / topWeight) * 100}%`,
+                                                    }}
+                                                />
+                                            </span>
+
+                                            <span
+                                                className={[
+                                                    "text-[11px] font-black tabular-nums",
+                                                    tone.ink,
+                                                ].join(" ")}
+                                            >
+                                                {weight.weightPercent}%
+                                                <span className="sr-only">
+                                                    {" "}
+                                                    of the result
+                                                </span>
+                                            </span>
+                                        </span>
+                                    )}
+
+                                    <span className="text-[11px] text-finn-iron">
+                                        {weight && (
+                                            <span aria-hidden="true" className="hidden sm:inline">· </span>
+                                        )}
+                                        {count === 0
+                                            ? "Judged on the whole priority"
+                                            : `${count} feature${count === 1 ? "" : "s"} raised`}
+                                    </span>
                                 </span>
                             </span>
 
@@ -208,84 +271,101 @@ export function PriorityOrderList({
 
                     <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
                         {atLimit
-                            ? `You're at ${MAX_PRIORITIES}. Remove one to add another — past that, the ones at the bottom stop changing any answer.`
+                            ? `You're at ${MAX_PRIORITIES}, the most Lens will weigh. Remove one to add another — anything below fifth place counts for so little it would barely move the answer.`
                             : "It joins the end of your order. Move it up if it matters more."}
                     </p>
 
                     <div className="mt-2.5 flex flex-wrap gap-2">
-                        {available.map((definition) => (
-                            <span
-                                key={definition.id}
-                                className={[
-                                    "inline-flex items-center gap-1 rounded-full pr-1.5",
-                                    "text-[11px] font-bold transition-colors",
-                                    /*
-                                     * A chip that cannot be pressed has to
-                                     * look like one, and this one did not:
-                                     * `finn-snow` on the panel's white is a
-                                     * 1.04:1 ground and `finn-iron/40` is
-                                     * barely ink, so at the limit — which is
-                                     * the state a reader arrives in, since
-                                     * the defaults fill all five slots — the
-                                     * row read as a set of chips that had
-                                     * failed to render rather than a set that
-                                     * was closed.
-                                     *
-                                     * A filled grey ground and the label at
-                                     * full strength instead. Solid `finn-iron`
-                                     * was the other candidate and is too
-                                     * heavy: it would make the one row of
-                                     * things a reader cannot use the darkest
-                                     * thing on the panel.
-                                     */
-                                    atLimit
-                                        ? "bg-finn-iron/15 text-finn-iron"
-                                        : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
-                                ].join(" ")}
-                            >
-                                <button
-                                    type="button"
-                                    disabled={atLimit}
-                                    onClick={() =>
-                                        onChange([...priorities, definition.id])
-                                    }
+                        {available.map((definition) => {
+                            const tone = surfaceTone(definition.icon);
+
+                            return (
+                                <span
+                                    key={definition.id}
                                     className={[
-                                        "inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3",
-                                        atLimit ? "cursor-not-allowed" : "",
+                                        /* `group` so the "i" inside can follow the chip's own hover
+                                       colours — see `InfoButton`. */
+                                    "group inline-flex items-center gap-1 rounded-full pr-1.5",
+                                        "text-[11px] font-bold transition-colors",
+                                        /*
+                                         * A chip that cannot be pressed has to
+                                         * look like one, and this one did not:
+                                         * `finn-snow` on the panel's white is a
+                                         * 1.04:1 ground and `finn-iron/40` is
+                                         * barely ink, so at the limit — which is
+                                         * the state a reader arrives in, since
+                                         * the defaults fill all five slots — the
+                                         * row read as a set of chips that had
+                                         * failed to render rather than a set that
+                                         * was closed.
+                                         *
+                                         * A filled grey ground and the label at
+                                         * full strength instead. Solid `finn-iron`
+                                         * was the other candidate and is too
+                                         * heavy: it would make the one row of
+                                         * things a reader cannot use the darkest
+                                         * thing on the panel.
+                                         */
+                                        /*
+                                         * Available, it wears the hue it will
+                                         * have in the list, so the reader can see
+                                         * which colour is about to join it.
+                                         */
+                                        atLimit
+                                            ? "bg-finn-iron/15 text-finn-iron"
+                                            : [
+                                                  "ring-1",
+                                                  tone.ground,
+                                                  tone.groundHover,
+                                                  tone.edge,
+                                                  tone.edgeHover,
+                                                  tone.ink,
+                                              ].join(" "),
                                     ].join(" ")}
                                 >
-                                    <Plus aria-hidden="true" className="h-3 w-3" />
+                                    <button
+                                        type="button"
+                                        disabled={atLimit}
+                                        onClick={() =>
+                                            onChange([...priorities, definition.id])
+                                        }
+                                        className={[
+                                            "inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3",
+                                            atLimit ? "cursor-not-allowed" : "",
+                                        ].join(" ")}
+                                    >
+                                        <Plus aria-hidden="true" className="h-3 w-3" />
+                                        {/*
+                                          * Inherits rather than tints: the chip's
+                                          * ink is already the mark's hue, and at
+                                          * the limit it dims to grey — a state
+                                          * only the cascade knows about.
+                                          */}
+                                        <PriorityIcon
+                                            name={definition.icon}
+                                            className="h-3.5 w-3.5"
+                                            tinted={false}
+                                        />
+                                        {definition.label}
+                                    </button>
+    
                                     {/*
-                                      * Inherits rather than tints: this chip
-                                      * turns solid blue on hover and dims
-                                      * when the limit is reached, and both
-                                      * are states only the cascade knows
-                                      * about.
+                                      * Still asks, even at the limit. Finding out
+                                      * what a priority is is exactly what a
+                                      * reader who has to drop one before adding
+                                      * it needs to do first.
                                       */}
-                                    <PriorityIcon
-                                        name={definition.icon}
-                                        className="h-3 w-3"
-                                        tinted={false}
+                                    <InfoButton
+                                        subject={{
+                                            kind: "priority",
+                                            id: definition.id,
+                                        }}
+                                        label={definition.label}
+                                        priorityDefinitions={priorityDefinitions}
                                     />
-                                    {definition.label}
-                                </button>
-
-                                {/*
-                                  * Still asks, even at the limit. Finding out
-                                  * what a priority is is exactly what a
-                                  * reader who has to drop one before adding
-                                  * it needs to do first.
-                                  */}
-                                <InfoButton
-                                    subject={{
-                                        kind: "priority",
-                                        id: definition.id,
-                                    }}
-                                    label={definition.label}
-                                    priorityDefinitions={priorityDefinitions}
-                                />
-                            </span>
-                        ))}
+                                </span>
+                            );
+                        })}
                     </div>
                 </div>
             )}

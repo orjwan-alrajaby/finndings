@@ -1,11 +1,26 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Info, X } from "lucide-react";
+import {
+    CircleCheck,
+    Gauge,
+    Info,
+    Lightbulb,
+    ListChecks,
+    ListOrdered,
+    MessageCircleQuestion,
+    Ruler,
+    Target,
+    UserRound,
+    Users,
+    X,
+    type LucideIcon,
+} from "lucide-react";
 
 import { DRAWER_SHELL } from "@/components/drawer";
 import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
-import { getCategory } from "@/lib/reasoning-engine";
+import { surfaceTone, type SurfaceTone } from "@/lib/priority-marks";
+import { getCategory, priorityWeights } from "@/lib/reasoning-engine";
 import { FEATURES } from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
@@ -133,7 +148,7 @@ export function InfoButton({
     label,
     profiles = [],
     priorityDefinitions,
-    tone = "quiet",
+    tone: variant = "quiet",
 }: {
     subject: InfoSubject;
     /** Names the thing, not the act: "Practicality". */
@@ -146,6 +161,19 @@ export function InfoButton({
 }) {
     const open = useOpenSubject();
     const mine = isSame(open, subject);
+
+    /*
+     * While its panel is open the "i" fills with the subject's own colour —
+     * the panel's header wears it too, so the button and what it opened are
+     * visibly the same thing. It was accent blue for everything, which on an
+     * orange Family First card pointed at the panel in the wrong colour.
+     */
+    const mark =
+        subject.kind === "profile"
+            ? profiles.find((profile) => profile.id === subject.id)?.icon
+            : (priorityDefinitions.find((definition) => definition.id === subject.id)?.icon ??
+              getCategory(subject.id)?.icon);
+    const tone = surfaceTone(mark);
 
     return (
         /*
@@ -165,10 +193,64 @@ export function InfoButton({
                 title={`What is ${label}?`}
                 className={[
                     "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors",
-                    tone === "onDark"
+                    /*
+                     * Open wins outright rather than layering over the rest:
+                     * the group-hover rules below would otherwise hand the
+                     * icon back to the chip's ink the moment the pointer
+                     * crossed it, and white on a pale chip is no mark at all.
+                     *
+                     * A filled 20px disc on its own was easy to lose among a
+                     * row of other small marks, so it also takes a halo in the
+                     * same hue, set off by a white gap and grown a step — the
+                     * one "i" on the screen whose panel is open should be
+                     * findable from across the page.
+                     */
+                    mine
+                        ? `${tone.solid} ${tone.edgeStrong} scale-110 text-white shadow-md ring-2 ring-offset-2 ring-offset-white`
+                        : variant === "onDark"
                         ? "text-white/70 hover:bg-white/20 hover:text-white"
-                        : "text-finn-iron/60 hover:bg-finn-pale-blue hover:text-finn-accent-blue",
-                    "data-[state=open]:bg-finn-pale-blue data-[state=open]:text-finn-accent-blue",
+                        : [
+                              "text-finn-iron/60",
+                              "hover:bg-finn-pale-blue hover:text-finn-accent-blue",
+                              /*
+                               * On a chip that colours itself under the
+                               * pointer, the "i" goes with it.
+                               *
+                               * These sit inside chips that recolour on hover
+                               * — the profile presets take the accent, the
+                               * "add a priority" chips go solid blue — and
+                               * the "i" was staying the grey it is at rest.
+                               * The whole chip lit up except the one thing
+                               * inside it, which read as a mark that had
+                               * failed to load rather than a control.
+                               *
+                               * `text-inherit` rather than a colour per
+                               * caller: whatever the chip turns its own type,
+                               * this is that. The self-hover ground follows
+                               * from the same place, so the pill the "i"
+                               * draws under itself is a wash of the chip's
+                               * own hue instead of a pale blue that only
+                               * suits one of them.
+                               *
+                               * Both are keyed on a `group` the chip has to
+                               * declare, so an "i" standing on its own — the
+                               * priority rows, the corner of a profile card —
+                               * keeps the accent-blue hover it has always had.
+                               */
+                              "group-hover:text-inherit",
+                              /*
+                               * Stacked, and not redundant: inside a group,
+                               * `group-hover:text-inherit` and the plain
+                               * `hover:` above it are the same specificity,
+                               * and Tailwind emits `hover:` last — so without
+                               * this the "i" would snap back to accent blue
+                               * the moment the pointer reached it, which on
+                               * the chip that goes solid blue is dark type on
+                               * its own dark ground.
+                               */
+                              "group-hover:hover:text-inherit",
+                              "group-hover:hover:bg-current/20",
+                          ].join(" "),
                 ].join(" ")}
             >
                 <Info aria-hidden="true" className="h-3.5 w-3.5" />
@@ -250,40 +332,97 @@ function InfoPanel({
     );
 }
 
-function PanelHeader({ icon, label, kind }: { icon: string; label: string; kind: string }) {
-    return (
-        <div className="flex items-start gap-3 border-b border-finn-cotton px-5 py-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-finn-iron/20 bg-white">
-                <PriorityIcon name={icon} className="h-5 w-5" />
-            </span>
 
-            <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
-                    {kind}
-                </p>
-                <Dialog.Title className="mt-0.5 text-base font-black leading-5 text-finn-black">
-                    {label}
-                </Dialog.Title>
+/**
+ * The top of the panel, in the subject's own colour.
+ *
+ * It was a white bar with a framed mark, the same for every priority and
+ * every profile, so a reader who opened Comfort and then Safety saw the
+ * panel's words change and nothing else. The list they opened it from now
+ * draws each priority in its hue; the panel carries that hue across, so the
+ * row and the explanation of it read as one thing.
+ */
+function PanelHeader({
+    icon,
+    label,
+    kind,
+    children,
+}: {
+    icon: string;
+    label: string;
+    kind: "Priority" | "Profile";
+    /** A line under the title — the question a priority answers. */
+    children?: React.ReactNode;
+}) {
+    const tone = surfaceTone(icon);
+    const KindIcon = kind === "Priority" ? Target : UserRound;
+
+    return (
+        <div className={["relative px-5 pb-5 pt-4", tone.ground].join(" ")}>
+            <div className="flex items-start gap-3.5">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+                    <PriorityIcon name={icon} className="h-7 w-7" />
+                </span>
+
+                <div className="min-w-0 flex-1 pt-1">
+                    <p
+                        className={[
+                            "flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.14em]",
+                            tone.ink,
+                        ].join(" ")}
+                    >
+                        <KindIcon aria-hidden="true" className="h-3 w-3" />
+                        {kind}
+                    </p>
+
+                    <Dialog.Title className="mt-1 text-lg font-black leading-6 text-finn-black">
+                        {label}
+                    </Dialog.Title>
+                </div>
+
+                <Dialog.Close
+                    aria-label="Close"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-finn-iron transition-colors hover:bg-white hover:text-finn-black"
+                >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                </Dialog.Close>
             </div>
 
-            <Dialog.Close
-                aria-label="Close"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-finn-iron transition-colors hover:bg-finn-cotton hover:text-finn-black"
-            >
-                <X aria-hidden="true" className="h-4 w-4" />
-            </Dialog.Close>
+            {children}
         </div>
     );
 }
 
 /** A titled block, so every section of the panel is built the same way. */
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+    title,
+    icon: Icon,
+    aside,
+    children,
+}: {
+    title: string;
+    icon: LucideIcon;
+    /** A count or note at the far end of the heading. */
+    aside?: React.ReactNode;
+    children: React.ReactNode;
+}) {
     return (
         <section>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
-                {title}
+            <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-finn-black">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-finn-cotton text-finn-iron">
+                    <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                </span>
+
+                <span className="min-w-0 flex-1">{title}</span>
+
+                {aside && (
+                    <span className="text-[11px] font-bold normal-case tracking-normal text-finn-iron">
+                        {aside}
+                    </span>
+                )}
             </h3>
-            <div className="mt-1.5">{children}</div>
+
+            <div className="mt-2.5">{children}</div>
         </section>
     );
 }
@@ -295,7 +434,7 @@ function PriorityBody({ id }: { id: CategoryId }) {
         return (
             <>
                 <PanelHeader icon="car" label={id} kind="Priority" />
-                <div className="px-5 py-4 text-sm leading-6 text-finn-iron">
+                <div className="px-5 py-5 text-sm leading-6 text-finn-iron">
                     This priority was added by you, so there is nothing written
                     about it beyond its name.
                 </div>
@@ -303,29 +442,42 @@ function PriorityBody({ id }: { id: CategoryId }) {
         );
     }
 
+    const tone = surfaceTone(category.icon);
     const features = category.features ?? [];
 
     return (
         <>
-            <PanelHeader icon={category.icon} label={category.label} kind="Priority" />
-
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-                {/* The question it answers, which is the shortest true summary. */}
-                <p className="text-sm font-bold leading-6 text-finn-black">
+            {/* The question it answers, which is the shortest true summary — so it leads. */}
+            <PanelHeader icon={category.icon} label={category.label} kind="Priority">
+                <p className="mt-4 flex gap-2 rounded-xl bg-white/80 px-3 py-2.5 text-sm font-bold leading-5 text-finn-black">
+                    <MessageCircleQuestion
+                        aria-hidden="true"
+                        className={["mt-0.5 h-4 w-4 shrink-0", tone.ink].join(" ")}
+                    />
                     {category.question}
                 </p>
+            </PanelHeader>
 
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
                 <p className="text-sm leading-6 text-finn-iron">
                     {category.description}
                 </p>
 
-                <Block title="What it looks at">
+                <Block
+                    title="What it looks at"
+                    icon={ListChecks}
+                    aside={
+                        !category.numericOnly && features.length > 0
+                            ? `${features.length} feature${features.length === 1 ? "" : "s"}`
+                            : undefined
+                    }
+                >
                     {category.numericOnly ? (
-                        <p className="text-sm leading-6 text-finn-iron">
-                            Measured figures rather than a list of features —
-                            this one is judged on what the car's own numbers
-                            say, so there is nothing here to tick or untick.
-                        </p>
+                        <Callout tone={tone} icon={Gauge} title="A measured figure">
+                            Not a list of features — this one is scored from
+                            the car's own published data, so there is nothing
+                            here to tick or untick.
+                        </Callout>
                     ) : features.length === 0 ? (
                         <p className="text-sm leading-6 text-finn-iron">
                             Nothing listed yet.
@@ -338,8 +490,17 @@ function PriorityBody({ id }: { id: CategoryId }) {
                                 return (
                                     <li
                                         key={feature}
-                                        className="inline-flex items-center gap-1 rounded-full bg-finn-cotton px-2.5 py-1 text-[11px] font-bold text-finn-black"
+                                        className={[
+                                            "inline-flex items-center gap-1.5 rounded-full py-1 pl-2 pr-2.5 text-[11px] font-bold text-finn-black ring-1",
+                                            tone.ground,
+                                            tone.edge,
+                                        ].join(" ")}
                                     >
+                                        <CircleCheck
+                                            aria-hidden="true"
+                                            className={["h-3.5 w-3.5 shrink-0", tone.ink].join(" ")}
+                                        />
+
                                         {meta.label}
 
                                         {/*
@@ -360,11 +521,6 @@ function PriorityBody({ id }: { id: CategoryId }) {
                                           * is the priority they want, which
                                           * is the only decision this panel is
                                           * open to support.
-                                          *
-                                          * The text was written long ago and
-                                          * is already on every one of these
-                                          * rows in `FEATURES`; it was simply
-                                          * never put in front of anyone here.
                                           */}
                                         {meta.explanation && (
                                             <InfoTip subject={meta.label}>
@@ -376,16 +532,51 @@ function PriorityBody({ id }: { id: CategoryId }) {
                             })}
                         </ul>
                     )}
+
+                    {/*
+                      * The other half of two of these priorities, which the
+                      * chips alone quietly deny. Practicality and Long
+                      * Distance are each scored on a measured figure as well
+                      * as their equipment, and the two are averaged — so a
+                      * reader looking at ten chips under Practicality is
+                      * looking at half the answer. The split bar says "half"
+                      * in the one way that cannot be skimmed past.
+                      */}
+                    {category.measured && (
+                        <div className="mt-3">
+                            <Callout tone={tone} icon={Ruler} title="And one measured figure">
+                                {category.measured}.
+
+                                <span className="mt-2.5 flex h-6 overflow-hidden rounded-lg text-[10px] font-black">
+                                    <span className="flex flex-1 items-center justify-center bg-white text-finn-black">
+                                        Features · 50%
+                                    </span>
+                                    <span
+                                        className={[
+                                            "flex flex-1 items-center justify-center text-white",
+                                            tone.solid,
+                                        ].join(" ")}
+                                    >
+                                        Measured · 50%
+                                    </span>
+                                </span>
+                            </Callout>
+                        </div>
+                    )}
                 </Block>
 
                 {category.recommendedFor.length > 0 && (
-                    <Block title="Worth ranking high if you are">
-                        <ul className="space-y-1">
+                    <Block title="Recommended for" icon={Users}>
+                        <ul className="space-y-1.5">
                             {category.recommendedFor.map((who) => (
                                 <li
                                     key={who}
-                                    className="text-sm leading-6 text-finn-iron"
+                                    className="flex items-start gap-2.5 rounded-xl bg-finn-snow px-3 py-2 text-sm leading-5 text-finn-black"
                                 >
+                                    <CircleCheck
+                                        aria-hidden="true"
+                                        className={["mt-0.5 h-4 w-4 shrink-0", tone.ink].join(" ")}
+                                    />
                                     {who}
                                 </li>
                             ))}
@@ -410,62 +601,158 @@ function ProfileBody({
 
     if (!profile) return null;
 
+    const tone = surfaceTone(profile.icon);
+    const weights = priorityWeights(profile.priorities);
+    const topWeight = weights[0]?.weight ?? 1;
+
     const definitionOf = (categoryId: CategoryId) =>
         priorityDefinitions.find((definition) => definition.id === categoryId);
 
     return (
         <>
-            <PanelHeader icon={profile.icon} label={profile.label} kind="Profile" />
-
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
-                <p className="text-sm leading-6 text-finn-iron">
+            <PanelHeader icon={profile.icon} label={profile.label} kind="Profile">
+                <p className="mt-4 text-sm leading-6 text-finn-black">
                     {profile.forWhom}
                 </p>
+            </PanelHeader>
 
-                <Block title="What it assumes">
-                    <p className="text-sm leading-6 text-finn-iron">
-                        {profile.assumes}
-                    </p>
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
+                <Block title="What it assumes" icon={Lightbulb}>
+                    <Callout tone={tone}>{profile.assumes}</Callout>
                 </Block>
 
                 {/*
                   * The order itself, which is the whole of what applying a
                   * profile does. A reader who can see it does not have to
-                  * take the label on trust.
+                  * take the label on trust — and drawn the way the list they
+                  * would be changing is drawn, colour for colour and share
+                  * for share, they can see what it would do to theirs.
                   */}
-                <Block title="The order it would set">
+                <Block
+                    title="The order it would set"
+                    icon={ListOrdered}
+                    aside="share of the result"
+                >
                     <ol className="space-y-1.5">
                         {profile.priorities.map((categoryId, index) => {
                             const definition = definitionOf(categoryId);
+                            const rowTone = surfaceTone(definition?.icon);
+                            const weight = weights[index];
 
                             return (
                                 <li
                                     key={categoryId}
-                                    className="flex items-center gap-2.5"
+                                    className={[
+                                        "flex items-center gap-2.5 rounded-xl bg-white px-2.5 py-2 ring-1",
+                                        rowTone.edge,
+                                    ].join(" ")}
                                 >
-                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-finn-pale-blue text-[11px] font-black text-finn-accent-blue">
+                                    <span
+                                        className={[
+                                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white",
+                                            rowTone.solid,
+                                        ].join(" ")}
+                                    >
                                         {index + 1}
                                     </span>
 
-                                    <PriorityIcon
-                                        name={definition?.icon ?? "car"}
-                                        className="h-4 w-4 shrink-0"
-                                    />
-
-                                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-finn-black">
-                                        {definition?.label ?? categoryId}
+                                    <span
+                                        className={[
+                                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                                            rowTone.ground,
+                                        ].join(" ")}
+                                    >
+                                        <PriorityIcon
+                                            name={definition?.icon ?? "car"}
+                                            className="h-4 w-4"
+                                        />
                                     </span>
+
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] font-bold leading-4 text-finn-black">
+                                            {definition?.label ?? categoryId}
+                                        </span>
+
+                                        {weight && (
+                                            <span
+                                                aria-hidden="true"
+                                                className={[
+                                                    "mt-1.5 block h-1 w-full max-w-32 overflow-hidden rounded-full",
+                                                    rowTone.track,
+                                                ].join(" ")}
+                                            >
+                                                <span
+                                                    className={["block h-full rounded-full", rowTone.bar].join(" ")}
+                                                    style={{
+                                                        width: `${(weight.weight / topWeight) * 100}%`,
+                                                    }}
+                                                />
+                                            </span>
+                                        )}
+                                    </span>
+
+                                    {weight && (
+                                        <span
+                                            className={[
+                                                "shrink-0 text-xs font-black tabular-nums",
+                                                rowTone.ink,
+                                            ].join(" ")}
+                                        >
+                                            {weight.weightPercent}%
+                                            <span className="sr-only"> of the result</span>
+                                        </span>
+                                    )}
                                 </li>
                             );
                         })}
                     </ol>
                 </Block>
 
-                <p className="text-[11px] leading-4 text-finn-iron">
+                <p className="flex gap-2 text-[11px] leading-4 text-finn-iron">
+                    <Info aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
                     Applying a profile only sets this order. Everything stays
                     yours to change afterwards.
                 </p>
             </div>
         </>
+    );
+}
+
+/** A tinted note in the subject's colour — for the one thing a block most needs noticed. */
+function Callout({
+    tone,
+    icon: Icon,
+    title,
+    children,
+}: {
+    tone: SurfaceTone;
+    icon?: LucideIcon;
+    title?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div
+            className={[
+                "flex gap-2.5 rounded-xl px-3.5 py-3 ring-1",
+                tone.ground,
+                tone.edge,
+            ].join(" ")}
+        >
+            {Icon && (
+                <Icon
+                    aria-hidden="true"
+                    className={["mt-0.5 h-4 w-4 shrink-0", tone.ink].join(" ")}
+                />
+            )}
+
+            <div className="min-w-0 flex-1 text-[13px] leading-5 text-finn-black">
+                {title && (
+                    <p className={["mb-0.5 font-black", tone.ink].join(" ")}>
+                        {title}
+                    </p>
+                )}
+                {children}
+            </div>
+        </div>
     );
 }

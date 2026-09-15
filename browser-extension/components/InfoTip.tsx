@@ -41,7 +41,17 @@ export function Tip({
             onOpenChange={setHovered}
             delayDuration={150}
         >
-            <Tooltip.Trigger asChild onClick={() => setPinned((value) => !value)}>
+            <Tooltip.Trigger
+                asChild
+                onClick={() => setPinned((value) => !value)}
+                /*
+                 * Pinned is this component's state, not Radix's, so it is
+                 * handed to the trigger as an attribute — the only way a
+                 * trigger passed in from outside can style "you clicked me"
+                 * differently from "the pointer is over me".
+                 */
+                data-pinned={pinned ? "" : undefined}
+            >
                 {trigger}
             </Tooltip.Trigger>
 
@@ -88,10 +98,22 @@ export function InfoTip({ subject, children }: InfoTipProps) {
                 <button
                     type="button"
                     aria-label={`What is ${subject}?`}
-                    /* Radix marks its own trigger open, which is how the
-                       pinned state survives the trigger being handed in from
-                       outside rather than owned here. */
-                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full align-middle text-finn-iron transition hover:text-finn-accent-blue data-[state=open]:text-finn-accent-blue"
+                    /*
+                     * Two states, told apart. Showing on hover or focus, the
+                     * "i" takes the accent; pinned open by a click, it fills
+                     * solid with a halo, the way a selected priority "i" does.
+                     *
+                     * Radix marks a tooltip trigger `delayed-open` or
+                     * `instant-open`, never `open` — the `data-[state=open]`
+                     * this used to rely on never matched, so the "i" gave no
+                     * sign at all that its explanation was showing.
+                     */
+                    className={[
+                        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full align-middle text-finn-iron transition",
+                        "hover:text-finn-accent-blue not-data-[state=closed]:text-finn-accent-blue",
+                        "data-pinned:scale-110 data-pinned:bg-finn-accent-blue data-pinned:text-white data-pinned:shadow-md",
+                        "data-pinned:ring-2 data-pinned:ring-finn-accent-blue data-pinned:ring-offset-2 data-pinned:ring-offset-white",
+                    ].join(" ")}
                 >
                     <Info aria-hidden="true" className="h-4 w-4" />
                 </button>

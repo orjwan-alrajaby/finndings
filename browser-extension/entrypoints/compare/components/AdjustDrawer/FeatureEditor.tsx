@@ -62,6 +62,7 @@ export function FeatureEditor({
         <div className="border-t border-finn-cotton p-4">
             <FeatureInfluencePicker
                 categoryLabel={category.label}
+                mark={category.icon}
                 features={features}
                 availableFeatures={availableFeatures}
                 rank={rank}
