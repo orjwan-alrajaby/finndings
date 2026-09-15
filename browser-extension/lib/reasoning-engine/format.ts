@@ -5,7 +5,11 @@
  * importing anything from the presentation layer.
  */
 
-const LOCALE = "de-DE";
+/**
+ * English number style, to match the English copy around it: a dot for
+ * decimals and a comma for thousands, so "5.8 L/100km" and "1,000 km".
+ */
+const LOCALE = "en-GB";
 
 export function formatEUR(value: number): string {
   return `€${Math.round(value).toLocaleString(LOCALE)}`;
@@ -18,7 +22,7 @@ export function formatNumber(value: number, decimals = 1): string {
   });
 }
 
-/** A per-unit price — always two decimals, so €0.20/km never reads as €0,2. */
+/** A per-unit price — always two decimals, so €0.20/km never reads as €0.2. */
 export function formatPrice(value: number): string {
   return `€${value.toLocaleString(LOCALE, {
     minimumFractionDigits: 2,

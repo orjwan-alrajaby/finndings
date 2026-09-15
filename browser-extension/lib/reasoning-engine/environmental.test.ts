@@ -648,7 +648,7 @@ describe("where each number comes from", () => {
 
     expect(combustion?.title).toMatch(/No official figure/i);
     expect(combustion?.body).toMatch(/worked back from the 136 g\/km/);
-    expect(combustion?.body).toMatch(/typical diesel car at 5,2 L\/100km/);
+    expect(combustion?.body).toMatch(/typical diesel car at 5.2 L\/100km/);
     expect(combustion?.body).toMatch(/diesel carries more carbon/i);
 
     /* The electric benchmark is measured rather than derived — say so. */

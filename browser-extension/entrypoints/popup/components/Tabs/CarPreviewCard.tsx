@@ -61,7 +61,7 @@ export function CarPreviewCard({
                 </h4>
 
                 <p className="mt-0.5 font-mono text-xs font-bold text-finn-black">
-                    €{price?.toLocaleString("de-DE")}
+                    €{price?.toLocaleString("en-GB")}
                     {period ? (
                         <span className="font-sans font-normal text-finn-iron">{` / ${period}`}</span>
                     ) : (

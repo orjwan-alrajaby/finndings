@@ -467,7 +467,7 @@ describe("financial reasoning is specific", () => {
 
   it("states the mileage the estimate was built on", () => {
     expect(narrative.cost.monthlyKm).toBe(1000);
-    expect(narrative.cost.sentences.join(" ")).toContain("1.000 km");
+    expect(narrative.cost.sentences.join(" ")).toContain("1,000 km");
   });
 
   it("quantifies the gap to the cheapest alternative in euros", () => {

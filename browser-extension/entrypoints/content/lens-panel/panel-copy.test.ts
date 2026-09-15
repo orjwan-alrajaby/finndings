@@ -85,7 +85,7 @@ describe("how much it uses", () => {
     expect(text).toContain("Highly efficient");
     /* Both figures, so the verdict can be checked rather than believed. */
     expect(text).toContain("4 L/100km");
-    expect(text).toMatch(/5,8 L\/100km/);
+    expect(text).toMatch(/5.8 L\/100km/);
     expect(text).toMatch(/\d+% less/);
   });
 
