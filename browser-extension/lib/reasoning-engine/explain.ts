@@ -140,15 +140,27 @@ export function explainHeadToHead(head: Omit<HeadToHead, "summary">): string {
      */
     const rankedLower = driver != null && counter.rank > driver.rank;
 
+    /*
+     * Neither "ranked below" nor "narrower" is true of a counter that moved
+     * the total more than the driver did — a lead built from several smaller
+     * advantages. What closes the gap there is the rest of the order.
+     */
+    const outweighsDriver =
+      driver?.versus != null &&
+      Math.abs(counter.versus.weightedDifference) >=
+        Math.abs(driver.versus.weightedDifference);
+
     sentences.push(
       sentence(
         `${trailName} does beat ${leadName} on ${phraseLabel(counter.label)}`,
         counterEvidence ? `— ${counterEvidence}` : "",
-        rankedLower && driver
-          ? `— but you ranked it #${counter.rank}, below ${phraseLabel(
-              driver.label,
-            )}, so that isn't enough to close the gap`
-          : "— but the gap there is narrower, so that isn't enough to close the gap",
+        outweighsDriver
+          ? `— but ${leadName} is ahead on enough of your other priorities to make up for it`
+          : rankedLower && driver
+            ? `— but you ranked it #${counter.rank}, below ${phraseLabel(
+                driver.label,
+              )}, so that isn't enough to close the gap`
+            : "— but the gap there is narrower, so that isn't enough to close the gap",
       ),
     );
   }
