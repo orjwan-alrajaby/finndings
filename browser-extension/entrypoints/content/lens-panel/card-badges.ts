@@ -183,8 +183,12 @@ function badgeFor(id: number, name: string | undefined): HTMLElement {
        * reads as a verdict with a source on it rather than a logo with a
        * verdict attached, and big enough that the artwork inside it — an
        * aperture, at 13px — is still a shape rather than a smudge.
+       *
+       * Idling, like the mark everywhere else Lens draws it — including the
+       * tour's React copy of this pill — so the reader who watched it turn
+       * during setup meets the same wheel here.
        */
-      brandMark(16),
+      brandMark(16, "", { idle: true }),
 
       meter(null),
 

@@ -408,6 +408,36 @@
 }
 
 /* ========================================
+   IDLE SPIN, ON FINN.COM
+   `BRAND_IDLE_SPIN` from lib/brand-spinner.ts — fourteen seconds a turn,
+   stopped under reduced motion — spelled out for the mark drawn into
+   finn.com's page by `brandMark`.
+
+   The utility spelling does not survive there. Tailwind's utilities live in
+   `@layer utilities`, and any rule the page writes outside a layer outranks
+   every layered rule whatever the order, so a stylesheet of FINN's that
+   touches `animation` on the same element puts the wheel back to a turn a
+   second: a loader, not an idle.
+
+   Hence unlayered, `!important`, and a keyframe name nobody else can have.
+   Keep the duration in step with `BRAND_IDLE_SPIN`.
+======================================== */
+
+@keyframes finn-lens-idle-spin {
+  to { transform: rotate(360deg); }
+}
+
+.finn-lens-idle-spin {
+  animation: finn-lens-idle-spin 14s linear infinite !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finn-lens-idle-spin {
+    animation: none !important;
+  }
+}
+
+/* ========================================
    DRAWER
    Every right-hand sheet in the product: the compare page's Adjust panel,
    the priority panel that explains one row of it, and the mock of both on

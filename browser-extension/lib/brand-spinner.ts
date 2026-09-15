@@ -88,3 +88,13 @@ export const SPINNER_ANIMATION =
  */
 export const BRAND_IDLE_SPIN =
   "animate-spin [animation-duration:14s] motion-reduce:animate-none";
+
+/**
+ * `BRAND_IDLE_SPIN`, for a mark drawn onto finn.com.
+ *
+ * The same fourteen seconds and the same reduced-motion stop, but written as
+ * a plain rule in `assets/tailwind.css` rather than as utilities, because the
+ * utilities lose to the page's own stylesheet — see the note there. Change the
+ * speed in both places.
+ */
+export const BRAND_IDLE_SPIN_ON_PAGE = "finn-lens-idle-spin";

@@ -10,7 +10,7 @@
 
 import { LENS_PANEL_ICONS } from "./icons";
 import {
-  BRAND_IDLE_SPIN,
+  BRAND_IDLE_SPIN_ON_PAGE,
   SPINNER_ANIMATION,
   SPINNER_CENTRE,
   SPINNER_HUB,
@@ -267,16 +267,20 @@ export function brandMark(
    * Turning over slowly, where the mark stands alone.
    *
    * The icon is a wheel, and a wheel at rest in a product about cars is a
-   * wheel that looks stuck. `idle` is opt-in rather than the default for one
-   * reason: the same mark is drawn on every fit badge, and a listing page
-   * carries forty of them — forty things rotating on somebody else's site is
-   * not personality, it is an infestation. The panel's own header is a single
-   * mark on a surface that is already ours, so it gets it.
+   * wheel that looks stuck. Both callers — the panel's header and the fit
+   * badge on every card — ask for it. It stays opt-in so a new caller decides
+   * deliberately, since a listing page carries forty badges and each one is a
+   * wheel turning on somebody else's site. At fourteen seconds a revolution
+   * that reads as idling rather than activity, and it stops under
+   * `prefers-reduced-motion`.
    *
    * Only the artwork turns, never the white disc under it. A rotating disc is
    * indistinguishable from a still one and its shadow would swing.
+   *
+   * Not `BRAND_IDLE_SPIN`'s utilities: on the badge, in FINN's light DOM, the
+   * page's stylesheet outranked them and the wheel spun at loader speed.
    */
-  if (idle) img.className = BRAND_IDLE_SPIN;
+  if (idle) img.className = BRAND_IDLE_SPIN_ON_PAGE;
 
   img.style.cssText = [
     `width:${inner}px`,
