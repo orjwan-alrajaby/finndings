@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 
 import { InfoTip } from "@/components/InfoTip";
+import { NumberInput } from "@/components/NumberInput";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type {
     ContractType,
@@ -104,7 +105,6 @@ export function DrivingAssumptions({
                     explanation={DRIVING_EXPLANATIONS.monthlyBudget}
                     unit="€/month"
                     value={preferences.monthlyBudget}
-                    step={50}
                     /* Blank rather than €0: nobody's budget is zero. */
                     optional
                     placeholder="No limit"
@@ -123,7 +123,6 @@ export function DrivingAssumptions({
                     explanation={DRIVING_EXPLANATIONS.monthlyKm}
                     unit="km/month"
                     value={preferences.monthlyKm}
-                    step={100}
                     onChange={(value) => update("monthlyKm", value)}
                 />
 
@@ -132,7 +131,6 @@ export function DrivingAssumptions({
                     explanation={DRIVING_EXPLANATIONS.petrolPrice}
                     unit="€/L"
                     value={preferences.petrolPrice}
-                    step={0.01}
                     onChange={(value) => update("petrolPrice", value)}
                 />
 
@@ -141,7 +139,6 @@ export function DrivingAssumptions({
                     explanation={DRIVING_EXPLANATIONS.dieselPrice}
                     unit="€/L"
                     value={preferences.dieselPrice}
-                    step={0.01}
                     onChange={(value) => update("dieselPrice", value)}
                 />
 
@@ -150,7 +147,6 @@ export function DrivingAssumptions({
                     explanation={DRIVING_EXPLANATIONS.electricityPrice}
                     unit="€/kWh"
                     value={preferences.electricityPrice}
-                    step={0.01}
                     onChange={(value) => update("electricityPrice", value)}
                 />
 
@@ -312,7 +308,6 @@ function AssumptionInput({
     explanation,
     unit,
     value,
-    step,
     optional,
     placeholder,
     onChange,
@@ -321,7 +316,6 @@ function AssumptionInput({
     explanation: ReactNode;
     unit: string;
     value: number;
-    step: number;
     /** Renders 0 as an empty field, so "unset" doesn't read as "zero". */
     optional?: boolean;
     placeholder?: string;
@@ -337,23 +331,15 @@ function AssumptionInput({
                 explanation={explanation}
             />
 
-            <div className="mt-1 flex items-center rounded-2xl bg-finn-pale-blue px-3 shadow-sm">
-                <input
+            <div className="mt-1 flex items-center rounded-2xl bg-finn-pale-blue px-3 shadow-sm has-[[aria-invalid]]:ring-2 has-[[aria-invalid]]:ring-finn-error/60">
+                <NumberInput
                     id={`${id}-field`}
-                    type="number"
-                    min="0"
-                    step={step}
+                    optional={optional}
                     placeholder={placeholder}
-                    value={optional && value === 0 ? "" : value}
-                    onChange={(event) =>
-                        onChange(Number(event.target.value) || 0)
-                    }
+                    value={value}
+                    onChange={onChange}
                     aria-describedby={`${id}-unit`}
-                    className={[
-                        "h-11 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none",
-                        // line below removes the number input's default HTML up/down arrows
-                        "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                    ].join(" ")}
+                    className="h-11 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none placeholder:font-normal placeholder:text-finn-iron aria-invalid:text-finn-error"
                 />
 
                 <span id={`${id}-unit`} className="text-xs text-finn-iron">

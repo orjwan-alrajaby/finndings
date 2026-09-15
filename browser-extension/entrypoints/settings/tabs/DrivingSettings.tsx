@@ -1,6 +1,7 @@
 import { DRIVING_EXPLANATIONS, FieldLabel } from "@/components/DrivingAssumptions";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type { ContractType, LensPreferences } from "@/lib/reasoning-engine/types";
+import { NumberInput } from "@/components/NumberInput";
 import { Section } from "../components/primitives";
 
 interface DrivingSettingsProps {
@@ -14,7 +15,6 @@ interface Field {
     key: NumericField;
     label: string;
     unit: string;
-    step: string;
     /**
      * Shown blank at 0, because 0 means "not set" rather than "zero euros".
      * Only the budget is optional; the rest are assumptions Lens has to have a
@@ -29,7 +29,6 @@ const FIELDS: Field[] = [
         key: "monthlyBudget",
         label: "Monthly budget",
         unit: "€/month",
-        step: "50",
         optional: true,
         placeholder: "No limit",
     },
@@ -38,11 +37,10 @@ const FIELDS: Field[] = [
         /* Matches the setup flow and the compare drawer. */
         label: "Monthly distance",
         unit: "km/month",
-        step: "100",
     },
-    { key: "petrolPrice", label: "Petrol price", unit: "€/L", step: "0.01" },
-    { key: "dieselPrice", label: "Diesel price", unit: "€/L", step: "0.01" },
-    { key: "electricityPrice", label: "Electricity price", unit: "€/kWh", step: "0.01" },
+    { key: "petrolPrice", label: "Petrol price", unit: "€/L" },
+    { key: "dieselPrice", label: "Diesel price", unit: "€/L" },
+    { key: "electricityPrice", label: "Electricity price", unit: "€/kWh" },
 ];
 
 const CONTRACT_OPTIONS: [ContractType, string, string][] = [
@@ -63,20 +61,18 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                   * longer wraps the input, so the "i" is a button of its own
                   * rather than something that also focuses the field.
                   */}
-                {FIELDS.map(({ key, label, unit, step, optional, placeholder }) => (
+                {FIELDS.map(({ key, label, unit, optional, placeholder }) => (
                     <div key={key}>
                         <FieldLabel htmlFor={`driving-${key}`} label={label} explanation={DRIVING_EXPLANATIONS[key]} />
-                        <div className="mt-1 flex rounded-2xl bg-finn-snow px-3">
-                            <input
+                        <div className="mt-1 flex rounded-2xl bg-finn-snow px-3 has-[[aria-invalid]]:ring-2 has-[[aria-invalid]]:ring-finn-error/60">
+                            <NumberInput
                                 id={`driving-${key}`}
-                                type="number"
-                                min="0"
-                                step={step}
+                                optional={optional}
                                 placeholder={placeholder}
-                                value={optional && preferences[key] === 0 ? "" : preferences[key]}
-                                onChange={(event) => onChange({ ...preferences, [key]: Number(event.target.value) || 0 })}
+                                value={preferences[key]}
+                                onChange={(value) => onChange({ ...preferences, [key]: value })}
                                 aria-describedby={`driving-${key}-unit`}
-                                className="h-12 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none"
+                                className="h-12 min-w-0 flex-1 bg-transparent text-sm font-bold text-finn-black outline-none placeholder:font-normal placeholder:text-finn-iron aria-invalid:text-finn-error"
                             />
                             <span id={`driving-${key}-unit`} className="flex items-center text-xs text-finn-iron">{unit}</span>
                         </div>
