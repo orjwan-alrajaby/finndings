@@ -393,7 +393,7 @@ describe("the language matches the size of the difference", () => {
     const prose = comfort.sentences.join(" ");
 
     expect(prose).toMatch(/didn't pick out/i);
-    expect(prose).toMatch(/across the category as a whole/i);
+    expect(prose).toMatch(/judged on everything it covers/i);
     expect(prose).not.toMatch(/should|need to|missing from your/i);
   });
 

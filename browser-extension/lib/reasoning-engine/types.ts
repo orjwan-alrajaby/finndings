@@ -143,6 +143,22 @@ export interface CategoryDef {
   recommendedFor: string[];
   numericOnly?: boolean;
   /**
+   * The figure this priority is scored on as well as its equipment, named for
+   * a reader.
+   *
+   * Practicality and Long Distance are the two: `numericScore` measures boot
+   * space, and electric range or energy use, against the other pinned cars,
+   * and `categoryDetail` averages that with the equipment score. Half the
+   * answer, in other words, and nothing on the screen said so — a reader
+   * picking features under Practicality had no way to know boot space was
+   * carrying as much as all of them together.
+   *
+   * Absent on the categories scored on equipment alone, and on
+   * `numericOnly` ones, where there is no equipment half to distinguish it
+   * from.
+   */
+  measured?: string;
+  /**
    * The catalogue of features this category *offers*, most relevant first.
    *
    * Not the user's selection — see `DEFAULT_CATEGORY_FEATURES` for the opening

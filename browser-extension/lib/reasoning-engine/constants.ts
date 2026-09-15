@@ -62,10 +62,15 @@ export const FEATURE_IMPORTANCE = {
     inSentence: "highly",
     /** Names the level where the control isn't on screen to give it context. */
     badgeLabel: "Highly influential",
-    hint: "As much as anything else in this priority",
+    /*
+      * It used to read "As much as anything else in this priority", which is
+      * the sentence *standard* means — a reader skimming the four levels met
+      * the top one and the resting one making the same promise.
+      */
+    hint: "The most a single feature can count here",
     /** What the level actually does, for the badge's tooltip. */
     meaning:
-      "Counts about four times as much as a feature left on standard — the strongest thing you can say here. Still not a requirement: a car can miss it and still be the recommendation, with the gap named in your advice.",
+      "Counts four times as much as a feature left on standard — the strongest thing you can say here. Still not a requirement: a car can miss it and still be the recommendation, with the gap named in your advice.",
     weight: 4,
     /* Rose: the loudest of the three. */
     activeClass:
@@ -82,9 +87,9 @@ export const FEATURE_IMPORTANCE = {
     label: "Moderately",
     inSentence: "moderately",
     badgeLabel: "Moderately influential",
-    hint: "Clearly more than the rest of the category",
+    hint: "Clearly more than the rest of this priority",
     meaning:
-      "Counts about three times as much as a feature left on standard — clearly more than the rest of this priority, without dominating it.",
+      "Counts three times as much as a feature left on standard — clearly more than the rest of this priority, without dominating it.",
     weight: 3,
     /* Orange: the middle step, warm rather than louder blue. */
     activeClass:
@@ -101,9 +106,9 @@ export const FEATURE_IMPORTANCE = {
     label: "Somewhat",
     inSentence: "somewhat",
     badgeLabel: "Somewhat influential",
-    hint: "A little more than the rest of the category",
+    hint: "A little more than the rest of this priority",
     meaning:
-      "Counts about twice as much as a feature left on standard — a nudge in its favour rather than a demand.",
+      "Counts twice as much as a feature left on standard — a nudge in its favour rather than a demand.",
     weight: 2,
     /* Emerald: the calmest of the three, so visual weight tracks stated
        weight. */
@@ -156,7 +161,7 @@ export const BASE_FEATURE_WEIGHT = 1;
  */
 export const STANDARD_INFLUENCE = {
   label: "Standard",
-  hint: "Counts like everything else in this category",
+  hint: "Counts like everything else in this priority",
   /**
    * Said as a state rather than as a level, because that is what it is: not
    * a fourth strength but the absence of a claim. "Standard influence" would
@@ -520,14 +525,24 @@ export const CATEGORIES = {
     label: "Safety & Driver Assistance",
     icon: "shield",
     color: "#2563EB",
-    question: "What does the car do to keep you out of an accident?",
+    /*
+     * Two claims the copy has to keep apart, because the catalogue mixes
+     * them: automatic braking, the lane and blind spot warnings and the
+     * emergency call do something when a situation has already gone wrong,
+     * while adaptive cruise, the parking sensors and the cameras only make
+     * driving less work. Neither half may be sold as prevention — the
+     * honest verb is "help", and the last sentence says so outright, because
+     * a category called Safety is the one place a reader might hear a
+     * promise nobody can make for them.
+     */
+    question: "What does the car do to help you avoid an accident?",
     description:
-      "Systems that intervene when something goes wrong — automatic braking, blind spot and lane warnings, the emergency call — plus the assistance that reduces the work of driving.",
+      "Two kinds of system, counted together: the ones that warn you, brake for you or call for help when something goes wrong — automatic braking, blind spot and lane warnings, the emergency call — and the ones that simply make driving less work, like adaptive cruise, parking sensors and cameras. They improve your odds; none of them makes a car accident-proof.",
     recommendedFor: [
       "Families",
       "New drivers",
-      "Long-distance commuters",
-      "Drivers who travel in poor weather often",
+      "Motorway commuters",
+      "Anyone often driving at night or in bad weather",
     ],
     numericOnly: false,
     features: [
@@ -554,14 +569,31 @@ export const CATEGORIES = {
     label: "Family Friendly",
     icon: "users",
     color: "#EA580C",
-    question: "Will this work for transporting your family, week after week?",
+    question: "How well does it handle children, car seats and all their kit?",
+    /*
+     * The catalogue is two different things and the copy has to say so. Four
+     * entries are about children specifically — the anchor points, the
+     * folding bench, the rear climate zone, the rear sockets. The other six
+     * are ordinary conveniences that happen to matter most with a full car:
+     * a boot you can open with your hands occupied, and the cameras and
+     * sensors you need when the back is packed and you can't see out of it.
+     * Calling all ten "family features" was the old description's mistake.
+     *
+     * It also said the category kept children "settled", which nothing here
+     * measures — the nearest thing in the catalogue is a rear temperature
+     * zone and a USB socket.
+     *
+     * No safety claim, deliberately. Crash protection is not in this
+     * catalogue and the assistance that is in it is counted here for the
+     * parking it helps with, not as a safety verdict — that is its own
+     * priority.
+     */
     description:
-      "Child seat anchors, a rear bench that folds, and the things that make loading children and their equipment less of a fight.",
+      "The practical side of family driving: anchor points for child seats, and a rear bench that folds so a pram and a passenger don't have to compete. The rest is what helps when the car is full — loading the boot, keeping the back seats comfortable, and seeing what's behind you when the view is blocked.",
     recommendedFor: [
-      "Parents",
-      "Large families",
-      "School runs",
-      "Weekend trips",
+      "Parents with children in car seats",
+      "Daily school or nursery runs",
+      "Families who travel with the car full",
     ],
     numericOnly: false,
     features: [
@@ -584,12 +616,26 @@ export const CATEGORIES = {
     icon: "backpack",
     color: "#0891B2",
     question: "Will everything you carry day-to-day actually fit?",
+    /*
+     * Boot space isn't a passing mention here: `numericScore` measures it
+     * against the other pinned cars and the category score is the average of
+     * that and the equipment score. Half the answer deserved more than a
+     * comma.
+     *
+     * What the description has to carry is the *kind* of thing boot space is
+     * — a figure measured off the cars on screen, not a box that is either
+     * ticked or not. How much it counts is said once, in `measured`, which
+     * is where the panel puts it; saying it here as well was the same
+     * sentence twice on one screen.
+     */
     description:
-      "Boot space, plus the fittings that decide what you can get in and out of it — folding seats, roof rails, a towbar, a powered tailgate.",
+      "How much you can get in, and how easily. Boot space is an actual measurement, compared against the other cars you pinned rather than ticked off a list — the rest is the practical kit: folding seats, roof rails, a towbar, a powered boot.",
+    measured:
+      "Boot space in litres, compared with the other cars you pinned",
     recommendedFor: [
       "Daily commuters",
-      "Active lifestyles",
-      "People carrying shopping or equipment",
+      "People carrying sports or work kit",
+      "Anyone who regularly moves bulky things",
     ],
     numericOnly: false,
     features: [
@@ -612,12 +658,26 @@ export const CATEGORIES = {
     icon: "road",
     color: "#D97706",
     question: "How does this feel after three hours on the motorway?",
+    /*
+     * The description is the equipment half plus a pointer at the other one.
+     * `numericScore` also ranks the car on how far it goes between stops —
+     * electric range where FINN publishes one, fuel or electricity use
+     * otherwise — and that counts for as much as everything listed here.
+     *
+     * The detail of it belongs in `measured`, including the part a reader
+     * would otherwise get wrong: the ranking happens inside each kind of
+     * reading, never across them, because kilometres of range and litres per
+     * 100 km are not the same number and nothing in FINN's data converts
+     * between them.
+     */
     description:
-      "What keeps a long drive tolerable: cruise assistance that holds a gap for you, a seat you can set up properly, and navigation that doesn't drop out.",
+      "What makes a long drive bearable: cruise assistance that holds a gap for you, a seat you can set up properly, navigation that doesn't drop out. Alongside that kit, Lens measures how far the car gets between stops.",
+    measured:
+      "How far it gets between stops — electric range where FINN publishes one, otherwise how much fuel or electricity it uses, and only ever compared with cars measured the same way, since range in kilometres and consumption per 100 km aren't the same figure",
     recommendedFor: [
-      "Road trippers",
-      "Business travellers",
-      "Highway drivers",
+      "Regular long-distance drivers",
+      "Motorway commuters",
+      "People who drive for work",
     ],
     numericOnly: false,
     features: [
@@ -641,14 +701,28 @@ export const CATEGORIES = {
     label: "Climate Suitability",
     icon: "snowflake",
     color: "#0284C7",
-    question: "How will this hold up through winter mornings and summer heat?",
+    /*
+     * "Heating and cooling for the people rather than the cabin" was wrong
+     * twice: air conditioning and the auxiliary heater are cabin systems, and
+     * five of the eleven things scored here — fog lights, cornering lights,
+     * headlight washers, rain and light sensors, folding mirrors — are about
+     * seeing and being seen rather than about temperature at all.
+     *
+     * What the description must not turn into is a bad-weather safety score.
+     * Fog lights and headlight washers help you see and be seen; nothing in
+     * this catalogue says anything about grip, and `driveType` — the one
+     * field that even mentions which wheels are driven — is never scored, in
+     * this category or any other. So the scope is stated outright in the
+     * second sentence rather than left for the reader to assume.
+     */
+    question: "How will this car cope with winter mornings, summer heat and bad weather?",
     description:
-      "Heating and cooling for the people rather than the cabin — warm seats and wheel on a frozen morning, air conditioning in August.",
+      "Equipment that only matters when the weather does: warming the car and you on a frozen morning, cooling it in August, and keeping your view clear in fog, rain and snow. It's about staying comfortable and seeing properly in bad conditions — not how the car drives in them.",
     recommendedFor: [
-      "Drivers in extreme climates",
-      "Mountain regions",
-      "Cold winters",
-      "Hot summers",
+      "Winters cold enough to scrape the windscreen",
+      "Summers spent in traffic with no shade",
+      "Regular driving in fog, rain or snow",
+      "Cars parked outside rather than in a garage",
     ],
     numericOnly: false,
     features: [
@@ -671,13 +745,36 @@ export const CATEGORIES = {
     label: "Environmental Impact",
     icon: "leaf",
     color: "#16A34A",
-    question: "How much does this car emit, and what does it run on?",
+    /*
+     * Both of these used to say the drivetrain was part of the judgement —
+     * "How much does this car emit, and what does it run on?" over "CO₂ per
+     * kilometre and the drivetrain it comes from". It hasn't been since the
+     * model was cut down to one figure: `assessEnvironment` scores
+     * `positionForCo2` and nothing else, and the method notes explain at
+     * length why counting the fuel type as well would mark the same car down
+     * twice for the same fact.
+     *
+     * The description then went one step too far the other way, finishing
+     * "what it runs on isn't scored on its own". True of petrol, diesel and
+     * electric; not quite true of plug-in hybrids, whose scale
+     * `assessEnvironment` compresses because their official figure assumes a
+     * charging habit FINN's data can't confirm. So the claim is gone rather
+     * than qualified — a one-clause version of that caveat in a category
+     * blurb reads as "hybrids are marked down", which is the wrong summary
+     * of it, and the method notes carry the real explanation where a reader
+     * meets the score itself.
+     *
+     * What stays is the scope: the figure is tailpipe CO₂ per kilometre, so
+     * the copy must not let "Environmental Impact" be read as a verdict on
+     * the whole life of the car — nothing here knows how it was built.
+     */
+    question: "How much CO₂ does this car emit per kilometre?",
     description:
-      "CO₂ per kilometre and the drivetrain it comes from. Measured from the vehicle data rather than from a feature list.",
+      "Based on the car's own reported CO₂ figure — grams per kilometre, placed on the A-to-G scale German listings use. It covers what the car emits while it's driven, not the whole environmental story of the vehicle.",
     recommendedFor: [
-      "Eco-conscious drivers",
-      "City drivers",
-      "Low-emission focused buyers",
+      "Drivers who want emissions to lead the decision",
+      "City drivers in low-emission zones",
+      "Anyone weighing electric against petrol or diesel",
     ],
     numericOnly: true,
     features: [],
@@ -688,11 +785,23 @@ export const CATEGORIES = {
     icon: "sofa",
     color: "#DB2777",
     question: "How pleasant is it to sit in, every single day?",
+    /*
+     * "Warmth, upholstery and the small everyday conveniences" named three
+     * of the fourteen things scored here and skipped the seats you can
+     * actually adjust and the phone and audio kit, which is where the
+     * picked-out five live.
+     *
+     * The second sentence is a limit rather than a feature: comfort is the
+     * category a reader is most likely to read as "how nice is this car to
+     * be in", and seats and ride are the two halves of that. FINN publishes
+     * equipment, so only one half is here, and saying so costs a clause.
+     */
     description:
-      "Warmth, upholstery and the small everyday conveniences you notice on the drive to work and nowhere else.",
+      "The things you notice on an ordinary drive: a seat you can adjust and heat, climate you can set, and the phone, sound and convenience kit you use on every trip. It's the equipment FINN lists — how the car actually rides isn't in the data.",
     recommendedFor: [
-      "Daily drivers who spend hours in the car",
-      "Anyone who wants driving to feel like a treat",
+      "Drivers who spend long stretches in the car",
+      "Anyone who shares the car with passengers",
+      "People coming from a sparsely equipped car",
     ],
     numericOnly: false,
     features: [
@@ -758,7 +867,7 @@ export const PROFILES = {
     forWhom:
       "Drivers who want the car watching the road with them — braking, lane and blind spot warnings doing the heavy lifting.",
     assumes:
-      "Safety and assistance systems outrank everything else, with visibility in bad weather close behind.",
+      "Safety and assistance systems outrank everything else, with coping in bad weather close behind.",
     priorities: [
       "safetyAssistance",
       "climateSuitability",
@@ -821,8 +930,7 @@ export const PROFILES = {
     icon: "leaf",
     forWhom:
       "Drivers who want emissions to be the first thing the choice answers to.",
-    assumes:
-      "CO₂ and drivetrain lead, with safety immediately behind them.",
+    assumes: "CO₂ leads, with safety immediately behind it.",
     priorities: [
       "environmental",
       "safetyAssistance",
@@ -837,8 +945,13 @@ export const PROFILES = {
     icon: "scale",
     forWhom:
       "Anyone without one dominant requirement who wants a sensible all-rounder.",
+    /*
+     * It used to say the weight was spread, which reads as "these count
+     * equally" — and the weighting is the same falling scale every profile
+     * gets. What is actually balanced is the choice of five, not the maths.
+     */
     assumes:
-      "No category runs away with it — the weight is spread across the everyday essentials.",
+      "The five everyday essentials, in a sensible order, with nothing unusual at the top.",
     priorities: [
       "safetyAssistance",
       "practicality",
@@ -1004,8 +1117,8 @@ export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> = {
 
   /*
    * Nothing, and not for want of an opinion: this category has no feature
-   * catalogue at all. It is scored from CO₂ and the drivetrain, straight off
-   * the vehicle data. See `numericOnly`.
+   * catalogue at all. It is scored from the CO₂ figure, straight off the
+   * vehicle data. See `numericOnly`.
    */
   environmental: [],
 };

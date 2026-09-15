@@ -112,8 +112,8 @@ export function summarisePriority(
   if (basis === "category" && total > 0) {
     return sentence(
       `${opener}. You didn't pick out particular features there, so it's`,
-      `judged across the category — this one has ${cover.present.length} of`,
-      `the ${total} systems it covers`,
+      `judged on everything the priority covers — this one has`,
+      `${cover.present.length} of the ${total}`,
     );
   }
 

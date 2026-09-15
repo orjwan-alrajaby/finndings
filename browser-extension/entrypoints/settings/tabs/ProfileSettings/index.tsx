@@ -48,7 +48,7 @@ export function ProfilesSettings({
     return (
         <Section
             title="Profiles"
-            description="A profile is a starting philosophy: five priorities in a sensible order. Turn off the ones you'll never use, and pick the one Lens should start you on. If you want a different order, choose your own priorities in the compare flow instead — that always wins over a profile."
+            description="A profile is a ready-made starting point: five priorities already in a sensible order. Turn off the ones you'll never use, and pick the one Lens should start you on. If you want a different order, choose your own priorities in the compare flow instead — that always wins over a profile."
         >
             <div className="flex flex-col gap-4">
                 {ordered.map((profile) => (

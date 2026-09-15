@@ -320,7 +320,7 @@ describe("picking nothing is an answer, not an empty form", () => {
 
     const prose = narrative.priorities[0]!.sentences.join(" ");
 
-    expect(prose).toMatch(/\d+ of the \d+ systems this priority covers/);
+    expect(prose).toMatch(/\d+ of the \d+ features this priority covers/);
     expect(prose).not.toMatch(/\/100|out of a hundred/i);
     expect(prose).not.toMatch(/poor|weak|inadequate|fails/i);
   });

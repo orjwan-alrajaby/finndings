@@ -146,7 +146,7 @@ function describeSelection(
 }
 
 /**
- * How the car does across the category as a whole.
+ * How the car does across the whole priority.
  *
  * Always said, because this is what the score actually counted — the picks
  * above it are evidence the reader supplied, not the measurement. Stating the
@@ -154,7 +154,7 @@ function describeSelection(
  * from being mistaken for "it is two-thirds of a safe car".
  *
  * Phrased as a count rather than a percentage on purpose. "12 of the 15
- * systems this priority covers" is a fact the reader can check; "80/100 for
+ * features this priority covers" is a fact the reader can check; "80/100 for
  * safety" is a grade the data doesn't support.
  */
 function describeCoverage(
@@ -169,7 +169,7 @@ function describeCoverage(
 
   if (total === 0) return null;
 
-  const figure = `it has ${present.length} of the ${total} systems this priority covers`;
+  const figure = `it has ${present.length} of the ${total} features this priority covers`;
 
   /*
    * A car with none of the category's equipment is a real finding, and
@@ -178,12 +178,12 @@ function describeCoverage(
    * every other car has none either — see `describeStanding`.
    */
   if (hasPicks) {
-    return sentence(`Across the category as a whole, ${figure}`);
+    return sentence(`Taking the whole priority together, ${figure}`);
   }
 
   return sentence(
     `You didn't pick out particular ${phraseLabel(label)} features, so this`,
-    `priority is judged across the category as a whole and ${figure}`,
+    `priority is judged on everything it covers: ${figure}`,
   );
 }
 

@@ -83,12 +83,12 @@ export function FeatureSection({
             title="What counts inside a priority"
             summary={
                 raised === 0
-                    ? "Nothing raised · each category judged as a whole"
+                    ? "Nothing raised · each priority judged in full"
                     : `${raised} raised for extra influence`
             }
         >
             <p className="mb-3 rounded-xl bg-finn-snow px-3 py-2 text-[11px] leading-4 text-finn-iron">
-                Optional. Every feature in a category counts the same until
+                Optional. Every feature in a priority counts the same until
                 you raise one — and raising one never rules a car out, it
                 turns up as a tradeoff instead.
             </p>

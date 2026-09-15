@@ -16,6 +16,9 @@ import {
   PROFILES,
 } from "./constants";
 
+import { DEFAULT_PREFERENCES } from "./constants";
+import { buildReasoningContext, evaluateVehicle, getCategory } from "./index";
+import { makeCar } from "./test-fixtures";
 import { validatePriorityDraft } from "@/entrypoints/settings/utils/PriorityValidation";
 import type { CategoryId } from "./types";
 
@@ -195,6 +198,40 @@ describe("feature selection", () => {
       .map((key) => ({ key, importance: "medium" }) as const);
 
     expect(validatePriorityDraft([...overCap], id)).toMatch(/at most/i);
+  });
+
+  /*
+   * Two priorities are scored on a measured figure as well as their
+   * equipment, and `categoryDetail` averages the two — so the figure carries
+   * half the answer. A reader is told that in `measured`, and this is what
+   * stops the two drifting apart again: add a numeric case to the engine
+   * without writing the copy and this fails, and so does the reverse.
+   */
+  it("names the measured half of every priority that has one", () => {
+    const cars = [
+      makeCar({ id: 1, trunk: 300, consumption: 5, range: null }),
+      makeCar({ id: 2, trunk: 600, consumption: 8, range: null }),
+    ];
+
+    const context = buildReasoningContext(cars, CATEGORY_IDS, DEFAULT_PREFERENCES);
+
+    const scoredOnAFigure = evaluateVehicle(cars[0] as never, context)
+      .priorities.filter(
+        (item) => item.numeric != null && !CATEGORIES[item.priority].numericOnly,
+      )
+      .map((item) => item.priority)
+      .sort();
+
+    expect(scoredOnAFigure).toEqual(["longDistance", "practicality"]);
+
+    for (const id of CATEGORY_IDS) {
+      const measured = getCategory(id)?.measured;
+
+      expect(Boolean(measured)).toBe(scoredOnAFigure.includes(id));
+
+      /* And it says what the figure is, not merely that there is one. */
+      if (measured) expect(measured.length).toBeGreaterThan(30);
+    }
   });
 
   /* Three levels, and none of them reads as a hard requirement. */

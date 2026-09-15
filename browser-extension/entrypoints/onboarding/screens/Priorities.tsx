@@ -121,9 +121,10 @@ export function Priorities({
                 </p>
 
                 <p className="mx-auto mt-3 max-w-2xl rounded-full bg-finn-pale-blue px-5 py-2 text-xs font-bold leading-5 text-finn-highlight-navy">
-                    This order weighs, it never filters. A car that is weak at
-                    your top priority is still ranked and still explained — it
-                    just has ground to make up.
+                    This order changes how much each one counts. It never
+                    rules a car out: one that's weak at your top priority is
+                    still ranked, and still explained — it just has ground to
+                    make up.
                 </p>
             </div>
 
@@ -385,7 +386,7 @@ function PresetsView({
                         the nervous driver, the family, the commuter — written
                         out as {MAX_PRIORITIES} priorities already in a
                         sensible order. Reach for one when you know roughly how
-                        you drive but not which categories that translates to.
+                        you drive but not which priorities that translates to.
                         Picking one fills in your order and brings you straight
                         back to it, where you can change anything you disagree
                         with.

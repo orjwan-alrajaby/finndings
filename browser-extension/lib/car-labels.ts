@@ -116,7 +116,7 @@ export function describeCoverage(priority: FitPriority): string {
         (feature) => feature.state === "present",
     ).length;
 
-    const catalogue = `${priority.covered} of ${priority.catalogueSize} systems it covers`;
+    const catalogue = `${priority.covered} of ${priority.catalogueSize} features it covers`;
 
     return picks
         ? `${held} of your ${picks} pick${picks === 1 ? "" : "s"} · ${catalogue}`

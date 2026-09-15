@@ -15,8 +15,8 @@ export function GoToFinnSection() {
                 </p>
 
                 <p className="mt-1.5 max-w-60 text-xs leading-5 text-finn-iron">
-                    Finn Lens activates while you browse car listings, so it can detect
-                    and pin cars for you.
+                    Finn Lens works while you're browsing car listings, so it can spot
+                    cars and pin them for you.
                 </p>
 
                 <a

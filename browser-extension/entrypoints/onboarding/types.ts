@@ -66,7 +66,7 @@ export const SCREEN_PROMISE: Record<
     },
     preview: {
         title: "Read a worked example",
-        body: "The real engine, run over three example cars, judged against the order you just set.",
+        body: "The same reasoning you'll get on real listings, run over three example cars and judged against the order you just set.",
         asks: false,
     },
 };

@@ -107,8 +107,9 @@ export function Preview({
                 </h1>
 
                 <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-finn-iron">
-                    The real engine, run over three example cars, judged
-                    against the order you just set
+                    The same reasoning you'll get on real listings, run over
+                    three example cars and judged against the order you just
+                    set
                     {topPriority
                         ? ` — led by ${CATEGORIES[topPriority]?.label ?? topPriority}`
                         : ""}

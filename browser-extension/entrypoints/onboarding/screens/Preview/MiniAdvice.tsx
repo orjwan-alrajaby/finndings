@@ -322,7 +322,7 @@ function MoreOnTheRealPage({
         alternatives.length > 0
             ? `A hot seat — put ${alternatives[0]!.name} up against the winner and Lens argues it again from that side`
             : "A hot seat for the closest alternatives",
-        "The full ranking with raw totals, and the weight table, so you can check the arithmetic yourself",
+        "The full ranking, the totals behind it and how much each priority counted, so you can check the sums yourself",
         "Your driving assumptions, beside the answer they produced, and a way to change them",
     ];
 

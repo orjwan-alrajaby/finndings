@@ -58,7 +58,7 @@ export function PrioritiesSettings({
 
         <Section
             title="What counts inside each priority"
-            description="Your priority order says how much each category matters overall. This is the finer question: inside a category, every feature counts the same by default — you can raise up to five so they count for more. Cars are judged on the whole category either way, and a car missing one you raised isn't ruled out; it just gives up some ground and the gap is named in your advice."
+            description="Your order above decides how much each priority counts overall. This is the finer question: inside one, every feature counts the same to start with, and you can raise up to five so they count for more. Either way a car is judged on the whole priority, and raising something never rules a car out — a car that misses it loses a little ground, and your advice says so."
         >
             <div className="flex flex-col gap-3">
                 {priorityDefinitions.map(
