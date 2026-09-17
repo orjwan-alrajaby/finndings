@@ -205,8 +205,8 @@ export function PriorityOrderList({
                                             <span aria-hidden="true" className="hidden sm:inline">· </span>
                                         )}
                                         {count === 0
-                                            ? "Judged on the whole priority"
-                                            : `${count} feature${count === 1 ? "" : "s"} raised`}
+                                            ? "Nothing raised"
+                                            : `${count} raised`}
                                     </span>
                                 </span>
                             </span>

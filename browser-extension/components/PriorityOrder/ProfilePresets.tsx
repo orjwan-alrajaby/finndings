@@ -7,6 +7,7 @@ import type {
     CategoryId,
     PriorityDefinition,
     Profile,
+    ProfileId,
 } from "@/lib/reasoning-engine/types";
 
 import { ProfileOrderChips } from "./ProfileOrderChips";
@@ -85,7 +86,12 @@ export function ProfilePresets({
     profiles: Profile[];
     priorityDefinitions: PriorityDefinition[];
     priorities: CategoryId[];
-    onApply: (priorities: CategoryId[]) => void;
+    /**
+     * Applying a profile replaces the reader's order *and* its emphasis, so
+     * the caller is handed the profile rather than just its order — see
+     * `applyProfile` in the engine, which every caller uses.
+     */
+    onApply: (profile: ProfileId) => void;
     layout?: "chips" | "tiles" | "cards";
 }) {
     const definitionOf = (id: CategoryId) =>
@@ -125,7 +131,7 @@ export function ProfilePresets({
 
                             <button
                                 type="button"
-                                onClick={() => onApply([...profile.priorities])}
+                                onClick={() => onApply(profile.id)}
                                 aria-pressed={active}
                                 className={[
                                     "flex h-full w-full flex-col gap-2 rounded-2xl p-2.5 text-left transition-all",
@@ -190,7 +196,7 @@ export function ProfilePresets({
                                 </span>
 
                                 <span className="sr-only">
-                                    Sets your order to {order}
+                                    Sets your order to {order}, and what counts for more inside each
                                 </span>
                             </button>
                         </div>
@@ -251,7 +257,7 @@ export function ProfilePresets({
                         >
                             <button
                                 type="button"
-                                onClick={() => onApply([...profile.priorities])}
+                                onClick={() => onApply(profile.id)}
                                 aria-pressed={active}
                                 className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3"
                             >
@@ -313,7 +319,7 @@ export function ProfilePresets({
                             profile={profile}
                             active={active}
                             priorityDefinitions={priorityDefinitions}
-                            onApply={() => onApply([...profile.priorities])}
+                            onApply={() => onApply(profile.id)}
                         />
                     </div>
                 );

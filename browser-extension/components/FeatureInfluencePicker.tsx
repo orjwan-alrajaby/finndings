@@ -12,23 +12,21 @@ import {
 
 import { surfaceTone, type SurfaceTone } from "@/lib/priority-marks";
 import {
+    CATEGORIES,
     FEATURE_IMPORTANCE,
     IMPORTANCE_SCALE,
     MAX_FEATURES_PER_CATEGORY,
+    NICHE_INFLUENCE,
     STANDARD_INFLUENCE,
 } from "@/lib/reasoning-engine/constants";
+import { countedItems, homeOf } from "@/lib/reasoning-engine/evidence";
 import type {
     CategoryId,
-    FeatureId,
     FeatureImportance,
     FeatureSelection,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
-import {
-    FeatureOption,
-    type FeatureElsewhere,
-} from "@/components/FeatureOption";
-
-export type PickedElsewhere = Partial<Record<FeatureId, FeatureElsewhere[]>>;
+import { FeatureOption } from "@/components/FeatureOption";
 
 interface FeatureInfluencePickerProps {
     /** What this priority is called, for the nothing-picked line. */
@@ -39,25 +37,28 @@ interface FeatureInfluencePickerProps {
      * influence colours, which are the whole point of them.
      */
     mark?: string;
+    /** The priority being edited; what it counts is read from the model. */
+    category: CategoryId;
     /** What the user has picked out. May legitimately be empty. */
     features: FeatureSelection;
-    /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureId[];
+    /**
+     * The profile these settings started from, so a raise it set and the
+     * reader hasn't touched can say so on its row.
+     */
+    profileLabel?: string | null;
     /**
      * Where this priority sits in the user's order, when the caller knows.
      * Only used to say the nothing-picked line a little louder at the top.
      */
     rank?: number;
-    /** Features already raised under a different priority, and where. */
-    pickedElsewhere?: PickedElsewhere;
-    onToggleFeature: (feature: FeatureId) => void;
+    onToggleFeature: (feature: SignalId) => void;
     onImportanceChange: (
-        feature: FeatureId,
+        feature: SignalId,
         importance: FeatureImportance,
     ) => void;
     /** Put every feature here back to standard. Omitted where it makes no sense. */
     onResetAll?: () => void;
-    /** Put this category back to the picks Lens ships with. */
+    /** Put this category back to what the starting profile raises. */
     onResetToDefaults?: () => void;
 }
 
@@ -84,24 +85,47 @@ interface FeatureInfluencePickerProps {
  * line and a disclosure, where a reader who wants it can have it and a reader
  * who already knows it is not made to scroll past it every time.
  *
+ * **Every row sits where the model puts it.** Each item has one home, the
+ * only priority it can be raised in. Niche items — a towbar, a spare wheel —
+ * rest on "Not counted" rather than Standard, because they count only once
+ * raised. An item counted here from another home is shown locked, with the
+ * home named. Standard equipment is an ordinary raisable row — how the engine
+ * counts it isn't the reader's concern — and a limit such as electric range is
+ * said once, as a figure rather than a row.
+ *
  * Shared by the compare drawer and the settings priority editor so the two never
  * drift into explaining the same model two different ways.
  */
 export function FeatureInfluencePicker({
     categoryLabel,
     mark,
+    category,
     features,
-    availableFeatures,
+    profileLabel,
     rank,
-    pickedElsewhere,
     onToggleFeature,
     onImportanceChange,
     onResetAll,
     onResetToDefaults,
 }: FeatureInfluencePickerProps) {
-    const importanceOf = new Map(
+    const importanceOf = new Map<SignalId, FeatureImportance>(
         features.map((preference) => [preference.key, preference.importance]),
     );
+    const sourceOf = new Map(
+        features.map((preference) => [preference.key, preference.source]),
+    );
+    const items = countedItems(category);
+    const home = items.filter((item) => item.role === "home");
+    const alsoCounted = items.filter((item) => item.role === "alsoCounts");
+    const expected = items.filter((item) => item.role === "expected");
+    const definition = CATEGORIES[category] as {
+        measured?: string;
+        limit?: string;
+    };
+    const countedWithoutRaising = items.filter(
+        (item) => !item.niche && item.role !== "expected",
+    ).length;
+    const hasNiche = home.some((item) => item.niche);
 
     const atMax = features.length >= MAX_FEATURES_PER_CATEGORY;
     const tone = mark ? surfaceTone(mark) : null;
@@ -115,7 +139,7 @@ export function FeatureInfluencePicker({
      * operations they are performing.
      */
     const set = (
-        feature: FeatureId,
+        feature: SignalId,
         importance: FeatureImportance | null,
     ) => {
         const current = importanceOf.get(feature) ?? null;
@@ -130,17 +154,6 @@ export function FeatureInfluencePicker({
         onImportanceChange(feature, importance);
     };
 
-    /*
-     * A feature already raised somewhere else is spoken for. Sorting those to
-     * the bottom keeps the rows the reader can actually act on together at
-     * the top, rather than interleaved with ones that will not respond.
-     */
-    const rows = [...availableFeatures].sort((a, b) => {
-        const lockedA = isLocked(a, importanceOf, pickedElsewhere) ? 1 : 0;
-        const lockedB = isLocked(b, importanceOf, pickedElsewhere) ? 1 : 0;
-
-        return lockedA - lockedB;
-    });
 
     return (
         <div className="space-y-3">
@@ -156,9 +169,12 @@ export function FeatureInfluencePicker({
                     </p>
 
                     <p className="mt-0.5 text-xs leading-5 text-finn-iron">
-                        Everything here already counts. Raise up to{" "}
-                        {MAX_FEATURES_PER_CATEGORY} so they count for more —
-                        none of them rules a car out.
+                        {hasNiche
+                            ? "Everything here counts except the items marked Not counted, which count only once you raise them."
+                            : "Everything here already counts."}{" "}
+
+                        Raise up to {MAX_FEATURES_PER_CATEGORY} so they count
+                        for more — none of them rules a car out.
                     </p>
                 </div>
 
@@ -179,27 +195,72 @@ export function FeatureInfluencePicker({
             <Explainer tone={tone ?? surfaceTone("shield")} />
 
             <div className="flex flex-col gap-3">
-                {rows.map((feature) => (
+                {home.map((item) => (
                     <FeatureOption
-                        key={feature}
-                        feature={feature}
-                        importance={importanceOf.get(feature) ?? null}
-                        atCap={!importanceOf.has(feature) && atMax}
-                        raisedElsewhere={
-                            importanceOf.has(feature)
-                                ? undefined
-                                : pickedElsewhere?.[feature]
+                        key={item.key}
+                        feature={item.key}
+                        importance={importanceOf.get(item.key) ?? null}
+                        atCap={!importanceOf.has(item.key) && atMax}
+                        niche={item.niche}
+                        measured={item.key === "compactLength"}
+                        setBy={
+                            profileLabel && sourceOf.get(item.key) === "profile"
+                                ? profileLabel
+                                : null
                         }
-                        onSet={(importance) => set(feature, importance)}
+                        onSet={(importance) => set(item.key, importance)}
                     />
                 ))}
+
+                {expected.map((item) => (
+                    <FeatureOption
+                        key={item.key}
+                        feature={item.key}
+                        importance={importanceOf.get(item.key) ?? null}
+                        atCap={!importanceOf.has(item.key) && atMax}
+                        setBy={
+                            profileLabel && sourceOf.get(item.key) === "profile"
+                                ? profileLabel
+                                : null
+                        }
+                        onSet={(importance) => set(item.key, importance)}
+                    />
+                ))}
+
+                {alsoCounted.map((item) => {
+                    const owner = homeOf(item.key);
+
+                    return (
+                        <FeatureOption
+                            key={item.key}
+                            feature={item.key}
+                            importance={null}
+                            atCap={false}
+                            homeElsewhere={
+                                owner
+                                    ? {
+                                          label: CATEGORIES[owner].label,
+                                          icon: CATEGORIES[owner].icon,
+                                      }
+                                    : undefined
+                            }
+                            onSet={() => {}}
+                        />
+                    );
+                })}
             </div>
+
+            {definition.limit && definition.measured && (
+                <LimitNote text={definition.measured} tone={tone ?? surfaceTone("shield")} />
+            )}
+
+
 
             {features.length === 0 && (
                 <NothingRaised
                     label={categoryLabel}
                     rank={rank}
-                    catalogueSize={availableFeatures.length}
+                    catalogueSize={countedWithoutRaising}
                 />
             )}
 
@@ -230,7 +291,7 @@ export function FeatureInfluencePicker({
 
                     <span className="text-[10px] leading-4 text-finn-iron/80">
                         {onResetToDefaults && onResetAll
-                            ? "Defaults puts back what Lens ships with; all puts everything on standard."
+                            ? "Defaults puts back what your starting profile raises here; all puts everything back at rest."
                             : "This priority only."}
                     </span>
                 </div>
@@ -239,15 +300,27 @@ export function FeatureInfluencePicker({
     );
 }
 
-/** Whether a row can be raised at all, or is spoken for elsewhere. */
-function isLocked(
-    feature: FeatureId,
-    importanceOf: Map<FeatureId, FeatureImportance>,
-    pickedElsewhere: PickedElsewhere | undefined,
-): boolean {
-    if (importanceOf.has(feature)) return false;
-
-    return (pickedElsewhere?.[feature]?.length ?? 0) > 0;
+/**
+ * A figure that can only hold this priority back, said once under the rows.
+ *
+ * Not a row: there is nothing to raise. Electric range under Long Distance
+ * limits a short-range car and gives a long-range one nothing extra.
+ */
+function LimitNote({ text, tone }: { text: string; tone: SurfaceTone }) {
+    return (
+        <p
+            className={[
+                "rounded-xl px-3 py-2 text-[11px] leading-4 ring-1",
+                tone.ground,
+                tone.edge,
+            ].join(" ")}
+        >
+            <strong className={["font-black", tone.ink].join(" ")}>
+                Also limited by a figure.
+            </strong>{" "}
+            <span className="text-finn-iron">{text}.</span>
+        </p>
+    );
 }
 
 /**
@@ -320,8 +393,12 @@ function Explainer({ tone }: { tone: SurfaceTone }) {
             <Collapsible.Content>
                 <div className="space-y-3 border-t border-black/5 bg-white px-3 py-3">
                     <p className="text-[11px] leading-4 text-finn-iron">
-                        Every feature in this priority counts toward its
-                        score.{" "}
+                        Every item in this priority counts toward its score,
+                        except niche ones, which rest on{" "}
+                        <strong className="font-black text-finn-black">
+                            {NICHE_INFLUENCE.label}
+                        </strong>{" "}
+                        until you raise them.{" "}
                         <strong className="font-black text-finn-black">
                             {STANDARD_INFLUENCE.label}
                         </strong>{" "}
@@ -349,10 +426,10 @@ function Explainer({ tone }: { tone: SurfaceTone }) {
                         </Rule>
 
                         <Rule icon={Lock} tone={tone}>
-                            Each feature can only be raised in one priority. If
-                            it's already raised elsewhere, you'll see that on
-                            its row. Set it back to Standard there if you want
-                            to raise it here.
+                            Each item has one home, and that is the only
+                            priority it can be raised in. Where an item also
+                            counts somewhere else, it counts there at
+                            Standard, and its row names the home.
                         </Rule>
                     </ul>
                 </div>
@@ -507,8 +584,8 @@ function Scale() {
  *
  * Deliberately not a warning. "I want the safest car, I just don't have
  * opinions about which systems it has" is a complete preference, and the only
- * thing they need to know is what Lens does with it — the whole catalogue,
- * the same denominator a car with five raised features is judged against.
+ * thing they need to know is what Lens does with it: everything the priority
+ * counts without being asked, each at Standard.
  */
 function NothingRaised({
     label,
@@ -522,38 +599,10 @@ function NothingRaised({
     return (
         <p className="rounded-xl bg-white/70 px-3 py-2 text-[11px] leading-4 text-finn-iron">
             {rank === 1 ? `${label} is your top priority. ` : ""}
-            Nothing is raised, so Lens judges this on the whole priority
-            — all {catalogueSize} features it covers, each counting the same.
-            That is a real answer, not an unfinished one.
+            Nothing is raised under {label}, so everything it checks counts
+            the same — {catalogueSize}{" "}
+            {catalogueSize === 1 ? "item" : "items"}. That is a real answer, not an unfinished one.
         </p>
     );
 }
 
-/**
- * Which of these features the reader has already spoken for elsewhere.
- *
- * Twenty-two of the catalogue's features sit in more than one category —
- * heated seats is in three — so without this a reader can spend two of their
- * picks saying the same thing and never see it. Computed by the callers,
- * which are the only place that knows about more than one priority at a time.
- */
-export function buildPickedElsewhere(
-    current: CategoryId,
-    selections: Partial<Record<CategoryId, FeatureSelection>>,
-    meta: Partial<Record<CategoryId, FeatureElsewhere>>,
-): PickedElsewhere {
-    const result: PickedElsewhere = {};
-
-    for (const [categoryId, features] of Object.entries(selections)) {
-        if (categoryId === current || !features) continue;
-
-        const owner = meta[categoryId as CategoryId];
-        if (!owner) continue;
-
-        for (const preference of features) {
-            (result[preference.key] ??= []).push(owner);
-        }
-    }
-
-    return result;
-}

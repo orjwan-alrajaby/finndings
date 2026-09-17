@@ -61,10 +61,11 @@ export function Welcome() {
 
                 <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-finn-iron">
                     Comparing car subscriptions means five tabs and a mental
-                    spreadsheet, with no way to weigh "this one has adaptive
-                    cruise control" against "this one is €80 a month cheaper".
-                    Lens does that weighing out loud, using the data FINN
-                    already publishes — and shows its working, every time.
+                    spreadsheet, with no easy way to tell which car's
+                    equipment answers what you care about — or what each one
+                    really costs a month. Lens works both out, using the data
+                    FINN already publishes, keeps them side by side rather than
+                    blended into one number, and shows its working every time.
                 </p>
             </div>
 

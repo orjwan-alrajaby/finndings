@@ -4,10 +4,13 @@ import type {
     FeatureSelection,
     PriorityDefinition,
     Profile,
+    ProfileId,
+    SettingsBasis,
 } from "@/lib/reasoning-engine/types";
 import {
     applicableProfiles,
     PriorityOrderList,
+    ProfileBasisNote,
     ProfilePresets,
 } from "@/components/PriorityOrder";
 
@@ -19,20 +22,29 @@ import { DrawerSection, SECTION_TONE } from "./DrawerSection";
  * The order itself, and the profiles as a way of setting it in one go.
  *
  * Presentational: it reads what it is given and calls back with the order it
- * wants. The draft it is editing belongs to the drawer.
+ * wants, or the profile to start from. The draft it is editing, and the undo
+ * for a profile just applied, belong to the drawer.
  */
 export function PriorityOrderSection({
     priorities,
     priorityDefinitions,
     profiles,
     features,
+    basedOn,
+    customised,
     onChange,
+    onApplyProfile,
+    onUndoProfile,
 }: {
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     profiles: Profile[];
     features: Record<CategoryId, FeatureSelection>;
+    basedOn: SettingsBasis;
+    customised: boolean;
     onChange: (priorities: CategoryId[]) => void;
+    onApplyProfile: (profile: ProfileId) => void;
+    onUndoProfile: (() => void) | null;
 }) {
     const hasProfiles =
         applicableProfiles(profiles, priorityDefinitions).length > 0;
@@ -57,8 +69,9 @@ export function PriorityOrderSection({
                     </p>
 
                     <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                        A way of driving, written out as an order. It fills
-                        the list in — change anything you disagree with.
+                        A way of driving, written out as an order and what
+                        counts for more inside each priority. It replaces
+                        both — change anything you disagree with.
                     </p>
 
                     <div className="mt-3">
@@ -66,10 +79,17 @@ export function PriorityOrderSection({
                             profiles={profiles}
                             priorityDefinitions={priorityDefinitions}
                             priorities={priorities}
-                            onApply={onChange}
+                            onApply={onApplyProfile}
                             layout="tiles"
                         />
                     </div>
+
+                    <ProfileBasisNote
+                        basedOn={basedOn}
+                        customised={customised}
+                        profiles={profiles}
+                        onUndo={onUndoProfile}
+                    />
                 </div>
             )}
 

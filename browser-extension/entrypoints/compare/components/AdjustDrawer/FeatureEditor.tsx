@@ -1,29 +1,24 @@
 import type {
     CategoryId,
-    FeatureId,
     FeatureImportance,
     FeatureSelection,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { CalculatedPriorityDetails } from "../CalculatedPriorityDetails";
-import {
-    FeatureInfluencePicker,
-    type PickedElsewhere,
-} from "@/components/FeatureInfluencePicker";
+import { FeatureInfluencePicker } from "@/components/FeatureInfluencePicker";
 
 interface FeatureEditorProps {
     categoryId: CategoryId;
     /** What the user has picked out for this run. May legitimately be empty. */
     features: FeatureSelection;
-    /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureId[];
+    /** The profile the answers started from, for "Set by" on its raises. */
+    profileLabel: string | null;
     /** Where this priority sits in the user's order, for the empty-state hint. */
     rank: number;
-    /** The same features already picked out under the user's other priorities. */
-    pickedElsewhere: PickedElsewhere;
-    onToggleFeature: (feature: FeatureId) => void;
+    onToggleFeature: (feature: SignalId) => void;
     onImportanceChange: (
-        feature: FeatureId,
+        feature: SignalId,
         importance: FeatureImportance,
     ) => void;
     /** Put this category back to standard, without touching the others. */
@@ -41,9 +36,8 @@ interface FeatureEditorProps {
 export function FeatureEditor({
     categoryId,
     features,
-    availableFeatures,
+    profileLabel,
     rank,
-    pickedElsewhere,
     onToggleFeature,
     onImportanceChange,
     onResetAll,
@@ -63,10 +57,10 @@ export function FeatureEditor({
             <FeatureInfluencePicker
                 categoryLabel={category.label}
                 mark={category.icon}
+                category={categoryId}
                 features={features}
-                availableFeatures={availableFeatures}
+                profileLabel={profileLabel}
                 rank={rank}
-                pickedElsewhere={pickedElsewhere}
                 onToggleFeature={onToggleFeature}
                 onImportanceChange={onImportanceChange}
                 /*

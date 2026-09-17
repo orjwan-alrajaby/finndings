@@ -1,19 +1,20 @@
 import * as RadioGroup from "@radix-ui/react-radio-group";
-import { Info, Lock } from "lucide-react";
+import { Info, Lock, Ruler } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { surfaceTone } from "@/lib/priority-marks";
 
 import {
     FEATURE_IMPORTANCE,
-    FEATURES,
     IMPORTANCE_SCALE,
     MAX_FEATURES_PER_CATEGORY,
+    NICHE_INFLUENCE,
+    SIGNALS,
     STANDARD_INFLUENCE,
 } from "@/lib/reasoning-engine/constants";
 import type {
-    FeatureId,
     FeatureImportance,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
 
 /**
@@ -44,25 +45,29 @@ const RAISED_CARD: Record<FeatureImportance, string> = {
     low: "bg-linear-to-r from-finn-influence-emerald-pale to-white to-50% ring-finn-influence-emerald/30",
 };
 
-/** A priority the user has already given this same feature extra influence in. */
+/** The priority an item belongs to, drawn as that priority's chip. */
 export interface FeatureElsewhere {
     label: string;
     icon: string;
 }
 
 interface FeatureOptionProps {
-    feature: FeatureId;
-    /** The level the reader gave it, or null — which means standard. */
+    feature: SignalId;
+    /** The level the reader gave it, or null — standard, or not counted for a niche item. */
     importance: FeatureImportance | null;
     /** True when this category's cap is reached and this row isn't in it. */
     atCap: boolean;
+    /** Counted only once raised, so its resting rung is "Not counted". */
+    niche?: boolean;
+    /** Read from a measured figure rather than FINN's equipment list. */
+    measured?: boolean;
+    /** The profile that set this raise, while the reader hasn't changed it. */
+    setBy?: string | null;
     /**
-     * The other priorities where this same feature is already raised.
-     *
-     * Set only when it is raised *elsewhere and not here* — a feature raised
-     * in this category is not competing with itself.
+     * Set when the item is counted here at standard but its home — the only
+     * place it can be raised — is another priority.
      */
-    raisedElsewhere?: FeatureElsewhere[];
+    homeElsewhere?: FeatureElsewhere;
     /** Raise it to a level, or put it back to standard with null. */
     onSet: (importance: FeatureImportance | null) => void;
 }
@@ -107,21 +112,21 @@ export function FeatureOption({
     feature,
     importance,
     atCap,
-    raisedElsewhere,
+    niche = false,
+    measured = false,
+    setBy = null,
+    homeElsewhere,
     onSet,
 }: FeatureOptionProps) {
-    const { label, explanation } = FEATURES[feature];
+    const { label, explanation } = SIGNALS[feature];
+    const resting = niche ? NICHE_INFLUENCE : STANDARD_INFLUENCE;
 
-    const elsewhere = raisedElsewhere ?? [];
-    const locked = elsewhere.length > 0;
-    const blocked = locked || atCap;
-
-    if (locked) {
+    if (homeElsewhere) {
         return (
             <LockedOption
                 label={label}
                 explanation={explanation}
-                elsewhere={elsewhere}
+                home={homeElsewhere}
             />
         );
     }
@@ -137,11 +142,27 @@ export function FeatureOption({
         >
             <div className="flex flex-col gap-3 @2xl:flex-row @2xl:items-center @2xl:gap-5">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <WeightTile importance={importance} />
+                    <WeightTile importance={importance} restingWeight={resting.weight} />
 
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black leading-5 text-finn-black">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black leading-5 text-finn-black">
                             {label}
+                            {measured && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-iron ring-1 ring-black/5">
+                                    <Ruler aria-hidden="true" className="h-3 w-3" />
+                                    Measured
+                                </span>
+                            )}
+                            {importance && setBy && (
+                                <span className="rounded-full bg-finn-pale-blue px-2 py-0.5 text-[10px] font-bold text-finn-accent-blue">
+                                    Set by {setBy}
+                                </span>
+                            )}
+                            {niche && !importance && (
+                                <span className="rounded-full bg-finn-cotton px-2 py-0.5 text-[10px] font-bold text-finn-iron">
+                                    Counts only if raised
+                                </span>
+                            )}
                         </p>
 
                         {/*
@@ -177,9 +198,9 @@ export function FeatureOption({
                           */}
                         <Segment
                             value={STANDARD}
-                            label={STANDARD_INFLUENCE.label}
-                            weight={STANDARD_INFLUENCE.weight}
-                            hint={STANDARD_INFLUENCE.hint}
+                            label={resting.label}
+                            weight={resting.weight}
+                            hint={resting.hint}
                             active={importance == null}
                             activeClass="bg-white text-finn-black shadow-sm ring-1 ring-black/10"
                             idleText="text-finn-iron"
@@ -211,7 +232,7 @@ export function FeatureOption({
                                     barClass={meta.dotClass}
                                     activeBarClass="bg-white"
                                     activeEmptyClass="bg-white/35"
-                                    disabled={blocked}
+                                    disabled={atCap}
                                 />
                             );
                         })}
@@ -223,8 +244,8 @@ export function FeatureOption({
                                 aria-hidden="true"
                                 className="mt-px h-3 w-3 shrink-0"
                             />
-                            You've raised {MAX_FEATURES_PER_CATEGORY} already. Set
-                            one back to Standard to raise this instead.
+                            You've raised {MAX_FEATURES_PER_CATEGORY} already. Put
+                            one back to rest to raise this instead.
                         </p>
                     )}
                 </div>
@@ -240,7 +261,14 @@ export function FeatureOption({
  * column of grey; a quiet outlined 1× on standard, because standard is a real
  * weight and not an empty slot.
  */
-function WeightTile({ importance }: { importance: FeatureImportance | null }) {
+function WeightTile({
+    importance,
+    restingWeight,
+}: {
+    importance: FeatureImportance | null;
+    /** 1 for standard, 0 for a niche item that isn't counted until raised. */
+    restingWeight: number;
+}) {
     const meta = importance ? FEATURE_IMPORTANCE[importance] : null;
 
     return (
@@ -254,11 +282,11 @@ function WeightTile({ importance }: { importance: FeatureImportance | null }) {
             ].join(" ")}
         >
             <span className="text-base font-black tabular-nums">
-                {meta?.weight ?? STANDARD_INFLUENCE.weight}×
+                {meta?.weight ?? restingWeight}×
             </span>
 
             <Meter
-                weight={meta?.weight ?? STANDARD_INFLUENCE.weight}
+                weight={meta?.weight ?? restingWeight}
                 filled={meta ? "bg-white" : "bg-finn-iron/50"}
                 empty={meta ? "bg-white/35" : "bg-black/10"}
                 className="mt-1"
@@ -305,22 +333,20 @@ function Meter({
 }
 
 /**
- * A feature spoken for under another priority.
+ * An item counted here whose home is another priority.
  *
- * Slimmer than an active card on purpose. Nothing on it can be pressed, and at
- * full height the locked rows — half a priority, in some — pushed the ones a
- * reader can act on apart and repeated the same boxed sentence down the page.
- * It keeps the name, what the feature is, and where it is raised, drawn as
- * that priority's own chip so the reader can see which card to open.
+ * Slimmer than an active card on purpose: nothing on it can be pressed. It
+ * keeps the name, what the item is, and where it can be raised, drawn as that
+ * priority's own chip so the reader can see which card to open.
  */
 function LockedOption({
     label,
     explanation,
-    elsewhere,
+    home,
 }: {
     label: string;
     explanation?: string;
-    elsewhere: FeatureElsewhere[];
+    home: FeatureElsewhere;
 }) {
     return (
         <div className="@container rounded-2xl bg-finn-snow p-3 ring-1 ring-black/5">
@@ -346,58 +372,41 @@ function LockedOption({
                     </div>
                 </div>
 
-                <ElsewhereNote elsewhere={elsewhere} />
+                <HomeNote home={home} />
             </div>
         </div>
     );
 }
 
 /**
- * Where this feature is already raised, and therefore why it can't be raised
- * here.
+ * Why this row can't be raised here, and where it can.
  *
  * Named rather than merely refused. "Not available" tells a reader nothing
- * they can act on; the category tells them exactly where to go and what to
- * undo.
+ * they can act on; the home priority tells them exactly where to go.
  */
-function ElsewhereNote({ elsewhere }: { elsewhere: FeatureElsewhere[] }) {
+function HomeNote({ home }: { home: FeatureElsewhere }) {
+    const tone = surfaceTone(home.icon);
+
     return (
         <div className="shrink-0 @2xl:w-88">
-            <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] font-black text-finn-black">
-                    Raised under
-                </span>
-
-                {/*
-                  * One chip per priority the feature is raised under, in that
-                  * priority's colour, laid out rather than concatenated.
-                  */}
-                {elsewhere.map((item) => {
-                    const tone = surfaceTone(item.icon);
-
-                    return (
-                        <span
-                            key={item.label}
-                            className={[
-                                "inline-flex items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[10px] font-black ring-1",
-                                tone.ground,
-                                tone.edge,
-                                tone.ink,
-                            ].join(" ")}
-                        >
-                            <PriorityIcon
-                                name={item.icon}
-                                className="h-3 w-3 shrink-0"
-                            />
-                            {item.label}
-                        </span>
-                    );
-                })}
-            </div>
-
-            <p className="mt-1 text-[10px] leading-4 text-finn-iron">
-                Set it back to Standard there to raise it here.
+            <p className="text-[10px] font-black text-finn-black">
+                Counted here at {STANDARD_INFLUENCE.label}
             </p>
+
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] leading-4 text-finn-iron">
+                Raise it under
+                <span
+                    className={[
+                        "inline-flex items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[10px] font-black ring-1",
+                        tone.ground,
+                        tone.edge,
+                        tone.ink,
+                    ].join(" ")}
+                >
+                    <PriorityIcon name={home.icon} className="h-3 w-3 shrink-0" />
+                    {home.label}
+                </span>
+            </div>
         </div>
     );
 }

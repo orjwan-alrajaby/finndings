@@ -11,12 +11,11 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 
 import {
     applicableProfiles,
-    matchingProfile,
     PriorityOrderList,
     ProfilePresets,
 } from "@/components/PriorityOrder";
 import {
-    DEFAULT_PRIORITIES,
+    DEFAULT_DEFAULT_PROFILE_ID,
     MAX_PRIORITIES,
     MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
@@ -25,7 +24,16 @@ import type {
     FeatureSelection,
     PriorityDefinition,
     Profile,
+    ProfileId,
+    SettingsBasis,
 } from "@/lib/reasoning-engine/types";
+
+/** Everything applying a profile replaces, kept so it can be put back. */
+export interface ProfileSnapshot {
+    priorities: CategoryId[];
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
+    basedOn: SettingsBasis;
+}
 
 /** Which of the panel's two faces is showing. */
 type View = "order" | "presets";
@@ -52,13 +60,24 @@ export function Priorities({
     priorityDefinitions,
     categoryFeatures,
     profiles,
+    basedOn,
+    customised,
     onChange,
+    onApplyProfile,
+    onRestore,
 }: {
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     categoryFeatures: Record<CategoryId, FeatureSelection>;
     profiles: Profile[];
+    basedOn: SettingsBasis;
+    /** Whether the order or the raises have moved away from `basedOn`. */
+    customised: boolean;
     onChange: (next: CategoryId[]) => void;
+    /** Replace the order and the raises with a profile's. */
+    onApplyProfile: (profile: ProfileId) => void;
+    /** Put back what a profile replaced. */
+    onRestore: (snapshot: ProfileSnapshot) => void;
 }) {
     const [view, setView] = useState<View>("order");
 
@@ -74,14 +93,31 @@ export function Priorities({
     const [applied, setApplied] = useState<{
         label: string;
         icon: string;
-        previous: CategoryId[];
+        previous: ProfileSnapshot;
     } | null>(null);
 
     const hasProfiles =
         applicableProfiles(profiles, priorityDefinitions).length > 0;
 
-    /** The preset the current order *is*, whether or not it was just applied. */
-    const inUse = matchingProfile(profiles, priorityDefinitions, priorities);
+    /** The profile the settings still are, whether or not it was just applied. */
+    const inUse =
+        basedOn && !customised
+            ? (profiles.find((profile) => profile.id === basedOn) ?? null)
+            : null;
+
+    const startingProfile = profiles.find(
+        (profile) => profile.id === DEFAULT_DEFAULT_PROFILE_ID,
+    );
+
+    const apply = (profile: Profile) => {
+        setApplied({
+            label: profile.label,
+            icon: profile.icon,
+            previous: { priorities: [...priorities], categoryFeatures, basedOn },
+        });
+
+        onApplyProfile(profile.id);
+    };
 
     /*
      * An edit of their own ends the announcement: it was about one action, and
@@ -140,16 +176,15 @@ export function Priorities({
                         onUndo={() => {
                             if (!applied) return;
 
-                            onChange([...applied.previous]);
+                            onRestore(applied.previous);
                             setApplied(null);
                         }}
+                        resetLabel={startingProfile?.label}
                         onReset={
-                            sameOrder(priorities, DEFAULT_PRIORITIES)
+                            !startingProfile ||
+                            (basedOn === startingProfile.id && !customised)
                                 ? undefined
-                                : () => {
-                                    setApplied(null);
-                                    onChange([...DEFAULT_PRIORITIES]);
-                                }
+                                : () => apply(startingProfile)
                         }
                         onOpenPresets={
                             hasProfiles ? () => setView("presets") : undefined
@@ -161,13 +196,7 @@ export function Priorities({
                         priorityDefinitions={priorityDefinitions}
                         profiles={profiles}
                         onApply={(profile) => {
-                            setApplied({
-                                label: profile.label,
-                                icon: profile.icon,
-                                previous: [...priorities],
-                            });
-
-                            onChange([...profile.priorities]);
+                            apply(profile);
 
                             /*
                              * Straight back to the list. A profile is a
@@ -185,11 +214,6 @@ export function Priorities({
     );
 }
 
-/** Whether two orders are the same list in the same order. */
-function sameOrder(a: CategoryId[], b: CategoryId[]): boolean {
-    return a.length === b.length && a.every((id, index) => b[index] === id);
-}
-
 /**
  * What just happened, said plainly.
  *
@@ -204,7 +228,7 @@ function AppliedBanner({
     applied,
     onUndo,
 }: {
-    applied: { label: string; icon: string; previous: CategoryId[] };
+    applied: { label: string; icon: string; previous: ProfileSnapshot };
     onUndo: () => void;
 }) {
     return (
@@ -220,8 +244,9 @@ function AppliedBanner({
                     {applied.label} applied.
                 </strong>{" "}
                 <span>
-                    Your order below is now its priorities, in its order — change
-                    anything you disagree with.
+                    Your order below is now its priorities, in its order, and
+                    it sets what counts for more inside each — change anything
+                    you disagree with.
                 </span>
             </p>
 
@@ -247,6 +272,7 @@ function OrderView({
     onChange,
     onUndo,
     onReset,
+    resetLabel,
     onOpenPresets,
 }: {
     priorities: CategoryId[];
@@ -255,11 +281,13 @@ function OrderView({
     /** The preset this order matches exactly, if any. */
     inUse: Profile | null;
     /** The preset just applied, when one was. */
-    applied: { label: string; icon: string; previous: CategoryId[] } | null;
+    applied: { label: string; icon: string; previous: ProfileSnapshot } | null;
     onChange: (next: CategoryId[]) => void;
     onUndo: () => void;
-    /** Omitted when the order already is the default — nothing to reset to. */
+    /** Omitted when the settings already are the starting profile — nothing to reset to. */
     onReset?: () => void;
+    /** The starting profile's name, for the reset button. */
+    resetLabel?: string;
     /** Omitted when every profile is switched off — then there is no offer. */
     onOpenPresets?: () => void;
 }) {
@@ -275,8 +303,8 @@ function OrderView({
                       * Persistent, unlike the banner below it. The banner is
                       * about an action a moment ago; this is about the state,
                       * and it survives a scroll, a page turn and a return.
-                      * It disappears the moment the reader moves anything,
-                      * because then the order is theirs and not the profile's.
+                      * It disappears the moment the reader changes the order
+                      * or a raise, because then the settings are theirs.
                       */}
                     {inUse && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-finn-pale-blue px-2.5 py-1 text-[11px] font-black text-finn-accent-blue">
@@ -311,7 +339,7 @@ function OrderView({
                             className="inline-flex items-center gap-1.5 rounded-full bg-finn-snow px-3.5 py-2 text-[11px] font-bold text-finn-iron transition hover:bg-finn-cotton hover:text-finn-black"
                         >
                             <Undo2 aria-hidden="true" className="h-3.5 w-3.5" />
-                            Start over from Lens's order
+                            Start over from {resetLabel ?? "Lens's starting profile"}
                         </button>
                     </div>
                 )}
@@ -387,9 +415,9 @@ function PresetsView({
                         out as {MAX_PRIORITIES} priorities already in a
                         sensible order. Reach for one when you know roughly how
                         you drive but not which priorities that translates to.
-                        Picking one fills in your order and brings you straight
-                        back to it, where you can change anything you disagree
-                        with.
+                        Picking one fills in your order and what counts for more
+                        inside each priority, and brings you straight back to
+                        it, where you can change anything you disagree with.
                     </p>
                 </div>
             </div>
@@ -400,13 +428,9 @@ function PresetsView({
                     profiles={profiles}
                     priorityDefinitions={priorityDefinitions}
                     priorities={priorities}
-                    onApply={(next) => {
+                    onApply={(id) => {
                         const chosen = profiles.find(
-                            (profile) =>
-                                profile.priorities.length === next.length &&
-                                profile.priorities.every(
-                                    (id, index) => next[index] === id,
-                                ),
+                            (profile) => profile.id === id,
                         );
 
                         if (chosen) onApply(chosen);

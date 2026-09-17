@@ -2,12 +2,14 @@ import {
     DEFAULT_FEATURE_IMPORTANCE,
     MAX_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
+import { applyProfile } from "@/lib/reasoning-engine";
 import { stableStringify } from "@/lib/stable-stringify";
 import type {
     CategoryId,
-    FeatureId,
     FeatureImportance,
     FeatureSelection,
+    ProfileId,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
 
 import type { Answers } from "../../store";
@@ -21,7 +23,25 @@ import type { Answers } from "../../store";
  * and returns the answers, so the drawer can hold a draft, the reader can
  * change their mind twice, and nothing reaches the recommendation until they
  * press Save.
+ *
+ * Every edit the reader makes marks what it touched as theirs, so the advice
+ * can tell "you raised" from "your starting profile emphasises".
  */
+
+/**
+ * Start from a profile: its order and its emphasis replace the draft's, and
+ * the draft remembers which profile it came from. Preferences are untouched.
+ */
+export function startFromProfile(answers: Answers, profile: ProfileId): Answers {
+    const applied = applyProfile(profile);
+
+    return {
+        ...answers,
+        priorities: applied.priorities,
+        features: applied.categoryFeatures,
+        basedOn: applied.basedOn,
+    };
+}
 
 /**
  * Pick a feature out, or put it back.
@@ -34,7 +54,7 @@ import type { Answers } from "../../store";
 export function toggleFeature(
     answers: Answers,
     category: CategoryId,
-    feature: FeatureId,
+    feature: SignalId,
 ): Answers {
     const current = answers.features[category] ?? [];
 
@@ -50,21 +70,21 @@ export function toggleFeature(
 
     return withFeatures(answers, category, [
         ...current,
-        { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE },
+        { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE, source: "user" },
     ]);
 }
 
 export function setFeatureImportance(
     answers: Answers,
     category: CategoryId,
-    feature: FeatureId,
+    feature: SignalId,
     importance: FeatureImportance,
 ): Answers {
     return withFeatures(
         answers,
         category,
         (answers.features[category] ?? []).map((item) =>
-            item.key === feature ? { ...item, importance } : item,
+            item.key === feature ? { ...item, importance, source: "user" } : item,
         ),
     );
 }
@@ -103,10 +123,16 @@ export function featuresChanged(
     answers: Answers,
     saved: Record<CategoryId, FeatureSelection>,
 ): boolean {
+    /* Who set a pick isn't a change to it: only the key and level count. */
+    const levels = (selection: FeatureSelection) =>
+        stableStringify(
+            selection.map(({ key, importance }) => ({ key, importance })),
+        );
+
     return answers.priorities.some(
         (categoryId) =>
-            stableStringify(answers.features[categoryId] ?? []) !==
-            stableStringify(saved[categoryId] ?? []),
+            levels(answers.features[categoryId] ?? []) !==
+            levels(saved[categoryId] ?? []),
     );
 }
 

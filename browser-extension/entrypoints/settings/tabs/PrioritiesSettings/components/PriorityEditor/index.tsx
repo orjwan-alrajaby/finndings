@@ -1,32 +1,27 @@
 import type {
-    FeatureId,
     FeatureImportance,
     FeatureSelection,
     PriorityDefinition,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
 import {
     DEFAULT_FEATURE_IMPORTANCE,
     MAX_FEATURES_PER_CATEGORY,
 } from "@/lib/reasoning-engine/constants";
 import { isNumericOnlyPriority } from "../../../../utils/PriorityValidation";
-import {
-    FeatureInfluencePicker,
-    type PickedElsewhere,
-} from "@/components/FeatureInfluencePicker";
+import { FeatureInfluencePicker } from "@/components/FeatureInfluencePicker";
 import { CalculatedPriorityInfo } from "./components/CalculatedPriorityInfo";
 
 interface PriorityEditorProps {
     priority: PriorityDefinition;
     /** What the user has picked out. May legitimately be empty. */
     features: FeatureSelection;
-    /** Everything this priority offers, most relevant first. */
-    availableFeatures: FeatureId[];
-    /** The same features already picked out under the user's other priorities. */
-    pickedElsewhere: PickedElsewhere;
+    /** The profile these settings started from, for "Set by" on its raises. */
+    profileLabel: string | null;
     /** Every edit, as it happens. There is nothing to commit here. */
     onChange: (features: FeatureSelection) => void;
     onClose: () => void;
-    /** What Lens ships for this priority, for "reset to defaults". */
+    /** What the starting profile raises in this priority, for "reset to defaults". */
     defaults: FeatureSelection;
 }
 
@@ -52,12 +47,14 @@ interface PriorityEditorProps {
  * The cap is enforced here rather than validated after the fact, because a
  * picker that allows a selection it will then refuse is worse than one that
  * never offers it: `FeatureInfluencePicker` already greys out the sixth.
+ *
+ * Every edit made here marks what it touched as the reader's; resetting to
+ * defaults hands back the profile's own entries, marked as the profile's.
  */
 export function PriorityEditor({
     priority,
     features,
-    availableFeatures,
-    pickedElsewhere,
+    profileLabel,
     onChange,
     onClose,
     defaults,
@@ -66,7 +63,7 @@ export function PriorityEditor({
         return <CalculatedPriorityInfo priority={priority} onClose={onClose} />;
     }
 
-    const toggleFeature = (feature: FeatureId) => {
+    const toggleFeature = (feature: SignalId) => {
         if (features.some((item) => item.key === feature)) {
             onChange(features.filter((item) => item.key !== feature));
 
@@ -78,12 +75,12 @@ export function PriorityEditor({
 
         onChange([
             ...features,
-            { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE },
+            { key: feature, importance: DEFAULT_FEATURE_IMPORTANCE, source: "user" },
         ]);
     };
 
     const updateImportance = (
-        feature: FeatureId,
+        feature: SignalId,
         importance: FeatureImportance,
     ) => {
         /*
@@ -98,14 +95,16 @@ export function PriorityEditor({
         if (!features.some((item) => item.key === feature)) {
             if (features.length >= MAX_FEATURES_PER_CATEGORY) return;
 
-            onChange([...features, { key: feature, importance }]);
+            onChange([...features, { key: feature, importance, source: "user" }]);
 
             return;
         }
 
         onChange(
             features.map((item) =>
-                item.key === feature ? { ...item, importance } : item,
+                item.key === feature
+                    ? { ...item, importance, source: "user" }
+                    : item,
             ),
         );
     };
@@ -115,9 +114,9 @@ export function PriorityEditor({
             <FeatureInfluencePicker
                 categoryLabel={priority.label}
                 mark={priority.icon}
+                category={priority.id}
                 features={features}
-                availableFeatures={availableFeatures}
-                pickedElsewhere={pickedElsewhere}
+                profileLabel={profileLabel}
                 onToggleFeature={toggleFeature}
                 onImportanceChange={updateImportance}
                 onResetAll={() => onChange([])}

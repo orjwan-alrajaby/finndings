@@ -1,6 +1,7 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
+    ArrowLeft,
     CircleCheck,
     Gauge,
     Info,
@@ -9,6 +10,7 @@ import {
     ListOrdered,
     MessageCircleQuestion,
     Ruler,
+    ShieldAlert,
     Target,
     UserRound,
     Users,
@@ -21,7 +23,13 @@ import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { surfaceTone, type SurfaceTone } from "@/lib/priority-marks";
 import { getCategory, priorityWeights } from "@/lib/reasoning-engine";
-import { FEATURES } from "@/lib/reasoning-engine/constants";
+import {
+    CATEGORIES,
+    FEATURE_IMPORTANCE,
+    SIGNALS,
+    profileEmphasis,
+} from "@/lib/reasoning-engine/constants";
+import { homeOf } from "@/lib/reasoning-engine/evidence";
 import type {
     CategoryId,
     PriorityDefinition,
@@ -92,6 +100,17 @@ function closeInfo() {
     announce();
 }
 
+/**
+ * Closes whichever panel is open.
+ *
+ * For a host that is going away: a panel mounted inside the compare drawer
+ * must not outlive the drawer, or it reopens the next time that subject's "i"
+ * is drawn.
+ */
+export function closeInfoPanel(): void {
+    if (openSubject) closeInfo();
+}
+
 function useOpenSubject() {
     /*
      * The same value for both snapshots. There is no server and no hydration
@@ -114,18 +133,30 @@ const isSame = (a: InfoSubject | null, b: InfoSubject) =>
 /* -------------------------------------------------------------------------- */
 
 /**
- * The element the panel portals into. Null means the document body.
+ * Where the panel is mounted, and how it sits against whatever it came from.
  *
- * It has to leave wherever it was written, because it measures itself against
- * the viewport and any transformed ancestor becomes the containing block for
- * a fixed child — which would pin it to that ancestor's edge.
+ * - `edge` — the default: portalled to the body and pinned to the window's
+ *   right edge. Right for every screen where the list is the page itself.
  *
- * The body is right for every caller but one. Inside the compare drawer — a
- * modal dialog — the body is outside the drawer's scroll lock and its focus
- * trap, so a panel opened from in there would be unscrollable and unfocusable.
- * The drawer names itself here and the panel mounts inside it instead.
+ * - `inside` — opened from inside a drawer. The panel becomes a page of that
+ *   drawer, filling it with a "Back to your answers" button, so there is only
+ *   ever one sheet on screen. It used to be pinned to the same right edge as
+ *   the drawer, landing on top of it: a second sheet over the first, with two
+ *   shadows and two close buttons stacked in one corner.
+ *
+ * `container` is the element to portal into; null means the body. A panel
+ * opened from inside a modal drawer has to mount inside it — the body is
+ * outside the drawer's scroll lock and focus trap, so it would be
+ * unscrollable and unfocusable.
  */
-export const InfoPanelContainer = createContext<HTMLElement | null>(null);
+export type InfoPanelHostValue =
+    | { placement: "edge"; container: null }
+    | { placement: "inside"; container: HTMLElement | null };
+
+export const InfoPanelHost = createContext<InfoPanelHostValue>({
+    placement: "edge",
+    container: null,
+});
 
 /* -------------------------------------------------------------------------- */
 /* The trigger                                                                */
@@ -269,6 +300,40 @@ export function InfoButton({
 /* The panel                                                                  */
 /* -------------------------------------------------------------------------- */
 
+/** The panel's shell in each placement — see `InfoPanelHost`. */
+const PANEL_CLASS: Record<InfoPanelHostValue["placement"], string> = {
+    edge: [
+        DRAWER_SHELL,
+        /*
+         * Between the setup flow's two bars: above its sticky header at
+         * `z-60`, below the stripe of controls it pins across the foot at
+         * `z-[62]`.
+         *
+         * The panel used to be over both, and the controls underneath were
+         * not merely hidden but dead — a press landed on the panel, so the
+         * control did nothing and the panel did not close either, which read
+         * as the thing refusing to go away. Passing behind the stripe fixes
+         * both at once: the controls stay live, and a press on one closes the
+         * panel the way any press outside does. Its own shadow goes with it,
+         * which is what it was for — a drawer stopping short of the bottom
+         * edge has a lit line under it that belongs to nothing.
+         *
+         * It has to stay above the header, though: it is full height, and a
+         * panel passing under that one loses its own title and the button
+         * that closes it.
+         */
+        "z-[61] max-w-96 bg-white",
+    ].join(" "),
+
+    /*
+     * A page of the drawer: filling it, and sliding in over the answers from
+     * the drawer's right edge and back out the same way. The answers stay
+     * mounted underneath, so going back finds them scrolled where they were.
+     */
+    inside:
+        "finn-lens-drawer absolute inset-0 z-10 flex flex-col bg-white outline-none",
+};
+
 function InfoPanel({
     subject,
     profiles,
@@ -278,9 +343,9 @@ function InfoPanel({
     profiles: Profile[];
     priorityDefinitions: PriorityDefinition[];
 }) {
-    const container = useContext(InfoPanelContainer);
+    const host = useContext(InfoPanelHost);
 
-    /* Portalled — see `InfoPanelContainer` for where to, and why. */
+    /* Portalled — see `InfoPanelHost` for where to, and why. */
     return (
         /*
          * No `Dialog.Overlay`. There was one, dimming the page behind — and
@@ -289,34 +354,11 @@ function InfoPanel({
          * is. Leaving it in was a scrim in the source that nobody had ever
          * seen on screen.
          */
-        <Dialog.Portal container={container ?? undefined}>
+        <Dialog.Portal container={host.container ?? undefined}>
             <Dialog.Content
                 /* Its body is the description; there is no separate line. */
                 aria-describedby={undefined}
-                className={[
-                    DRAWER_SHELL,
-                    /*
-                     * Between the setup flow's two bars: above its sticky
-                     * header at `z-60`, below the stripe of controls it pins
-                     * across the foot at `z-[62]`.
-                     *
-                     * The panel used to be over both, and the controls
-                     * underneath were not merely hidden but dead — a press
-                     * landed on the panel, so the control did nothing and the
-                     * panel did not close either, which read as the thing
-                     * refusing to go away. Passing behind the stripe fixes
-                     * both at once: the controls stay live, and a press on one
-                     * closes the panel the way any press outside does. Its own
-                     * shadow goes with it, which is what it was for — a drawer
-                     * stopping short of the bottom edge has a lit line under
-                     * it that belongs to nothing.
-                     *
-                     * It has to stay above the header, though: it is full
-                     * height, and a panel passing under that one loses its own
-                     * title and the button that closes it.
-                     */
-                    "z-[61] max-w-96 bg-white",
-                ].join(" ")}
+                className={PANEL_CLASS[host.placement]}
             >
                 {subject.kind === "profile" ? (
                     <ProfileBody
@@ -356,9 +398,22 @@ function PanelHeader({
 }) {
     const tone = surfaceTone(icon);
     const KindIcon = kind === "Priority" ? Target : UserRound;
+    const { placement } = useContext(InfoPanelHost);
 
     return (
         <div className={["relative px-5 pb-5 pt-4", tone.ground].join(" ")}>
+            {/*
+              * A page of the drawer is left the way pages are left: back, to
+              * what it covered, rather than closed as though it were a
+              * separate thing.
+              */}
+            {placement === "inside" && (
+                <Dialog.Close className="-ml-1.5 mb-3 inline-flex h-8 items-center gap-1.5 rounded-full bg-white/70 px-3 text-xs font-black text-finn-black transition-colors hover:bg-white">
+                    <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+                    Back to your answers
+                </Dialog.Close>
+            )}
+
             <div className="flex items-start gap-3.5">
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
                     <PriorityIcon name={icon} className="h-7 w-7" />
@@ -380,12 +435,14 @@ function PanelHeader({
                     </Dialog.Title>
                 </div>
 
-                <Dialog.Close
-                    aria-label="Close"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-finn-iron transition-colors hover:bg-white hover:text-finn-black"
-                >
-                    <X aria-hidden="true" className="h-4 w-4" />
-                </Dialog.Close>
+                {placement !== "inside" && (
+                    <Dialog.Close
+                        aria-label="Close"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/70 text-finn-iron transition-colors hover:bg-white hover:text-finn-black"
+                    >
+                        <X aria-hidden="true" className="h-4 w-4" />
+                    </Dialog.Close>
+                )}
             </div>
 
             {children}
@@ -443,7 +500,13 @@ function PriorityBody({ id }: { id: CategoryId }) {
     }
 
     const tone = surfaceTone(category.icon);
-    const features = category.features ?? [];
+    const niche = new Set(category.niche ?? []);
+    /* Boot volume is defined but not scored until FINN's figure can be trusted. */
+    const features = (category.features ?? []).filter(
+        (feature) => feature !== "bootVolume",
+    );
+    const alsoCounts = category.alsoCounts ?? [];
+    const expected = category.expected ?? [];
 
     return (
         <>
@@ -468,7 +531,7 @@ function PriorityBody({ id }: { id: CategoryId }) {
                     icon={ListChecks}
                     aside={
                         !category.numericOnly && features.length > 0
-                            ? `${features.length} feature${features.length === 1 ? "" : "s"}`
+                            ? `${features.length + alsoCounts.length + expected.length} item${features.length + alsoCounts.length + expected.length === 1 ? "" : "s"}`
                             : undefined
                     }
                 >
@@ -484,8 +547,14 @@ function PriorityBody({ id }: { id: CategoryId }) {
                         </p>
                     ) : (
                         <ul className="flex flex-wrap gap-1.5">
-                            {features.map((feature) => {
-                                const meta = FEATURES[feature];
+                            {[...features, ...alsoCounts, ...expected].map((feature) => {
+                                const meta = SIGNALS[feature];
+                                const home = homeOf(feature);
+                                const note = niche.has(feature)
+                                    ? "only if raised"
+                                    : home && home !== id
+                                      ? `from ${CATEGORIES[home].label}`
+                                      : null;
 
                                 return (
                                     <li
@@ -502,6 +571,12 @@ function PriorityBody({ id }: { id: CategoryId }) {
                                         />
 
                                         {meta.label}
+
+                                        {note && (
+                                            <span className="font-medium text-finn-iron">
+                                                · {note}
+                                            </span>
+                                        )}
 
                                         {/*
                                           * Every one of these carries its own
@@ -534,35 +609,24 @@ function PriorityBody({ id }: { id: CategoryId }) {
                     )}
 
                     {/*
-                      * The other half of two of these priorities, which the
-                      * chips alone quietly deny. Practicality and Long
-                      * Distance are each scored on a measured figure as well
-                      * as their equipment, and the two are averaged — so a
-                      * reader looking at ten chips under Practicality is
-                      * looking at half the answer. The split bar says "half"
-                      * in the one way that cannot be skimmed past.
+                      * The figures, which the chips alone don't show. Length
+                      * under City & Parking is one of its items, scored on a
+                      * fixed scale; electric range under Long Distance is a
+                      * limit — it can hold a short-range car back, and gives
+                      * a long-range one nothing extra.
                       */}
                     {category.measured && (
                         <div className="mt-3">
-                            <Callout tone={tone} icon={Ruler} title="And one measured figure">
+                            <Callout
+                                tone={tone}
+                                icon={Ruler}
+                                title={category.limit ? "And a limit" : "One of these is measured"}
+                            >
                                 {category.measured}.
-
-                                <span className="mt-2.5 flex h-6 overflow-hidden rounded-lg text-[10px] font-black">
-                                    <span className="flex flex-1 items-center justify-center bg-white text-finn-black">
-                                        Features · 50%
-                                    </span>
-                                    <span
-                                        className={[
-                                            "flex flex-1 items-center justify-center text-white",
-                                            tone.solid,
-                                        ].join(" ")}
-                                    >
-                                        Measured · 50%
-                                    </span>
-                                </span>
                             </Callout>
                         </div>
                     )}
+
                 </Block>
 
                 {category.recommendedFor.length > 0 && (
@@ -603,6 +667,10 @@ function ProfileBody({
 
     const tone = surfaceTone(profile.icon);
     const weights = priorityWeights(profile.priorities);
+    const emphasis = profileEmphasis(profile.id);
+    const raised = profile.priorities.flatMap((categoryId) =>
+        (emphasis[categoryId] ?? []).map((pick) => ({ categoryId, pick })),
+    );
     const topWeight = weights[0]?.weight ?? 1;
 
     const definitionOf = (categoryId: CategoryId) =>
@@ -708,10 +776,43 @@ function ProfileBody({
                     </ol>
                 </Block>
 
+                {raised.length > 0 && (
+                    <Block title="What it counts for more" icon={Target}>
+                        <ul className="space-y-1.5">
+                            {raised.map(({ categoryId, pick }) => (
+                                <li
+                                    key={`${categoryId}-${pick.key}`}
+                                    className="flex items-baseline justify-between gap-3 rounded-xl bg-finn-snow px-3 py-2 text-[13px] leading-5 text-finn-black"
+                                >
+                                    <span className="min-w-0">
+                                        {SIGNALS[pick.key].label}
+                                        <span className="text-finn-iron">
+                                            {" "}· {definitionOf(categoryId)?.label ?? categoryId}
+                                        </span>
+                                    </span>
+                                    <span
+                                        className={[
+                                            "shrink-0 text-[11px] font-black",
+                                            FEATURE_IMPORTANCE[pick.importance].accentTextClass,
+                                        ].join(" ")}
+                                    >
+                                        {FEATURE_IMPORTANCE[pick.importance].label}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Block>
+                )}
+
+                <Block title="What it doesn't promise" icon={ShieldAlert}>
+                    <Callout tone={tone}>{profile.doesNotGuarantee}</Callout>
+                </Block>
+
                 <p className="flex gap-2 text-[11px] leading-4 text-finn-iron">
                     <Info aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
-                    Applying a profile only sets this order. Everything stays
-                    yours to change afterwards.
+                    Applying a profile sets this order and what counts for more,
+                    replacing yours — you can undo it straight away, and
+                    everything stays yours to change afterwards.
                 </p>
             </div>
         </>

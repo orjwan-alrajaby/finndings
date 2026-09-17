@@ -28,6 +28,7 @@ import {
 export { applicableProfiles, matchingProfile, ProfilePresets } from "./ProfilePresets";
 export { PriorityOrderList } from "./PriorityOrderList";
 export { ProfileOrderChips } from "./ProfileOrderChips";
+export { ProfileBasisNote } from "./ProfileBasisNote";
 
 export const PRIORITY_ORDER_DESCRIPTION =
     `What matters to you about a car, in the order it matters. The first counts ` +

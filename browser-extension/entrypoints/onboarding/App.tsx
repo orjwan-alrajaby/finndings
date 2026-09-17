@@ -6,18 +6,27 @@ import { LoadingScreen } from "@/components/Spinner";
 import { MIN_PRIORITIES } from "@/lib/reasoning-engine/constants";
 import {
     DEFAULT_CATEGORY_FEATURES,
+    DEFAULT_DEFAULT_PROFILE_ID,
     DEFAULT_PREFERENCES,
     DEFAULT_PRIORITIES,
     DEFAULT_PRIORITY_DEFINITIONS,
     DEFAULT_PROFILES,
 } from "@/lib/reasoning-engine/constants";
-import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
+import {
+    applyProfile,
+    isCustomisedFrom,
+    loadLensSettings,
+    saveLensSettings,
+} from "@/lib/reasoning-engine";
+import { stableStringify } from "@/lib/stable-stringify";
 import type {
     CategoryId,
     FeatureSelection,
     LensPreferences,
     PriorityDefinition,
     Profile,
+    ProfileId,
+    SettingsBasis,
 } from "@/lib/reasoning-engine/types";
 import {
     markOnboardingComplete,
@@ -36,7 +45,7 @@ import {
 } from "./components/StepNav";
 import { Welcome } from "./screens/Welcome";
 import { Tour } from "./screens/Tour";
-import { Priorities } from "./screens/Priorities";
+import { Priorities, type ProfileSnapshot } from "./screens/Priorities";
 import { Driving } from "./screens/Driving";
 import { Preview } from "./screens/Preview";
 
@@ -78,6 +87,20 @@ export default function OnboardingPage() {
         useState<Record<CategoryId, FeatureSelection>>(
             DEFAULT_CATEGORY_FEATURES,
         );
+    const [basedOn, setBasedOn] = useState<SettingsBasis>(
+        DEFAULT_DEFAULT_PROFILE_ID,
+    );
+
+    /*
+     * The raises and basis as they were read, so finishing writes them only
+     * when this flow changed them — which only applying a profile does.
+     */
+    const [loadedEmphasis, setLoadedEmphasis] = useState(() =>
+        stableStringify({
+            categoryFeatures: DEFAULT_CATEGORY_FEATURES,
+            basedOn: DEFAULT_DEFAULT_PROFILE_ID,
+        }),
+    );
 
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(false);
@@ -99,6 +122,13 @@ export default function OnboardingPage() {
                 setPriorityDefinitions(settings.priorityDefinitions);
                 setProfiles(settings.profiles);
                 setCategoryFeatures(settings.categoryFeatures);
+                setBasedOn(settings.basedOn);
+                setLoadedEmphasis(
+                    stableStringify({
+                        categoryFeatures: settings.categoryFeatures,
+                        basedOn: settings.basedOn,
+                    }),
+                );
             })
             .catch((error: unknown) => {
                 console.error(
@@ -134,16 +164,25 @@ export default function OnboardingPage() {
      * Write the answers, then leave.
      *
      * `saveLensSettings` is given only what this flow actually asked about.
-     * Feature picks, profile toggles and the default profile are untouched:
-     * a reader who configured those before opening this must not have them
-     * quietly replaced by whatever the flow happened to be holding.
+     * Profile toggles and the default profile are untouched, and so are the
+     * raises unless the reader applied a profile here: a reader who
+     * configured those before opening this must not have them quietly
+     * replaced by whatever the flow happened to be holding.
      */
     const finish = async (then: () => void) => {
         setSaving(true);
         setSaveError(false);
 
         try {
-            await saveLensSettings({ priorities, preferences });
+            const emphasisChanged =
+                stableStringify({ categoryFeatures, basedOn }) !==
+                loadedEmphasis;
+
+            await saveLensSettings({
+                priorities,
+                preferences,
+                ...(emphasisChanged ? { categoryFeatures, basedOn } : {}),
+            });
             await markOnboardingComplete();
 
             then();
@@ -341,7 +380,24 @@ export default function OnboardingPage() {
                             priorityDefinitions={priorityDefinitions}
                             categoryFeatures={categoryFeatures}
                             profiles={profiles}
+                            basedOn={basedOn}
+                            customised={isCustomisedFrom(
+                                { priorities, categoryFeatures },
+                                basedOn,
+                            )}
                             onChange={setPriorities}
+                            onApplyProfile={(id: ProfileId) => {
+                                const applied = applyProfile(id);
+
+                                setPriorities(applied.priorities);
+                                setCategoryFeatures(applied.categoryFeatures);
+                                setBasedOn(applied.basedOn);
+                            }}
+                            onRestore={(snapshot: ProfileSnapshot) => {
+                                setPriorities(snapshot.priorities);
+                                setCategoryFeatures(snapshot.categoryFeatures);
+                                setBasedOn(snapshot.basedOn);
+                            }}
                         />
                     )}
 

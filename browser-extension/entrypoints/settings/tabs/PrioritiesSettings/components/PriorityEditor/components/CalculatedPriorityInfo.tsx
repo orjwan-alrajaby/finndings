@@ -18,6 +18,7 @@ import {
 import { surfaceTone, type SurfaceTone } from "@/lib/priority-marks";
 import {
     CO2_CLASSES,
+    phevScore,
     positionForCo2,
 } from "@/lib/reasoning-engine/environmental";
 import { classifyFit, FIT_BANDS } from "@/lib/reasoning-engine/fit";
@@ -112,8 +113,8 @@ export function CalculatedPriorityInfo({
                     </p>
 
                     <p className="mt-0.5 text-xs leading-5 text-finn-iron">
-                        Because it's judged on figures rather than equipment,
-                        there's no feature list here to single one out of. Where
+                        Because it's judged on the car's CO₂ figure alone,
+                        there's no list here to raise anything in. Where
                         this priority sits in your order is what decides how
                         much it counts.
                     </p>
@@ -237,8 +238,7 @@ const CLASS_LOOK: Record<string, string> = {
  * so either end of a class gives the same answer.
  *
  * The plug-in note takes its ceiling from the same place the engine does:
- * `assessEnvironment` scales a plug-in hybrid's score by where class C ends,
- * so the best a plug-in can do is the score of the top of class C.
+ * `phevScore`, applied to the best score a car that emits anything can get.
  */
 function ClassScale({ tone }: { tone: SurfaceTone }) {
     const rows = CO2_CLASSES.map((band, index) => ({
@@ -247,10 +247,7 @@ function ClassScale({ tone }: { tone: SurfaceTone }) {
         last: index === CO2_CLASSES.length - 1,
     }));
 
-    const classC = CO2_CLASSES.find((band) => band.letter === "C");
-    const plugInBest = classC
-        ? classifyFit(Math.round(positionForCo2(0) * (positionForCo2(classC.upTo) / 100)))
-        : null;
+    const plugInBest = classifyFit(phevScore(positionForCo2(1)));
 
     return (
         <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
@@ -328,13 +325,12 @@ function ClassScale({ tone }: { tone: SurfaceTone }) {
                     emit nothing while driving: 0 g/km, class A.
                 </Note>
 
-                {plugInBest && (
-                    <Note icon={PlugZap} tone={tone}>
-                        <strong className="font-black text-finn-black">Plug-in hybrids</strong>{" "}
-                        are scaled down, so the best they reach is a{" "}
-                        {plugInBest.label.toLowerCase()}.
-                    </Note>
-                )}
+                <Note icon={PlugZap} tone={tone}>
+                    <strong className="font-black text-finn-black">Plug-in hybrids</strong>{" "}
+                    can't be rated Strong, because their official figure
+                    assumes regular charging: the best they reach is a{" "}
+                    {plugInBest.label.toLowerCase()}.
+                </Note>
             </div>
         </section>
     );

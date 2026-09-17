@@ -1,18 +1,16 @@
-import { useMemo } from "react";
 import { Gauge, RotateCcw } from "lucide-react";
 
-import {
-    AVAILABLE_CATEGORY_FEATURES,
-    CATEGORIES,
-} from "@/lib/reasoning-engine/constants";
+import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import type {
     CategoryId,
-    FeatureId,
     FeatureImportance,
     FeatureSelection,
+    Profile,
+    SettingsBasis,
+    SignalId,
 } from "@/lib/reasoning-engine/types";
+import { EmphasisScope } from "@/components/EmphasisScope";
 import { FeatureCard } from "@/components/FeatureCard";
-import { buildPickedElsewhere } from "@/components/FeatureInfluencePicker";
 
 import { DrawerSection, SECTION_TONE } from "./DrawerSection";
 import { FeatureEditor } from "./FeatureEditor";
@@ -29,6 +27,9 @@ export function FeatureSection({
     onClearCategory,
     onRestoreSaved,
     changed,
+    basedOn,
+    customised,
+    profiles,
 }: {
     priorities: CategoryId[];
     features: Record<CategoryId, FeatureSelection>;
@@ -36,32 +37,23 @@ export function FeatureSection({
     /** The priority whose feature editor is open, if any. */
     expanded: CategoryId | null;
     onExpandedChange: (category: CategoryId | null) => void;
-    onToggleFeature: (category: CategoryId, feature: FeatureId) => void;
+    onToggleFeature: (category: CategoryId, feature: SignalId) => void;
     onImportanceChange: (
         category: CategoryId,
-        feature: FeatureId,
+        feature: SignalId,
         importance: FeatureImportance,
     ) => void;
     onClearCategory: (category: CategoryId) => void;
     onRestoreSaved: () => void;
     /** True when the draft's picks differ from the reader's saved ones. */
     changed: boolean;
+    basedOn: SettingsBasis;
+    customised: boolean;
+    profiles: Profile[];
 }) {
-    /*
-     * "Picked elsewhere" means picked in another priority the reader is
-     * actually being asked about — picks kept for a category they since
-     * dropped are not somewhere they can see or reach.
-     */
-    const pickedInPriorities = useMemo(
-        () =>
-            Object.fromEntries(
-                priorities.map((categoryId) => [
-                    categoryId,
-                    features[categoryId] ?? [],
-                ]),
-            ) as Partial<Record<CategoryId, FeatureSelection>>,
-        [priorities, features],
-    );
+    const profileLabel = basedOn
+        ? (profiles.find((profile) => profile.id === basedOn)?.label ?? null)
+        : null;
 
     const raised = priorities.reduce(
         (total, categoryId) => total + (features[categoryId]?.length ?? 0),
@@ -87,10 +79,18 @@ export function FeatureSection({
                     : `${raised} raised for extra influence`
             }
         >
+            <EmphasisScope
+                scope="comparison"
+                basedOn={basedOn}
+                customised={customised}
+                profiles={profiles}
+            />
+
             <p className="mb-3 rounded-xl bg-finn-snow px-3 py-2 text-[11px] leading-4 text-finn-iron">
-                Optional. Every feature in a priority counts the same until
-                you raise one — and raising one never rules a car out, it
-                turns up as a tradeoff instead.
+                Optional. Inside a priority, everything it checks counts at
+                Standard except a few niche items that count only once
+                raised. Raising something never rules a car out — it turns
+                up as a tradeoff instead.
             </p>
 
             <div className="flex flex-col gap-2">
@@ -120,17 +120,8 @@ export function FeatureSection({
                                 <FeatureEditor
                                     categoryId={categoryId}
                                     features={categoryFeatures}
-                                    availableFeatures={
-                                        AVAILABLE_CATEGORY_FEATURES[
-                                            categoryId
-                                        ] ?? []
-                                    }
+                                    profileLabel={profileLabel}
                                     rank={index + 1}
-                                    pickedElsewhere={buildPickedElsewhere(
-                                        categoryId,
-                                        pickedInPriorities,
-                                        CATEGORIES,
-                                    )}
                                     onToggleFeature={(feature) =>
                                         onToggleFeature(categoryId, feature)
                                     }

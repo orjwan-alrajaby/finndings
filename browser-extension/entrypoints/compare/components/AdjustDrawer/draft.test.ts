@@ -18,8 +18,10 @@ import {
     restoreSavedFeatures,
     sameAnswers,
     setFeatureImportance,
+    startFromProfile,
     toggleFeature,
 } from "./draft";
+import { PROFILES, profileEmphasis } from "@/lib/reasoning-engine/constants";
 
 /**
  * The drawer's draft: the rules that used to live in the compare store, now
@@ -46,15 +48,16 @@ function answers(features: FeatureSelection = []): Answers {
             CategoryId,
             FeatureSelection
         >,
+        basedOn: null,
     };
 }
 
 describe("toggleFeature", () => {
-    it("picks a feature out at the middle rung", () => {
+    it("picks a feature out at the middle rung, as the reader's own", () => {
         const next = toggleFeature(answers(), category, feature);
 
         expect(next.features[category]).toEqual([
-            { key: feature, importance: "medium" },
+            { key: feature, importance: "medium", source: "user" },
         ]);
     });
 
@@ -96,18 +99,18 @@ describe("toggleFeature", () => {
 });
 
 describe("setFeatureImportance", () => {
-    it("re-grades one pick and nothing else", () => {
+    it("re-grades one pick, makes it the reader's, and leaves the rest", () => {
         const picked = answers([
-            { key: feature, importance: "medium" },
-            { key: "hasLaneAssist" as FeatureId, importance: "low" },
+            { key: feature, importance: "medium", source: "profile" },
+            { key: "hasRearCrosswalkWarning" as FeatureId, importance: "low", source: "profile" },
         ]);
 
         expect(
             setFeatureImportance(picked, category, feature, "high")
                 .features[category],
         ).toEqual([
-            { key: feature, importance: "high" },
-            { key: "hasLaneAssist", importance: "low" },
+            { key: feature, importance: "high", source: "user" },
+            { key: "hasRearCrosswalkWarning", importance: "low", source: "profile" },
         ]);
     });
 });
@@ -118,7 +121,7 @@ describe("clearFeatures", () => {
             ...answers([{ key: feature, importance: "high" }]),
         };
 
-        picked.features["comfortConvenience" as CategoryId] = [
+        picked.features["comfort" as CategoryId] = [
             { key: "hasHeatedSeats" as FeatureId, importance: "low" },
         ];
 
@@ -126,7 +129,7 @@ describe("clearFeatures", () => {
 
         expect(next.features[category]).toEqual([]);
         expect(
-            next.features["comfortConvenience" as CategoryId],
+            next.features["comfort" as CategoryId],
         ).toHaveLength(1);
     });
 });
@@ -166,6 +169,15 @@ describe("featuresChanged", () => {
         ).toBe(false);
     });
 
+    it("doesn't count who set a pick as a change to it", () => {
+        expect(
+            featuresChanged(
+                answers([{ key: feature, importance: "low", source: "user" }]),
+                saved,
+            ),
+        ).toBe(false);
+    });
+
     it("notices a re-graded pick", () => {
         expect(
             featuresChanged(
@@ -178,12 +190,33 @@ describe("featuresChanged", () => {
     it("ignores a category the reader is no longer asked about", () => {
         const draft = answers([{ key: feature, importance: "low" }]);
 
-        draft.features["comfortConvenience" as CategoryId] = [
-            { key: "hasHeatedSeats" as FeatureId, importance: "high" },
+        draft.features["longDistance" as CategoryId] = [
+            { key: "hasLumbarSupport" as FeatureId, importance: "high" },
         ];
 
         /* Not in `priorities`, so it is not somewhere they can see or reach. */
         expect(featuresChanged(draft, saved)).toBe(false);
+    });
+});
+
+describe("startFromProfile", () => {
+    it("replaces the order and the emphasis, and records the profile", () => {
+        const edited = answers([{ key: feature, importance: "high", source: "user" }]);
+        const next = startFromProfile(edited, "nervous");
+
+        expect(next.priorities).toEqual([...PROFILES.nervous.priorities]);
+        expect(next.features).toEqual(profileEmphasis("nervous"));
+        expect(next.basedOn).toBe("nervous");
+        expect(next.preferences).toBe(edited.preferences);
+    });
+
+    it("leaves the draft it replaced intact, so it can be put back", () => {
+        const before = answers([{ key: feature, importance: "high", source: "user" }]);
+        const snapshot = JSON.stringify(before);
+
+        startFromProfile(before, "family");
+
+        expect(JSON.stringify(before)).toBe(snapshot);
     });
 });
 
@@ -194,6 +227,7 @@ describe("sameAnswers", () => {
             features: a.features,
             preferences: { ...DEFAULT_PREFERENCES },
             priorities: [...a.priorities],
+            basedOn: null,
         };
 
         expect(sameAnswers(a, b)).toBe(true);

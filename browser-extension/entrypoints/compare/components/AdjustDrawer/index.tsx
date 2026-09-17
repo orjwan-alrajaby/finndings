@@ -1,14 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Accordion from "@radix-ui/react-accordion";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Settings, X } from "lucide-react";
 
+import { isCustomisedFrom } from "@/lib/reasoning-engine";
 import type {
     CategoryId,
     LensPreferences,
+    ProfileId,
 } from "@/lib/reasoning-engine/types";
 import { DRAWER_SHELL } from "@/components/drawer";
-import { InfoPanelContainer } from "@/components/PriorityInfo";
+import {
+    closeInfoPanel,
+    InfoPanelHost,
+    type InfoPanelHostValue,
+} from "@/components/PriorityInfo";
 import { SaveControl } from "@/components/SaveControl";
 
 import { type Answers, useCompareStore } from "../../store";
@@ -18,6 +24,7 @@ import {
     restoreSavedFeatures,
     sameAnswers,
     setFeatureImportance,
+    startFromProfile,
     toggleFeature,
 } from "./draft";
 import { AssumptionsSection } from "./AssumptionsSection";
@@ -89,10 +96,11 @@ export function AdjustDrawer({
     const priorities = useCompareStore((state) => state.priorities);
     const preferences = useCompareStore((state) => state.preferences);
     const features = useCompareStore((state) => state.features);
+    const basedOn = useCompareStore((state) => state.basedOn);
 
     const applied: Answers = useMemo(
-        () => ({ priorities, preferences, features }),
-        [priorities, preferences, features],
+        () => ({ priorities, preferences, features, basedOn }),
+        [priorities, preferences, features, basedOn],
     );
 
     /*
@@ -107,6 +115,17 @@ export function AdjustDrawer({
     const [saved, setSaved] = useState(false);
 
     /*
+     * What a profile just replaced, for its one-tap undo. Any other edit
+     * clears it: the undo belongs to the apply, not to a history.
+     */
+    const [beforeProfile, setBeforeProfile] = useState<Answers | null>(null);
+
+    const edit = (change: (current: Answers) => Answers) => {
+        setBeforeProfile(null);
+        setDraft(change);
+    };
+
+    /*
      * The drawer's own element, so the "i" panels the priority list opens can
      * mount inside it. This is a modal dialog: anything portalled to the body
      * lands outside its scroll lock and its focus trap, which for a panel
@@ -114,18 +133,37 @@ export function AdjustDrawer({
      */
     const [content, setContent] = useState<HTMLDivElement | null>(null);
 
+    /*
+     * The "i" on a priority or profile in here opens its explanation as a
+     * page of this drawer, with a way back to the answers, rather than as a
+     * second drawer stacked over this one — see `InfoPanelHost`.
+     */
+    const infoHost: InfoPanelHostValue = useMemo(
+        () => ({ placement: "inside", container: content }),
+        [content],
+    );
+
+    /* An explanation of something in the drawer goes when the drawer does. */
+    useEffect(() => {
+        if (!open) closeInfoPanel();
+    }, [open]);
+
     const dirty = !sameAnswers(draft, applied);
+
+    const customised = isCustomisedFrom(
+        { priorities: draft.priorities, categoryFeatures: draft.features },
+        draft.basedOn,
+    );
 
     const save = () => {
         applyAnswers(draft);
+        setBeforeProfile(null);
 
         setSaved(true);
         window.setTimeout(() => setSaved(false), 1800);
     };
 
-    const setPriorities = (priorities: CategoryId[]) => {
-        setDraft((current) => ({ ...current, priorities }));
-
+    const followOrder = (priorities: CategoryId[]) => {
         /*
          * The feature editor stays open on a priority the reader still has.
          * Leaving a card open for a category they just dropped would leave
@@ -136,6 +174,28 @@ export function AdjustDrawer({
                 ? current
                 : (priorities[0] ?? null),
         );
+    };
+
+    const setPriorities = (priorities: CategoryId[]) => {
+        edit((current) => ({ ...current, priorities }));
+        followOrder(priorities);
+    };
+
+    const chooseProfile = (profile: ProfileId) => {
+        setBeforeProfile(draft);
+
+        const next = startFromProfile(draft, profile);
+
+        setDraft(next);
+        followOrder(next.priorities);
+    };
+
+    const undoProfile = () => {
+        if (!beforeProfile) return;
+
+        setDraft(beforeProfile);
+        followOrder(beforeProfile.priorities);
+        setBeforeProfile(null);
     };
 
     const setPreferences = (preferences: LensPreferences) => {
@@ -155,7 +215,7 @@ export function AdjustDrawer({
                         "z-50 max-w-[min(100vw,46rem)] bg-finn-snow",
                     ].join(" ")}
                 >
-                    <InfoPanelContainer.Provider value={content}>
+                    <InfoPanelHost.Provider value={infoHost}>
                         <Header onSettings={onSettings} />
 
                         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
@@ -174,7 +234,13 @@ export function AdjustDrawer({
                                     priorityDefinitions={priorityDefinitions}
                                     profiles={profiles}
                                     features={draft.features}
+                                    basedOn={draft.basedOn}
+                                    customised={customised}
                                     onChange={setPriorities}
+                                    onApplyProfile={chooseProfile}
+                                    onUndoProfile={
+                                        beforeProfile ? undoProfile : null
+                                    }
                                 />
 
                                 <FeatureSection
@@ -187,8 +253,11 @@ export function AdjustDrawer({
                                         draft,
                                         savedCategoryFeatures,
                                     )}
+                                    basedOn={draft.basedOn}
+                                    customised={customised}
+                                    profiles={profiles}
                                     onToggleFeature={(category, feature) =>
-                                        setDraft((current) =>
+                                        edit((current) =>
                                             toggleFeature(
                                                 current,
                                                 category,
@@ -201,7 +270,7 @@ export function AdjustDrawer({
                                         feature,
                                         importance,
                                     ) =>
-                                        setDraft((current) =>
+                                        edit((current) =>
                                             setFeatureImportance(
                                                 current,
                                                 category,
@@ -211,12 +280,12 @@ export function AdjustDrawer({
                                         )
                                     }
                                     onClearCategory={(category) =>
-                                        setDraft((current) =>
+                                        edit((current) =>
                                             clearFeatures(current, category),
                                         )
                                     }
                                     onRestoreSaved={() =>
-                                        setDraft((current) =>
+                                        edit((current) =>
                                             restoreSavedFeatures(
                                                 current,
                                                 savedCategoryFeatures,
@@ -242,7 +311,7 @@ export function AdjustDrawer({
                             onSave={save}
                             onSettings={onSettings}
                         />
-                    </InfoPanelContainer.Provider>
+                    </InfoPanelHost.Provider>
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>

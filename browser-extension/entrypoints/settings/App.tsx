@@ -17,6 +17,8 @@ import {
   DEFAULT_PROFILES,
 } from "@/lib/reasoning-engine/constants";
 import {
+  applyProfile,
+  isCustomisedFrom,
   loadLensSettings,
   saveLensSettings,
   unregisterCategoryMeta,
@@ -29,6 +31,7 @@ import type {
   PriorityDefinition,
   Profile,
   ProfileId,
+  SettingsBasis,
 } from "@/lib/reasoning-engine/types";
 import { SettingsTabs, type SettingsTab } from "./tabs/SettingsTabs";
 import { PrioritiesSettings } from "./tabs/PrioritiesSettings";
@@ -52,6 +55,17 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   const [categoryFeatures, setCategoryFeatures] = useState<Record<CategoryId, FeatureSelection>>(DEFAULT_CATEGORY_FEATURES);
   const [profiles, setProfiles] = useState<Profile[]>(DEFAULT_PROFILES);
   const [defaultProfileId, setDefaultProfileId] = useState<string>(DEFAULT_DEFAULT_PROFILE_ID);
+  const [basedOn, setBasedOn] = useState<SettingsBasis>(DEFAULT_DEFAULT_PROFILE_ID);
+
+  /*
+   * What a profile just replaced, for its one-tap undo. Any other edit to the
+   * order or the raises clears it: the undo belongs to the apply.
+   */
+  const [beforeProfile, setBeforeProfile] = useState<{
+    priorities: CategoryId[];
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
+    basedOn: SettingsBasis;
+  } | null>(null);
 
   const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -95,6 +109,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       setCategoryFeatures(settings.categoryFeatures);
       setProfiles(settings.profiles);
       setDefaultProfileId(settings.defaultProfileId);
+      setBasedOn(settings.basedOn);
       setPersisted(stableStringify(settings));
       setLoading(false);
     });
@@ -117,6 +132,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     categoryFeatures,
     profiles,
     defaultProfileId: defaultProfileId as ProfileId,
+    basedOn,
   });
 
   const save = async () => {
@@ -136,7 +152,33 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * for a reader to press and be misled by.
    */
   const handleChangeFeatures = (priorityId: CategoryId, features: FeatureSelection) => {
+    setBeforeProfile(null);
     setCategoryFeatures((cur) => ({ ...cur, [priorityId]: features }));
+  };
+
+  const handleChangePriorities = (next: CategoryId[]) => {
+    setBeforeProfile(null);
+    setPriorities(next);
+  };
+
+  /* A profile replaces the order and the raises together, and can be undone in one tap. */
+  const handleApplyProfile = (id: ProfileId) => {
+    setBeforeProfile({ priorities, categoryFeatures, basedOn });
+
+    const applied = applyProfile(id);
+
+    setPriorities(applied.priorities);
+    setCategoryFeatures(applied.categoryFeatures);
+    setBasedOn(applied.basedOn);
+  };
+
+  const handleUndoProfile = () => {
+    if (!beforeProfile) return;
+
+    setPriorities(beforeProfile.priorities);
+    setCategoryFeatures(beforeProfile.categoryFeatures);
+    setBasedOn(beforeProfile.basedOn);
+    setBeforeProfile(null);
   };
 
   // ── Profiles ────────────────────────────────────────────────────────────
@@ -190,6 +232,8 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     setCategoryFeatures(DEFAULT_CATEGORY_FEATURES);
     setProfiles(DEFAULT_PROFILES);
     setDefaultProfileId(DEFAULT_DEFAULT_PROFILE_ID);
+    setBasedOn(DEFAULT_DEFAULT_PROFILE_ID);
+    setBeforeProfile(null);
 
     /*
      * The snapshot is set to the defaults rather than re-read, because that
@@ -205,6 +249,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         categoryFeatures: DEFAULT_CATEGORY_FEATURES,
         profiles: DEFAULT_PROFILES,
         defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+        basedOn: DEFAULT_DEFAULT_PROFILE_ID,
       }),
     );
   };
@@ -221,6 +266,8 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     setCategoryFeatures(DEFAULT_CATEGORY_FEATURES);
     setProfiles(DEFAULT_PROFILES);
     setDefaultProfileId(DEFAULT_DEFAULT_PROFILE_ID);
+    setBasedOn(DEFAULT_DEFAULT_PROFILE_ID);
+    setBeforeProfile(null);
     await saveLensSettings({
       preferences: DEFAULT_PREFERENCES,
       priorities: DEFAULT_PRIORITIES,
@@ -228,6 +275,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
       categoryFeatures: DEFAULT_CATEGORY_FEATURES,
       profiles: DEFAULT_PROFILES,
       defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+      basedOn: DEFAULT_DEFAULT_PROFILE_ID,
     });
     setPersisted(
       stableStringify({
@@ -237,6 +285,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         categoryFeatures: DEFAULT_CATEGORY_FEATURES,
         profiles: DEFAULT_PROFILES,
         defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+        basedOn: DEFAULT_DEFAULT_PROFILE_ID,
       }),
     );
     setRestoreOpen(false);
@@ -318,7 +367,11 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
               priorityDefinitions={priorityDefinitions}
               categoryFeatures={categoryFeatures}
               profiles={profiles}
-              onChangePriorities={setPriorities}
+              basedOn={basedOn}
+              customised={isCustomisedFrom({ priorities, categoryFeatures }, basedOn)}
+              onChangePriorities={handleChangePriorities}
+              onApplyProfile={handleApplyProfile}
+              onUndoProfile={beforeProfile ? handleUndoProfile : null}
               onChangeFeatures={handleChangeFeatures}
             />
           )}

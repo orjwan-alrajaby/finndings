@@ -17,6 +17,7 @@ import type {
     LensPreferences,
     PriorityDefinition,
     Profile,
+    SettingsBasis,
 } from "@/lib/reasoning-engine/types";
 
 /**
@@ -45,6 +46,8 @@ export interface Answers {
      * picks the reader made for it.
      */
     features: Record<CategoryId, FeatureSelection>;
+    /** The profile these answers started from, or null once there is none. */
+    basedOn: SettingsBasis;
 }
 
 interface CompareState extends Answers {
@@ -109,8 +112,8 @@ export function copyFeatures(
  * customised order on the next run. Preferences and feature picks made here
  * are deliberately not written back — those belong to Settings.
  */
-function persistPriorities(priorities: CategoryId[]) {
-    void saveLensSettings({ priorities }).catch((error: unknown) => {
+function persistPriorities(priorities: CategoryId[], basedOn: SettingsBasis) {
+    void saveLensSettings({ priorities, basedOn }).catch((error: unknown) => {
         console.error("Finn Lens: could not save priority order", error);
     });
 }
@@ -126,6 +129,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     priorities: DEFAULT_PRIORITIES,
     preferences: DEFAULT_PREFERENCES,
     features: copyFeatures(DEFAULT_CATEGORY_FEATURES),
+    basedOn: DEFAULT_DEFAULT_PROFILE_ID,
 
     challengerId: null,
 
@@ -149,6 +153,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
             priorities: settings.priorities,
             preferences: settings.preferences,
             features: copyFeatures(settings.categoryFeatures),
+            basedOn: settings.basedOn,
         });
     },
 
@@ -158,19 +163,20 @@ export const useCompareStore = create<CompareState>((set, get) => ({
      * The order is persisted here and the rest is not, which is the same
      * split as before: there is one priority order and it belongs to the
      * reader, while what they tried out on today's shortlist belongs to
-     * today's shortlist.
+     * today's shortlist. The profile the order came from travels with it.
      *
      * The challenger is cleared because it names a car by id against the old
      * reasoning, and the new answers may not rank it anywhere near where it
      * was.
      */
-    applyAnswers({ priorities, preferences, features }) {
-        persistPriorities(priorities);
+    applyAnswers({ priorities, preferences, features, basedOn }) {
+        persistPriorities(priorities, basedOn);
 
         set({
             priorities,
             preferences,
             features: copyFeatures(features),
+            basedOn,
             challengerId: null,
         });
     },

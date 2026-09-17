@@ -3,12 +3,15 @@ import type {
     FeatureSelection,
     PriorityDefinition,
     Profile,
+    ProfileId,
+    SettingsBasis,
 } from "@/lib/reasoning-engine/types";
 
 import {
     applicableProfiles,
     PRIORITY_ORDER_DESCRIPTION,
     PriorityOrderList,
+    ProfileBasisNote,
     ProfilePresets,
 } from "@/components/PriorityOrder";
 
@@ -28,13 +31,21 @@ export function PriorityOrder({
     priorityDefinitions,
     categoryFeatures,
     profiles,
+    basedOn,
+    customised,
     onChange,
+    onApplyProfile,
+    onUndoProfile,
 }: {
     priorities: CategoryId[];
     priorityDefinitions: PriorityDefinition[];
     categoryFeatures: Record<CategoryId, FeatureSelection>;
     profiles: Profile[];
+    basedOn: SettingsBasis;
+    customised: boolean;
     onChange: (next: CategoryId[]) => void;
+    onApplyProfile: (profile: ProfileId) => void;
+    onUndoProfile: (() => void) | null;
 }) {
     const hasProfiles =
         applicableProfiles(profiles, priorityDefinitions).length > 0;
@@ -48,8 +59,9 @@ export function PriorityOrder({
                     </p>
 
                     <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                        A profile is a starting point, not a setting — apply one
-                        and then change whatever you like.
+                        A profile is a starting point, not a setting. Applying
+                        one replaces your order and what counts for more inside
+                        each priority — then change whatever you like.
                     </p>
 
                     <div className="mt-2.5">
@@ -57,9 +69,16 @@ export function PriorityOrder({
                             profiles={profiles}
                             priorityDefinitions={priorityDefinitions}
                             priorities={priorities}
-                            onApply={onChange}
+                            onApply={onApplyProfile}
                         />
                     </div>
+
+                    <ProfileBasisNote
+                        basedOn={basedOn}
+                        customised={customised}
+                        profiles={profiles}
+                        onUndo={onUndoProfile}
+                    />
                 </div>
             )}
 
