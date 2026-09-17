@@ -188,6 +188,106 @@ export interface AskResult {
     scope?: ScopeKind | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Conversation: understanding a person, not extracting priorities            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What a person has told Lens, kept as the kinds of thing it actually is.
+ *
+ * Not a priority list. A budget someone "can't exceed" is a constraint; two
+ * children are context that creates needs; "I'm confident keeping my
+ * distance" is a capability that makes some equipment matter less; "young"
+ * is an unknown worth one question. Priorities are derived from this by the
+ * extension, deterministically — the model never ranks or scores.
+ *
+ * The model returns the whole understanding on every turn, merged with the
+ * one it was given. Everything in it is a claim until `understanding.ts`
+ * checks it against Lens's vocabulary and evidence.
+ */
+export type NeedImportance = "essential" | "important" | "niceToHave";
+
+export interface WireNeed {
+    /** Stable across turns: "kids-entertained". */
+    id: string;
+    /** A short heading in the person's terms: "Keeping the kids occupied". */
+    label: string;
+    importance: NeedImportance;
+    /** What they said that this comes from, quoted or closely paraphrased. */
+    said: string;
+    /** Lens priorities this need legitimately bears on. */
+    priorities: string[];
+    /**
+     * Evidence Lens can check that would serve the need, each with how it
+     * helps — a plain implication, never a spec: "could keep their tablets
+     * charged on long drives".
+     */
+    evidence: { id: string; use: string }[];
+    /** What the person would ideally want that FINN's data can't show: "a built-in rear entertainment system". */
+    notInData: string | null;
+    status: "active" | "dropped";
+}
+
+export interface WireUnderstanding {
+    budget: { kind: "hardMax" | "target"; monthly: number; said: string } | null;
+    rental: { from: string; to: string; startDay: number | null; said: string } | null;
+    monthlyKm: { value: number; said: string } | null;
+    needs: WireNeed[];
+    /** Facts about their situation that explain needs: "Two children". */
+    context: { label: string; said: string }[];
+    /** What they say they're already good at, and the evidence that therefore matters less. */
+    capabilities: { label: string; said: string; lessRelevant: string[] }[];
+    /** Priorities they said they don't care about. */
+    droppedPriorities: string[];
+    /** Things they said that Lens can't use, and why. */
+    notModelled: { said: string; explanation: string }[];
+    /** What they explicitly withdrew this turn, so it isn't carried over: "budget", "rental", "monthlyKm". */
+    cleared: string[];
+}
+
+export interface WireQuestion {
+    ask: string;
+    /** One clause on why the answer matters to the recommendation. */
+    why: string;
+    /** Up to four short tap-to-answer options. */
+    options: string[];
+    /** True when comparing before the answer would likely give the wrong recommendation. */
+    blocking: boolean;
+}
+
+export interface ConverseRequest {
+    message: string;
+    vocabulary: LensVocabulary;
+    /** What Lens understood before this message. */
+    understanding: WireUnderstanding;
+    /** The question Lens last asked, if unanswered. */
+    openQuestion: WireQuestion | null;
+    /** Questions already asked and answered — never ask these again. */
+    answered: { question: string; answer: string }[];
+    /** Every piece of evidence Lens can check, and how common each is in scope. */
+    evidence: { id: string; label: string; explanation: string; scoredBy: string; listedOn: string }[];
+    /** Present once Lens has compared cars: the result, and each car's evidence for the reader's needs. */
+    facts: LensFacts | null;
+    /** The last few exchanges, oldest first. */
+    history: { role: "reader" | "lens"; text: string }[];
+    scope?: ConversationScope;
+    today: string;
+}
+
+export interface ConverseResult {
+    /**
+     * `understanding` — the person told Lens about themselves; show what changed.
+     * `answer` — a question about the result, answered from the facts.
+     * `whatIf` — a hypothetical; `understanding` holds the proposed version.
+     */
+    kind: "understanding" | "answer" | "whatIf";
+    /** Short. Shows Lens listened: what it took from this message, or the answer. */
+    reply: string;
+    understanding: WireUnderstanding | null;
+    question: WireQuestion | null;
+    scope?: ScopeKind | null;
+}
+
 export type AiEnvelope<T> =
     | {
           ok: true;

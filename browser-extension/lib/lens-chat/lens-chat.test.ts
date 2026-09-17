@@ -6,7 +6,7 @@ import type { PageContext } from "@/lib/lens-chat/messages";
 import { copyFeatures, type Answers } from "@/entrypoints/compare/store";
 import { buildScopes, conversationScope, defaultScope } from "@/entrypoints/lens-chat/scopes";
 
-import { compareRows, explainWhy, runLens, summariseMatch } from "./run";
+import { compareRows, runLens, summariseMatch } from "./run";
 
 /*
  * Ask Lens on finn.com: what it compares, and what it says about the result.
@@ -94,21 +94,6 @@ describe("reading a run", () => {
             run.recommendation.alternatives.slice(0, 3).map((car) => car.id),
         );
         expect(match.candidateCount).toBe(3);
-    });
-
-    it("explains why as the chain from what was said to what it costs", () => {
-        const run = runLens(cars(), answers(), "page", "")!;
-        const why = explainWhy(run, { toldMe: ["I'm a nervous driver"], understood: "You want safety first." });
-
-        expect(why.toldMe).toEqual(["I'm a nervous driver"]);
-        expect(why.prioritised.map((item) => item.label)).toEqual([
-            "Safety & Driver Assistance",
-            "Practicality",
-            "Comfort",
-        ]);
-        expect(why.prioritised.map((item) => item.percent)).toEqual([50, 33, 17]);
-        expect(why.matched.length).toBeGreaterThan(0);
-        expect(why.tradeoffs.length).toBeGreaterThan(0);
     });
 
     it("puts the match first in a comparison, whatever its raw rank", () => {

@@ -3,7 +3,6 @@ import {
     buildAdviceNarrative,
     buildRecommendation,
     describeRentalProblem,
-    getCategory,
 } from "@/lib/reasoning-engine";
 import { bandForScore } from "@/lib/reasoning-engine/bands";
 import { FIT_BANDS, type FitLevel } from "@/lib/reasoning-engine/fit";
@@ -167,81 +166,26 @@ export function summariseMatch(run: LensRun): MatchSummary {
     };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Why                                                                        */
-/* -------------------------------------------------------------------------- */
-
-export interface WhyExplanation {
-    carName: string;
-    /** What the reader said in this conversation, oldest first. */
-    toldMe: string[];
-    /** What Lens understood from it, when an interpretation was used. */
-    understood: string | null;
-    prioritised: { rank: number; label: string; percent: number; icon: string }[];
-    matched: string[];
-    tradeoffs: string[];
-    caveats: string[];
-}
-
 /**
- * "Why this car?" as the chain the product is built on: what the reader said,
- * what Lens took from it, the order it weighed, what this car did about each,
- * and what taking it costs.
+ * Alternatives for someone with hard limits: the best-ranked cars that respect
+ * them first, and only then the closest ones that don't, flagged as such. The
+ * engine's own alternatives are chosen by closeness of score, which is right
+ * for the advice page and wrong for "I can't spend more than €500".
  */
-export function explainWhy(
-    run: LensRun,
-    story: { toldMe: string[]; understood: string | null },
-): WhyExplanation {
-    const { recommendation, narrative } = run;
-    const { context } = recommendation;
-    const winner = recommendation.winner;
+export function alternativesWithinLimits(run: LensRun, limit = 3): CarLine[] {
+    const { ranked, winner, context } = run.recommendation;
 
-    /*
-     * The verdict's reasons already summarise the top priorities — one each —
-     * so the per-priority sentences only add the ones those don't cover.
-     * Taking both repeated the same equipment twice in different words.
-     */
-    const matched = [
-        ...narrative.verdict.reasons,
-        ...narrative.priorities
-            .slice(narrative.verdict.reasons.length, 3)
-            .map((priority) => priority.sentences[0])
-            .filter((sentence): sentence is string => Boolean(sentence)),
-    ];
-
-    const tradeoffs = narrative.tradeoffs.length
-        ? narrative.tradeoffs.slice(0, 2).map((item) => item.sentences.join(" ") || item.evidence)
-        : context.vehicles.length === 1
-          ? ["There's nothing to weigh it against here — switch to the cars on this page or your pinned cars to see what you'd give up."]
-          : ["Nothing you ranked comes out meaningfully worse on this car than on the alternatives closest to it."];
-
-    const contract = context.costs[winner.id]?.contract;
-    const rentalProblem = contract ? describeRentalProblem(contract) : null;
-
-    const caveats = [
-        narrative.verdict.budgetNote,
-        narrative.verdict.marginNote,
-        narrative.verdict.dependsNote,
-        rentalProblem ? `${winner.name} ${rentalProblem}.` : null,
-        ...narrative.unsupported.map(
-            (priority) => `FINN's data doesn't say enough to judge ${priority.label} for this car.`,
-        ),
-    ].filter((item): item is string => Boolean(item));
-
-    return {
-        carName: carLabel(winner, context.vehicles),
-        toldMe: story.toldMe,
-        understood: story.understood,
-        prioritised: context.weights.map((weight) => ({
-            rank: weight.rank,
-            label: getCategory(weight.priority)?.label ?? weight.priority,
-            percent: weight.weightPercent,
-            icon: getCategory(weight.priority)?.icon ?? "car",
-        })),
-        matched: [...new Set(matched)].slice(0, 4),
-        tradeoffs,
-        caveats,
+    const within = (car: PinnedFinnCar) => {
+        const cost = context.costs[car.id];
+        return Boolean(cost) && (cost!.budget == null || cost!.budgetStatus === "within") &&
+            (cost!.contract.status === "notSet" || cost!.contract.status === "fits");
     };
+
+    const others = ranked.filter((car) => car.id !== winner.id);
+
+    return [...others.filter(within), ...others.filter((car) => !within(car))]
+        .slice(0, limit)
+        .map((car) => carLine(run, car));
 }
 
 /* -------------------------------------------------------------------------- */

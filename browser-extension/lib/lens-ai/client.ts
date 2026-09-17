@@ -2,6 +2,8 @@ import type {
     AiEnvelope,
     AskRequest,
     AskResult,
+    ConverseRequest,
+    ConverseResult,
     HealthResult,
     InterpretRequest,
     InterpretResult,
@@ -23,7 +25,8 @@ export const LENS_AI_URL: string =
     (import.meta.env?.WXT_LENS_AI_URL as string | undefined) ??
     "http://127.0.0.1:8787";
 
-const TIMEOUT_MS = 60_000;
+/* Long enough for the server to try a slow model and fall back to the next. */
+const TIMEOUT_MS = 120_000;
 
 export type AiCall<T> =
     | { ok: true; result: T; provider: string; model: string | null; ms: number }
@@ -87,6 +90,9 @@ export const interpret = (request: InterpretRequest) =>
     post<InterpretResult>("/v1/interpret", request);
 
 export const ask = (request: AskRequest) => post<AskResult>("/v1/ask", request);
+
+export const converse = (request: ConverseRequest) =>
+    post<ConverseResult>("/v1/converse", request);
 
 /** Whether the server is up, and what's answering. Null when it isn't. */
 export async function health(): Promise<HealthResult | null> {
