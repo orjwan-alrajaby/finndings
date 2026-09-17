@@ -1,5 +1,5 @@
 import type { PinnedFinnCar } from "@/lib/types";
-import type { CATEGORIES, FEATURES, PROFILES } from "./constants";
+import type { CATEGORIES, FEATURES, PROFILES, SIGNALS } from "./constants";
 import type { EnvironmentalAssessment } from "./environmental";
 
 /* -------------------------------------------------------------------------- */
@@ -7,7 +7,10 @@ import type { EnvironmentalAssessment } from "./environmental";
 /* -------------------------------------------------------------------------- */
 
 export type CategoryId = keyof typeof CATEGORIES;
+/** An entry in FINN's equipment list. */
 export type FeatureId = keyof typeof FEATURES;
+/** Any piece of evidence Lens scores or names: an equipment entry or a derived signal. */
+export type SignalId = keyof typeof SIGNALS;
 export type ProfileId = keyof typeof PROFILES;
 
 /* -------------------------------------------------------------------------- */
@@ -56,36 +59,39 @@ export interface LegacyLensPreferences {
 /* -------------------------------------------------------------------------- */
 
 /**
- * How much extra influence one picked-out feature should have.
+ * How much extra influence one raised item should have.
  *
  * The keys are internal and never shown; what the user reads is the answer
  * to "how much should this influence your decision?" — somewhat, moderately,
  * highly. See FEATURE_IMPORTANCE.
  *
- * Deliberately not "essential". A feature nobody would buy the car without is
- * a hard requirement, and Lens has none — a car missing even a pick the
- * reader said should count highly stays in the running, and the gap is
- * reported as a tradeoff. These words describe strength of preference, nothing more.
+ * Deliberately not "essential". Lens has no hard requirements — a car missing
+ * even an item raised highly stays in the running, and the gap is reported as
+ * a tradeoff.
  */
 export type FeatureImportance = "high" | "medium" | "low";
 
-/** One feature the user picked out, and how much it should influence. */
+/**
+ * Who set an emphasis: a profile the reader applied, or the reader.
+ *
+ * Lets every surface say "Nervous Driver emphasises…" for a raise the reader
+ * never touched, and "You raised…" only for one they did.
+ */
+export type EmphasisSource = "profile" | "user";
+
+/** One raised item, how much it should influence, and who raised it. */
 export interface FeaturePreference {
-  key: FeatureId;
+  key: SignalId;
   importance: FeatureImportance;
+  /** Absent on settings saved before provenance existed; read as the reader's. */
+  source?: EmphasisSource;
 }
 
 /**
- * What the user picked out within one priority, at most five entries.
+ * What is raised within one priority, at most five entries.
  *
- * This is not the old tier system returning. That asked the reader to grade
- * every feature in a catalogue of up to fifteen, most of which they had no
- * opinion about, and called the top grade "essential" — which read as a hard
- * requirement it never was. Here they grade only the handful they chose to
- * name, and the grade adjusts weight rather than gating anything.
- *
- * An empty list is a valid, meaningful answer: the category is then judged on
- * its catalogue alone. See `CategoryDetail`.
+ * An empty list is a valid answer: every item then counts at standard, and
+ * niche items don't count.
  */
 export type FeatureSelection = FeaturePreference[];
 
@@ -94,12 +100,12 @@ export type FeatureSelection = FeaturePreference[];
 /* -------------------------------------------------------------------------- */
 
 /**
- * A predefined recommendation strategy.
+ * A predefined starting point: an order, a starting emphasis, a promise and
+ * its limits.
  *
- * Profiles are product configuration, not user documents: the label, icon,
- * copy and priority order are fixed. `enabled` is the only field the user
- * owns, and whether a profile is *selected by default* is a separate setting
- * (`LensSettings.defaultProfileId`) rather than a flag here.
+ * Profiles are product configuration, not user documents. `enabled` is the
+ * only field the user owns; applying a profile copies its order and emphasis
+ * into the reader's settings, which are then theirs.
  */
 export interface Profile {
   id: ProfileId;
@@ -116,10 +122,20 @@ export interface Profile {
   icon: string;
   forWhom: string;
   assumes: string;
-  /** Exactly five, in rank order. Fixed for the life of the profile. */
+  /** What the profile does not promise, said as plainly as what it does. */
+  doesNotGuarantee: string;
+  /** Three to five, in rank order. */
   priorities: CategoryId[];
   enabled: boolean;
 }
+
+/**
+ * Which profile the reader's settings started from.
+ *
+ * `null` for settings that predate provenance or were built by hand. Whether
+ * they have since been customised is derived, never stored.
+ */
+export type SettingsBasis = ProfileId | null;
 
 /* -------------------------------------------------------------------------- */
 /* Categories                                                                 */
@@ -143,29 +159,26 @@ export interface CategoryDef {
   recommendedFor: string[];
   numericOnly?: boolean;
   /**
-   * The figure this priority is scored on as well as its equipment, named for
-   * a reader.
-   *
-   * Practicality and Long Distance are the two: `numericScore` measures boot
-   * space, and electric range or energy use, against the other pinned cars,
-   * and `categoryDetail` averages that with the equipment score. Half the
-   * answer, in other words, and nothing on the screen said so — a reader
-   * picking features under Practicality had no way to know boot space was
-   * carrying as much as all of them together.
-   *
-   * Absent on the categories scored on equipment alone, and on
-   * `numericOnly` ones, where there is no equipment half to distinguish it
-   * from.
+   * The measured figure this priority reads, named for a reader: length under
+   * City & Parking, electric range under Long Distance. Absent elsewhere.
    */
   measured?: string;
   /**
-   * The catalogue of features this category *offers*, most relevant first.
-   *
-   * Not the user's selection — see `DEFAULT_CATEGORY_FEATURES` for the opening
-   * five and `LensSettings.categoryFeatures` for what they actually picked.
-   * It is also the fallback yardstick when they pick nothing.
+   * The evidence this priority scores and is the home of, most relevant first.
+   * The only items the reader can raise here.
    */
-  features: FeatureId[];
+  features: SignalId[];
+  /** Items in `features` that count only once raised. */
+  niche?: SignalId[];
+  /** Evidence whose home is another priority, counted here at standard. */
+  alsoCounts?: SignalId[];
+  /**
+   * Equipment on nearly every FINN car. Having it earns nothing; a car FINN
+   * confirms is missing it loses what a missing Standard item costs.
+   */
+  expected?: FeatureId[];
+  /** A figure that can only reduce this priority's score. */
+  limit?: "evRange";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -195,90 +208,140 @@ export interface PriorityDefinition {
 /* -------------------------------------------------------------------------- */
 
 /**
- * A measured number behind a category score — boot litres, electric range,
- * CO₂ — so the UI can cite the actual figure rather than only the score.
+ * A measured number behind a category score — length, electric range, CO₂ —
+ * so the UI can cite the actual figure rather than only the score.
  */
 export interface NumericEvidence {
   label: string;
   value: number;
   unit: string;
   display: string;
-  /** True when a smaller number is the better outcome (CO₂, consumption). */
+  /** True when a smaller number is the better outcome (CO₂, length). */
   lowerIsBetter: boolean;
 }
 
 /**
- * What a category's feature score was measured against.
+ * What a category's score was read from.
  *
- * - `category` — the category's whole catalogue, which is always the answer
- *   when it has one.
- * - `none` — the category has no feature catalogue and is measured from
- *   vehicle data instead (see `numericOnly`).
- *
- * There is deliberately no "selected" case. A category score always measures
- * the category; what the user picked out decides what gets *said* about it,
- * not what gets counted. See `categoryDetail`.
+ * - `category` — its evidence list.
+ * - `none` — it has no evidence list and is read from a figure (Environmental).
  */
 export type FeatureBasis = "category" | "none";
 
+/** One piece of evidence as a category scored it. */
+export interface EvidenceItem {
+  key: SignalId;
+  /** "home" for the priority's own evidence, "alsoCounts" for a second home. */
+  role: "home" | "alsoCounts" | "expected";
+  /** 0 for a niche item nobody raised; 1 standard; 2–4 raised. */
+  weight: number;
+  /** 0–1, or null when FINN's data doesn't say. */
+  utility: number | null;
+  importance: FeatureImportance | null;
+  source: EmphasisSource | null;
+  niche: boolean;
+}
+
+/**
+ * One standard item on one car: listed by FINN, not listed, or unknowable
+ * because FINN sent no equipment list.
+ */
+export interface StandardCheck {
+  key: FeatureId;
+  state: "listed" | "unlisted" | "unknown";
+}
+
 export interface CategoryDetail {
+  /** 0–100, rounded, for display. 0 when the priority isn't assessed. */
   score: number;
-  /** Catalogue features the car has. */
-  matched: FeatureId[];
-  /** Catalogue features it doesn't. */
-  missing: FeatureId[];
-  /** What the feature score was measured against. */
-  basis: FeatureBasis;
+  /** The unrounded score the fit is built from. */
+  exactScore: number;
   /**
-   * The features the user picked out, split by whether the car has them, each
-   * carrying the importance they gave it.
-   *
-   * Reported separately from the catalogue lists because they answer a
-   * different question — "does it have the things I asked for?" rather than
-   * "how well equipped is it here?" — and the Advice says both.
+   * True when at least half the priority's counted evidence is known — or,
+   * for Environmental, when there is a CO₂ reading. An unassessed priority
+   * is left out of the fit rather than scored as zero or as average.
    */
+  assessed: boolean;
+  /** Every counted item, known or not. */
+  items: EvidenceItem[];
+  /** Counted yes-or-no items the car has. */
+  matched: SignalId[];
+  /** Counted yes-or-no items FINN's data says it hasn't. */
+  missing: SignalId[];
+  /** Counted items FINN's data doesn't answer. */
+  unknown: SignalId[];
+  /** Expected equipment FINN confirms this car is missing: each one costs. */
+  expectedMissing: FeatureId[];
+  /**
+   * Every standard item, checked against this car's
+   * listing, so a reader doesn't have to remember what counts as standard.
+   */
+  standard: StandardCheck[];
+  basis: FeatureBasis;
+  /** Raised items the car has, carrying the level and who raised them. */
   pickedMatched: FeaturePreference[];
   pickedMissing: FeaturePreference[];
-  /**
-   * Plain share of the category's catalogue the car carries, ignoring what
-   * the user picked. The figure behind "12 of the 15 systems we check".
-   */
+  /** Raised items FINN's data doesn't answer for this car. */
+  pickedUnknown: FeaturePreference[];
+  /** Plain share of known yes-or-no items present: "3 of the 4 it checks". */
   coverageScore: number | null;
-  /**
-   * The share that actually feeds the ranking: the same catalogue, with the
-   * features the user picked out counting for more.
-   *
-   * Equal to `coverageScore` when nothing was picked. Because the whole
-   * catalogue remains the denominator, no single feature can drive this to 0
-   * or 100 — which is exactly what went wrong when the picks *were* the
-   * denominator.
-   */
+  /** The weighted evidence score, 0–100, before any limit. */
   featureScore: number | null;
-  /** Score derived from vehicle data alone, when the category has a numeric signal. */
+  /** A scored figure's own 0–100 reading — the CO₂ score. */
   numericScore: number | null;
   numeric: NumericEvidence | null;
-  /**
-   * False when neither a feature list nor a measurement was available and the
-   * score is the neutral placeholder rather than a measured result.
-   *
-   * Scoring is unchanged by this flag. It exists so an explanation can say
-   * "we don't have enough data here" instead of dressing up a default as
-   * evidence.
-   */
-  /**
-   * The working behind a category scored on figures rather than equipment.
-   * Only environmental impact has one — see `environmentalImpact`.
-   */
+  /** Long Distance on an electric car: the range factor applied, ≤ 1. */
+  tripFactor: number | null;
+  /** The working behind Environmental Impact. */
   environmental?: EnvironmentalAssessment | null;
-
+  /**
+   * The lowest and highest this priority could score if every unknown item
+   * turned out absent or present — or, unassessed, 0 and 100.
+   */
+  bounds: { low: number; high: number };
+  /** Same as `assessed`, kept for the surfaces that read it by this name. */
   hasEvidence: boolean;
+}
+
+/**
+ * One line of a fit's working. Summed, the lines equal the fit exactly.
+ *
+ * - `item` — a piece of evidence's share of the result.
+ * - `range` — Long Distance on an electric car: what a short range took away.
+ * - `emissions` — the Environmental Impact score's share.
+ */
+export type Contribution =
+  | { kind: "item"; priority: CategoryId; key: SignalId; points: number }
+  | { kind: "missingExpected"; priority: CategoryId; key: FeatureId; points: number }
+  | { kind: "range"; priority: CategoryId; points: number }
+  | { kind: "emissions"; priority: CategoryId; points: number };
+
+/** What FINN's data didn't tell Lens about one car. */
+export interface EvidenceGaps {
+  /** False when FINN supplied no usable equipment list. */
+  equipmentKnown: boolean;
+  /** Counted items with no answer, outside a missing equipment list. */
+  unknownItems: { priority: CategoryId; key: SignalId }[];
+  /** Priorities left out of the fit. */
+  unassessed: CategoryId[];
+  /** Expected equipment FINN confirms missing, in priority order. */
+  expectedMissing: FeatureId[];
 }
 
 export interface VehicleScore {
   vehicleId: number;
+  /** The fit, rounded, for display. */
   total: number;
+  /** The unrounded fit that ranking uses. */
+  fit: number;
+  /** #1 and #2 priorities both assessed. Only judgeable cars are recommended. */
+  judgeable: boolean;
   byCategory: Record<CategoryId, number>;
   details: Partial<Record<CategoryId, CategoryDetail>>;
+  contributions: Contribution[];
+  gaps: EvidenceGaps;
+  /** The fit if every unknown resolved worst and best. */
+  bounds: { low: number; high: number };
 }
 
 /** How much a single priority contributes, given its position in the order. */
@@ -300,7 +363,9 @@ export type CostUnavailableReason =
   | "missingSubscriptionPrice"
   | "missingConsumption"
   | "missingEnergyPrice"
-  | "missingExtraKmPrice";
+  | "missingExtraKmPrice"
+  /** A plug-in hybrid's energy is priced as fuel only: a floor, not a total. */
+  | "plugInElectricityExcluded";
 
 export interface CostComponent {
   /** Estimated euros per month, or null when it cannot be calculated. */
@@ -332,6 +397,13 @@ export interface EnergyCost extends CostComponent {
    * electric/petrol split.
    */
   caveat: string | null;
+  /**
+   * True when the amount is a floor rather than an estimate: a plug-in
+   * hybrid's combined figure priced as fuel leaves out the electricity it
+   * charges on, so the real energy cost is higher by an amount FINN's data
+   * can't give.
+   */
+  isFloor: boolean;
 }
 
 export interface ExcessMileageCost extends CostComponent {
@@ -452,22 +524,31 @@ export interface PriorityBreakdown {
   /** score × weight — this priority's actual contribution to the total. */
   weightedContribution: number;
 
-  matched: FeatureId[];
-  missing: FeatureId[];
+  matched: SignalId[];
+  missing: SignalId[];
+  /** See `CategoryDetail.unknown`. */
+  unknown: SignalId[];
+  /** See `CategoryDetail.expectedMissing`. */
+  expectedMissing: FeatureId[];
+  /** See `CategoryDetail.standard`. */
+  standard: StandardCheck[];
   /** See `CategoryDetail.basis`. */
   basis: FeatureBasis;
   /** See `CategoryDetail.pickedMatched`. */
   pickedMatched: FeaturePreference[];
   pickedMissing: FeaturePreference[];
+  pickedUnknown: FeaturePreference[];
   /** See `CategoryDetail.coverageScore`. */
   coverageScore: number | null;
   matchedLabels: string[];
   missingLabels: string[];
   numeric: NumericEvidence | null;
-  /** See `CategoryDetail.hasEvidence`. */
+  /** See `CategoryDetail.tripFactor`. */
+  tripFactor: number | null;
   /** See `CategoryDetail.environmental`. */
   environmental: EnvironmentalAssessment | null;
 
+  /** See `CategoryDetail.assessed`. */
   hasEvidence: boolean;
 
   /**
@@ -506,10 +587,10 @@ export interface PriorityComparison {
   /** difference × weight — how much this gap moved the overall result. */
   weightedDifference: number;
   numeric: NumericEvidence | null;
-  /** Features the subject has that the other vehicle does not. */
-  onlySubjectHas: FeatureId[];
-  /** Features the other vehicle has that the subject does not. */
-  onlyOtherHas: FeatureId[];
+  /** Evidence the subject has that the other vehicle does not. */
+  onlySubjectHas: SignalId[];
+  /** Evidence the other vehicle has that the subject does not. */
+  onlyOtherHas: SignalId[];
 }
 
 /** One car's overall standing, as a comparison refers to it. */
@@ -644,10 +725,35 @@ export interface Recommendation {
    * head-to-head.
    */
   alternatives: PinnedFinnCar[];
+  /**
+   * True when no car in the winner's budget pool could be judged on the
+   * reader's top two priorities, and the winner is the best estimate among
+   * them rather than a confident recommendation.
+   */
+  evidenceFallback: boolean;
+  /**
+   * The runner-up the recommendation was checked against: the next car in the
+   * same budget pool that can be judged. Null when there isn't one.
+   */
+  runnerUp: PinnedFinnCar | null;
+  /**
+   * Missing evidence that could change the recommendation.
+   *
+   * Filled only when re-scoring the winner with every unknown at its worst
+   * and the runner-up with every unknown at its best puts the runner-up
+   * ahead. Empty means nothing FINN left out could reorder the two.
+   */
+  dependsOn: DependsOnGap[];
   /** The winner's own evaluation, explained on its own merits. */
   evaluation: VehicleEvaluation;
   context: ReasoningContext;
 }
+
+/** A piece of missing evidence, on one of the two cars being checked. */
+export type DependsOnGap =
+  | { vehicleId: number; name: string; kind: "equipmentList" }
+  | { vehicleId: number; name: string; kind: "item"; priority: CategoryId; key: SignalId }
+  | { vehicleId: number; name: string; kind: "priority"; priority: CategoryId };
 
 /* -------------------------------------------------------------------------- */
 /* Alternatives and the hot seat                                              */
@@ -694,4 +800,6 @@ export interface LensSettings {
   profiles: Profile[];
   categoryFeatures: Record<CategoryId, FeatureSelection>;
   defaultProfileId: ProfileId;
+  /** The profile the order and emphasis were copied from. See `SettingsBasis`. */
+  basedOn: SettingsBasis;
 }

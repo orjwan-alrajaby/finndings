@@ -6,6 +6,7 @@ import type {
 } from "../types";
 
 import { featurePhrase } from "../scoring";
+import { absentList } from "./evidence-phrases";
 import { formatEUR } from "../format";
 import {
   classifyMonthlyCostGap,
@@ -111,8 +112,8 @@ function whatSeparates(
   if (theirs.length) {
     return sentence(
       `${aheadName} has`,
-      `${joinCapped(theirs.map(featurePhrase))},`,
-      `which ${behindName} doesn't`,
+      `${joinCapped(theirs.map(featurePhrase))};`,
+      absentList(theirs, 3, behindName),
     );
   }
 

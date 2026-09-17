@@ -51,6 +51,7 @@ export const STORED_DATA_GROUPS: StoredDataGroup[] = [
             "finnLensProfiles",
             "finnLensCategoryFeatures",
             "finnLensDefaultProfileId",
+            "finnLensBasedOn",
         ],
     },
     {

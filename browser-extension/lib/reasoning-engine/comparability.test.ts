@@ -29,10 +29,18 @@ describe("comparing figures across powertrains", () => {
    * Long distance reads an electric car's range and a petrol car's
    * consumption. Two of each, so both cohorts are scored.
    */
-  const evLong = makeCar({ id: 1, name: "EV Long", fuelType: "Electric", range: 500, consumption: 17, co2: 0 });
-  const evShort = makeCar({ id: 2, name: "EV Short", fuelType: "Electric", range: 300, consumption: 17, co2: 0 });
-  const frugal = makeCar({ id: 3, name: "Petrol Frugal", consumption: 4 });
-  const thirsty = makeCar({ id: 4, name: "Petrol Thirsty", consumption: 9 });
+  /* Long Distance's standard equipment on every car, so no gap decides it. */
+  const kit = [
+    "hasLumbarSupport",
+    "hasCruiseControl",
+    "hasAdaptiveCruiseControl",
+    "hasIntegratedNavigationSystem",
+  ] as const;
+  const evLong = makeCar({ id: 1, name: "EV Long", fuelType: "Electric", range: 500, consumption: 17, co2: 0, features: [...kit] });
+  const evShort = makeCar({ id: 2, name: "EV Short", fuelType: "Electric", range: 300, consumption: 17, co2: 0, features: [...kit] });
+  /* The best equipped, so a petrol car wins and an electric car challenges it. */
+  const frugal = makeCar({ id: 3, name: "Petrol Frugal", consumption: 4, features: [...kit, "hasHeadUpDisplay"] });
+  const thirsty = makeCar({ id: 4, name: "Petrol Thirsty", consumption: 9, features: [...kit] });
 
   const cars = [evLong, evShort, frugal, thirsty];
   const features = { ...DEFAULT_CATEGORY_FEATURES, longDistance: [] };

@@ -1,7 +1,6 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
   AlternativeOption,
-  FeatureId,
   FeatureImportance,
   FeaturePreference,
   BudgetPartition,
@@ -20,12 +19,13 @@ import type {
   ReasoningContext,
   Recommendation,
   ScoreRef,
+  SettingsBasis,
+  SignalId,
   VehicleEvaluation,
   VehicleScore,
 } from "./types";
 
 import {
-  AVAILABLE_CATEGORY_FEATURES,
   CATEGORIES,
   CATEGORY_IDS,
   DEFAULT_FEATURE_IMPORTANCE,
@@ -38,6 +38,7 @@ import {
   DEFAULT_PROFILES,
   MAX_FEATURES_PER_CATEGORY,
   PROFILES,
+  profileEmphasis,
 } from "./constants";
 
 import {
@@ -51,6 +52,7 @@ import {
   computeAllScores,
   featureLabel,
   featurePhrase,
+  fitFor,
   getCategory,
   priorityWeights,
   registerCategoryMeta,
@@ -59,6 +61,8 @@ import {
   winnerForCategory,
 } from "./scoring";
 
+import { hasSignal, homeOf } from "./evidence";
+import { dependsOnFor, pickWinner, runnerUpFor } from "./decision";
 import { explainHeadToHead } from "./explain";
 import {
   classifyMeasurementGap,
@@ -82,13 +86,23 @@ export {
 export {
   categoryDetail,
   computeAllScores,
+  fitFor,
   getCategory,
   priorityWeights,
   registerCategoryMeta,
   scoreFor,
+  scoreVehicle,
   unregisterCategoryMeta,
   winnerForCategory,
 } from "./scoring";
+
+export {
+  BOOT_SCORING_ENABLED,
+  equipmentKnown,
+  hasSignal,
+  homeOf,
+  signalUtility,
+} from "./evidence";
 
 export { explainHeadToHead } from "./explain";
 
@@ -142,13 +156,9 @@ export function buildReasoningContext(
     categoryFeatures,
   );
 
-  const ranked = [...vehicles].sort((a, b) => {
-    const difference = totalFor(scores, b.id) - totalFor(scores, a.id);
-
-    return difference !== 0
-      ? difference
-      : breakTieOnPicks(a, b, ordered, categoryFeatures);
-  });
+  const ranked = [...vehicles].sort((a, b) =>
+    compareForRanking(a, b, scores, ordered),
+  );
 
   return {
     vehicles,
@@ -164,41 +174,33 @@ export function buildReasoningContext(
 }
 
 /**
- * Separates two cars that finished on exactly the same score.
+ * The ranking order: unrounded fit, then the #1 priority's score, then the
+ * #2's, then FINN's config id so the same cars always come out the same way.
  *
- * This is the only place the features a user picked out touch the ranking,
- * and it deliberately adds no weight to anything: it applies when — and only
- * when — the arithmetic has said the two cars are identical. At that point
- * the honest way to order them is by what the user actually asked for.
- *
- * Resolved priority by priority, in the user's own order, so a pick under
- * their #1 settles it before their #3 is consulted. Nothing here is a
- * constant, a multiplier or a grade; it is their ordering applied twice.
+ * A priority that couldn't be assessed ranks below any that could on a tie.
  */
-function breakTieOnPicks(
+function compareForRanking(
   a: PinnedFinnCar,
   b: PinnedFinnCar,
+  scores: VehicleScore[],
   priorities: CategoryId[],
-  categoryFeatures: Record<CategoryId, FeatureSelection>,
 ): number {
-  for (const priority of priorities) {
-    const selected = categoryFeatures[priority] ?? [];
-    if (!selected.length) continue;
+  const fit = fitFor(scores, b.id) - fitFor(scores, a.id);
+  if (fit !== 0) return fit;
 
-    const held = (vehicle: PinnedFinnCar): number =>
-      selected.reduce(
-        (sum, preference) =>
-          vehicle.features?.[preference.key]
-            ? sum + FEATURE_IMPORTANCE[preference.importance].weight
-            : sum,
-        0,
-      );
+  for (const priority of priorities.slice(0, 2)) {
+    const exact = (vehicle: PinnedFinnCar) => {
+      const detail = scores.find((score) => score.vehicleId === vehicle.id)
+        ?.details[priority];
 
-    const difference = held(b) - held(a);
+      return detail?.assessed ? detail.exactScore : -1;
+    };
+
+    const difference = exact(b) - exact(a);
     if (difference !== 0) return difference;
   }
 
-  return 0;
+  return a.id - b.id;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -280,17 +282,22 @@ function priorityBreakdown(
     weightedContribution: score * weight,
     matched: detail.matched,
     missing: detail.missing,
+    unknown: detail.unknown,
+    expectedMissing: detail.expectedMissing,
+    standard: detail.standard,
     basis: detail.basis,
     pickedMatched: detail.pickedMatched,
     pickedMissing: detail.pickedMissing,
+    pickedUnknown: detail.pickedUnknown,
     coverageScore: detail.coverageScore,
     matchedLabels,
     missingLabels,
     numeric: detail.numeric,
+    tripFactor: detail.tripFactor,
     environmental: detail.environmental ?? null,
     hasEvidence: detail.hasEvidence,
     leader,
-    isLeader: leader ? leader.score <= score : true,
+    isLeader: leader ? leader.score <= score : detail.assessed,
     gapToLeader: leader ? Math.max(0, leader.score - score) : 0,
     runnerUp,
     versus: other
@@ -314,29 +321,33 @@ function comparePriority(
     categoryDetail(category, other, vehicles, preferences, categoryFeatures);
 
   /*
-   * Compared over the category's whole catalogue, which is what the score
-   * counted. Narrowing this to the user's picks would let a head-to-head
-   * report "nothing separates them" while the scores differ by thirty points
-   * on equipment the picks didn't happen to mention.
-   *
-   * Which of these differences the user actually asked about is a separate
-   * question, answered by `pickedMatched` / `pickedMissing`.
+   * Compared over every yes-or-no item the priority counts, which is what the
+   * score counted — not just the reader's raises. Evidence FINN's data doesn't
+   * answer on either car is never reported as a difference.
    */
-  const catalogue =
-    AVAILABLE_CATEGORY_FEATURES[category] ??
-    getCategory(category)?.features ??
-    [];
+  const subjectDetail =
+    scores.find((score) => score.vehicleId === subject.id)?.details[category] ??
+    categoryDetail(category, subject, vehicles, preferences, categoryFeatures);
 
-  const onlySubjectHas: FeatureId[] = [];
-  const onlyOtherHas: FeatureId[] = [];
+  /* Expected equipment is a difference only where one car's gap cost it. */
+  const expectedListed = (detail: typeof subjectDetail): SignalId[] =>
+    detail.standard
+      .filter((item) => item.state === "listed")
+      .map((item) => item.key);
 
-  for (const key of catalogue) {
-    const subjectHas = Boolean(subject.features?.[key]);
-    const otherHas = Boolean(other.features?.[key]);
+  const onlySubjectHas: SignalId[] = [
+    ...subjectDetail.matched.filter((key) => otherDetail.missing.includes(key)),
+    ...expectedListed(subjectDetail).filter((key) =>
+      otherDetail.expectedMissing.includes(key as never),
+    ),
+  ];
 
-    if (subjectHas && !otherHas) onlySubjectHas.push(key);
-    if (otherHas && !subjectHas) onlyOtherHas.push(key);
-  }
+  const onlyOtherHas: SignalId[] = [
+    ...otherDetail.matched.filter((key) => subjectDetail.missing.includes(key)),
+    ...expectedListed(otherDetail).filter((key) =>
+      subjectDetail.expectedMissing.includes(key as never),
+    ),
+  ];
 
   const difference = subjectScore - otherDetail.score;
 
@@ -447,8 +458,18 @@ export function evaluateVehicle(
     ({
       vehicleId: vehicle.id,
       total: 0,
+      fit: 0,
+      judgeable: false,
       byCategory: {} as Record<CategoryId, number>,
       details: {},
+      contributions: [],
+      gaps: {
+        equipmentKnown: false,
+        unknownItems: [],
+        unassessed: [],
+        expectedMissing: [],
+      },
+      bounds: { low: 0, high: 100 },
     } satisfies VehicleScore);
 
   const rank = ranked.findIndex((item) => item.id === vehicle.id) + 1;
@@ -536,15 +557,19 @@ export function selectAlternatives(
 ): PinnedFinnCar[] {
   const { ranked, scores } = context;
 
-  const winnerTotal = totalFor(scores, winnerId);
+  const winnerFit = fitFor(scores, winnerId);
+
+  /* Only a car Lens could judge is put up against the recommendation. */
+  const judgeable = (vehicle: PinnedFinnCar) =>
+    scores.find((score) => score.vehicleId === vehicle.id)?.judgeable ?? false;
 
   return ranked
     .map((vehicle, index) => ({ vehicle, index }))
-    .filter((item) => item.vehicle.id !== winnerId)
+    .filter((item) => item.vehicle.id !== winnerId && judgeable(item.vehicle))
     .sort((a, b) => {
       const distance =
-        Math.abs(totalFor(scores, a.vehicle.id) - winnerTotal) -
-        Math.abs(totalFor(scores, b.vehicle.id) - winnerTotal);
+        Math.abs(fitFor(scores, a.vehicle.id) - winnerFit) -
+        Math.abs(fitFor(scores, b.vehicle.id) - winnerFit);
 
       return distance !== 0 ? distance : a.index - b.index;
     })
@@ -585,8 +610,8 @@ function alternativeHook(
       )
       .filter(
         (preference) =>
-          Boolean(alternative.features?.[preference.key]) &&
-          !winner.features?.[preference.key],
+          hasSignal(alternative, preference.key) &&
+          !hasSignal(winner, preference.key),
       );
 
     if (gained.length) {
@@ -730,17 +755,14 @@ export function recommendFrom(
 
   if (!ranked.length) return null;
 
-  const eligible = pickEligible(budget, ranked);
-
-  const winner = ranked.find((vehicle) =>
-    eligible.some((item) => item.id === vehicle.id),
-  );
+  const winner = pickWinner(context);
 
   if (!winner) return null;
 
-  const winnerScore = scores.find(
-    (score) => score.vehicleId === winner.id,
-  ) as VehicleScore;
+  const scoreOf = (vehicle: PinnedFinnCar) =>
+    scores.find((score) => score.vehicleId === vehicle.id) as VehicleScore;
+
+  const winnerScore = scoreOf(winner);
 
   /*
    * Fallback means: the user set a budget, nothing was confirmed to fit it,
@@ -754,6 +776,8 @@ export function recommendFrom(
 
   const topScorer = ranked[0] as PinnedFinnCar;
   const alternatives = selectAlternatives(context, winner.id);
+
+  const runnerUp = runnerUpFor(context, winner.id);
 
   return {
     winner,
@@ -770,6 +794,9 @@ export function recommendFrom(
     topScorer,
     budgetChangedTheAnswer: topScorer.id !== winner.id,
     alternatives,
+    evidenceFallback: !winnerScore.judgeable,
+    runnerUp,
+    dependsOn: dependsOnFor(context, winner),
     evaluation: evaluateVehicle(winner, context, {
       recommendedId: winner.id,
       compareWith: null,
@@ -777,18 +804,6 @@ export function recommendFrom(
     }),
     context,
   };
-}
-
-/**
- * The pool a winner may be drawn from, preferring certainty about the budget.
- */
-function pickEligible(
-  budget: BudgetPartition,
-  ranked: PinnedFinnCar[],
-): PinnedFinnCar[] {
-  if (budget.within.length) return budget.within;
-  if (budget.unknown.length) return budget.unknown;
-  return ranked;
 }
 
 /**
@@ -821,6 +836,7 @@ const STORAGE_KEYS = [
   "finnLensProfiles",
   "finnLensCategoryFeatures",
   "finnLensDefaultProfileId",
+  "finnLensBasedOn",
 ] as const;
 
 /**
@@ -843,6 +859,13 @@ const RETIRED_PRIORITIES: string[] = ["affordability"];
 const MERGED_PRIORITIES: Record<string, CategoryId> = {
   safety: "safetyAssistance",
   driverAssistance: "safetyAssistance",
+  /*
+   * Family Friendly couldn't carry a score of its own: on FINN's inventory its
+   * child-specific evidence was either on nearly every car (ISOFIX) or minor.
+   * What remains of it — rear doors, a folding bench, a powered tailgate —
+   * lives in Practicality, and family intent lives in the Family First profile.
+   */
+  familyFriendly: "practicality",
 };
 
 const isLivePriority = (id: string): boolean =>
@@ -887,10 +910,11 @@ function migratePriorityOrder(stored: string[]): CategoryId[] {
  * told us across an upgrade.
  */
 type StoredFeature =
-  | FeatureId
+  | string
   | {
-      key?: FeatureId;
+      key?: string;
       importance?: string;
+      source?: string;
       /** essential | good | luxury, from the original tier system. */
       tier?: string;
     };
@@ -910,7 +934,11 @@ const TIER_TO_IMPORTANCE: Record<string, FeatureImportance> = {
 
 function readStoredFeature(stored: StoredFeature): FeaturePreference | null {
   if (typeof stored === "string") {
-    return { key: stored, importance: DEFAULT_FEATURE_IMPORTANCE };
+    return {
+      key: stored as SignalId,
+      importance: DEFAULT_FEATURE_IMPORTANCE,
+      source: "user",
+    };
   }
 
   if (!stored?.key) return null;
@@ -922,149 +950,134 @@ function readStoredFeature(stored: StoredFeature): FeaturePreference | null {
         ? (TIER_TO_IMPORTANCE[stored.tier] ?? DEFAULT_FEATURE_IMPORTANCE)
         : DEFAULT_FEATURE_IMPORTANCE;
 
-  return { key: stored.key, importance };
+  return {
+    key: stored.key as SignalId,
+    importance,
+    /* Settings saved before provenance existed were the reader's own. */
+    source: stored.source === "profile" ? "profile" : "user",
+  };
 }
 
+const louder = (a: FeaturePreference, b: FeaturePreference): boolean =>
+  FEATURE_IMPORTANCE[a.importance].weight > FEATURE_IMPORTANCE[b.importance].weight;
+
 /**
- * Brings a stored feature selection up to the current rules.
+ * Brings stored raises up to the current evidence model.
  *
- * Ids the catalogue no longer offers are dropped, duplicates created by the
- * safety merge collapse to one keeping the stronger importance, and the
- * result is capped at the maximum.
+ * Every raise moves to its item's home priority, wherever it was stored — a
+ * reversing camera raised under the old Safety or Family Friendly now lives
+ * under City & Parking. A raise is kept even when that home isn't in the
+ * reader's order, so putting the priority back restores it.
  *
- * A category that ends up empty stays empty, and so does a fresh install:
- * picking nothing means "judge this category on its catalogue", which is a
- * preference to respect rather than a form to fill in on the user's behalf.
+ * Raises on evidence the model no longer scores — baseline equipment on
+ * nearly every car, and taste items — have nowhere to live and are dropped.
+ * A duplicate keeps the louder level; each priority is capped at five.
+ *
+ * Priorities the reader never stored anything for start from `base`: the
+ * emphasis of the profile their settings came from.
  */
 function migrateCategoryFeatures(
   stored: Record<string, StoredFeature[]> | undefined,
+  base: Record<CategoryId, FeatureSelection>,
 ): Record<CategoryId, FeatureSelection> {
-  const result = { ...DEFAULT_CATEGORY_FEATURES };
+  if (!stored) return base;
 
-  if (!stored) return result;
-
-  const merged: Record<string, StoredFeature[]> = {};
+  const rehomed = new Map<CategoryId, Map<SignalId, FeaturePreference>>();
+  const answered = new Set<CategoryId>();
 
   for (const [id, features] of Object.entries(stored)) {
     if (!isLivePriority(id)) continue;
 
     const current = currentIdFor(id);
-    if (!(current in CATEGORIES)) continue;
+    if (current in CATEGORIES) answered.add(current);
 
-    merged[current] = [...(merged[current] ?? []), ...(features ?? [])];
-  }
-
-  for (const [id, features] of Object.entries(merged)) {
-    const category = id as CategoryId;
-    const catalogue = AVAILABLE_CATEGORY_FEATURES[category] ?? [];
-
-    const kept = new Map<FeatureId, FeaturePreference>();
-
-    for (const entry of features) {
+    for (const entry of features ?? []) {
       const preference = readStoredFeature(entry);
-
       if (!preference) continue;
-      if (!catalogue.includes(preference.key)) continue;
 
+      const home = homeOf(preference.key);
+      if (!home) continue;
+
+      /* A raise that arrives in a new home makes that home answered too. */
+      answered.add(home);
+
+      const kept = rehomed.get(home) ?? new Map<SignalId, FeaturePreference>();
       const existing = kept.get(preference.key);
 
-      /* The safety merge can bring one feature in twice. Keep the louder. */
-      if (
-        existing &&
-        FEATURE_IMPORTANCE[existing.importance].weight >=
-          FEATURE_IMPORTANCE[preference.importance].weight
-      ) {
-        continue;
+      if (!existing || louder(preference, existing)) {
+        kept.set(preference.key, preference);
       }
 
-      kept.set(preference.key, preference);
-    }
-
-    result[category] = [...kept.values()].slice(0, MAX_FEATURES_PER_CATEGORY);
-  }
-
-  /*
-   * Only the categories the reader actually stored something for count as
-   * theirs; the rest are still sitting on the shipped defaults.
-   */
-  return giveEachFeatureOneHome(
-    result,
-    new Set(Object.keys(merged) as CategoryId[]),
-  );
-}
-
-/**
- * Enforce the one-home rule on settings saved before it existed.
- *
- * A feature counts extra in one priority only. The picker enforces it — a
- * feature raised elsewhere shows as locked, naming the category that holds
- * it — and the shipped defaults obey it. Settings saved by an earlier build
- * do not: they can raise heated seats under climate, comfort and long
- * distance at once.
- *
- * Leaving those alone was the previous behaviour, on the reasonable-sounding
- * ground that nothing a reader saved should be taken away. It turned out to
- * be the wrong call: it left the product displaying a configuration it would
- * refuse to let anyone build, with no way to see why or to fix it, and the
- * reader has no idea their heated-seats pick is being counted three times.
- *
- * So a duplicate is resolved rather than kept. See `winner` for which side
- * of a contest wins, and why a saved answer always beats a shipped default.
- */
-function giveEachFeatureOneHome(
-  selections: Record<CategoryId, FeatureSelection>,
-  answered: Set<CategoryId>,
-): Record<CategoryId, FeatureSelection> {
-  const home = new Map<FeatureId, CategoryId>();
-
-  /**
-   * Which of two categories keeps a feature they both raise.
-   *
-   * The reader's own answer beats a shipped default outright, whatever the
-   * levels say — a default is Lens guessing, and a guess never overrules the
-   * person it was guessing about. Between two of the reader's own, the one
-   * they said it mattered more in keeps it. A dead tie goes to whichever
-   * comes first in `CATEGORY_IDS`: arbitrary, but stable, so the same
-   * settings always migrate the same way rather than depending on the order
-   * storage happened to hand them back.
-   */
-  const winner = (a: CategoryId, b: CategoryId, key: FeatureId): CategoryId => {
-    if (answered.has(a) !== answered.has(b)) {
-      return answered.has(a) ? a : b;
-    }
-
-    const levelIn = (category: CategoryId) => {
-      const found = (selections[category] ?? []).find(
-        (item) => item.key === key,
-      );
-
-      return found ? FEATURE_IMPORTANCE[found.importance].weight : 0;
-    };
-
-    if (levelIn(a) !== levelIn(b)) return levelIn(a) > levelIn(b) ? a : b;
-
-    return CATEGORY_IDS.indexOf(a) <= CATEGORY_IDS.indexOf(b) ? a : b;
-  };
-
-  for (const category of CATEGORY_IDS) {
-    for (const preference of selections[category] ?? []) {
-      const held = home.get(preference.key);
-
-      home.set(
-        preference.key,
-        held ? winner(held, category, preference.key) : category,
-      );
+      rehomed.set(home, kept);
     }
   }
 
   return Object.fromEntries(
     CATEGORY_IDS.map((category) => [
       category,
-      (selections[category] ?? []).filter(
-        (preference) => home.get(preference.key) === category,
-      ),
+      answered.has(category)
+        ? [...(rehomed.get(category)?.values() ?? [])].slice(0, MAX_FEATURES_PER_CATEGORY)
+        : base[category],
     ]),
   ) as Record<CategoryId, FeatureSelection>;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Profiles as starting points                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What applying a profile sets: its order and its emphasis, marked as the
+ * profile's, and a note of where the settings came from.
+ *
+ * Replaces the reader's order and emphasis outright. The caller keeps what it
+ * replaced so it can offer an undo.
+ */
+export function applyProfile(id: ProfileId): {
+  priorities: CategoryId[];
+  categoryFeatures: Record<CategoryId, FeatureSelection>;
+  basedOn: SettingsBasis;
+} {
+  return {
+    priorities: [...PROFILES[id].priorities],
+    categoryFeatures: profileEmphasis(id),
+    basedOn: id,
+  };
+}
+
+const sameEmphasis = (a: FeatureSelection, b: FeatureSelection): boolean =>
+  a.length === b.length &&
+  a.every((item) =>
+    b.some((other) => other.key === item.key && other.importance === item.importance),
+  );
+
+/**
+ * Whether settings have moved away from the profile they started from.
+ *
+ * Derived rather than stored: the order, or any priority's emphasis, differs
+ * from the profile's own. Who set an entry doesn't count — a reader who
+ * raises something to exactly the level the profile had hasn't changed it.
+ */
+export function isCustomisedFrom(
+  settings: {
+    priorities: CategoryId[];
+    categoryFeatures: Record<CategoryId, FeatureSelection>;
+  },
+  basedOn: SettingsBasis,
+): boolean {
+  if (!basedOn) return true;
+
+  const profile = applyProfile(basedOn);
+
+  if (profile.priorities.join() !== settings.priorities.join()) return true;
+
+  return CATEGORY_IDS.some(
+    (category) =>
+      !sameEmphasis(
+        settings.categoryFeatures[category] ?? [],
+        profile.categoryFeatures[category],
+      ),
+  );
 }
 
 /**
@@ -1183,6 +1196,7 @@ export async function loadLensSettings(): Promise<LensSettings> {
     finnLensProfiles?: Profile[];
     finnLensCategoryFeatures?: Record<string, StoredFeature[]>;
     finnLensDefaultProfileId?: string;
+    finnLensBasedOn?: string | null;
   };
 
   /*
@@ -1245,19 +1259,36 @@ export async function loadLensSettings(): Promise<LensSettings> {
    * With nothing usable stored, the default profile is what the user gets —
    * that being the whole meaning of "default profile".
    */
-  const fallbackOrder =
-    profiles.find((profile) => profile.id === defaultProfileId && profile.enabled)
-      ?.priorities ??
-    profiles.find((profile) => profile.enabled)?.priorities ??
-    DEFAULT_PRIORITIES;
+  const startingProfile =
+    profiles.find((profile) => profile.id === defaultProfileId && profile.enabled) ??
+    profiles.find((profile) => profile.enabled);
+
+  const fallbackOrder = startingProfile?.priorities ?? DEFAULT_PRIORITIES;
+
+  /*
+   * Where the settings came from. A stored answer wins; otherwise a reader
+   * with no stored order is on the starting profile, and one with an order
+   * saved before provenance existed built it by hand.
+   */
+  const storedBasis = stored.finnLensBasedOn;
+
+  const basedOn: SettingsBasis =
+    typeof storedBasis === "string" && storedBasis in PROFILES
+      ? (storedBasis as ProfileId)
+      : storedBasis === null || priorities.length
+        ? null
+        : (startingProfile?.id ?? DEFAULT_DEFAULT_PROFILE_ID);
+
+  const base = basedOn ? profileEmphasis(basedOn) : DEFAULT_CATEGORY_FEATURES;
 
   return {
     preferences: migratePreferences(stored.finnLensPreferences),
     priorities: priorities.length ? priorities : [...fallbackOrder],
     priorityDefinitions,
     profiles,
-    categoryFeatures: migrateCategoryFeatures(stored.finnLensCategoryFeatures),
+    categoryFeatures: migrateCategoryFeatures(stored.finnLensCategoryFeatures, base),
     defaultProfileId,
+    basedOn,
   };
 }
 
@@ -1285,6 +1316,10 @@ export async function saveLensSettings(
 
     ...(settings.defaultProfileId
       ? { finnLensDefaultProfileId: settings.defaultProfileId }
+      : {}),
+
+    ...(settings.basedOn !== undefined
+      ? { finnLensBasedOn: settings.basedOn }
       : {}),
   });
 }

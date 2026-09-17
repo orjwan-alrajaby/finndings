@@ -8,6 +8,8 @@ import type { PriorityReasoning, Verdict } from "./types";
 import { formatEUR } from "../format";
 import { totalFor } from "../scoring";
 import { classifyTotalGap, isEffectivelyLevel } from "./magnitude";
+import { dependsOnFor } from "../decision";
+import { absentList, emphasisClause, gapPhrase } from "./evidence-phrases";
 import {
   coverage,
   inSentence,
@@ -59,34 +61,35 @@ export function summarisePriority(
   const { basis, picked, coverage: cover } = reasoning.features;
   const { present, missing } = picked;
 
-  /* What the reader asked for leads, because they wrote it. */
+  /* What was raised leads, saying whose raise it was. */
   if (present.length + missing.length > 0) {
     const total = present.length + missing.length;
+    const who = emphasisClause([...present, ...missing].map((fact) => fact.source));
 
     if (!missing.length) {
       const named = joinCapped(present.map((fact) => fact.phrase), 5);
 
       return total === 1
-        ? sentence(`${opener}, and this car has ${named}, the one feature you picked out`)
+        ? sentence(`${opener}, and this car has ${named}, the one thing ${who} there`)
         : sentence(
-            `${opener}, and this car has every feature you picked out there:`,
+            `${opener}, and this car has everything ${who} there:`,
             named,
           );
     }
 
-    const gap = joinCapped(missing.map((fact) => fact.phrase), 5);
+    const gap = absentList(missing.map((fact) => fact.key));
 
     if (!present.length) {
       return sentence(
-        `${opener}, and this car has none of what you picked out there —`,
-        `it's missing ${gap}`,
+        `${opener}, and this car has none of what ${who} there —`,
+        gap,
       );
     }
 
     return sentence(
       `${opener}, and this car has`,
-      `${coverage(present.length, total)} features you picked out there —`,
-      `it doesn't have ${gap}`,
+      `${coverage(present.length, total)} things ${who} there —`,
+      gap,
     );
   }
 
@@ -111,9 +114,8 @@ export function summarisePriority(
 
   if (basis === "category" && total > 0) {
     return sentence(
-      `${opener}. You didn't pick out particular features there, so it's`,
-      `judged on everything the priority covers — this one has`,
-      `${cover.present.length} of the ${total}`,
+      `${opener}. Nothing is raised there, so everything it checks counts`,
+      `the same — this one has ${cover.present.length} of the ${total}`,
     );
   }
 
@@ -312,6 +314,7 @@ function challengerVerdict(
         : null,
     margin,
     marginNote: null,
+    dependsNote: null,
   };
 }
 
@@ -344,10 +347,41 @@ export function reasonAboutVerdict(
       : sentence(`${name} is the strongest match for what you told us`);
 
   return {
-    headline,
+    headline: judgeable(evaluation)
+      ? headline
+      : sentence(
+          `${name} is the best estimate for what you told us, but FINN's data`,
+          "doesn't cover enough of your top two priorities to recommend it with confidence",
+        ),
     reasons: describeReasons(priorities),
     budgetNote: describeBudgetOverride(evaluation, context),
     margin,
     marginNote: describeMargin(margin, priorities),
+    dependsNote: describeDependsOn(evaluation, context),
   };
+}
+
+const judgeable = (evaluation: VehicleEvaluation): boolean =>
+  evaluation.score.judgeable;
+
+/**
+ * "This could change depending on …", said only when filling a gap FINN left
+ * could put the runner-up ahead of the recommendation.
+ */
+function describeDependsOn(
+  evaluation: VehicleEvaluation,
+  context: ReasoningContext,
+): string | null {
+  const gaps = dependsOnFor(context, evaluation.vehicle);
+  if (!gaps.length) return null;
+
+  const electric = (id: number) =>
+    context.vehicles.find((vehicle) => vehicle.id === id)?.fuelType === "Electric";
+
+  const phrases = [...new Set(gaps.map((gap) => gapPhrase(gap, electric(gap.vehicleId))))];
+
+  return sentence(
+    `This could change depending on ${joinCapped(phrases, 3)},`,
+    "which FINN doesn't publish",
+  );
 }

@@ -10,14 +10,17 @@ import {
   selectAlternatives,
 } from "./index";
 import { buildAdviceNarrative, reasonAboutChallenge } from "./narrative";
-import type { CategoryId, FeatureSelection } from "./types";
+import type { CategoryId, FeatureId, FeatureSelection } from "./types";
+import { LOAD_VOLUME } from "./narrative/facts";
 import {
+  CATEGORIES,
   CATEGORY_IDS,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_PREFERENCES,
   DEFAULT_PRIORITIES,
   DEFAULT_PROFILES,
 } from "./constants";
+import { BASELINE } from "./test-garage";
 import { makeCar, prefs } from "./test-fixtures";
 
 const SAFETY_FIRST: CategoryId[] = ["safetyAssistance", "practicality"];
@@ -498,33 +501,30 @@ describe("alternatives and the hot seat", () => {
   const preferences = prefs({ monthlyBudget: 0, monthlyKm: 500 });
 
   /*
-   * Five cars ranked C, A, E, B, D with C recommended. Safety feature counts
-   * are chosen to force exactly that order.
+   * Five cars ranked C, A, E, B, D with C recommended. Their safety equipment
+   * is chosen to force exactly that order under the default emphasis: blind
+   * spot warning ×3, rear cross-traffic alert and matrix LED ×1 — 100, 80,
+   * 60, 40 and 0.
    */
   const buildFive = () => {
-    const safety: Array<[number, string, number]> = [
-      [3, "Car C", 4],
-      [1, "Car A", 3],
-      [5, "Car E", 2],
-      [2, "Car B", 1],
-      [4, "Car D", 0],
+    const safety: Array<[number, string, FeatureId[]]> = [
+      [3, "Car C", ["hasBlindSpotAssist", "hasRearCrosswalkWarning", "hasMatrixLedHeadlights"]],
+      [1, "Car A", ["hasBlindSpotAssist", "hasRearCrosswalkWarning"]],
+      [5, "Car E", ["hasBlindSpotAssist"]],
+      [2, "Car B", ["hasRearCrosswalkWarning", "hasMatrixLedHeadlights"]],
+      [4, "Car D", []],
     ];
 
-    const pool = [
-      "hasEmergencyBrakingAssist",
-      "hasBlindSpotAssist",
-      "hasLaneKeepingAssist",
-      "hasEmergencyCallSystem",
-    ] as const;
-
-    return safety.map(([id, name, count]) =>
+    return safety.map(([id, name, equipment]) =>
       makeCar({
         id,
         name,
         customerMonthly: 400,
         consumption: 5,
         trunk: 400,
-        features: [...pool.slice(0, count)],
+        /* Safety's standard kit on every car, so only the varying kit decides. */
+        features: [...CATEGORIES.safetyAssistance.expected, ...equipment],
+        featuresSupplied: true,
       }),
     );
   };
@@ -573,17 +573,17 @@ describe("alternatives and the hot seat", () => {
    * The point of the alternatives set: a distant car that happens to top one
    * category is not a realistic thing to be offered instead.
    */
+  /* Every car carries the standard kit, so no confirmed gap decides it. */
   it("picks alternatives by overall closeness, not by winning one category", () => {
     const winner = makeCar({
       id: 1,
       name: "Winner Car",
-      trunk: 400,
       features: [
-        "hasEmergencyBrakingAssist",
+        ...BASELINE,
         "hasBlindSpotAssist",
-        "hasLaneKeepingAssist",
-        "hasEmergencyCallSystem",
-        "hasAdaptiveCruiseControl",
+        "hasRearCrosswalkWarning",
+        "hasMatrixLedHeadlights",
+        "hasSplitFoldingRearSeats",
       ],
     });
 
@@ -591,34 +591,27 @@ describe("alternatives and the hot seat", () => {
       makeCar({
         id: index + 2,
         name: `Close ${index + 1}`,
-        trunk: 400,
-        features: [
-          "hasEmergencyBrakingAssist",
-          "hasBlindSpotAssist",
-          "hasLaneKeepingAssist",
-          "hasEmergencyCallSystem",
-        ],
+        features: [...BASELINE, "hasBlindSpotAssist", "hasRearCrosswalkWarning", "hasSplitFoldingRearSeats"],
       }),
     );
 
-    /* Tops practicality on boot space, and is hopeless at everything else. */
-    const bootSpecialist = makeCar({
+    /* Tops practicality, and is hopeless at everything else. */
+    const practicalSpecialist = makeCar({
       id: 99,
-      name: "Boot Specialist",
-      trunk: 2000,
-      features: [],
+      name: "Practical Specialist",
+      features: [...BASELINE, "hasSplitFoldingRearSeats", "hasElectricTailgate"],
     });
 
     const result = buildRecommendation(
-      [winner, ...close, bootSpecialist],
-      ["safetyAssistance", "practicality"],
+      [winner, ...close, practicalSpecialist],
+      ["safetyAssistance", "practicality", "comfort"],
       preferences,
       features(),
     )!;
 
     expect(result.winner.id).toBe(1);
     expect(
-      result.alternatives.some((car) => car.name === "Boot Specialist"),
+      result.alternatives.some((car) => car.name === "Practical Specialist"),
     ).toBe(false);
   });
 
@@ -629,13 +622,15 @@ describe("alternatives and the hot seat", () => {
         name: `Car ${index + 1}`,
         customerMonthly: 400,
         consumption: 5,
-        trunk: 300 + index * 10,
+        length: 4000 + index * 50,
+        features: ["hasEmergencyBrakingAssist"],
+        featuresSupplied: true,
       }),
     );
 
     const result = buildRecommendation(
       many,
-      ["practicality"],
+      ["cityParking", "safetyAssistance", "comfort"],
       preferences,
       features(),
     )!;
@@ -673,35 +668,22 @@ describe("alternatives and the hot seat", () => {
     const winner = makeCar({
       id: 1,
       name: "Winner Car",
-      trunk: 400,
-      features: [
-        "hasEmergencyBrakingAssist",
-        "hasBlindSpotAssist",
-        "hasLaneKeepingAssist",
-        "hasEmergencyCallSystem",
-      ],
+      length: 4800,
+      features: ["hasBlindSpotAssist", "hasRearCrosswalkWarning", "hasMatrixLedHeadlights"],
     });
 
-    const bigBoot = makeCar({
+    const shortCar = makeCar({
       id: 2,
-      name: "Roomy Car",
-      trunk: 1600,
-      features: [
-        "hasEmergencyBrakingAssist",
-        "hasBlindSpotAssist",
-        "hasLaneKeepingAssist",
-      ],
+      name: "Short Car",
+      length: 3900,
+      features: ["hasBlindSpotAssist"],
     });
 
     const result = buildRecommendation(
-      [winner, bigBoot],
-      ["safetyAssistance", "practicality"],
+      [winner, shortCar],
+      ["safetyAssistance", "cityParking", "comfort"],
       preferences,
-      features({
-        safetyAssistance: [
-          { key: "hasEmergencyCallSystem", importance: "high" },
-        ],
-      }),
+      features(),
     )!;
 
     const [option] = alternativeOptions(
@@ -936,16 +918,20 @@ describe("comparative reasoning", () => {
     expect(summary).not.toMatch(/\d+\/100/);
   });
 
-  /* The recommendation's own boot figure is still reported, unprompted. */
-  it("quotes the measurement behind a priority without being asked", () => {
+  /*
+   * FINN's boot figure is still reported, unprompted — and labelled as FINN's
+   * listing, never scored, because it doesn't say whether the seats are folded.
+   */
+  it("quotes FINN's load volume without scoring it", () => {
     const result = setup();
 
-    const practicality = result.evaluation.priorities.find(
-      (item) => item.priority === "practicality",
-    )!;
+    const narrative = buildAdviceNarrative(result.evaluation, result.context, result.alternatives);
+    const practicality = narrative.priorities.find((item) => item.priority === "practicality")!;
+    const load = practicality.measurements.find((fact) => fact.label === LOAD_VOLUME);
 
-    expect(practicality.numeric?.label).toBe("Boot space");
-    expect([390, 520]).toContain(practicality.numeric?.value);
+    expect(result.evaluation.priorities.find((item) => item.priority === "practicality")?.numeric).toBeNull();
+    expect(load?.scored).toBe(false);
+    expect([390, 520]).toContain(load?.value);
   });
 
   it("never says a car won because 'your other priorities matter more'", () => {
@@ -992,7 +978,8 @@ describe("comparative reasoning", () => {
       0,
     );
 
-    expect(Math.round(recomputed)).toBe(result.evaluation.score.total);
+    /* Each priority's share is built from its rounded score, so allow the rounding. */
+    expect(Math.abs(recomputed - result.evaluation.score.total)).toBeLessThanOrEqual(1);
   });
 });
 

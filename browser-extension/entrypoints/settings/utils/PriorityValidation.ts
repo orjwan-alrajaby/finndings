@@ -1,7 +1,8 @@
 import {
   MAX_FEATURES_PER_CATEGORY,
+  MAX_PRIORITIES,
+  MIN_PRIORITIES,
   NUMERIC_ONLY_CATEGORIES,
-  PROFILE_PRIORITY_COUNT,
 } from "@/lib/reasoning-engine/constants";
 import type {
   CategoryId,
@@ -24,8 +25,8 @@ export function isNumericOnlyPriority(id: CategoryId): boolean {
 export function getProfileIssues(profile: Profile, priorityDefinitions: PriorityDefinition[]): string[] {
   const issues: string[] = [];
 
-  if (profile.priorities.length !== PROFILE_PRIORITY_COUNT) {
-    issues.push(`Has ${profile.priorities.length} priorities — every profile carries ${PROFILE_PRIORITY_COUNT}.`);
+  if (profile.priorities.length < MIN_PRIORITIES || profile.priorities.length > MAX_PRIORITIES) {
+    issues.push(`Has ${profile.priorities.length} priorities — a profile carries ${MIN_PRIORITIES} to ${MAX_PRIORITIES}.`);
   }
 
   for (const id of profile.priorities) {

@@ -1,7 +1,7 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
-  FeatureId,
   FeatureImportance,
+  SignalId,
   FeaturePreference,
   PriorityBreakdown,
 } from "../types";
@@ -15,7 +15,8 @@ import type {
   TraitFact,
 } from "./types";
 
-import { FEATURES } from "../constants";
+import { SIGNALS } from "../constants";
+import { isBinarySignal } from "../evidence";
 import { featureLabel, featurePhrase } from "../scoring";
 import { formatNumber } from "../format";
 import {
@@ -39,10 +40,11 @@ import {
 /* -------------------------------------------------------------------------- */
 
 export function featureFact(
-  key: FeatureId,
+  key: SignalId,
   importance: FeatureImportance | null = null,
+  source: FeaturePreference["source"] | null = null,
 ): FeatureFact {
-  const meta = FEATURES[key];
+  const meta = SIGNALS[key];
 
   return {
     key,
@@ -50,12 +52,13 @@ export function featureFact(
     phrase: featurePhrase(key),
     explanation: meta?.explanation ?? "",
     importance,
+    source: importance ? (source ?? "user") : null,
   };
 }
 
-/** A picked feature keeps the importance the user gave it. */
+/** A raised item keeps its level and who raised it. */
 const pickedFact = (preference: FeaturePreference): FeatureFact =>
-  featureFact(preference.key, preference.importance);
+  featureFact(preference.key, preference.importance, preference.source);
 
 /**
  * What the car has and hasn't, on both questions the reader cares about.
@@ -66,11 +69,20 @@ const pickedFact = (preference: FeaturePreference): FeatureFact =>
  * explanation has to be able to answer separately.
  */
 export function featureEvidence(breakdown: PriorityBreakdown): FeatureEvidence {
-  const { matched, missing, basis, pickedMatched, pickedMissing } = breakdown;
+  const { matched, missing, unknown, basis, pickedMatched, pickedMissing, pickedUnknown } =
+    breakdown;
+
+  /*
+   * Yes-or-no evidence only. A measured figure — length — is quoted as the
+   * figure it is, in the measurements, never as a chip saying the car "has"
+   * compact length.
+   */
+  const binary = (preference: FeaturePreference) => isBinarySignal(preference.key);
 
   const picked = {
-    present: pickedMatched.map(pickedFact),
-    missing: pickedMissing.map(pickedFact),
+    present: pickedMatched.filter(binary).map(pickedFact),
+    missing: pickedMissing.filter(binary).map(pickedFact),
+    unknown: pickedUnknown.filter(binary).map(pickedFact),
   };
 
   return {
@@ -78,10 +90,15 @@ export function featureEvidence(breakdown: PriorityBreakdown): FeatureEvidence {
     coverage: {
       present: matched.map((key) => featureFact(key)),
       missing: missing.map((key) => featureFact(key)),
+      unknown: unknown.filter(isBinarySignal).map((key) => featureFact(key)),
     },
     picked,
     highMisses: picked.missing.filter((fact) => fact.importance === "high"),
     selectedCount: picked.present.length + picked.missing.length,
+    standard: (breakdown.standard ?? []).map((check) => ({
+      ...featureFact(check.key),
+      state: check.state,
+    })),
   };
 }
 
@@ -109,28 +126,35 @@ function supportingMeasurements(
   const trunk = finite(vehicle.capacity?.trunk);
   const doors = finite(vehicle.doors);
   const consumption = finite(vehicle.consumption?.combined);
+  const charging = vehicle.fuelType === "Electric" ? (vehicle.dcChargeMinutes ?? null) : null;
 
   const consumptionUnit =
     vehicle.fuelType === "Electric" ? "kWh/100km" : "L/100km";
 
   switch (priority) {
+    /*
+     * The load volume is shown and never scored: FINN's single figure is the
+     * seats-up volume for some cars and the seats-folded one for others, and
+     * doesn't say which. Its label says as much wherever it appears.
+     */
     case "practicality":
-      return seats == null
-        ? []
-        : [{ label: "Seats", value: seats, unit: "", lowerIsBetter: false }];
-
-    case "familyFriendly":
       return [
-        ...(seats == null
+        ...(seats == null || seats <= 0
           ? []
           : [{ label: "Seats", value: seats, unit: "", lowerIsBetter: false }]),
-        ...(trunk == null
-          ? []
-          : [{ label: "Boot space", value: trunk, unit: "L", lowerIsBetter: false }]),
-        ...(doors == null
+        ...(doors == null || doors <= 0
           ? []
           : [{ label: "Doors", value: doors, unit: "", lowerIsBetter: false }]),
+        ...(trunk == null
+          ? []
+          : [{ label: LOAD_VOLUME, value: trunk, unit: "L", lowerIsBetter: false }]),
       ];
+
+    /* FINN's charging time for an electric car: quoted, never scored. */
+    case "longDistance":
+      return charging == null
+        ? []
+        : [{ label: DC_CHARGING, value: charging, unit: "min", lowerIsBetter: true }];
 
     case "environmental":
       return consumption == null
@@ -148,6 +172,12 @@ function supportingMeasurements(
       return [];
   }
 }
+
+/** The label FINN's unscored boot figure carries everywhere. */
+export const LOAD_VOLUME = "Load volume as FINN lists it";
+
+/** The label FINN's DC charging time carries everywhere. */
+export const DC_CHARGING = "DC charging, 10–80%";
 
 /**
  * The figure a priority is *about*, reported when the engine couldn't score
@@ -172,36 +202,20 @@ function headlineMeasurements(
       ? finite(vehicle.electric.range)
       : null;
 
-  const consumption = finite(vehicle.consumption?.combined);
-  const trunk = finite(vehicle.capacity?.trunk);
   const co2 = finite(vehicle.co2?.value);
-
-  const consumptionUnit =
-    vehicle.fuelType === "Electric" ? "kWh/100km" : "L/100km";
+  const length = finite(vehicle.dimensions?.length);
 
   switch (priority) {
-    case "practicality":
-      return trunk == null
+    case "cityParking":
+      return length == null || length <= 0
         ? []
-        : [{ label: "Boot space", value: trunk, unit: "L", lowerIsBetter: false }];
+        : [{ label: "Length", value: length, unit: "mm", lowerIsBetter: true }];
 
+    /* Consumption isn't part of Long Distance: CO₂ and the cost already read it. */
     case "longDistance":
-      if (range != null) {
-        return [
-          { label: "Electric range", value: range, unit: "km", lowerIsBetter: false },
-        ];
-      }
-
-      return consumption == null
+      return range == null || vehicle.fuelType !== "Electric"
         ? []
-        : [
-            {
-              label: "Consumption",
-              value: consumption,
-              unit: consumptionUnit,
-              lowerIsBetter: true,
-            },
-          ];
+        : [{ label: "Electric range", value: range, unit: "km", lowerIsBetter: false }];
 
     case "environmental":
       return co2 == null || co2 <= 0

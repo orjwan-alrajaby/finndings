@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  AVAILABLE_CATEGORY_FEATURES,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_DEFAULT_PROFILE_ID,
   DEFAULT_PROFILES,
   MAX_FEATURES_PER_CATEGORY,
   PROFILES,
+  profileEmphasis,
 } from "./constants";
+import type { CategoryId } from "./types";
 
 /**
  * Settings migration.
@@ -37,7 +38,13 @@ vi.stubGlobal("browser", {
   },
 });
 
-const { hasSavedLensSettings, loadLensSettings } = await import("./index");
+const {
+  applyProfile,
+  hasSavedLensSettings,
+  isCustomisedFrom,
+  loadLensSettings,
+  saveLensSettings,
+} = await import("./index");
 
 beforeEach(() => {
   stored = {};
@@ -94,7 +101,7 @@ describe("the safety merge reaches existing users without breaking them", () => 
     expect(settings.priorities).toContain("safetyAssistance");
   });
 
-  it("folds both old feature lists into the merged one", async () => {
+  it("moves every stored raise to its item's home, whichever list it came from", async () => {
     stored.finnLensCategoryFeatures = {
       safety: [
         { key: "hasEmergencyBrakingAssist", tier: "essential" },
@@ -102,37 +109,107 @@ describe("the safety merge reaches existing users without breaking them", () => 
       ],
       driverAssistance: [
         { key: "hasAdaptiveCruiseControl", tier: "good" },
-        { key: "hasParkingSensors", tier: "good" },
+        { key: "hasOneEightyDegreesReversingCamera", tier: "good" },
       ],
     };
 
     const settings = await loadLensSettings();
-    const keys = settings.categoryFeatures.safetyAssistance.map((p) => p.key);
 
-    expect(keys).toContain("hasEmergencyBrakingAssist");
-    expect(keys).toContain("hasAdaptiveCruiseControl");
-    expect(keys.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
+    /* Emergency braking is Safety's standard kit: raisable, so its raise is kept. */
+    expect(settings.categoryFeatures.safetyAssistance).toEqual([
+      { key: "hasEmergencyBrakingAssist", importance: "high", source: "user" },
+      { key: "hasBlindSpotAssist", importance: "high", source: "user" },
+    ]);
+
+    expect(settings.categoryFeatures.longDistance).toEqual([
+      { key: "hasAdaptiveCruiseControl", importance: "medium", source: "user" },
+    ]);
+
+    expect(settings.categoryFeatures.cityParking).toEqual([
+      { key: "hasOneEightyDegreesReversingCamera", importance: "medium", source: "user" },
+    ]);
   });
 
-  /* The same feature sat in both old lists. It must arrive once, and loud. */
-  it("collapses a feature the merge duplicates, keeping the stronger", async () => {
+  /* A raise on something the model no longer counts has nowhere to count, and is dropped. */
+  it("drops raises on items no longer scored, and keeps those on standard equipment", async () => {
     stored.finnLensCategoryFeatures = {
-      safety: [{ key: "hasEmergencyBrakingAssist", tier: "essential" }],
-      driverAssistance: [{ key: "hasEmergencyBrakingAssist", tier: "luxury" }],
+      comfort: [
+        { key: "hasSunroof", importance: "medium" },
+        { key: "hasAmbientInteriorLightning", importance: "low" },
+      ],
+      safetyAssistance: [{ key: "hasEmergencyBrakingAssist", importance: "high" }],
     };
 
     const settings = await loadLensSettings();
 
+    expect(settings.categoryFeatures.comfort).toEqual([]);
     expect(settings.categoryFeatures.safetyAssistance).toEqual([
-      { key: "hasEmergencyBrakingAssist", importance: "high" },
+      { key: "hasEmergencyBrakingAssist", importance: "high", source: "user" },
     ]);
+  });
+
+  it("folds Family Friendly into Practicality, in the order and the raises", async () => {
+    stored.finnLensPriorities = ["familyFriendly", "practicality", "comfort"];
+    stored.finnLensCategoryFeatures = {
+      familyFriendly: [
+        { key: "hasIsofix", importance: "high" },
+        { key: "hasElectricTailgate", importance: "medium" },
+        { key: "hasOneEightyDegreesReversingCamera", importance: "high" },
+      ],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.priorities).toEqual(["practicality", "comfort"]);
+    /* ISOFIX is Practicality's standard equipment: raisable, so its raise is kept. */
+    expect(settings.categoryFeatures.practicality).toEqual([
+      { key: "hasIsofix", importance: "high", source: "user" },
+      { key: "hasElectricTailgate", importance: "medium", source: "user" },
+    ]);
+    expect(settings.categoryFeatures.cityParking).toEqual([
+      { key: "hasOneEightyDegreesReversingCamera", importance: "high", source: "user" },
+    ]);
+  });
+
+  /* A raise stays with its item even when that priority isn't ranked. */
+  it("keeps a raise whose new home isn't in the reader's order", async () => {
+    stored.finnLensPriorities = ["safety", "comfort", "practicality"];
+    stored.finnLensCategoryFeatures = {
+      safety: [{ key: "hasThreeSixtyDegreesCamera", importance: "low" }],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.priorities).not.toContain("cityParking");
+    expect(settings.categoryFeatures.cityParking).toEqual([
+      { key: "hasThreeSixtyDegreesCamera", importance: "low", source: "user" },
+    ]);
+  });
+
+  /* The same item raised in two old lists arrives once, and loud. */
+  it("collapses a duplicate raise, keeping the stronger level", async () => {
+    stored.finnLensCategoryFeatures = {
+      comfort: [{ key: "hasHeatedSeats", importance: "low" }],
+      climateSuitability: [{ key: "hasHeatedSeats", importance: "high" }],
+      longDistance: [{ key: "hasHeatedSeats", importance: "medium" }],
+    };
+
+    const settings = await loadLensSettings();
+
+    expect(settings.categoryFeatures.climateSuitability).toEqual([
+      { key: "hasHeatedSeats", importance: "high", source: "user" },
+    ]);
+
+    const homes = Object.values(settings.categoryFeatures).filter((picks) =>
+      picks.some((p) => p.key === "hasHeatedSeats"),
+    );
+
+    expect(homes).toHaveLength(1);
   });
 
   /*
    * Old tiers map onto importance by intent. "Essential" becomes high rather
-   * than something stronger on purpose — it was never a hard requirement in
-   * the engine, and importing it as one now would add a meaning the product
-   * deliberately doesn't have.
+   * than something stronger on purpose — it was never a hard requirement.
    */
   it("carries the old tiers over as importance", async () => {
     stored.finnLensCategoryFeatures = {
@@ -146,88 +223,14 @@ describe("the safety merge reaches existing users without breaking them", () => 
     const settings = await loadLensSettings();
 
     expect(settings.categoryFeatures.practicality).toEqual([
-      { key: "hasSplitFoldingRearSeats", importance: "high" },
-      { key: "hasElectricTailgate", importance: "medium" },
-      { key: "hasRoofRails", importance: "low" },
+      { key: "hasSplitFoldingRearSeats", importance: "high", source: "user" },
+      { key: "hasElectricTailgate", importance: "medium", source: "user" },
+      { key: "hasRoofRails", importance: "low", source: "user" },
     ]);
   });
 
-  /*
-   * A feature counts extra in one priority only — the picker enforces it and
-   * the shipped defaults obey it. Settings saved before the rule existed do
-   * not, and leaving them alone would leave the product displaying a
-   * configuration it would refuse to let anyone build.
-   */
-  describe("one feature, one home", () => {
-    it("keeps a duplicate where the reader said it mattered most", async () => {
-      stored.finnLensCategoryFeatures = {
-        comfort: [{ key: "hasHeatedSeats", importance: "low" }],
-        climateSuitability: [{ key: "hasHeatedSeats", importance: "high" }],
-      };
-
-      const settings = await loadLensSettings();
-
-      expect(
-        settings.categoryFeatures.climateSuitability.map((p) => p.key),
-      ).toContain("hasHeatedSeats");
-
-      expect(
-        settings.categoryFeatures.comfort.map((p) => p.key),
-      ).not.toContain("hasHeatedSeats");
-    });
-
-    /*
-     * The direction that matters most. A default is Lens guessing, and a
-     * guess never overrules the person it was guessing about — even when the
-     * default claims the feature matters more.
-     */
-    it("lets a saved answer beat a shipped default", async () => {
-      stored.finnLensCategoryFeatures = {
-        comfort: [{ key: "hasHeatedSeats", importance: "low" }],
-      };
-
-      const settings = await loadLensSettings();
-
-      expect(
-        settings.categoryFeatures.comfort.map((p) => p.key),
-      ).toContain("hasHeatedSeats");
-
-      expect(
-        settings.categoryFeatures.climateSuitability.map((p) => p.key),
-      ).not.toContain("hasHeatedSeats");
-    });
-
-    it("leaves a feature raised in only one category alone", async () => {
-      stored.finnLensCategoryFeatures = {
-        comfort: [{ key: "hasSunroof", importance: "medium" }],
-      };
-
-      const settings = await loadLensSettings();
-
-      expect(settings.categoryFeatures.comfort).toEqual([
-        { key: "hasSunroof", importance: "medium" },
-      ]);
-    });
-
-    it("resolves every duplicate, whatever the reader saved", async () => {
-      stored.finnLensCategoryFeatures = {
-        comfort: [{ key: "hasHeatedSeats", importance: "high" }],
-        climateSuitability: [{ key: "hasHeatedSeats", importance: "high" }],
-        longDistance: [{ key: "hasHeatedSeats", importance: "high" }],
-      };
-
-      const settings = await loadLensSettings();
-
-      const homes = Object.values(settings.categoryFeatures).filter(
-        (picks) => picks.some((p) => p.key === "hasHeatedSeats"),
-      );
-
-      expect(homes).toHaveLength(1);
-    });
-  });
-
   /* The selection-only build stored bare ids and no importance at all. */
-  it("reads a flat id list as an unrated selection", async () => {
+  it("reads a flat id list as the reader's raises at the middle level", async () => {
     stored.finnLensCategoryFeatures = {
       practicality: ["hasSplitFoldingRearSeats", "hasRoofRails"],
     };
@@ -235,35 +238,32 @@ describe("the safety merge reaches existing users without breaking them", () => 
     const settings = await loadLensSettings();
 
     expect(settings.categoryFeatures.practicality).toEqual([
-      { key: "hasSplitFoldingRearSeats", importance: "medium" },
-      { key: "hasRoofRails", importance: "medium" },
+      { key: "hasSplitFoldingRearSeats", importance: "medium", source: "user" },
+      { key: "hasRoofRails", importance: "medium", source: "user" },
     ]);
   });
 
-  it("keeps an importance the user already set", async () => {
+  it("keeps who raised an item when it was stored", async () => {
     stored.finnLensCategoryFeatures = {
-      practicality: [{ key: "hasRoofRails", importance: "low" }],
+      practicality: [{ key: "hasRoofRails", importance: "low", source: "profile" }],
     };
 
     const settings = await loadLensSettings();
 
     expect(settings.categoryFeatures.practicality).toEqual([
-      { key: "hasRoofRails", importance: "low" },
+      { key: "hasRoofRails", importance: "low", source: "profile" },
     ]);
   });
 
   it("caps a merged list that overflows the maximum", async () => {
     stored.finnLensCategoryFeatures = {
-      safety: AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(0, 5),
-      driverAssistance:
-        AVAILABLE_CATEGORY_FEATURES.safetyAssistance.slice(5, 10),
+      familyFriendly: ["hasSplitFoldingRearSeats", "hasElectricTailgate"],
+      practicality: ["rearDoors", "hasTowbar", "hasRoofRails", "seatsSixPlus"],
     };
 
     const settings = await loadLensSettings();
 
-    expect(
-      settings.categoryFeatures.safetyAssistance,
-    ).toHaveLength(MAX_FEATURES_PER_CATEGORY);
+    expect(settings.categoryFeatures.practicality).toHaveLength(MAX_FEATURES_PER_CATEGORY);
   });
 });
 
@@ -272,7 +272,7 @@ describe("the safety merge reaches existing users without breaking them", () => 
 /* -------------------------------------------------------------------------- */
 
 describe("stored feature lists are brought up to the current rules", () => {
-  it("drops features the catalogue no longer offers", async () => {
+  it("drops items the model doesn't know", async () => {
     stored.finnLensCategoryFeatures = {
       practicality: [
         { key: "hasSplitFoldingRearSeats", tier: "essential" },
@@ -287,11 +287,6 @@ describe("stored feature lists are brought up to the current rules", () => {
     expect(keys).not.toContain("hasSomethingRemoved");
   });
 
-  /*
-   * An empty selection used to mean the priority could not tell two cars
-   * apart, so it was refilled from the defaults. It now means "judge this
-   * category on its own terms" — a preference to respect, not repair.
-   */
   it("respects a cleared selection instead of refilling it", async () => {
     stored.finnLensCategoryFeatures = { practicality: [] };
 
@@ -300,32 +295,49 @@ describe("stored feature lists are brought up to the current rules", () => {
     expect(settings.categoryFeatures.practicality).toEqual([]);
   });
 
-  /* And a fresh install picks nothing on the user's behalf. */
   /*
    * A fresh install is configured, not blank. What makes that honest is that
-   * `hasSavedLensSettings` still reads it as unanswered, so every surface can
-   * label the verdict as Lens's default rather than the reader's own.
+   * the raises are marked as the profile's, and `hasSavedLensSettings` still
+   * reads the install as unanswered.
    */
-  it("opens a fresh install on Lens's own picks", async () => {
+  it("opens a fresh install on the default profile, and says so", async () => {
     const settings = await loadLensSettings();
 
-    expect(settings.categoryFeatures.practicality).toEqual(
-      DEFAULT_CATEGORY_FEATURES.practicality,
-    );
-    expect(settings.categoryFeatures.practicality.length).toBeGreaterThan(0);
+    expect(settings.categoryFeatures).toEqual(DEFAULT_CATEGORY_FEATURES);
+    expect(settings.basedOn).toBe(DEFAULT_DEFAULT_PROFILE_ID);
     expect(await hasSavedLensSettings()).toBe(false);
   });
 
-  it("leaves untouched categories on their defaults", async () => {
+  it("starts a fresh install on a chosen default profile's emphasis too", async () => {
+    stored.finnLensDefaultProfileId = "nervous";
+
+    const settings = await loadLensSettings();
+
+    expect(settings.basedOn).toBe("nervous");
+    expect(settings.categoryFeatures).toEqual(profileEmphasis("nervous"));
+  });
+
+  it("leaves untouched categories on the starting emphasis", async () => {
     stored.finnLensCategoryFeatures = {
       practicality: [{ key: "hasRoofRails", tier: "good" }],
     };
 
     const settings = await loadLensSettings();
 
-    expect(settings.categoryFeatures.comfort).toEqual(
-      DEFAULT_CATEGORY_FEATURES.comfort,
-    );
+    expect(settings.categoryFeatures.cityParking).toEqual(DEFAULT_CATEGORY_FEATURES.cityParking);
+  });
+
+  it("reads an order saved before provenance existed as built by hand", async () => {
+    stored.finnLensPriorities = ["comfort", "practicality", "safetyAssistance"];
+
+    expect((await loadLensSettings()).basedOn).toBeNull();
+  });
+
+  it("keeps the profile a reader's settings were copied from", async () => {
+    stored.finnLensPriorities = [...PROFILES.eco.priorities];
+    stored.finnLensBasedOn = "eco";
+
+    expect((await loadLensSettings()).basedOn).toBe("eco");
   });
 });
 
@@ -455,5 +467,80 @@ describe("the default profile is the one you actually start on", () => {
     const settings = await loadLensSettings();
 
     expect(settings.priorities).toEqual(["comfort", "practicality"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Applying a profile                                                         */
+/* -------------------------------------------------------------------------- */
+
+describe("applying a profile", () => {
+  it("replaces the order and the emphasis, marked as the profile's", () => {
+    const applied = applyProfile("family");
+
+    expect(applied.priorities).toEqual([...PROFILES.family.priorities]);
+    expect(applied.categoryFeatures).toEqual(profileEmphasis("family"));
+    expect(applied.basedOn).toBe("family");
+
+    for (const picks of Object.values(applied.categoryFeatures)) {
+      for (const pick of picks) expect(pick.source).toBe("profile");
+    }
+  });
+
+  it("isn't customised straight after it is applied", () => {
+    const applied = applyProfile("nervous");
+
+    expect(isCustomisedFrom(applied, "nervous")).toBe(false);
+  });
+
+  it("is customised once the order moves", () => {
+    const applied = applyProfile("nervous");
+    const [first, second, ...rest] = applied.priorities as [CategoryId, CategoryId, ...CategoryId[]];
+
+    expect(
+      isCustomisedFrom(
+        { ...applied, priorities: [second, first, ...rest] },
+        "nervous",
+      ),
+    ).toBe(true);
+  });
+
+  it("is customised once a raise changes, but not when only who set it does", () => {
+    const applied = applyProfile("nervous");
+    const safety = applied.categoryFeatures.safetyAssistance;
+
+    const regraded = {
+      ...applied,
+      categoryFeatures: {
+        ...applied.categoryFeatures,
+        safetyAssistance: safety.map((pick, index) =>
+          index === 0 ? { ...pick, importance: "low" as const } : pick,
+        ),
+      },
+    };
+
+    const reclaimed = {
+      ...applied,
+      categoryFeatures: {
+        ...applied.categoryFeatures,
+        safetyAssistance: safety.map((pick) => ({ ...pick, source: "user" as const })),
+      },
+    };
+
+    expect(isCustomisedFrom(regraded, "nervous")).toBe(true);
+    expect(isCustomisedFrom(reclaimed, "nervous")).toBe(false);
+  });
+
+  it("counts settings with no profile behind them as the reader's own", () => {
+    expect(isCustomisedFrom(applyProfile("eco"), null)).toBe(true);
+  });
+
+  it("survives a save and a reload, basis included", async () => {
+    await saveLensSettings(applyProfile("roadtrip"));
+
+    const settings = await loadLensSettings();
+
+    expect(settings.basedOn).toBe("roadtrip");
+    expect(isCustomisedFrom(settings, settings.basedOn)).toBe(false);
   });
 });

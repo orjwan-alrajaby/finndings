@@ -5,7 +5,7 @@ import { challengeRows, reasonAboutChallenge } from "./narrative/challenge";
 import { buildAdviceNarrative } from "./narrative";
 import { classifyMonthlyCostGap, classifyScoreGap } from "./narrative/magnitude";
 import { coverage, inSentence, phraseLabel } from "./narrative/phrase";
-import { DEFAULT_CATEGORY_FEATURES, FEATURES } from "./constants";
+import { DEFAULT_CATEGORY_FEATURES, FEATURES, SIGNALS } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
 import type { AdviceNarrative } from "./narrative";
 import type { CategoryId, FeatureSelection } from "./types";
@@ -138,10 +138,10 @@ describe("the Advice never asks the reader to infer what it meant", () => {
   ];
 
   const ORDERS: CategoryId[][] = [
-    ["safetyAssistance", "familyFriendly", "practicality"],
+    ["safetyAssistance", "cityParking", "practicality"],
     ["safetyAssistance", "longDistance", "comfort"],
     ["environmental", "safetyAssistance", "practicality"],
-    ["practicality", "familyFriendly", "longDistance"],
+    ["practicality", "cityParking", "longDistance"],
     ["climateSuitability", "comfort", "safetyAssistance"],
   ];
 
@@ -190,7 +190,7 @@ describe("the reasoning follows the user's priorities, not a template", () => {
   });
 
   it("cites the measurements a practicality-led reader actually asked about", () => {
-    const narrative = adviceFor(["practicality", "familyFriendly"]);
+    const narrative = adviceFor(["practicality", "cityParking", "comfort"]);
 
     const practicality = narrative.priorities.find(
       (item) => item.priority === "practicality",
@@ -198,7 +198,9 @@ describe("the reasoning follows the user's priorities, not a template", () => {
 
     const prose = practicality.sentences.join(" ");
 
-    expect(prose).toContain("boot space");
+    /* FINN's boot figure, quoted as FINN's and never passed off as seats-up. */
+    expect(prose).toContain("load volume");
+    expect(prose).toMatch(/rear seats folded/);
     expect(prose).toMatch(/\d/);
 
     /* Seat count is reported as context, never as something that scored. */
@@ -224,7 +226,7 @@ describe("the reasoning follows the user's priorities, not a template", () => {
 
 describe("tradeoffs are filtered by what the user told us", () => {
   it("does not raise CO₂ with a reader who never ranked the environment", () => {
-    const narrative = adviceFor(["safetyAssistance", "familyFriendly", "practicality"]);
+    const narrative = adviceFor(["safetyAssistance", "cityParking", "practicality"]);
 
     const prose = narrative.tradeoffs
       .flatMap((item) => [item.headline, ...item.sentences])
@@ -321,9 +323,7 @@ describe("a feature the user picked out is surfaced, not used to disqualify", ()
 
     expect(gap).toBeDefined();
     /* Named in the reader's own terms, at the importance they gave it. */
-    expect(gap.sentences.join(" ")).toMatch(
-      /you (picked (it|them) out|said .+ should count highly)/i,
-    );
+    expect(gap.sentences.join(" ")).toMatch(/you raised .+under/i);
     expect(gap.sentences.join(" ")).toMatch(/doesn't\b/i);
 
     /* A pick is an interest, never a requirement — the copy must say so. */
@@ -392,8 +392,8 @@ describe("the language matches the size of the difference", () => {
     /* And it says which yardstick it used, without implying a mistake. */
     const prose = comfort.sentences.join(" ");
 
-    expect(prose).toMatch(/didn't pick out/i);
-    expect(prose).toMatch(/judged on everything it covers/i);
+    expect(prose).toMatch(/nothing is raised/i);
+    expect(prose).toMatch(/counts the same/i);
     expect(prose).not.toMatch(/should|need to|missing from your/i);
   });
 
@@ -439,7 +439,7 @@ describe("the language matches the size of the difference", () => {
     expect(environmental.standing).toBe("unsupported");
     expect(environmental.hasEvidence).toBe(false);
     expect(environmental.sentences.join(" ")).toContain(
-      "FINN's data doesn't tell us enough",
+      "Lens can't judge this car on environmental impact",
     );
 
     /* And it is not dressed up as a finding elsewhere. */
@@ -553,7 +553,7 @@ describe("feature terminology is explained in the product", () => {
 
     for (const fact of named) {
       expect(fact.explanation.length).toBeGreaterThan(20);
-      expect(fact.label).toBe(FEATURES[fact.key].label);
+      expect(fact.label).toBe(SIGNALS[fact.key].label);
     }
   });
 
@@ -606,10 +606,15 @@ describe("language primitives", () => {
   it("names a car in full wherever it names it", () => {
     const result = buildRecommendation(
       [
-        makeCar({ id: 1, name: "Ford Puma", trunk: 456, features: ["hasIsofix"] }),
-        makeCar({ id: 2, name: "Hyundai i30", trunk: 395 }),
+        makeCar({
+          id: 1,
+          name: "Ford Puma",
+          length: 4200,
+          features: ["hasSplitFoldingRearSeats", "hasElectricTailgate", "hasOneEightyDegreesReversingCamera"],
+        }),
+        makeCar({ id: 2, name: "Hyundai i30", length: 4600, features: ["hasSplitFoldingRearSeats"] }),
       ],
-      ["practicality", "familyFriendly"],
+      ["practicality", "cityParking", "comfort"],
       preferences,
       DEFAULT_CATEGORY_FEATURES,
     )!;
@@ -687,7 +692,7 @@ describe("the recommendation is explained on its own merits", () => {
   const ORDER: CategoryId[] = [
     "safetyAssistance",
     "practicality",
-    "familyFriendly",
+    "cityParking",
     "climateSuitability",
     "comfort",
   ];

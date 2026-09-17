@@ -3,31 +3,54 @@ import type {
   CategoryDef,
   CategoryDetail,
   CategoryId,
+  Contribution,
+  EvidenceGaps,
+  EvidenceItem,
   FeatureId,
+  StandardCheck,
   FeaturePreference,
   FeatureSelection,
   LensPreferences,
   NumericEvidence,
   PriorityWeight,
+  SignalId,
   VehicleScore,
 } from "./types";
 
 import {
-  AVAILABLE_CATEGORY_FEATURES,
   BASE_FEATURE_WEIGHT,
   CATEGORIES,
   DEFAULT_CATEGORY_FEATURES,
   DEFAULT_PRIORITIES,
   FEATURE_IMPORTANCE,
-  FEATURES,
+  SIGNALS,
 } from "./constants";
 
 import { formatNumber } from "./format";
 import {
   assessEnvironment,
   assessEnvironmentOrGaps,
-  type EnvironmentalAssessment,
 } from "./environmental";
+import {
+  ASSESSED_SHARE,
+  countedItems,
+  equipmentKnown,
+  evRangeKm,
+  isBinarySignal,
+  isDerivedSignal,
+  lengthMm,
+  signalUtility,
+  tripFactor,
+} from "./evidence";
+
+/**
+ * How one car fits one reader, from the evidence FINN publishes about it.
+ *
+ * Everything here is intrinsic. A car's score depends on the car and the
+ * reader's settings and on nothing else — no other pinned car can move it, so
+ * one car viewed on its own and the same car in a comparison always score the
+ * same, and adding a car to a comparison never reorders the ones already there.
+ */
 
 /* -------------------------------------------------------------------------- */
 /* Runtime category registry                                                  */
@@ -37,15 +60,15 @@ import {
  * Built-in categories are immutable.
  *
  * Custom categories live here instead of being added directly to CATEGORIES.
- * This keeps CATEGORIES as the single source of truth for built-in product
- * configuration while still allowing user-created priorities at runtime.
+ * Nothing creates one any more, and the settings migration keeps them out of
+ * the order; the registry survives so a stored definition still reads.
  */
 const CUSTOM_CATEGORIES: Record<string, CategoryDef> = {};
 
 /** Resolves either a built-in or custom category. */
 export function getCategory(category: CategoryId): CategoryDef | undefined {
   return (
-    CATEGORIES[category as keyof typeof CATEGORIES] ??
+    (CATEGORIES[category as keyof typeof CATEGORIES] as CategoryDef | undefined) ??
     CUSTOM_CATEGORIES[category]
   );
 }
@@ -56,11 +79,7 @@ export function registerCategoryMeta(id: CategoryId, meta: CategoryDef): void {
   CUSTOM_CATEGORIES[id] = meta;
 }
 
-/**
- * Removes a custom category.
- *
- * Built-in categories can never be removed from the registry.
- */
+/** Removes a custom category. Built-in categories can never be removed. */
 export function unregisterCategoryMeta(id: CategoryId): void {
   if (id in CATEGORIES) return;
   delete CUSTOM_CATEGORIES[id];
@@ -71,18 +90,14 @@ export function unregisterCategoryMeta(id: CategoryId): void {
 /* -------------------------------------------------------------------------- */
 
 export const featureLabel = (key: string): string =>
-  FEATURES[key as keyof typeof FEATURES]?.label ?? key;
+  SIGNALS[key as SignalId]?.label ?? key;
 
 /**
- * A feature's name as it reads inside a sentence: "a towbar", "adaptive
- * cruise control".
- *
- * Prose says "it doesn't have …" far more often now that features are a
- * simple list, so the article matters. Chips and headings keep the bare
- * label — "No towbar" is correct as a heading and wrong as a clause.
+ * A signal's name as it reads inside a sentence: "a towbar", "adaptive
+ * cruise control". Chips and headings keep the bare label.
  */
 export const featurePhrase = (key: string): string => {
-  const meta = FEATURES[key as keyof typeof FEATURES];
+  const meta = SIGNALS[key as SignalId];
 
   if (!meta) return key;
 
@@ -106,386 +121,277 @@ function sentenceCase(label: string): string {
   return label.charAt(0).toLowerCase() + label.slice(1);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Numeric scoring                                                            */
-/* -------------------------------------------------------------------------- */
-
-function relativeScore(
-  value: number,
-  values: number[],
-  lowerIsBetter: boolean,
-): number {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  if (max === min) return 80;
-
-  const ratio = (value - min) / (max - min);
-
-  return Math.round((lowerIsBetter ? 1 - ratio : ratio) * 100);
-}
-
-/**
- * How far apart a set has to be before the full 0–100 is earned.
- *
- * The same 35% `classifyMeasurementGap` calls "decisive", so the scale and the
- * prose agree about when a difference is real. See `spreadAwareScore`.
- */
-const DECISIVE_SPREAD = 0.35;
-
-/** The score for a set the measurement cannot separate at all. */
-const INDIFFERENT = 50;
-
-/**
- * A relative score that only claims as much of the scale as the figures support.
- *
- * Plain min-max hands the worst car 0 and the best 100 whatever the spread, so
- * 495 km against 500 km comes out as the widest gap the engine can express. In
- * a category built out of one measurement that is not a rounding error — it is
- * the whole category score, and from there a third of the overall result.
- *
- * So the spread decides the reach: a set spanning 35% or more of its own top
- * figure uses the full scale, and anything tighter is compressed proportionally
- * toward the middle. Ordering is untouched — the better car still scores
- * higher, every time — and what changes is how much that lead is allowed to be
- * worth. Two cars a few kilometres apart end up a few points apart, which is
- * what leaves the rest of the priority free to decide the result.
- */
-function spreadAwareScore(
-  value: number,
-  values: number[],
-  lowerIsBetter: boolean,
-): number {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  if (max === min || max === 0) return INDIFFERENT;
-
-  const ratio = (value - min) / (max - min);
-  const placed = lowerIsBetter ? 1 - ratio : ratio;
-
-  const reach = Math.min(1, (max - min) / max / DECISIVE_SPREAD);
-
-  return Math.round(INDIFFERENT + (placed - 0.5) * 100 * reach);
-}
-
-interface NumericResult {
-  score: number;
-  /** Null where the score rests on several figures rather than one. */
-  evidence: NumericEvidence | null;
-  /** The reading behind a category scored on figures rather than equipment. */
-  environmental?: EnvironmentalAssessment;
-}
-
 function evidence(
   label: string,
   value: number,
   unit: string,
+  display: string,
   lowerIsBetter: boolean,
 ): NumericEvidence {
-  return {
-    label,
-    value,
-    unit,
-    display: unit ? `${formatNumber(value)} ${unit}` : formatNumber(value),
-    lowerIsBetter,
-  };
-}
-
-/**
- * The three things that can be measured about how a car travels a long way,
- * and which of them applies to one car.
- *
- * They are cohorts rather than a preference order: a car belongs to exactly
- * one, and is only ever ranked inside it. `range` beats `energy` for an
- * electric car because kilometres between stops is the more direct answer to
- * the question and FINN publishes it.
- */
-type LongDistanceBasis = "range" | "energyElectric" | "energyFuel";
-
-interface LongDistanceReading {
-  basis: LongDistanceBasis;
-  value: number;
-  label: string;
-  unit: string;
-  lowerIsBetter: boolean;
-}
-
-function longDistanceReading(
-  vehicle: PinnedFinnCar,
-): LongDistanceReading | null {
-  const isElectric = vehicle.fuelType === "Electric";
-
-  const rawRange = vehicle.electric?.range;
-
-  const range =
-    rawRange != null && rawRange !== "Unknown" ? Number(rawRange) : Number.NaN;
-
-  if (Number.isFinite(range) && range > 0) {
-    return {
-      basis: "range",
-      value: range,
-      label: "Electric range",
-      unit: "km",
-      lowerIsBetter: false,
-    };
-  }
-
-  const consumption = Number(vehicle.consumption?.combined);
-
-  if (!Number.isFinite(consumption) || consumption <= 0) return null;
-
-  /*
-   * `consumption.unit` is hard-coded to litres by the mapper for every car, so
-   * the powertrain is what says which quantity this actually is. A plug-in
-   * hybrid's figure is litres — FINN publishes one combined fuel figure and no
-   * electric split — so it sits with the combustion cars.
-   */
-  return isElectric
-    ? {
-        basis: "energyElectric",
-        value: consumption,
-        label: "Consumption",
-        unit: "kWh/100km",
-        lowerIsBetter: true,
-      }
-    : {
-        basis: "energyFuel",
-        value: consumption,
-        label: "Consumption",
-        unit: "L/100km",
-        lowerIsBetter: true,
-      };
-}
-
-/**
- * Scores the measurable part of a category against the rest of the comparison.
- *
- * Deliberately has no cost case. Price is a budget constraint, not a priority,
- * so no number here is allowed to reward a car for being cheap.
- */
-function numericScore(
-  category: CategoryId,
-  vehicle: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-): NumericResult | null {
-  switch (category) {
-    case "practicality": {
-      const values = vehicles
-        .map((item) => Number.parseFloat(item.capacity.trunk))
-        .filter(Number.isFinite);
-
-      const trunk = Number.parseFloat(vehicle.capacity.trunk);
-
-      if (!Number.isFinite(trunk) || values.length < 2) return null;
-
-      return {
-        score: relativeScore(trunk, values, false),
-        evidence: evidence("Boot space", trunk, "L", false),
-      };
-    }
-
-    case "longDistance": {
-      const own = longDistanceReading(vehicle);
-
-      if (!own) return null;
-
-      /*
-       * Measured only against cars carrying the same reading.
-       *
-       * This used to pool everything: a car with an electric range was ranked
-       * against the other ranges, and everything else was ranked on
-       * consumption across the whole set — which put an electric car's
-       * kilowatt-hours into the same min-max as a petrol car's litres. FINN
-       * reports both in `consumption.combined` and the mapper labels the field
-       * litres regardless, so a 17 kWh/100 km electric car was read as a
-       * catastrophically thirsty one and scored near zero for it.
-       *
-       * Kilometres of range, litres per 100 km and kilowatt-hours per 100 km
-       * are three different quantities. Nothing in FINN's data converts
-       * between them — a combustion car's real range needs a tank size FINN
-       * doesn't publish, and an electric car's needs a charging network this
-       * has no view of — so no cross-powertrain ordering is claimed. Each car
-       * is placed among its own kind, which is the same thing
-       * `assessEfficiency` does when it says "frugal for a petrol car".
-       */
-      const cohort = vehicles
-        .map((item) => longDistanceReading(item))
-        .filter(
-          (reading): reading is LongDistanceReading =>
-            reading != null && reading.basis === own.basis,
-        )
-        .map((reading) => reading.value);
-
-      /* One car of its kind has nothing to be relative to. */
-      if (cohort.length < 2) return null;
-
-      return {
-        score: spreadAwareScore(own.value, cohort, own.lowerIsBetter),
-        evidence: evidence(own.label, own.value, own.unit, own.lowerIsBetter),
-      };
-    }
-
-    /*
-     * The one category not scored by comparison, and the one scored on a
-     * single figure. See `assessEnvironment`: emissions have an absolute,
-     * published scale where boot space doesn't, and the three things that used
-     * to be averaged alongside CO₂ all turned out to be the CO₂ figure wearing
-     * different clothes.
-     */
-    case "environmental": {
-      const assessment = assessEnvironment(vehicle);
-
-      if (!assessment || assessment.score == null) return null;
-
-      return {
-        score: assessment.score,
-        evidence: assessment.co2
-          ? evidence("CO₂ emissions", assessment.co2.gPerKm, "g/km", true)
-          : null,
-        environmental: assessment,
-      };
-    }
-
-    default:
-      return null;
-  }
+  return { label, value, unit, display, lowerIsBetter };
 }
 
 /* -------------------------------------------------------------------------- */
 /* Category scoring                                                           */
 /* -------------------------------------------------------------------------- */
 
+/** The weight a reader's settings give one counted item. */
+function weighItem(
+  role: EvidenceItem["role"],
+  niche: boolean,
+  preference: FeaturePreference | undefined,
+): { weight: number; preference: FeaturePreference | null } {
+  /* Evidence from another home counts at standard; it is raised only at home. */
+  if (role === "alsoCounts") return { weight: BASE_FEATURE_WEIGHT, preference: null };
+
+  if (preference) {
+    return {
+      weight: FEATURE_IMPORTANCE[preference.importance].weight,
+      preference,
+    };
+  }
+
+  return { weight: niche ? 0 : BASE_FEATURE_WEIGHT, preference: null };
+}
+
 /**
- * Scores one vehicle in one category and records the evidence behind it.
+ * Scores one car in one priority and records the evidence behind it.
  *
- * The returned feature and numeric sub-scores are kept separate from the
- * combined `score` so an explanation can point at whichever actually drove
- * the result.
+ * - Every counted item has a weight from the reader's settings and a reading
+ *   from the car. An item FINN's data doesn't answer is left out of the score
+ *   entirely — never counted as absent, never counted as average.
+ * - The priority is **assessed** when at least half its counted weight is
+ *   known. An unassessed priority is left out of the car's fit and said to be
+ *   unassessed, rather than scored.
+ * - Long Distance on an electric car is multiplied by the range factor, which
+ *   can only lower it; an electric car with no published range is unassessed.
+ * - Environmental Impact is the CO₂ reading, and is assessed when there is one.
  *
- * Features the user picked out are never a filter. A car missing one stays in
- * the running, scores lower than it otherwise would, and the gap surfaces as a
- * tradeoff the reader weighs — not a decision the engine makes for them.
+ * `vehicles` is accepted for callers that pass the comparison set and is
+ * deliberately unused: nothing about another car may move this score.
  */
 export function categoryDetail(
   category: CategoryId,
   vehicle: PinnedFinnCar,
-  vehicles: PinnedFinnCar[],
-  _preferences: LensPreferences,
-  categoryFeatures: Record<
-    CategoryId,
-    FeatureSelection
-  > = DEFAULT_CATEGORY_FEATURES,
+  _vehicles: PinnedFinnCar[] = [vehicle],
+  _preferences?: LensPreferences,
+  categoryFeatures: Record<CategoryId, FeatureSelection> = DEFAULT_CATEGORY_FEATURES,
 ): CategoryDetail {
-  /*
-   * The category is measured against its own catalogue, always.
-   *
-   * Measuring it against the user's picks instead — which an earlier version
-   * did — fails in two directions at once. Pick one common feature and every
-   * car scores 100, so the priority silently stops separating anything. Pick
-   * one rare feature and a car with twelve of the fifteen safety systems
-   * scores 0 for want of the thirteenth, which is a hard requirement in all
-   * but name.
-   *
-   * So the catalogue is the denominator, and what the user picked out adjusts
-   * the weight of individual entries inside it. That keeps a picked feature
-   * genuinely influential while making it arithmetically impossible for any
-   * one of them to drive the category to either extreme.
-   */
-  const catalogue =
-    AVAILABLE_CATEGORY_FEATURES[category] ??
-    getCategory(category)?.features ??
-    [];
+  if (category === "environmental") return environmentalDetail(vehicle);
 
-  const selected = categoryFeatures[category] ?? [];
+  const def = getCategory(category);
+  const selection = categoryFeatures[category] ?? [];
+  const known = equipmentKnown(vehicle);
 
-  const importanceOf = new Map(
-    selected.map((preference) => [preference.key, preference.importance]),
+  const items: EvidenceItem[] = (def ? countedItems(category) : []).map(
+    ({ key, role, niche }) => {
+      const { weight, preference } = weighItem(
+        role,
+        niche,
+        selection.find((item) => item.key === key),
+      );
+
+      return {
+        key,
+        role,
+        weight,
+        utility: signalUtility(key, vehicle),
+        importance: preference?.importance ?? null,
+        source: preference ? (preference.source ?? "user") : null,
+        niche,
+      };
+    },
   );
 
-  const matched: FeatureId[] = [];
-  const missing: FeatureId[] = [];
-
-  let earned = 0;
-  let total = 0;
-
-  for (const key of catalogue) {
-    const importance = importanceOf.get(key);
-
-    /*
-     * One count for being relevant equipment, plus one, two or three more for
-     * how much the user said it matters. See FEATURE_IMPORTANCE.
-     */
-    const weight = importance
-      ? FEATURE_IMPORTANCE[importance].weight
-      : BASE_FEATURE_WEIGHT;
-
-    total += weight;
-
-    if (vehicle.features?.[key]) {
-      matched.push(key);
-      earned += weight;
-    } else {
-      missing.push(key);
-    }
-  }
-
-  /* The plain count, for the explanation to quote. */
-  const coverageScore = catalogue.length
-    ? Math.round((matched.length / catalogue.length) * 100)
-    : null;
-
-  /* The weighted share, which is what the ranking runs on. */
-  const featureScore = total ? Math.round((earned / total) * 100) : null;
+  const counted = items.filter((item) => item.weight > 0);
 
   /*
-   * The picks, split by presence and carrying their importance, so the Advice
-   * can answer "does it have the things I asked for?" separately from "how
-   * well equipped is it here?".
-   *
-   * Picks the catalogue no longer offers are ignored rather than counted as
-   * misses — the user cannot have meant a feature this category doesn't cover.
+   * Expected items stay out of the arithmetic that earns: counted there, they
+   * would add the same to every car and only squeeze the differences between
+   * them. A confirmed gap in one is taken off what the car earned, at the
+   * weight a missing Standard (or raised) item carries.
    */
+  const scored = counted.filter((item) => item.role !== "expected");
+  const expectedItems = counted.filter((item) => item.role === "expected");
+
+  const totalWeight = scored.reduce((sum, item) => sum + item.weight, 0);
+  const knownItems = scored.filter((item) => item.utility != null);
+  const knownWeight = knownItems.reduce((sum, item) => sum + item.weight, 0);
+  const earned = knownItems.reduce(
+    (sum, item) => sum + item.weight * (item.utility as number),
+    0,
+  );
+  const deduction = expectedItems
+    .filter((item) => item.utility === 0)
+    .reduce((sum, item) => sum + item.weight, 0);
+
+  const featureScore =
+    knownWeight > 0 ? (100 * Math.max(0, earned - deduction)) / knownWeight : null;
+
+  /* Long Distance on an electric car: the range can only take away. */
+  const range = def?.limit === "evRange" ? evRangeKm(vehicle) : null;
+  const isElectric = vehicle.fuelType === "Electric";
+  const limited = def?.limit === "evRange" && isElectric;
+  const factor = limited && range != null ? tripFactor(range) : null;
+
+  const assessed =
+    totalWeight > 0 &&
+    knownWeight >= ASSESSED_SHARE * totalWeight &&
+    !(limited && range == null);
+
+  const exactScore = assessed ? (featureScore ?? 0) * (factor ?? 1) : 0;
+
+  const binary = scored.filter((item) => isBinarySignal(item.key));
+  const matched = binary.filter((item) => item.utility === 1).map((item) => item.key);
+  const missing = binary.filter((item) => item.utility === 0).map((item) => item.key);
+  const unknown = scored.filter((item) => item.utility == null).map((item) => item.key);
+
   const pickedMatched: FeaturePreference[] = [];
   const pickedMissing: FeaturePreference[] = [];
+  const pickedUnknown: FeaturePreference[] = [];
 
-  for (const preference of selected) {
-    if (!catalogue.includes(preference.key)) continue;
+  for (const item of items) {
+    if (!item.importance || item.role === "alsoCounts") continue;
 
-    if (vehicle.features?.[preference.key]) pickedMatched.push(preference);
+    const preference = selection.find((entry) => entry.key === item.key) as FeaturePreference;
+
+    if (item.utility == null) pickedUnknown.push(preference);
+    else if (item.utility > 0) pickedMatched.push(preference);
     else pickedMissing.push(preference);
   }
 
-  const numeric = numericScore(category, vehicle, vehicles);
+  const standard: StandardCheck[] = ((def?.expected ?? []) as FeatureId[]).map((key) => ({
+    key,
+    state: !known ? "unknown" : vehicle.features?.[key] ? "listed" : "unlisted",
+  }));
 
-  const score =
-    numeric != null && featureScore != null
-      ? Math.round((numeric.score + featureScore) / 2)
-      : (numeric?.score ?? featureScore ?? 50);
+  const expectedMissing = standard
+    .filter((item) => item.state === "unlisted")
+    .map((item) => item.key);
+
+  const coverageScore =
+    matched.length + missing.length
+      ? Math.round((100 * matched.length) / (matched.length + missing.length))
+      : null;
 
   return {
-    score,
+    score: Math.round(exactScore),
+    exactScore,
+    assessed,
+    items,
     matched,
     missing,
-    basis: catalogue.length ? "category" : "none",
+    unknown,
+    expectedMissing,
+    standard,
+    basis: items.length ? "category" : "none",
     pickedMatched,
     pickedMissing,
+    pickedUnknown,
     coverageScore,
     featureScore,
-    numericScore: numeric?.score ?? null,
-    numeric: numeric?.evidence ?? null,
+    numericScore: null,
+    numeric: categoryNumeric(category, vehicle, range),
+    tripFactor: factor,
+    environmental: null,
+    bounds: priorityBounds(assessed, scored, expectedItems, totalWeight, earned, deduction, factor),
+    hasEvidence: assessed,
+  };
+}
+
+/** The measured figure a priority quotes: length for City & Parking, range for Long Distance. */
+function categoryNumeric(
+  category: CategoryId,
+  vehicle: PinnedFinnCar,
+  range: number | null,
+): NumericEvidence | null {
+  if (category === "cityParking") {
+    const length = lengthMm(vehicle);
+
+    return length == null
+      ? null
+      : evidence("Length", length, "mm", `${formatNumber(length / 1000, 2)} m`, true);
+  }
+
+  if (category === "longDistance" && range != null) {
+    return evidence("Electric range", range, "km", `${formatNumber(range, 0)} km`, false);
+  }
+
+  return null;
+}
+
+/**
+ * The lowest and highest a priority could score once FINN filled its gaps.
+ *
+ * Unknown items at absent and at present, with the range factor applied; an
+ * unassessed priority could be anything.
+ */
+function priorityBounds(
+  assessed: boolean,
+  scored: EvidenceItem[],
+  expected: EvidenceItem[],
+  totalWeight: number,
+  earned: number,
+  deduction: number,
+  factor: number | null,
+): { low: number; high: number } {
+  if (!assessed || totalWeight === 0) return { low: 0, high: 100 };
+
+  const unknownWeight = (items: EvidenceItem[]) =>
+    items
+      .filter((item) => item.utility == null)
+      .reduce((sum, item) => sum + item.weight, 0);
+
+  const f = factor ?? 1;
+  const clamp = (value: number) => Math.max(0, Math.min(100, value));
+
+  /* Worst: unknown scored items absent and unknown expected items missing. */
+  return {
+    low: clamp((100 * (earned - deduction - unknownWeight(expected))) / totalWeight) * f,
+    high: clamp((100 * (earned - deduction + unknownWeight(scored))) / totalWeight) * f,
+  };
+}
+
+/** Environmental Impact: the CO₂ reading, or unassessed without one. */
+function environmentalDetail(vehicle: PinnedFinnCar): CategoryDetail {
+  const assessment = assessEnvironment(vehicle);
+  const score = assessment?.score ?? null;
+  const assessed = score != null;
+
+  return {
+    score: assessed ? Math.round(score) : 0,
+    exactScore: assessed ? score : 0,
+    assessed,
+    items: [],
+    matched: [],
+    missing: [],
+    unknown: [],
+    expectedMissing: [],
+    standard: [],
+    basis: "none",
+    pickedMatched: [],
+    pickedMissing: [],
+    pickedUnknown: [],
+    coverageScore: null,
+    featureScore: null,
+    numericScore: score,
+    numeric: assessment?.co2
+      ? evidence(
+          "CO₂ emissions",
+          assessment.co2.gPerKm,
+          "g/km",
+          `${formatNumber(assessment.co2.gPerKm)} g/km`,
+          true,
+        )
+      : null,
+    tripFactor: null,
     /*
-     * Carried even when there is no CO₂ figure to score. The priority stays
-     * unscored and reads "Not enough data", but the reader can still be told
-     * exactly what FINN didn't publish, and shown what it did (fuel use),
-     * instead of the environmental result vanishing. With neither figure
-     * published it still carries what the car runs on, so the table can
-     * show that fuel's reference.
+     * Carried even when there is no CO₂ figure to score, so the reader can be
+     * told exactly what FINN didn't publish.
      */
-    environmental:
-      numeric?.environmental ??
-      (category === "environmental" ? assessEnvironmentOrGaps(vehicle) : null),
-    hasEvidence: featureScore != null || numeric != null,
+    environmental: assessment ?? assessEnvironmentOrGaps(vehicle),
+    bounds: assessed ? { low: score, high: score } : { low: 0, high: 100 },
+    hasEvidence: assessed,
   };
 }
 
@@ -497,9 +403,7 @@ export function categoryDetail(
  * Turns a priority *order* into explicit weights.
  *
  * Position 1 gets the largest share and each step down gets one unit less,
- * normalised so the weights sum to 1. Exposing this as data — rather than
- * burying it in the scoring loop — is what lets the UI say "safety accounts
- * for 40% of the result" instead of "your other priorities matter more".
+ * normalised so the weights sum to 1: 5:4:3:2:1 for five priorities.
  */
 export function priorityWeights(priorities: CategoryId[]): PriorityWeight[] {
   const ordered = priorities.length ? priorities : DEFAULT_PRIORITIES;
@@ -522,55 +426,186 @@ export function priorityWeights(priorities: CategoryId[]): PriorityWeight[] {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Calculates the complete score for every vehicle across the user's ordered
- * priorities.
+ * One car's fit under the reader's settings, with its working.
  *
- * This function is intentionally unaware of the user's budget. Cost is not a
- * category and never contributes a point in either direction.
+ * - **Fit** is the weighted average over assessed priorities only.
+ * - **Judgeable** means the #1 and #2 priorities are both assessed. Only a
+ *   judgeable car can be recommended or given an overall band.
+ * - **Contributions** add up exactly to the fit: one line per piece of counted
+ *   evidence, a range line for an electric car under Long Distance, and one
+ *   line for the CO₂ score.
+ * - **Bounds** are the fit with every unknown at its worst and at its best —
+ *   the check behind "this could change depending on…".
+ */
+export function scoreVehicle(
+  vehicle: PinnedFinnCar,
+  priorities: CategoryId[],
+  preferences?: LensPreferences,
+  categoryFeatures: Record<CategoryId, FeatureSelection> = DEFAULT_CATEGORY_FEATURES,
+): VehicleScore {
+  const weights = priorityWeights(priorities);
+
+  const byCategory = {} as Record<CategoryId, number>;
+  const details: Partial<Record<CategoryId, CategoryDetail>> = {};
+
+  for (const { priority } of weights) {
+    const detail = categoryDetail(priority, vehicle, [vehicle], preferences, categoryFeatures);
+
+    byCategory[priority] = detail.score;
+    details[priority] = detail;
+  }
+
+  const assessedWeight = weights
+    .filter(({ priority }) => details[priority]?.assessed)
+    .reduce((sum, { weight }) => sum + weight, 0);
+
+  const fit = assessedWeight
+    ? weights.reduce((sum, { priority, weight }) => {
+        const detail = details[priority] as CategoryDetail;
+        return detail.assessed ? sum + weight * detail.exactScore : sum;
+      }, 0) / assessedWeight
+    : 0;
+
+  const [first, second] = weights;
+
+  const judgeable = Boolean(
+    first &&
+      details[first.priority]?.assessed &&
+      (!second || details[second.priority]?.assessed),
+  );
+
+  return {
+    vehicleId: vehicle.id,
+    total: Math.round(fit),
+    fit,
+    judgeable,
+    byCategory,
+    details,
+    contributions: contributionsFor(weights, details, assessedWeight),
+    gaps: gapsFor(vehicle, weights, details),
+    bounds: {
+      low: weights.reduce(
+        (sum, { priority, weight }) => sum + weight * (details[priority]?.bounds.low ?? 0),
+        0,
+      ),
+      high: weights.reduce(
+        (sum, { priority, weight }) => sum + weight * (details[priority]?.bounds.high ?? 100),
+        0,
+      ),
+    },
+  };
+}
+
+function contributionsFor(
+  weights: PriorityWeight[],
+  details: Partial<Record<CategoryId, CategoryDetail>>,
+  assessedWeight: number,
+): Contribution[] {
+  const lines: Contribution[] = [];
+
+  if (!assessedWeight) return lines;
+
+  for (const { priority, weight } of weights) {
+    const detail = details[priority];
+    if (!detail?.assessed) continue;
+
+    const share = weight / assessedWeight;
+
+    if (detail.basis === "none") {
+      lines.push({ kind: "emissions", priority, points: share * detail.exactScore });
+      continue;
+    }
+
+    const known = detail.items.filter(
+      (item) => item.weight > 0 && item.utility != null && item.role !== "expected",
+    );
+    const knownWeight = known.reduce((sum, item) => sum + item.weight, 0);
+    if (!knownWeight) continue;
+
+    let itemPoints = 0;
+
+    for (const item of known) {
+      const points = (share * item.weight * (item.utility as number) * 100) / knownWeight;
+      itemPoints += points;
+      lines.push({ kind: "item", priority, key: item.key, points });
+    }
+
+    /*
+     * Each confirmed gap in expected equipment, as a negative line. A priority
+     * can't go below zero, so when the gaps outweigh what the car earned they
+     * share out exactly what it lost.
+     */
+    const gaps = detail.items.filter(
+      (item) => item.weight > 0 && item.role === "expected" && item.utility === 0,
+    );
+    const gapPoints = gaps.reduce(
+      (sum, item) => sum + (share * item.weight * 100) / knownWeight,
+      0,
+    );
+    const taken = Math.min(gapPoints, itemPoints);
+
+    for (const item of gaps) {
+      const points = (share * item.weight * 100) / knownWeight;
+      lines.push({ kind: "missingExpected", priority, key: item.key as FeatureId, points: -(points * taken) / gapPoints });
+    }
+
+    itemPoints -= taken;
+
+    if (detail.tripFactor != null && detail.tripFactor < 1) {
+      lines.push({ kind: "range", priority, points: -(1 - detail.tripFactor) * itemPoints });
+    }
+  }
+
+  return lines;
+}
+
+function gapsFor(
+  vehicle: PinnedFinnCar,
+  weights: PriorityWeight[],
+  details: Partial<Record<CategoryId, CategoryDetail>>,
+): EvidenceGaps {
+  const known = equipmentKnown(vehicle);
+
+  const unknownItems: EvidenceGaps["unknownItems"] = [];
+  const unassessed: CategoryId[] = [];
+  const expectedMissing: FeatureId[] = [];
+
+  for (const { priority } of weights) {
+    const detail = details[priority];
+    if (!detail) continue;
+
+    if (!detail.assessed) unassessed.push(priority);
+
+    for (const key of detail.unknown) {
+      /* A missing equipment list is one gap, not one per entry. */
+      if (!known && !isDerivedSignal(key)) continue;
+      unknownItems.push({ priority, key });
+    }
+
+    for (const key of detail.expectedMissing) {
+      if (!expectedMissing.includes(key)) expectedMissing.push(key);
+    }
+  }
+
+  return { equipmentKnown: known, unknownItems, unassessed, expectedMissing };
+}
+
+/**
+ * Scores every vehicle against the reader's ordered priorities.
  *
- * Scores are relative to the vehicles passed in, so callers should pass the
- * whole comparison set — including over-budget cars — to keep every vehicle
- * judged against one frame of reference.
+ * Intentionally unaware of the budget, and of which other cars are in the set:
+ * each car is scored on its own, so the list is just the same calculation
+ * mapped over it.
  */
 export function computeAllScores(
   vehicles: PinnedFinnCar[],
   priorities: CategoryId[],
   preferences: LensPreferences,
-  categoryFeatures: Record<
-    CategoryId,
-    FeatureSelection
-  > = DEFAULT_CATEGORY_FEATURES,
+  categoryFeatures: Record<CategoryId, FeatureSelection> = DEFAULT_CATEGORY_FEATURES,
 ): VehicleScore[] {
-  const weights = priorityWeights(priorities);
-
-  return vehicles.map((vehicle) => {
-    const byCategory = {} as Record<CategoryId, number>;
-    const details: Partial<Record<CategoryId, CategoryDetail>> = {};
-
-    let total = 0;
-
-    for (const { priority, weight } of weights) {
-      const detail = categoryDetail(
-        priority,
-        vehicle,
-        vehicles,
-        preferences,
-        categoryFeatures,
-      );
-
-      byCategory[priority] = detail.score;
-      details[priority] = detail;
-
-      total += detail.score * weight;
-    }
-
-    return {
-      vehicleId: vehicle.id,
-      total: Math.round(total),
-      byCategory,
-      details,
-    };
-  });
+  return vehicles.map((vehicle) =>
+    scoreVehicle(vehicle, priorities, preferences, categoryFeatures),
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -593,12 +628,23 @@ export function totalFor(scores: VehicleScore[], vehicleId: number): number {
   return scores.find((score) => score.vehicleId === vehicleId)?.total ?? 0;
 }
 
+/** The unrounded fit, which ranking and closeness use. */
+export function fitFor(scores: VehicleScore[], vehicleId: number): number {
+  return scores.find((score) => score.vehicleId === vehicleId)?.fit ?? 0;
+}
+
+/** The best car in one priority among those it could be assessed for. */
 export function winnerForCategory(
   vehicles: PinnedFinnCar[],
   scores: VehicleScore[],
   category: CategoryId,
 ): PinnedFinnCar | undefined {
-  return [...vehicles].sort(
-    (a, b) => scoreFor(scores, b.id, category) - scoreFor(scores, a.id, category),
-  )[0];
+  const exact = (vehicle: PinnedFinnCar) =>
+    scores.find((score) => score.vehicleId === vehicle.id)?.details[category];
+
+  return [...vehicles]
+    .filter((vehicle) => exact(vehicle)?.assessed)
+    .sort(
+      (a, b) => (exact(b)?.exactScore ?? 0) - (exact(a)?.exactScore ?? 0),
+    )[0];
 }

@@ -65,6 +65,10 @@ interface DemoSpec {
     doors: string;
     /** Electric range in km. Only meaningful for the electric car. */
     range: number | null;
+    /** Length in millimetres, ordinary for the class. */
+    length: number;
+    /** FINN's driver assistance level. */
+    assistanceLevel: 1 | 2;
     batteryCapacity: number | null;
     features: FeatureId[];
 }
@@ -91,6 +95,8 @@ const DEMO_SPECS: DemoSpec[] = [
         seats: "5",
         doors: "5",
         range: 380,
+        length: 4050,
+        assistanceLevel: 2,
         batteryCapacity: 58,
         features: [
             /*
@@ -143,6 +149,8 @@ const DEMO_SPECS: DemoSpec[] = [
         seats: "5",
         doors: "5",
         range: null,
+        length: 4640,
+        assistanceLevel: 2,
         batteryCapacity: null,
         features: [
             "hasEmergencyBrakingAssist",
@@ -194,6 +202,8 @@ const DEMO_SPECS: DemoSpec[] = [
         seats: "5",
         doors: "5",
         range: null,
+        length: 4920,
+        assistanceLevel: 2,
         batteryCapacity: null,
         features: [
             "hasEmergencyBrakingAssist",
@@ -311,8 +321,10 @@ function build(spec: DemoSpec): PinnedFinnCar {
         features,
         /* Written out in full above, so FINN "answered" for all three. */
         featuresSupplied: true,
+        driverAssistanceLevel: spec.assistanceLevel,
+        dcChargeMinutes: spec.fuelType === "Electric" ? 29 : null,
 
-        dimensions: { length: 4500, width: 1820, height: 1550, unit: "mm" },
+        dimensions: { length: spec.length, width: 1820, height: 1550, unit: "mm" },
 
         /* Never linked anywhere — these cars have no page to open. */
         url: "",

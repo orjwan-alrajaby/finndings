@@ -22,7 +22,7 @@ type NumericField = Exclude<keyof LensPreferences, "contractType">;
  */
 export const DRIVING_EXPLANATIONS: Record<keyof LensPreferences, string> = {
     monthlyBudget:
-        "The most you want to spend per month all in — the subscription plus the running costs Lens works out below. It is the only figure here that changes which cars you see rather than what one costs: Lens recommends a car only if it can confirm it fits. Optional, and leaving it blank keeps every car you pinned in the running.",
+        "The most you want to spend per month all in — the subscription plus the running costs Lens works out below. It is the only figure here that changes which car Lens recommends rather than what one costs: the recommendation comes from the cars Lens can confirm fit, then from those it can't confirm either way, and only from cars over budget when that's all there is. Every car you pinned is still shown and explained. Optional.",
     monthlyKm:
         `Roughly how many kilometres you cover in a typical month — an estimate is fine. Everything Lens works out about energy is scaled by it, and FINN includes ${FINN_INCLUDED_MONTHLY_KM} km/month, so anything past that is charged at the car's own price per extra kilometre.`,
     petrolPrice:

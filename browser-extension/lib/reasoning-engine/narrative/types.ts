@@ -3,8 +3,9 @@ import type {
   BudgetStatus,
   CategoryId,
   FeatureBasis,
-  FeatureId,
+  EmphasisSource,
   FeatureImportance,
+  SignalId,
   NumericEvidence,
 } from "../types";
 import type { EnvironmentalAssessment } from "../environmental";
@@ -25,7 +26,7 @@ import type { Magnitude } from "./magnitude";
 
 /** One feature, with the plain-English explanation of it. */
 export interface FeatureFact {
-  key: FeatureId;
+  key: SignalId;
   /** The name as a label or heading: "Towbar". */
   label: string;
   /** The name as it reads inside a sentence: "a towbar". */
@@ -37,12 +38,21 @@ export interface FeatureFact {
    * picked out, which is most of a catalogue.
    */
   importance: FeatureImportance | null;
+  /** Who raised it: a profile the reader applied, or the reader. Null when not raised. */
+  source: EmphasisSource | null;
+}
+
+/** One standard item, checked against this car's listing. */
+export interface StandardFact extends FeatureFact {
+  state: "listed" | "unlisted" | "unknown";
 }
 
 /** A set of features split by whether the car has them. */
 export interface FeatureSplit {
   present: FeatureFact[];
   missing: FeatureFact[];
+  /** FINN's data doesn't say either way. Never read as missing. */
+  unknown: FeatureFact[];
 }
 
 /**
@@ -73,6 +83,8 @@ export interface FeatureEvidence {
   highMisses: FeatureFact[];
   /** How many features the user picked out. Zero is a valid answer. */
   selectedCount: number;
+  /** The priority's standard equipment, checked for this car. */
+  standard: StandardFact[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -318,6 +330,11 @@ export interface Verdict {
   } | null;
   /** Said only when the top two are close enough that the ranking misleads. */
   marginNote: string | null;
+  /**
+   * Said only when evidence FINN didn't publish could reorder the
+   * recommendation and the runner-up, naming that evidence.
+   */
+  dependsNote: string | null;
 }
 
 /* -------------------------------------------------------------------------- */

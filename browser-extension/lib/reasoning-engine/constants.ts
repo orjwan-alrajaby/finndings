@@ -161,7 +161,11 @@ export const BASE_FEATURE_WEIGHT = 1;
  */
 export const STANDARD_INFLUENCE = {
   label: "Standard",
-  hint: "Counts like everything else in this priority",
+  /*
+   * It used to say "Counts like everything else in this priority", which was
+   * only true while nothing was raised — and every profile raises something.
+   */
+  hint: "Counts once",
   /**
    * Said as a state rather than as a level, because that is what it is: not
    * a fourth strength but the absence of a claim. "Standard influence" would
@@ -170,7 +174,7 @@ export const STANDARD_INFLUENCE = {
    */
   badgeLabel: "Standard Influence",
   meaning:
-    "Counts once, like every other feature in this priority. Nothing here is ignored — this one just isn't carrying extra weight.",
+    "Counts once. Nothing here is ignored — this one just isn't carrying extra weight, and anything raised in this priority counts two to four times as much.",
   /** Stated for the reader of this file; the scorer uses BASE_FEATURE_WEIGHT. */
   weight: BASE_FEATURE_WEIGHT,
   activeClass: "bg-finn-iron/20 text-finn-black ring-1 ring-finn-iron/25",
@@ -180,13 +184,31 @@ export const STANDARD_INFLUENCE = {
 } as const;
 
 /**
- * What a feature gets when the user picks it without touching the importance
- * control.
+ * The resting state of a niche item: not counted until raised.
  *
- * The middle rung on purpose: picking something already says it matters, and
- * defaulting to either end would put words in their mouth. Leaving every pick
- * in the middle reproduces plain equal weighting, so the importance layer is
- * refinement the user opts into rather than a form they must fill in.
+ * A towbar, roof rails, a sixth seat and a spare wheel matter a great deal to
+ * the people who need them and not at all to everyone else. Counting them at
+ * standard for every reader would mark half of FINN's cars down for lacking a
+ * towbar nobody asked for, so they start here and count from the first raise.
+ */
+export const NICHE_INFLUENCE = {
+  label: "Not counted",
+  hint: "Only counts if you raise it",
+  badgeLabel: "Not counted",
+  meaning:
+    "Most drivers don't need this, so it doesn't count unless you raise it. Raise it and it counts like any other raised item.",
+  weight: 0,
+  activeClass: "bg-finn-cotton text-finn-iron ring-1 ring-finn-iron/15",
+  idleClass: "text-finn-iron hover:bg-finn-cotton hover:text-finn-black",
+  dotClass: "bg-finn-iron/15",
+  accentTextClass: "text-finn-iron",
+} as const;
+
+/**
+ * The level a raise lands on when nothing chose one — a migrated flat list
+ * from an older build, or a toggle with no level attached. The middle rung,
+ * because picking something already says it matters and either end would put
+ * words in the reader's mouth. It still counts three times a standard item.
  */
 export const DEFAULT_FEATURE_IMPORTANCE: FeatureImportance = "medium";
 
@@ -497,117 +519,137 @@ export const FEATURES = {
       "An actual spare wheel in the boot, rather than only a tyre repair kit — so a serious puncture doesn't need a tow.",
   },
 } as const;
-
 type FeatureId = keyof typeof FEATURES;
+
+/* -------------------------------------------------------------------------- */
+/* Derived signals                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Evidence read from FINN's structured fields rather than its equipment list.
+ *
+ * Each is something FINN states directly — the number of doors, the number of
+ * seats, the driver assistance level it lists, the measured length — turned
+ * into the same yes-or-no or 0-to-1 reading an equipment entry gives. None is
+ * inferred from an unrelated field.
+ *
+ * `bootVolume` is defined but not scored: FINN's single boot figure is
+ * sometimes the seats-up volume and sometimes the seats-folded one, without
+ * saying which. See `BOOT_SCORING_ENABLED` in `evidence.ts`.
+ */
+export const DERIVED_SIGNALS = {
+  rearDoors: {
+    label: "Rear doors",
+    explanation:
+      "Doors for the back seats, so passengers and child seats go in without folding a front seat out of the way. Read from the number of doors FINN lists.",
+  },
+  seatsSixPlus: {
+    label: "Six or more seats",
+    explanation:
+      "Room for more than five people, usually with a third row. Read from the seat count FINN lists, and only counted if you raise it.",
+  },
+  driverAssistLevel2: {
+    label: "Level 2 driver assistance",
+    explanation:
+      "FINN lists this car's assistance as level 2: it can keep its speed, its distance and its lane together while you supervise. Level 1 manages one of those at a time.",
+  },
+  compactLength: {
+    label: "Compact length",
+    explanation:
+      "How long the car is, from FINN's measured length. A shorter car fits more parking spaces and garages. It isn't a measure of how the car handles.",
+  },
+  bootVolume: {
+    label: "Boot space (seats up)",
+    explanation:
+      "How much the boot holds with the rear seats in place, in litres.",
+  },
+} as const;
+
+/** Every piece of evidence Lens can name: equipment entries and derived signals. */
+export const SIGNALS = { ...FEATURES, ...DERIVED_SIGNALS } as const;
+
+type SignalId = keyof typeof SIGNALS;
 
 /* -------------------------------------------------------------------------- */
 /* Categories                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * `features` is the **catalogue** — every feature the user may pick out for
- * this category, ordered most relevant first. It is not what they picked.
+ * The seven priorities, and exactly what each one scores.
  *
- * Order is load-bearing twice over: it decides which five are offered as the
- * starting selection, and it is the list a car is judged against when the
- * user picks nothing at all.
+ * Every list here was checked against FINN's own inventory (728 cars, 152
+ * models, September 2026) rather than chosen for sounding relevant:
+ *
+ * - `features` — the evidence the priority scores, and whose home it is. Only
+ *   here can the reader raise it.
+ * - `niche` — scored only once raised. A towbar is on half of FINN's cars;
+ *   counting it for everyone would cost half the fleet points for something
+ *   most drivers never use.
+ * - `alsoCounts` — evidence whose home is elsewhere, counted here at standard
+ *   for a genuinely different reason. There is one in the whole model: matrix
+ *   LED headlights, home in Safety, also easing night motorway driving.
+ * - `expected` — equipment nearly every FINN car lists (eCall, at 79%, with
+ *   the rest because the law requires it on most models). Having it earns
+ *   nothing, since it would earn the same for every car and only squeeze the
+ *   differences between them; a car FINN confirms is missing one loses what
+ *   missing any Standard item here costs. Raisable, like any other item. Not
+ *   explained to the reader: it is arithmetic, not a rule they need.
+ * - `limit` — a figure that can only reduce the priority. Electric range under
+ *   Long Distance is the one.
  */
 export const CATEGORIES = {
-  /**
-   * Safety and driver assistance are one priority.
-   *
-   * They were two, and splitting them made the user rank the same systems
-   * twice: automatic emergency braking is a safety feature and an assistance
-   * feature, and no reader has a coherent opinion about which of the two they
-   * care about more.
-   */
   safetyAssistance: {
     label: "Safety & Driver Assistance",
     icon: "shield",
     color: "#2563EB",
-    /*
-     * Two claims the copy has to keep apart, because the catalogue mixes
-     * them: automatic braking, the lane and blind spot warnings and the
-     * emergency call do something when a situation has already gone wrong,
-     * while adaptive cruise, the parking sensors and the cameras only make
-     * driving less work. Neither half may be sold as prevention — the
-     * honest verb is "help", and the last sentence says so outright, because
-     * a category called Safety is the one place a reader might hear a
-     * promise nobody can make for them.
-     */
-    question: "What does the car do to help you avoid an accident?",
+    question:
+      "How much does the car actively do to help you avoid a collision, beyond what nearly every car has?",
     description:
-      "Two kinds of system, counted together: the ones that warn you, brake for you or call for help when something goes wrong — automatic braking, blind spot and lane warnings, the emergency call — and the ones that simply make driving less work, like adaptive cruise, parking sensors and cameras. They improve your odds; none of them makes a car accident-proof.",
+      "The assistance that helps you avoid a collision: blind spot warning, rear cross-traffic alert and matrix LED headlights, plus the everyday systems like emergency braking and lane keeping. None of this is crash protection, which isn't in FINN's data.",
     recommendedFor: [
-      "Families",
-      "New drivers",
+      "New or nervous drivers",
       "Motorway commuters",
-      "Anyone often driving at night or in bad weather",
+      "Anyone often driving at night or in heavy traffic",
     ],
     numericOnly: false,
     features: [
-      "hasEmergencyBrakingAssist",
       "hasBlindSpotAssist",
-      "hasLaneKeepingAssist",
-      "hasEmergencyCallSystem",
-      "hasAdaptiveCruiseControl",
-      /* Offered, unselected by default. */
-      "hasParkingSensors",
-      "hasOneEightyDegreesReversingCamera",
-      "hasTrafficSignRecognition",
       "hasRearCrosswalkWarning",
-      "hasTirePressureMonitoringSystem",
-      "hasParkingAssistant",
-      "hasHillStartAssist",
-      "hasCruiseControl",
-      "hasThreeSixtyDegreesCamera",
       "hasMatrixLedHeadlights",
+    ],
+    expected: [
+      "hasEmergencyBrakingAssist",
+      "hasLaneKeepingAssist",
+      "hasTrafficSignRecognition",
+      "hasEmergencyCallSystem",
+      "hasTirePressureMonitoringSystem",
     ],
   },
 
-  familyFriendly: {
-    label: "Family Friendly",
-    icon: "users",
-    color: "#EA580C",
-    question: "How well does it handle children, car seats and all their kit?",
-    /*
-     * The catalogue is two different things and the copy has to say so. Four
-     * entries are about children specifically — the anchor points, the
-     * folding bench, the rear climate zone, the rear sockets. The other six
-     * are ordinary conveniences that happen to matter most with a full car:
-     * a boot you can open with your hands occupied, and the cameras and
-     * sensors you need when the back is packed and you can't see out of it.
-     * Calling all ten "family features" was the old description's mistake.
-     *
-     * It also said the category kept children "settled", which nothing here
-     * measures — the nearest thing in the catalogue is a rear temperature
-     * zone and a USB socket.
-     *
-     * No safety claim, deliberately. Crash protection is not in this
-     * catalogue and the assistance that is in it is counted here for the
-     * parking it helps with, not as a safety verdict — that is its own
-     * priority.
-     */
+  cityParking: {
+    label: "City & Parking",
+    icon: "parking",
+    color: "#0D9488",
+    question: "How easy is this car to park and fit into town life?",
     description:
-      "The practical side of family driving: anchor points for child seats, and a rear bench that folds so a pram and a passenger don't have to compete. The rest is what helps when the car is full — loading the boot, keeping the back seats comfortable, and seeing what's behind you when the view is blocked.",
+      "How long the car is, and the cameras that help you place it. A shorter car fits more spaces; cameras help when it doesn't. This isn't a verdict on how the car handles.",
+    measured:
+      "The car's length, placed on a fixed scale: the shorter the car, the more of the scale it earns, whatever else you pinned",
     recommendedFor: [
-      "Parents with children in car seats",
-      "Daily school or nursery runs",
-      "Families who travel with the car full",
+      "City driving and street parking",
+      "Tight garages and multi-storey car parks",
+      "Anyone who finds parking stressful",
     ],
     numericOnly: false,
     features: [
-      "hasIsofix",
-      "hasSplitFoldingRearSeats",
-      "hasParkingSensors",
-      "hasElectricTailgate",
-      "hasBackUSBPorts",
-      /* Offered, unselected by default. */
+      "compactLength",
       "hasOneEightyDegreesReversingCamera",
-      "hasThreeZoneAutomaticClimateControls",
-      "hasRearCrosswalkWarning",
       "hasThreeSixtyDegreesCamera",
-      "hasPrivacyGlass",
+    ],
+    expected: [
+      "hasParkingSensors",
+      "hasParkingAssistant",
+      "hasElectricallyFoldingMirrors",
     ],
   },
 
@@ -615,65 +657,37 @@ export const CATEGORIES = {
     label: "Practicality",
     icon: "backpack",
     color: "#0891B2",
-    question: "Will everything you carry day-to-day actually fit?",
-    /*
-     * Boot space isn't a passing mention here: `numericScore` measures it
-     * against the other pinned cars and the category score is the average of
-     * that and the equipment score. Half the answer deserved more than a
-     * comma.
-     *
-     * What the description has to carry is the *kind* of thing boot space is
-     * — a figure measured off the cars on screen, not a box that is either
-     * ticked or not. How much it counts is said once, in `measured`, which
-     * is where the panel puts it; saying it here as well was the same
-     * sentence twice on one screen.
-     */
+    question:
+      "Can you get people and things in and out, and carry what you need?",
     description:
-      "How much you can get in, and how easily. Boot space is an actual measurement, compared against the other cars you pinned rather than ticked off a list — the rest is the practical kit: folding seats, roof rails, a towbar, a powered boot.",
-    measured:
-      "Boot space in litres, compared with the other cars you pinned",
+      "Doors for the back seats, a rear bench that folds, a tailgate that opens itself — and, if you raise them, a towbar, roof rails or room for six or more. Boot space isn't scored yet: FINN's figure sometimes means seats up and sometimes seats folded, and doesn't say which.",
     recommendedFor: [
-      "Daily commuters",
-      "People carrying sports or work kit",
-      "Anyone who regularly moves bulky things",
+      "Families with children in car seats",
+      "People carrying sports, work or holiday kit",
+      "Anyone who tows or uses a roof box",
     ],
     numericOnly: false,
     features: [
+      "rearDoors",
       "hasSplitFoldingRearSeats",
       "hasElectricTailgate",
-      "hasRoofRails",
       "hasTowbar",
-      "hasParkingSensors",
-      /* Offered, unselected by default. */
-      "hasSpareWheel",
-      "hasKeylessEntryAndStart",
-      "hasElectricallyFoldingMirrors",
-      "hasFrontUSBPorts",
-      "hasBackUSBPorts",
+      "hasRoofRails",
+      "seatsSixPlus",
     ],
+    niche: ["hasTowbar", "hasRoofRails", "seatsSixPlus"],
+    expected: ["hasIsofix"],
   },
 
   longDistance: {
     label: "Long Distance Travel",
     icon: "road",
     color: "#D97706",
-    question: "How does this feel after three hours on the motorway?",
-    /*
-     * The description is the equipment half plus a pointer at the other one.
-     * `numericScore` also ranks the car on how far it goes between stops —
-     * electric range where FINN publishes one, fuel or electricity use
-     * otherwise — and that counts for as much as everything listed here.
-     *
-     * The detail of it belongs in `measured`, including the part a reader
-     * would otherwise get wrong: the ranking happens inside each kind of
-     * reading, never across them, because kilometres of range and litres per
-     * 100 km are not the same number and nothing in FINN's data converts
-     * between them.
-     */
+    question: "Would this be a good tool for regular long drives?",
     description:
-      "What makes a long drive bearable: cruise assistance that holds a gap for you, a seat you can set up properly, navigation that doesn't drop out. Alongside that kit, Lens measures how far the car gets between stops.",
+      "What takes the work out of hours on the motorway: level 2 driver assistance, lumbar support, a head-up display and matrix LED headlights. For an electric car a short range limits the result, and a long one doesn't raise it.",
     measured:
-      "How far it gets between stops — electric range where FINN publishes one, otherwise how much fuel or electricity it uses, and only ever compared with cars measured the same way, since range in kilometres and consumption per 100 km aren't the same figure",
+      "Electric range, for electric cars only: below 480 km it limits how well the car can do here, and above that it makes no difference",
     recommendedFor: [
       "Regular long-distance drivers",
       "Motorway commuters",
@@ -681,19 +695,18 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      "hasAdaptiveCruiseControl",
+      "driverAssistLevel2",
       "hasLumbarSupport",
-      "hasIntegratedNavigationSystem",
-      "hasHeatedSeats",
-      "hasElectricFrontSeatAdjustment",
-      /* Offered, unselected by default. */
-      "hasCruiseControl",
-      "hasAppleCarPlaySlashAndroidAuto",
-      "hasRainSlashLightSensors",
       "hasHeadUpDisplay",
-      "hasSeatCooling",
-      "hasMatrixLedHeadlights",
-      "hasPremiumSoundSystem",
+      "hasSpareWheel",
+    ],
+    niche: ["hasSpareWheel"],
+    alsoCounts: ["hasMatrixLedHeadlights"],
+    limit: "evRange",
+    expected: [
+      "hasCruiseControl",
+      "hasAdaptiveCruiseControl",
+      "hasIntegratedNavigationSystem",
     ],
   },
 
@@ -701,79 +714,38 @@ export const CATEGORIES = {
     label: "Climate Suitability",
     icon: "snowflake",
     color: "#0284C7",
-    /*
-     * "Heating and cooling for the people rather than the cabin" was wrong
-     * twice: air conditioning and the auxiliary heater are cabin systems, and
-     * five of the eleven things scored here — fog lights, cornering lights,
-     * headlight washers, rain and light sensors, folding mirrors — are about
-     * seeing and being seen rather than about temperature at all.
-     *
-     * What the description must not turn into is a bad-weather safety score.
-     * Fog lights and headlight washers help you see and be seen; nothing in
-     * this catalogue says anything about grip, and `driveType` — the one
-     * field that even mentions which wheels are driven — is never scored, in
-     * this category or any other. So the scope is stated outright in the
-     * second sentence rather than left for the reader to assume.
-     */
-    question: "How will this car cope with winter mornings, summer heat and bad weather?",
+    question:
+      "Will you stay comfortable and see clearly in cold, heat and bad weather?",
     description:
-      "Equipment that only matters when the weather does: warming the car and you on a frozen morning, cooling it in August, and keeping your view clear in fog, rain and snow. It's about staying comfortable and seeing properly in bad conditions — not how the car drives in them.",
+      "Equipment that only matters when the weather does: warming the car and you on a frozen morning, cooling you in August, and keeping your view clear in fog, rain and snow. It's about comfort and visibility in bad conditions — not how the car drives in them.",
     recommendedFor: [
       "Winters cold enough to scrape the windscreen",
       "Summers spent in traffic with no shade",
       "Regular driving in fog, rain or snow",
-      "Cars parked outside rather than in a garage",
     ],
     numericOnly: false,
     features: [
-      "hasAirConditioning",
       "hasHeatedSeats",
-      "hasHeatedSteeringWheel",
       "hasRainSlashLightSensors",
-      "hasAuxiliaryHeater",
-      /* Offered, unselected by default. */
-      "hasThreeZoneAutomaticClimateControls",
+      "hasHeatedSteeringWheel",
+      "hasCorneringLights",
       "hasSeatCooling",
       "hasFogLights",
-      "hasCorneringLights",
+      "hasAuxiliaryHeater",
       "hasHeadlightCleaningSystem",
-      "hasElectricallyFoldingMirrors",
     ],
+    expected: ["hasAirConditioning"],
   },
 
   environmental: {
     label: "Environmental Impact",
     icon: "leaf",
     color: "#16A34A",
-    /*
-     * Both of these used to say the drivetrain was part of the judgement —
-     * "How much does this car emit, and what does it run on?" over "CO₂ per
-     * kilometre and the drivetrain it comes from". It hasn't been since the
-     * model was cut down to one figure: `assessEnvironment` scores
-     * `positionForCo2` and nothing else, and the method notes explain at
-     * length why counting the fuel type as well would mark the same car down
-     * twice for the same fact.
-     *
-     * The description then went one step too far the other way, finishing
-     * "what it runs on isn't scored on its own". True of petrol, diesel and
-     * electric; not quite true of plug-in hybrids, whose scale
-     * `assessEnvironment` compresses because their official figure assumes a
-     * charging habit FINN's data can't confirm. So the claim is gone rather
-     * than qualified — a one-clause version of that caveat in a category
-     * blurb reads as "hybrids are marked down", which is the wrong summary
-     * of it, and the method notes carry the real explanation where a reader
-     * meets the score itself.
-     *
-     * What stays is the scope: the figure is tailpipe CO₂ per kilometre, so
-     * the copy must not let "Environmental Impact" be read as a verdict on
-     * the whole life of the car — nothing here knows how it was built.
-     */
     question: "How much CO₂ does this car emit per kilometre?",
     description:
       "Based on the car's own reported CO₂ figure — grams per kilometre, placed on the A-to-G scale German listings use. It covers what the car emits while it's driven, not the whole environmental story of the vehicle.",
     recommendedFor: [
       "Drivers who want emissions to lead the decision",
-      "City drivers in low-emission zones",
       "Anyone weighing electric against petrol or diesel",
     ],
     numericOnly: true,
@@ -784,20 +756,9 @@ export const CATEGORIES = {
     label: "Comfort",
     icon: "sofa",
     color: "#DB2777",
-    question: "How pleasant is it to sit in, every single day?",
-    /*
-     * "Warmth, upholstery and the small everyday conveniences" named three
-     * of the fourteen things scored here and skipped the seats you can
-     * actually adjust and the phone and audio kit, which is where the
-     * picked-out five live.
-     *
-     * The second sentence is a limit rather than a feature: comfort is the
-     * category a reader is most likely to read as "how nice is this car to
-     * be in", and seats and ride are the two halves of that. FINN publishes
-     * equipment, so only one half is here, and saying so costs a clause.
-     */
+    question: "How pleasant is it to sit in and use on an ordinary day?",
     description:
-      "The things you notice on an ordinary drive: a seat you can adjust and heat, climate you can set, and the phone, sound and convenience kit you use on every trip. It's the equipment FINN lists — how the car actually rides isn't in the data.",
+      "The things you notice on an ordinary drive: seats you can adjust at the touch of a button, climate each passenger can set, keyless entry, and the phone and sound kit you use on every trip. It's the equipment FINN lists — how the car actually rides isn't in the data.",
     recommendedFor: [
       "Drivers who spend long stretches in the car",
       "Anyone who shares the car with passengers",
@@ -805,28 +766,22 @@ export const CATEGORIES = {
     ],
     numericOnly: false,
     features: [
-      "hasHeatedSeats",
-      "hasThreeZoneAutomaticClimateControls",
-      "hasHeatedSteeringWheel",
-      "hasLumbarSupport",
-      "hasLeatherSeats",
-      /* Offered, unselected by default. */
-      "hasSeatCooling",
-      "hasElectricFrontSeatAdjustment",
-      "hasKeylessEntryAndStart",
-      "hasAppleCarPlaySlashAndroidAuto",
-      "hasPremiumSoundSystem",
-      "hasAmbientInteriorLightning",
       "hasWirelessChargingStation",
-      "hasHeadUpDisplay",
-      "hasSunroof",
+      "hasKeylessEntryAndStart",
+      "hasPremiumSoundSystem",
+      "hasThreeZoneAutomaticClimateControls",
+      "hasElectricFrontSeatAdjustment",
     ],
+    expected: ["hasAppleCarPlaySlashAndroidAuto"],
   },
 } satisfies Record<
   string,
   Omit<CategoryDef, "id"> & {
     numericOnly: boolean;
-    features: FeatureId[];
+    features: SignalId[];
+    niche?: SignalId[];
+    alsoCounts?: SignalId[];
+    expected?: FeatureId[];
   }
 >;
 
@@ -837,12 +792,9 @@ type CategoryId = keyof typeof CATEGORIES;
 /* -------------------------------------------------------------------------- */
 
 /**
- * The most features a user may pick out within one priority.
+ * The most items a reader may raise within one priority.
  *
- * A cap on how many things they can single out, not a quota to fill. Picking
- * none is a real answer — "I want the safest car, I just don't have opinions
- * about which systems it has" — and is handled by judging the category on its
- * catalogue alone. See `categoryDetail`.
+ * A cap on how many things they can single out, not a quota to fill.
  */
 export const MAX_FEATURES_PER_CATEGORY = 5;
 
@@ -850,47 +802,87 @@ export const MAX_FEATURES_PER_CATEGORY = 5;
 /* Profiles                                                                   */
 /* -------------------------------------------------------------------------- */
 
+const emphasis = (
+  entries: [SignalId, FeatureImportance][],
+): FeatureSelection =>
+  entries.map(([key, importance]) => ({ key, importance, source: "profile" }));
+
 /**
- * Profiles are fixed starting philosophies, not user documents.
+ * Profiles are strong starting points, not permanent modes.
  *
- * They can be enabled, disabled and chosen. They cannot be renamed, reordered
- * or deleted — a "Family First" profile the user has rewritten to lead on
- * comfort is a lie in the picker, and the way to express that is the custom
- * priority flow instead.
+ * Each carries a priority order, the evidence it starts emphasised, what it
+ * promises and what it doesn't. Applying one replaces the reader's order and
+ * emphasis — with an undo — and from then on everything is theirs to change;
+ * the settings remember which profile they started from so the page can say
+ * "Customised from Nervous Driver".
  *
- * Every profile carries exactly five priorities.
+ * A profile that promises one dominant concern — Nervous Driver, Eco-Conscious
+ * — carries exactly three priorities, so its first one is half the result.
+ * That is the whole of their protection: tested against FINN's inventory it
+ * keeps the promise in over 99% of comparable sets, and no guardrail on top of
+ * the weighting is needed.
  */
 export const PROFILES = {
   nervous: {
     label: "Nervous Driver",
     icon: "shield",
     forWhom:
-      "Drivers who want the car watching the road with them — braking, lane and blind spot warnings doing the heavy lifting.",
+      "Drivers who want the car watching the road with them, easy to park, and helping them see in bad weather.",
     assumes:
-      "Safety and assistance systems outrank everything else, with coping in bad weather close behind.",
-    priorities: [
-      "safetyAssistance",
-      "climateSuitability",
-      "practicality",
-      "familyFriendly",
-      "longDistance",
-    ],
+      "Assistance that helps you avoid a collision leads, with parking and bad-weather visibility behind it.",
+    doesNotGuarantee:
+      "Crash protection, which isn't in FINN's data, or that no pinned car is safer in every respect.",
+    priorities: ["safetyAssistance", "cityParking", "climateSuitability"],
+    emphasis: {
+      safetyAssistance: emphasis([
+        ["hasBlindSpotAssist", "high"],
+        ["hasRearCrosswalkWarning", "high"],
+        ["hasMatrixLedHeadlights", "low"],
+      ]),
+      cityParking: emphasis([
+        ["compactLength", "high"],
+        ["hasOneEightyDegreesReversingCamera", "low"],
+        ["hasThreeSixtyDegreesCamera", "low"],
+      ]),
+      climateSuitability: emphasis([
+        ["hasRainSlashLightSensors", "medium"],
+        ["hasFogLights", "low"],
+        ["hasHeadlightCleaningSystem", "low"],
+        ["hasCorneringLights", "low"],
+      ]),
+    },
   },
 
   commuter: {
     label: "City Commuter",
     icon: "compass",
     forWhom:
-      "People doing the same short, busy journey twice a day, mostly in traffic.",
+      "People doing the same short, busy journey most days, mostly in town.",
     assumes:
-      "Assistance that reduces daily friction leads, and emissions matter because most of the driving is urban.",
+      "A car that's easy to park and pleasant in traffic leads, with safety assistance and emissions behind it.",
+    doesNotGuarantee:
+      "The lowest running cost, low-emission-zone access, or the smallest car you pinned.",
     priorities: [
-      "safetyAssistance",
-      "practicality",
+      "cityParking",
       "comfort",
+      "safetyAssistance",
       "environmental",
-      "climateSuitability",
     ],
+    emphasis: {
+      cityParking: emphasis([
+        ["compactLength", "high"],
+        ["hasOneEightyDegreesReversingCamera", "low"],
+        ["hasThreeSixtyDegreesCamera", "low"],
+      ]),
+      comfort: emphasis([
+        ["hasKeylessEntryAndStart", "medium"],
+        ["hasWirelessChargingStation", "low"],
+      ]),
+      safetyAssistance: emphasis([
+        ["hasBlindSpotAssist", "high"],
+        ["hasRearCrosswalkWarning", "medium"],
+      ]),
+    },
   },
 
   family: {
@@ -899,14 +891,30 @@ export const PROFILES = {
     forWhom:
       "Parents moving children, car seats and everything that comes with them, week after week.",
     assumes:
-      "Fitting the family in comes first, with safety immediately behind it.",
-    priorities: [
-      "familyFriendly",
-      "safetyAssistance",
-      "practicality",
-      "climateSuitability",
-      "longDistance",
-    ],
+      "Getting people and kit in and out leads, with safety assistance, parking and rear-seat comfort behind it.",
+    doesNotGuarantee:
+      "Rear legroom, room for three car seats across, or crash protection — none of which is in FINN's data. This is a preference, not a complete family-car model.",
+    priorities: ["practicality", "safetyAssistance", "cityParking", "comfort"],
+    emphasis: {
+      practicality: emphasis([
+        ["rearDoors", "high"],
+        ["hasSplitFoldingRearSeats", "high"],
+        ["hasElectricTailgate", "medium"],
+      ]),
+      safetyAssistance: emphasis([
+        ["hasBlindSpotAssist", "high"],
+        ["hasRearCrosswalkWarning", "high"],
+      ]),
+      cityParking: emphasis([
+        ["compactLength", "high"],
+        ["hasOneEightyDegreesReversingCamera", "low"],
+        ["hasThreeSixtyDegreesCamera", "low"],
+      ]),
+      comfort: emphasis([
+        ["hasThreeZoneAutomaticClimateControls", "medium"],
+        ["hasKeylessEntryAndStart", "low"],
+      ]),
+    },
   },
 
   roadtrip: {
@@ -915,7 +923,9 @@ export const PROFILES = {
     forWhom:
       "Anyone who regularly spends hours at a stretch behind the wheel.",
     assumes:
-      "How the car feels after three hours matters as much as what it does in an emergency.",
+      "How little a long drive wears you out leads, then everyday comfort, with safety, carrying and weather behind.",
+    doesNotGuarantee:
+      "Fast charging or real-world winter range, neither of which Lens scores.",
     priorities: [
       "longDistance",
       "comfort",
@@ -923,6 +933,29 @@ export const PROFILES = {
       "practicality",
       "climateSuitability",
     ],
+    emphasis: {
+      longDistance: emphasis([
+        ["driverAssistLevel2", "high"],
+        ["hasLumbarSupport", "medium"],
+        ["hasHeadUpDisplay", "low"],
+      ]),
+      comfort: emphasis([
+        ["hasElectricFrontSeatAdjustment", "medium"],
+        ["hasPremiumSoundSystem", "low"],
+      ]),
+      safetyAssistance: emphasis([
+        ["hasBlindSpotAssist", "medium"],
+        ["hasRearCrosswalkWarning", "low"],
+      ]),
+      practicality: emphasis([
+        ["hasRoofRails", "low"],
+        ["hasSplitFoldingRearSeats", "low"],
+      ]),
+      climateSuitability: emphasis([
+        ["hasHeatedSeats", "low"],
+        ["hasRainSlashLightSensors", "low"],
+      ]),
+    },
   },
 
   eco: {
@@ -930,14 +963,20 @@ export const PROFILES = {
     icon: "leaf",
     forWhom:
       "Drivers who want emissions to be the first thing the choice answers to.",
-    assumes: "CO₂ leads, with safety immediately behind it.",
-    priorities: [
-      "environmental",
-      "safetyAssistance",
-      "practicality",
-      "longDistance",
-      "comfort",
-    ],
+    assumes: "Tailpipe CO₂ leads, with safety assistance and practicality behind it.",
+    doesNotGuarantee:
+      "The car's full lifecycle footprint, the lowest running cost, or where your electricity comes from.",
+    priorities: ["environmental", "safetyAssistance", "practicality"],
+    emphasis: {
+      safetyAssistance: emphasis([
+        ["hasBlindSpotAssist", "high"],
+        ["hasRearCrosswalkWarning", "medium"],
+      ]),
+      practicality: emphasis([
+        ["rearDoors", "medium"],
+        ["hasSplitFoldingRearSeats", "low"],
+      ]),
+    },
   },
 
   balanced: {
@@ -946,40 +985,50 @@ export const PROFILES = {
     forWhom:
       "Anyone without one dominant requirement who wants a sensible all-rounder.",
     /*
-     * It used to say the weight was spread, which reads as "these count
-     * equally" — and the weighting is the same falling scale every profile
-     * gets. What is actually balanced is the choice of five, not the maths.
+     * The weighting is the same falling scale every profile gets. What is
+     * balanced is the choice of five and the light emphasis, not the maths.
      */
     assumes:
-      "The five everyday essentials, in a sensible order, with nothing unusual at the top.",
+      "Five everyday concerns in a sensible order, with only light emphasis inside each.",
+    doesNotGuarantee:
+      "That every priority counts equally — the order still decides how much each one counts.",
     priorities: [
       "safetyAssistance",
       "practicality",
-      "familyFriendly",
-      "climateSuitability",
       "comfort",
+      "cityParking",
+      "environmental",
     ],
+    emphasis: {
+      safetyAssistance: emphasis([["hasBlindSpotAssist", "medium"]]),
+      practicality: emphasis([["hasSplitFoldingRearSeats", "low"]]),
+      cityParking: emphasis([["compactLength", "medium"]]),
+    },
   },
-} as const;
+} satisfies Record<
+  string,
+  {
+    label: string;
+    icon: string;
+    forWhom: string;
+    assumes: string;
+    doesNotGuarantee: string;
+    priorities: CategoryId[];
+    emphasis: Partial<Record<CategoryId, FeatureSelection>>;
+  }
+>;
 
 export type ProfileId = keyof typeof PROFILES;
-
-/** How many priorities every profile carries. */
-export const PROFILE_PRIORITY_COUNT = 5;
 
 /**
  * How many priorities a reader's own order may hold.
  *
  * Below three there isn't enough to separate cars on: the weighting gives the
- * first priority half the result, and two of them is closer to a filter than
- * to an ordering. Above five each one is worth so little that the ones at the
- * bottom stop changing any answer — which is the same as not having asked.
- *
- * The compare flow and the settings page both enforce these, so they live
- * here rather than in either of them.
+ * first priority half the result. Above five each one is worth so little that
+ * the ones at the bottom stop changing any answer.
  */
 export const MIN_PRIORITIES = 3;
-export const MAX_PRIORITIES = PROFILE_PRIORITY_COUNT;
+export const MAX_PRIORITIES = 5;
 
 /* -------------------------------------------------------------------------- */
 /* Derived defaults                                                           */
@@ -992,136 +1041,40 @@ export const NUMERIC_ONLY_CATEGORIES = CATEGORY_IDS.filter(
 );
 
 /**
- * Every feature a category *offers*, in relevance order.
- *
- * Two jobs: it is the list the picker draws from, and it is what a car is
- * judged against when the user singles out nothing.
+ * Every item a category can be raised on, in relevance order — its home
+ * evidence, niche items included.
  */
 export const AVAILABLE_CATEGORY_FEATURES = Object.fromEntries(
-  CATEGORY_IDS.map((id) => [id, CATEGORIES[id].features as FeatureId[]])
-) as Record<CategoryId, FeatureId[]>;
+  CATEGORY_IDS.map((id) => [id, [...CATEGORIES[id].features] as SignalId[]])
+) as Record<CategoryId, SignalId[]>;
 
 /**
- * What a category starts with picked out, and how much each one counts.
+ * Which profile is automatically selected out of the box.
  *
- * This was empty, on the argument that a pick says "this matters to me" and
- * carries an importance the reader chose, so shipping five of them puts words
- * in their mouth and then reasons from them. The argument was right about the
- * risk and wrong about the remedy. Empty did not mean Lens made no assumption
- * — a category with nothing picked is judged on its whole catalogue, which
- * assumes every feature in it matters exactly the same amount, and *that* is
- * the claim nobody would make if asked. It also meant the product's first
- * answer to a new reader was a shrug, and the only way out of it was a form.
- *
- * So Lens now ships an opinion and says whose it is. Everywhere a verdict
- * appears before the reader has saved anything, it is labelled as Lens's
- * default rather than theirs, with the way to change it beside it — see
- * `hasSavedLensSettings`, which is what the whole product reads to tell "ours"
- * from "theirs".
- *
- * The five per category are not the first five in the catalogue and are not
- * anyone here's taste. They come from what large samples of car buyers
- * actually say they want, and the weightings say how loudly:
- *
- * - AutoPacific's Future Attribute Demand Study (19,000+ intending buyers)
- *   puts heated seats first outright, heated steering wheels at 38% and
- *   heated-and-ventilated front seats at 37%, and wireless CarPlay/Android
- *   Auto and power front seats in its top four.
- * - Cars.com's 2025 buyer survey has rear automatic emergency braking tied
- *   top at 43%, with blind-spot cameras and parking sensors scoring high on
- *   "must have" rather than "nice to have".
- * - Family-car guidance is consistent to the point of monotony: ISOFIX
- *   points first, then folding rear seats for a pram plus luggage, then
- *   rearward visibility.
- * - Long-distance advice names adaptive cruise and adjustable lumbar support
- *   ahead of everything else, both as fatigue rather than luxury.
- *
- * **No feature is raised in more than one category**, and that is a rule the
- * product now enforces rather than a coincidence: a reader who has already
- * said heated seats matter under Climate Suitability is not asked the same
- * question again under Comfort. It cost this list something real — heated
- * seats genuinely bear on both — so each shared feature went to the category
- * that makes the strongest claim on it, and the categories that lost one
- * backfilled from their own catalogue. Adaptive cruise sits under safety
- * rather than long distance because every safety survey leads with it;
- * heated seats under climate rather than comfort because winter is the
- * question they answer; the seats and the phone kit under comfort because
- * that is the everyday-pleasure end of the same catalogue.
- *
- * Two deliberate departures from "the obvious five", both for the same
- * reason — a feature every car has separates no cars:
- *
- * - **The emergency call system is not picked**, though it is a safety
- *   feature and a good one. eCall has been mandatory on new cars sold in the
- *   EU since 2018, so every car FINN rents has it and raising it would add
- *   weight to a fact that never varies.
- * - **Air conditioning is picked but only moderately**, for the same reason
- *   softened: near-universal, so it rarely moves a comparison, but its
- *   absence is severe enough to be worth catching when it happens.
+ * "Default" means selected, not merely present.
  */
-export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> = {
-  safetyAssistance: [
-    /* The one system that acts to prevent the collision rather than warn about it. */
-    { key: "hasEmergencyBrakingAssist", importance: "high" },
-    { key: "hasBlindSpotAssist", importance: "high" },
-    { key: "hasAdaptiveCruiseControl", importance: "medium" },
-    { key: "hasLaneKeepingAssist", importance: "medium" },
-    { key: "hasParkingSensors", importance: "medium" },
-  ],
+export const DEFAULT_DEFAULT_PROFILE_ID: ProfileId = "balanced";
 
-  familyFriendly: [
-    { key: "hasIsofix", importance: "high" },
-    /* Rearward visibility, which parent guidance names as often as the seats. */
-    { key: "hasOneEightyDegreesReversingCamera", importance: "high" },
-    /* Hands full of child; the boot still has to open. */
-    { key: "hasElectricTailgate", importance: "medium" },
-    { key: "hasThreeZoneAutomaticClimateControls", importance: "medium" },
-    { key: "hasRearCrosswalkWarning", importance: "low" },
-  ],
+/** Every category's emphasis under one profile, empty where it sets none. */
+export function profileEmphasis(
+  id: ProfileId,
+): Record<CategoryId, FeatureSelection> {
+  const set: Partial<Record<CategoryId, FeatureSelection>> = PROFILES[id].emphasis;
 
-  practicality: [
-    /* A pram and the luggage, without choosing between them. */
-    { key: "hasSplitFoldingRearSeats", importance: "high" },
-    { key: "hasRoofRails", importance: "medium" },
-    { key: "hasTowbar", importance: "medium" },
-    { key: "hasSpareWheel", importance: "low" },
-    { key: "hasKeylessEntryAndStart", importance: "low" },
-  ],
+  return Object.fromEntries(
+    CATEGORY_IDS.map((category) => [
+      category,
+      (set[category] ?? []).map((preference) => ({ ...preference })),
+    ]),
+  ) as Record<CategoryId, FeatureSelection>;
+}
 
-  longDistance: [
-    /* Named as fatigue rather than luxury wherever long drives are discussed. */
-    { key: "hasLumbarSupport", importance: "high" },
-    { key: "hasHeadUpDisplay", importance: "medium" },
-    { key: "hasMatrixLedHeadlights", importance: "medium" },
-    { key: "hasCruiseControl", importance: "medium" },
-    /* Phone mirroring has largely taken this over, so it counts least. */
-    { key: "hasIntegratedNavigationSystem", importance: "low" },
-  ],
-
-  climateSuitability: [
-    { key: "hasHeatedSeats", importance: "high" },
-    { key: "hasHeatedSteeringWheel", importance: "high" },
-    /* The summer half of the same question. */
-    { key: "hasSeatCooling", importance: "medium" },
-    { key: "hasAirConditioning", importance: "medium" },
-    { key: "hasRainSlashLightSensors", importance: "low" },
-  ],
-
-  comfort: [
-    { key: "hasAppleCarPlaySlashAndroidAuto", importance: "high" },
-    { key: "hasElectricFrontSeatAdjustment", importance: "high" },
-    { key: "hasWirelessChargingStation", importance: "medium" },
-    { key: "hasPremiumSoundSystem", importance: "medium" },
-    { key: "hasAmbientInteriorLightning", importance: "low" },
-  ],
-
-  /*
-   * Nothing, and not for want of an opinion: this category has no feature
-   * catalogue at all. It is scored from the CO₂ figure, straight off the
-   * vehicle data. See `numericOnly`.
-   */
-  environmental: [],
-};
+/**
+ * What a fresh install starts with raised: the default profile's emphasis,
+ * marked as the profile's so nothing calls it the reader's own.
+ */
+export const DEFAULT_CATEGORY_FEATURES: Record<CategoryId, FeatureSelection> =
+  profileEmphasis(DEFAULT_DEFAULT_PROFILE_ID);
 
 export const DEFAULT_PRIORITY_DEFINITIONS: PriorityDefinition[] =
   CATEGORY_IDS.map((id) => ({
@@ -1137,18 +1090,14 @@ export const DEFAULT_PROFILES: Profile[] = (
   Object.keys(PROFILES) as ProfileId[]
 ).map((id) => ({
   id,
-  ...PROFILES[id],
+  label: PROFILES[id].label,
+  icon: PROFILES[id].icon,
+  forWhom: PROFILES[id].forWhom,
+  assumes: PROFILES[id].assumes,
+  doesNotGuarantee: PROFILES[id].doesNotGuarantee,
   priorities: [...PROFILES[id].priorities],
   enabled: true,
 }));
-
-/**
- * Which profile is automatically selected out of the box.
- *
- * "Default" means selected, not merely present. Nothing else in the product
- * is allowed to use the word for "shipped in the list".
- */
-export const DEFAULT_DEFAULT_PROFILE_ID: ProfileId = "balanced";
 
 /**
  * The starting priority order: the default profile's own, so that opening

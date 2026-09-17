@@ -5,6 +5,7 @@ import type {
   FeatureSelection,
   LensPreferences,
   PriorityBreakdown,
+  VehicleScore,
 } from "./types";
 import { assessEnvironment } from "./environmental";
 import type { EnvironmentalAssessment } from "./environmental";
@@ -13,6 +14,7 @@ import type {
   FeatureFact,
   MeasurementFact,
   PriorityReasoning,
+  StandardFact,
   Tradeoff,
   TraitFact,
 } from "./narrative/types";
@@ -24,6 +26,8 @@ import { reasonAboutTradeoffs } from "./narrative/tradeoffs";
 import { summarisePriority } from "./narrative/verdict";
 import { phraseLabel, sentence } from "./narrative/phrase";
 import { DEFAULT_CATEGORY_FEATURES } from "./constants";
+import { atLeast, bandForScore, type ScoreBand } from "./bands";
+import { equipmentKnown, isBinarySignal } from "./evidence";
 
 /**
  * One car, judged against one reader — the question asked on finn.com while
@@ -160,45 +164,56 @@ export const FIT_SEGMENTS: Record<FitLevel, number> = {
 /** The meter's length, so the three places that draw it agree on it. */
 export const FIT_METER_SEGMENTS = 5;
 
-/**
- * Where the bands sit on the engine's own 0–100 category score.
- *
- * The score is a weighted share of a catalogue: every feature the priority
- * covers counts once for being relevant equipment, and one the reader picked
- * out counts two, three or four times depending on how much influence they
- * gave it. So the ceiling is only reachable by a car that has essentially all
- * of a fifteen-item catalogue, and the thresholds have to be read against
- * that rather than against a school grade.
- *
- * Worked through: a fifteen-feature catalogue with five picks at the highest
- * influence has a denominator of 30. A car with every one of those picks and
- * nothing else scores 67; with half the remaining catalogue as well, 83. A car
- * with none of the picks but two-thirds of the catalogue scores 33. The
- * boundaries below put those where a reader would put them.
- *
- * These four numbers are the one genuinely new judgement in this file, and
- * they are a presentation choice rather than a scoring one — the ordering they
- * band is entirely the engine's. They are worth recalibrating against real
- * FINN inventory.
- */
-const STRONG_FROM = 65;
-const GOOD_FROM = 45;
-const PARTIAL_FROM = 25;
-
 /** Bands a score the engine produced. Never produces a score of its own. */
 export function classifyFit(score: number, hasEvidence = true): FitBand {
   if (!hasEvidence) {
     return { level: "unknown", label: FIT_BANDS.unknown.label };
   }
 
-  const level: FitLevel =
-    score >= STRONG_FROM
-      ? "strong"
-      : score >= GOOD_FROM
-        ? "good"
-        : score >= PARTIAL_FROM
-          ? "partial"
-          : "limited";
+  const level: FitLevel = bandForScore(score);
+
+  return { level, label: FIT_BANDS[level].label };
+}
+
+/**
+ * A car's overall band: what it means for this reader, not only where its fit
+ * lands.
+ *
+ * - **Strong** — delivers on nearly everything they ranked: a high fit, the #1
+ *   priority at least Good, and nothing in the top three Limited.
+ * - **Good** — delivers on what matters most, with real trade-offs: a fit in
+ *   the Good range or better, and the #1 priority at least Partial.
+ * - **Partial** — falls short on at least one top priority.
+ * - **Limited** — falls short on the top priorities.
+ * - **Not enough data** — the car can't be judged on the #1 and #2 priorities.
+ *
+ * A fit high enough for a band is held back a band when the priorities under
+ * it don't bear it out. Where the fit lands is placed by `bands.ts`, which is
+ * calibrated; these rules are the meaning and don't move with it.
+ */
+export function classifyCarFit(score: VehicleScore, priorities: CategoryId[]): FitBand {
+  if (!score.judgeable) return classifyFit(0, false);
+
+  const bandOf = (priority: CategoryId | undefined): ScoreBand | null => {
+    const detail = priority ? score.details[priority] : undefined;
+    return detail?.assessed ? bandForScore(detail.exactScore) : null;
+  };
+
+  const first = bandOf(priorities[0]);
+  const topThree = priorities.slice(0, 3).map(bandOf);
+
+  let level: ScoreBand = bandForScore(score.fit);
+
+  if (
+    level === "strong" &&
+    ((first && !atLeast(first, "good")) || topThree.includes("limited"))
+  ) {
+    level = "good";
+  }
+
+  if (atLeast(level, "good") && first && !atLeast(first, "partial")) {
+    level = "partial";
+  }
 
   return { level, label: FIT_BANDS[level].label };
 }
@@ -210,34 +225,11 @@ export function classifyFit(score: number, hasEvidence = true): FitBand {
 /**
  * Whether FINN told us what this car is equipped with.
  *
- * Two different states used to collapse into one here, and getting them
- * confused is the difference between a fact and an invention:
- *
- * - **FINN said nothing.** No equipment list at all. The honest answer is
- *   that we don't know, and every surface says so rather than scoring it.
- * - **FINN said no.** A list arrived and every entry in it is false. That is
- *   a bare car, and it is a real answer — worth scoring, and worth saying
- *   out loud as "it doesn't have these" rather than "we can't tell".
- *
- * This used to guess between them by asking whether *any* feature was true,
- * on the reasoning that no real car has none of fifty-odd features. That was
- * a fair heuristic and it was wrong about exactly the cars it mattered most
- * for: a stripped-out car answered honestly by FINN was reported as a car
- * Lens knew nothing about, so it got no band, no badge on its card, and a
- * shrug in the panel — while the data to judge it was sitting right there.
- *
- * The answer is now taken where the raw response is, by
- * `hasSuppliedEquipment`, and carried on the car as `featuresSupplied`. The
- * heuristic survives only for cars pinned before that field existed, where a
- * guess really is all there is.
+ * FINN sends every key on every car, so a list that answers nothing with a
+ * yes is not an answer — see `equipmentKnown`, which this is.
  */
 export function hasEquipmentData(vehicle: FinnCar): boolean {
-  if (typeof vehicle.featuresSupplied === "boolean") {
-    return vehicle.featuresSupplied;
-  }
-
-  /* Stored by an older build: the flag was never written, so guess as before. */
-  return Object.values(vehicle.features ?? {}).some(Boolean);
+  return equipmentKnown(vehicle);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -274,6 +266,13 @@ export interface FitPriority {
 
   /** The reader's picks under this priority, present ones first. */
   picked: FitFeature[];
+
+  /**
+   * The priority's standard equipment, each checked against this car's
+   * listing. Never scored; shown so the reader doesn't have to know what's
+   * standard.
+   */
+  standard: StandardFact[];
 
   /**
    * Everything else the priority covers, present ones first.
@@ -394,10 +393,7 @@ export function buildFitAnalysis(
     toFitPriority(breakdown, reasoning[index] as PriorityReasoning, equipmentKnown),
   );
 
-  const overall = classifyFit(
-    evaluation.score.total,
-    equipmentKnown && fitPriorities.some((item) => item.hasEvidence),
-  );
+  const overall = classifyCarFit(evaluation.score, context.priorities);
 
   return {
     vehicle,
@@ -418,16 +414,14 @@ export function buildFitAnalysis(
 function toFitPriority(
   breakdown: PriorityBreakdown,
   reasoning: PriorityReasoning,
-  equipmentKnown: boolean,
+  _equipmentKnown: boolean,
 ): FitPriority {
   const { picked, coverage } = reasoning.features;
 
-  const state = equipmentKnown ? "present" : "unknown";
-
   /* A pick is listed once, under the reader's own heading rather than twice. */
-  const isPicked = (key: string): boolean =>
-    picked.present.some((fact) => fact.key === key) ||
-    picked.missing.some((fact) => fact.key === key);
+  const pickedKeys = new Set(
+    [...picked.present, ...picked.missing, ...picked.unknown].map((fact) => fact.key),
+  );
 
   const toFeature = (
     fact: FeatureFact,
@@ -439,6 +433,9 @@ function toFitPriority(
     state: featureState,
   });
 
+  const rest = (facts: FeatureFact[]) =>
+    facts.filter((fact) => !pickedKeys.has(fact.key) && isBinarySignal(fact.key));
+
   return {
     priority: breakdown.priority,
     label: breakdown.label,
@@ -446,50 +443,38 @@ function toFitPriority(
     rank: breakdown.rank,
     weightPercent: breakdown.weightPercent,
 
-    /*
-     * A car whose equipment list FINN never supplied scores zero on every
-     * catalogue, which is not the same statement as "it has none of them".
-     */
-    band: classifyFit(
-      breakdown.score,
-      breakdown.hasEvidence &&
-        (equipmentKnown || breakdown.environmental != null),
-    ),
+    /* An unassessed priority reads "Not enough data", never a low band. */
+    band: classifyFit(breakdown.score, breakdown.hasEvidence),
 
     covered: breakdown.matched.length,
-    catalogueSize: breakdown.matched.length + breakdown.missing.length,
+    catalogueSize:
+      breakdown.matched.length +
+      breakdown.missing.length +
+      breakdown.unknown.filter(isBinarySignal).length,
 
     picked: [
-      ...picked.present.map((fact) => toFeature(fact, state)),
-      ...picked.missing.map((fact) =>
-        toFeature(fact, equipmentKnown ? "absent" : "unknown"),
-      ),
+      ...picked.present.map((fact) => toFeature(fact, "present")),
+      ...picked.missing.map((fact) => toFeature(fact, "absent")),
+      ...picked.unknown.map((fact) => toFeature(fact, "unknown")),
     ],
 
+    standard: reasoning.features.standard,
+
     alsoCounted: [
-      ...coverage.present
-        .filter((fact) => !isPicked(fact.key))
-        .map((fact) => toFeature(fact, state)),
-      ...coverage.missing
-        .filter((fact) => !isPicked(fact.key))
-        .map((fact) => toFeature(fact, equipmentKnown ? "absent" : "unknown")),
+      ...rest(coverage.present).map((fact) => toFeature(fact, "present")),
+      ...rest(coverage.missing).map((fact) => toFeature(fact, "absent")),
+      ...rest(coverage.unknown).map((fact) => toFeature(fact, "unknown")),
     ],
 
     measurements: reasoning.measurements,
     traits: reasoning.traits,
     impact: breakdown.environmental,
 
-    /*
-     * The engine's own sentences, except where they rest on equipment we
-     * don't have. A priority scored on figures keeps them either way — an
-     * emissions result doesn't depend on the equipment list at all.
-     */
+    /* The engine's own sentences wherever the priority could be judged. */
     sentences:
-      equipmentKnown || breakdown.environmental ? reasoning.sentences : [],
+      breakdown.hasEvidence || breakdown.environmental ? reasoning.sentences : [],
 
-    hasEvidence: equipmentKnown
-      ? breakdown.hasEvidence
-      : breakdown.environmental != null || reasoning.measurements.length > 0,
+    hasEvidence: breakdown.hasEvidence,
   };
 }
 

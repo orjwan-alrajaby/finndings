@@ -75,6 +75,7 @@ const UNKNOWN_LABEL: Record<string, string> = {
   missingConsumption: "the fuel or electricity it uses",
   missingEnergyPrice: "the energy price to apply",
   missingExtraKmPrice: "the price of kilometres beyond the included allowance",
+  plugInElectricityExcluded: "the electricity a plug-in hybrid charges on",
 };
 
 /** Splits the total into the parts it's actually made of. */

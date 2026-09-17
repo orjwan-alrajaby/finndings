@@ -12,184 +12,186 @@ import {
   FEATURES,
   IMPORTANCE_LEVELS,
   MAX_FEATURES_PER_CATEGORY,
-  PROFILE_PRIORITY_COUNT,
+  MAX_PRIORITIES,
+  MIN_PRIORITIES,
   PROFILES,
+  SIGNALS,
+  profileEmphasis,
+  type ProfileId,
 } from "./constants";
 
 import { DEFAULT_PREFERENCES } from "./constants";
+import { homeOf } from "./evidence";
 import { buildReasoningContext, evaluateVehicle, getCategory } from "./index";
 import { makeCar } from "./test-fixtures";
 import { validatePriorityDraft } from "@/entrypoints/settings/utils/PriorityValidation";
-import type { CategoryId } from "./types";
+import type { CategoryId, FeatureId, SignalId } from "./types";
+
+const def = (id: CategoryId) =>
+  CATEGORIES[id] as {
+    features: readonly SignalId[];
+    niche?: readonly SignalId[];
+    alsoCounts?: readonly SignalId[];
+    expected?: readonly FeatureId[];
+    numericOnly: boolean;
+  };
 
 /* -------------------------------------------------------------------------- */
-/* One safety priority, not two                                               */
+/* The priorities                                                             */
 /* -------------------------------------------------------------------------- */
 
-describe("safety and driver assistance are one priority", () => {
-  it("no longer exist as separate categories", () => {
-    expect(CATEGORY_IDS).not.toContain("safety");
-    expect(CATEGORY_IDS).not.toContain("driverAssistance");
-    expect(CATEGORY_IDS).toContain("safetyAssistance");
+describe("the seven priorities", () => {
+  it("are the ones the model defines, with Family Friendly folded into Practicality", () => {
+    expect(CATEGORY_IDS).toEqual([
+      "safetyAssistance",
+      "cityParking",
+      "practicality",
+      "longDistance",
+      "climateSuitability",
+      "environmental",
+      "comfort",
+    ]);
+    expect(CATEGORY_IDS).not.toContain("familyFriendly");
   });
 
-  it("is named for what it covers", () => {
-    expect(CATEGORIES.safetyAssistance.label).toBe(
-      "Safety & Driver Assistance",
-    );
+  it("scores safety on the assistance that varies, and counts gaps in its standard kit", () => {
+    expect(def("safetyAssistance").features).toEqual([
+      "hasBlindSpotAssist",
+      "hasRearCrosswalkWarning",
+      "hasMatrixLedHeadlights",
+    ]);
+
+    expect(def("safetyAssistance").expected).toEqual([
+      "hasEmergencyBrakingAssist",
+      "hasLaneKeepingAssist",
+      "hasTrafficSignRecognition",
+      "hasEmergencyCallSystem",
+      "hasTirePressureMonitoringSystem",
+    ]);
   });
 
-  /*
-   * The merge exists because these systems overlapped: automatic emergency
-   * braking was in both lists, so the user was ranking the same feature
-   * against itself.
-   */
-  it("carries the systems that used to be split across the two", () => {
-    const keys = AVAILABLE_CATEGORY_FEATURES.safetyAssistance;
-
-    expect(keys).toContain("hasEmergencyBrakingAssist");
-    expect(keys).toContain("hasEmergencyCallSystem");
-    expect(keys).toContain("hasAdaptiveCruiseControl");
-    expect(keys).toContain("hasParkingAssistant");
+  it("keeps boot volume out of Practicality while its data isn't trustworthy", () => {
+    expect(def("practicality").features).not.toContain("bootVolume");
   });
 
-  it("is gone from every shipped profile", () => {
-    for (const profile of DEFAULT_PROFILES) {
-      expect(profile.priorities).not.toContain("safety");
-      expect(profile.priorities).not.toContain("driverAssistance");
+  it("marks towbar, roof rails, six seats and a spare wheel as counted only once raised", () => {
+    expect(def("practicality").niche).toEqual(["hasTowbar", "hasRoofRails", "seatsSixPlus"]);
+    expect(def("longDistance").niche).toEqual(["hasSpareWheel"]);
+
+    for (const id of CATEGORY_IDS) {
+      for (const key of def(id).niche ?? []) expect(def(id).features).toContain(key);
     }
   });
-});
 
-/* -------------------------------------------------------------------------- */
-/* Feature selection rules                                                    */
-/* -------------------------------------------------------------------------- */
-
-describe("feature selection", () => {
-  /*
-   * Nothing is picked on the user's behalf. A pick now says "this matters to
-   * me" and carries an importance they chose, so pre-selecting five would be
-   * the product inventing preferences and then reasoning from them.
-   */
-  /*
-   * Lens ships an opinion rather than a shrug, and these are the rules that
-   * keep it an opinion the product can stand behind: it is a subset of what
-   * each category actually offers, it is inside the cap the reader is held
-   * to, and it is a real selection rather than a token one.
-   */
-  it("picks five features in every category that has any", () => {
+  it("gives Long Distance the electric range limit and no other priority one", () => {
     for (const id of CATEGORY_IDS) {
-      const picked = DEFAULT_CATEGORY_FEATURES[id];
+      expect((CATEGORIES[id] as { limit?: string }).limit).toBe(
+        id === "longDistance" ? "evRange" : undefined,
+      );
+    }
+  });
 
-      if (CATEGORIES[id].numericOnly) {
-        /* Scored from vehicle data; there is no catalogue to pick from. */
-        expect(picked).toEqual([]);
-        continue;
+  it("only names evidence that exists", () => {
+    for (const id of CATEGORY_IDS) {
+      for (const key of [...def(id).features, ...(def(id).alsoCounts ?? [])]) {
+        expect(SIGNALS[key]).toBeDefined();
       }
-
-      expect(picked).toHaveLength(5);
-    }
-  });
-
-  it("never picks a feature the category doesn't offer", () => {
-    for (const id of CATEGORY_IDS) {
-      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
-        expect(AVAILABLE_CATEGORY_FEATURES[id]).toContain(pick.key);
-      }
-    }
-  });
-
-  it("never picks the same feature twice in one category", () => {
-    for (const id of CATEGORY_IDS) {
-      const keys = DEFAULT_CATEGORY_FEATURES[id].map((pick) => pick.key);
-
-      expect(new Set(keys).size).toBe(keys.length);
-    }
-  });
-
-  it("stays inside the cap the reader is held to", () => {
-    for (const id of CATEGORY_IDS) {
-      expect(
-        DEFAULT_CATEGORY_FEATURES[id].length,
-      ).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
-    }
-  });
-
-  /*
-   * A default that raised everything to "highly" would be the same as raising
-   * nothing: the point of the scale is that some of these matter more than
-   * others, and the shipped opinion has to demonstrate that or it teaches the
-   * reader the control does nothing.
-   */
-  it("uses more than one level of importance", () => {
-    for (const id of CATEGORY_IDS) {
-      const picked = DEFAULT_CATEGORY_FEATURES[id];
-
-      if (picked.length === 0) continue;
-
-      const levels = new Set(picked.map((pick) => pick.importance));
-
-      expect(levels.size).toBeGreaterThan(1);
-    }
-  });
-
-  /*
-   * The rule the picker now enforces: a feature counts extra in one priority
-   * only. Shipping defaults that broke it would put the product in a state
-   * the reader could see but never recreate — every duplicate would show as
-   * locked, under a category they never chose.
-   *
-   * It cost this list something real. Heated seats genuinely bear on both
-   * climate and comfort, and each shared feature had to go to the category
-   * with the strongest claim on it while the others backfilled.
-   */
-  it("never raises the same feature in two categories", () => {
-    const homes = new Map<string, CategoryId[]>();
-
-    for (const id of CATEGORY_IDS) {
-      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
-        homes.set(pick.key, [...(homes.get(pick.key) ?? []), id]);
-      }
-    }
-
-    const shared = [...homes.entries()].filter(
-      ([, categories]) => categories.length > 1,
-    );
-
-    expect(shared).toEqual([]);
-  });
-
-  it("gives every pick a real level", () => {
-    for (const id of CATEGORY_IDS) {
-      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
-        expect(IMPORTANCE_LEVELS).toContain(pick.importance);
-      }
-    }
-  });
-
-  it("only offers features that actually exist in the data", () => {
-    for (const id of CATEGORY_IDS) {
-      for (const key of AVAILABLE_CATEGORY_FEATURES[id]) {
+      for (const key of def(id).expected ?? []) {
         expect(FEATURES[key]).toBeDefined();
       }
     }
   });
 
-  it("never offers the same feature twice within one priority", () => {
+  it("never lists an item twice within one priority", () => {
     for (const id of CATEGORY_IDS) {
       const keys = AVAILABLE_CATEGORY_FEATURES[id];
-
       expect(new Set(keys).size).toBe(keys.length);
     }
   });
 
   /*
+   * Two priorities read a measured figure — length, and electric range — and
+   * say so in `measured`. Add a figure to the engine without the copy and
+   * this fails, and so does the reverse.
+   */
+  it("names the measured figure of every priority that reads one", () => {
+    const cars = [
+      makeCar({ id: 1, fuelType: "Electric", co2: 0, consumption: 16, range: 450, features: ["hasHeatedSeats"] }),
+    ];
+
+    const context = buildReasoningContext(cars, CATEGORY_IDS.slice(0, 5), DEFAULT_PREFERENCES);
+    const all = buildReasoningContext(cars, CATEGORY_IDS.slice(2, 7), DEFAULT_PREFERENCES);
+
+    const scoredOnAFigure = [
+      ...evaluateVehicle(cars[0] as never, context).priorities,
+      ...evaluateVehicle(cars[0] as never, all).priorities,
+    ]
+      .filter((item) => item.numeric != null && !CATEGORIES[item.priority].numericOnly)
+      .map((item) => item.priority);
+
+    const distinct = [...new Set(scoredOnAFigure)].sort();
+
+    expect(distinct).toEqual(["cityParking", "longDistance"]);
+
+    for (const id of CATEGORY_IDS) {
+      const measured = getCategory(id)?.measured;
+
+      expect(Boolean(measured)).toBe(distinct.includes(id));
+      if (measured) expect(measured.length).toBeGreaterThan(30);
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Raising                                                                    */
+/* -------------------------------------------------------------------------- */
+
+describe("raising items", () => {
+  it("starts a fresh install on the default profile's emphasis, marked as the profile's", () => {
+    expect(DEFAULT_CATEGORY_FEATURES).toEqual(profileEmphasis(DEFAULT_DEFAULT_PROFILE_ID));
+
+    for (const id of CATEGORY_IDS) {
+      for (const pick of DEFAULT_CATEGORY_FEATURES[id]) {
+        expect(pick.source).toBe("profile");
+      }
+    }
+  });
+
+  it("only raises items in their home, within the cap, at a real level", () => {
+    for (const profile of Object.keys(PROFILES) as ProfileId[]) {
+      const emphasis = profileEmphasis(profile);
+
+      for (const id of CATEGORY_IDS) {
+        const picks = emphasis[id];
+
+        expect(picks.length).toBeLessThanOrEqual(MAX_FEATURES_PER_CATEGORY);
+        expect(new Set(picks.map((pick) => pick.key)).size).toBe(picks.length);
+
+        for (const pick of picks) {
+          expect(homeOf(pick.key)).toBe(id);
+          expect(IMPORTANCE_LEVELS).toContain(pick.importance);
+        }
+      }
+    }
+  });
+
+  it("only raises priorities the profile actually ranks", () => {
+    for (const profile of Object.keys(PROFILES) as ProfileId[]) {
+      const emphasis = profileEmphasis(profile);
+      const ranked = PROFILES[profile].priorities as CategoryId[];
+
+      for (const id of CATEGORY_IDS) {
+        if (!ranked.includes(id)) expect(emphasis[id]).toEqual([]);
+      }
+    }
+  });
+
+  /*
    * The only rule left is the ceiling. There is deliberately no floor: an
-   * empty selection means "compare on the category as a whole", which the
-   * editors must accept rather than treat as an unfinished form.
+   * empty selection means every item counts at standard.
    */
   it("accepts an empty selection and refuses one over the cap", () => {
-    const id: CategoryId = "practicality";
+    const id: CategoryId = "climateSuitability";
 
     expect(validatePriorityDraft([], id)).toBeNull();
 
@@ -200,95 +202,47 @@ describe("feature selection", () => {
     expect(validatePriorityDraft([...overCap], id)).toMatch(/at most/i);
   });
 
-  /*
-   * Two priorities are scored on a measured figure as well as their
-   * equipment, and `categoryDetail` averages the two — so the figure carries
-   * half the answer. A reader is told that in `measured`, and this is what
-   * stops the two drifting apart again: add a numeric case to the engine
-   * without writing the copy and this fails, and so does the reverse.
-   */
-  it("names the measured half of every priority that has one", () => {
-    const cars = [
-      makeCar({ id: 1, trunk: 300, consumption: 5, range: null }),
-      makeCar({ id: 2, trunk: 600, consumption: 8, range: null }),
-    ];
-
-    const context = buildReasoningContext(cars, CATEGORY_IDS, DEFAULT_PREFERENCES);
-
-    const scoredOnAFigure = evaluateVehicle(cars[0] as never, context)
-      .priorities.filter(
-        (item) => item.numeric != null && !CATEGORIES[item.priority].numericOnly,
-      )
-      .map((item) => item.priority)
-      .sort();
-
-    expect(scoredOnAFigure).toEqual(["longDistance", "practicality"]);
-
-    for (const id of CATEGORY_IDS) {
-      const measured = getCategory(id)?.measured;
-
-      expect(Boolean(measured)).toBe(scoredOnAFigure.includes(id));
-
-      /* And it says what the figure is, not merely that there is one. */
-      if (measured) expect(measured.length).toBeGreaterThan(30);
-    }
-  });
-
   /* Three levels, and none of them reads as a hard requirement. */
   it("describes importance as preference, never as a requirement", () => {
-    expect(Object.keys(FEATURE_IMPORTANCE)).toEqual([
-      "high",
-      "medium",
-      "low",
-    ]);
+    expect(Object.keys(FEATURE_IMPORTANCE)).toEqual(["high", "medium", "low"]);
 
     for (const level of IMPORTANCE_LEVELS) {
       const meta = FEATURE_IMPORTANCE[level];
 
       expect(meta.label).not.toMatch(/essential|required|must/i);
       expect(meta.hint.length).toBeGreaterThan(0);
-      expect(meta.weight).toBeGreaterThan(0);
     }
 
-    /* Ordered, and gentler than the 5-to-1 the old tier system used. */
-    expect(FEATURE_IMPORTANCE.high.weight).toBeGreaterThan(
-      FEATURE_IMPORTANCE.medium.weight,
-    );
-    expect(FEATURE_IMPORTANCE.medium.weight).toBeGreaterThan(
-      FEATURE_IMPORTANCE.low.weight,
-    );
-    expect(FEATURE_IMPORTANCE.high.weight).toBeLessThan(5);
+    expect([FEATURE_IMPORTANCE.low.weight, FEATURE_IMPORTANCE.medium.weight, FEATURE_IMPORTANCE.high.weight]).toEqual([2, 3, 4]);
   });
 
-  /* A calculated priority has nothing to enable, so the rule doesn't apply. */
   it("exempts priorities measured from vehicle data", () => {
     expect(validatePriorityDraft([], "environmental")).toBeNull();
   });
 });
 
 /* -------------------------------------------------------------------------- */
-/* Feature explanations                                                        */
+/* Explanations                                                               */
 /* -------------------------------------------------------------------------- */
 
-describe("no reader should have to look a feature up elsewhere", () => {
-  const offered = new Set(
-    CATEGORY_IDS.flatMap((id) => AVAILABLE_CATEGORY_FEATURES[id]),
+describe("no reader should have to look evidence up elsewhere", () => {
+  const offered = new Set<SignalId>(
+    CATEGORY_IDS.flatMap((id) => [
+      ...def(id).features,
+      ...(def(id).alsoCounts ?? []),
+      ...(def(id).expected ?? []),
+    ]),
   );
 
-  it("explains every feature it offers, specifically", () => {
+  it("explains every item it names, specifically", () => {
     for (const key of offered) {
-      const { explanation } = FEATURES[key];
+      const { explanation } = SIGNALS[key];
 
       expect(explanation.length).toBeGreaterThan(30);
       expect(explanation).toMatch(/[.!]$/);
     }
   });
 
-  /*
-   * The explanations are the one place vagueness does the most damage: a
-   * reader who clicks "what is this?" and gets "provides useful everyday
-   * assistance" has been told nothing and now trusts the page less.
-   */
   it("never answers with filler", () => {
     const FILLER = [
       "useful everyday",
@@ -302,11 +256,8 @@ describe("no reader should have to look a feature up elsewhere", () => {
     ];
 
     for (const key of offered) {
-      const explanation = FEATURES[key].explanation.toLowerCase();
-
-      for (const phrase of FILLER) {
-        expect(explanation).not.toContain(phrase);
-      }
+      const explanation = SIGNALS[key].explanation.toLowerCase();
+      for (const phrase of FILLER) expect(explanation).not.toContain(phrase);
     }
   });
 });
@@ -316,25 +267,35 @@ describe("no reader should have to look a feature up elsewhere", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("profiles", () => {
-  it("each carry exactly five priorities", () => {
+  it("carry three to five priorities", () => {
     for (const profile of DEFAULT_PROFILES) {
-      expect(profile.priorities).toHaveLength(PROFILE_PRIORITY_COUNT);
+      expect(profile.priorities.length).toBeGreaterThanOrEqual(MIN_PRIORITIES);
+      expect(profile.priorities.length).toBeLessThanOrEqual(MAX_PRIORITIES);
     }
+  });
+
+  /* A profile promising one dominant concern puts it at half the result. */
+  it("give each single-concern profile exactly three priorities, led by its concern", () => {
+    expect(PROFILES.nervous.priorities).toEqual(["safetyAssistance", "cityParking", "climateSuitability"]);
+    expect(PROFILES.eco.priorities).toEqual(["environmental", "safetyAssistance", "practicality"]);
+  });
+
+  it("match the model's final orders", () => {
+    expect(PROFILES.family.priorities).toEqual(["practicality", "safetyAssistance", "cityParking", "comfort"]);
+    expect(PROFILES.commuter.priorities).toEqual(["cityParking", "comfort", "safetyAssistance", "environmental"]);
+    expect(PROFILES.roadtrip.priorities).toEqual(["longDistance", "comfort", "safetyAssistance", "practicality", "climateSuitability"]);
+    expect(PROFILES.balanced.priorities).toEqual(["safetyAssistance", "practicality", "comfort", "cityParking", "environmental"]);
   });
 
   it("never repeat a priority within one profile", () => {
     for (const profile of DEFAULT_PROFILES) {
-      expect(new Set(profile.priorities).size).toBe(
-        profile.priorities.length,
-      );
+      expect(new Set(profile.priorities).size).toBe(profile.priorities.length);
     }
   });
 
   it("only reference priorities that exist", () => {
     for (const profile of DEFAULT_PROFILES) {
-      for (const priority of profile.priorities) {
-        expect(CATEGORY_IDS).toContain(priority);
-      }
+      for (const priority of profile.priorities) expect(CATEGORY_IDS).toContain(priority);
     }
   });
 
@@ -342,25 +303,16 @@ describe("profiles", () => {
     expect(DEFAULT_PROFILES.every((profile) => profile.enabled)).toBe(true);
   });
 
-  /*
-   * "Default" means automatically selected, not merely present in the list.
-   * The starting priority order is therefore the default profile's own — if
-   * these two ever drift apart, the product is claiming one thing and doing
-   * another.
-   */
   it("makes the default profile the one the user actually starts on", () => {
     expect(PROFILES[DEFAULT_DEFAULT_PROFILE_ID]).toBeDefined();
-
-    expect(DEFAULT_PRIORITIES).toEqual([
-      ...PROFILES[DEFAULT_DEFAULT_PROFILE_ID].priorities,
-    ]);
+    expect(DEFAULT_PRIORITIES).toEqual([...PROFILES[DEFAULT_DEFAULT_PROFILE_ID].priorities]);
   });
 
-  it("explains who each one is for, without marketing", () => {
+  it("say who each one is for, what it assumes and what it doesn't promise", () => {
     for (const profile of DEFAULT_PROFILES) {
       expect(profile.forWhom.length).toBeGreaterThan(30);
       expect(profile.assumes.length).toBeGreaterThan(30);
-      expect(profile.label.length).toBeGreaterThan(0);
+      expect(profile.doesNotGuarantee.length).toBeGreaterThan(30);
     }
   });
 });

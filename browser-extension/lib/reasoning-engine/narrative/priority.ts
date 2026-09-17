@@ -27,6 +27,15 @@ import {
 } from "./magnitude";
 
 import { describeEnvironment } from "../environmental";
+import { formatNumber } from "../format";
+import { DC_CHARGING, LOAD_VOLUME } from "./facts";
+import {
+  absentList,
+  absentPronounClause,
+  emphasisSubject,
+  unassessedPhrase,
+  unknownPhrase,
+} from "./evidence-phrases";
 
 import {
   coverage,
@@ -90,30 +99,30 @@ function describeSelection(
 
   if (total === 0) return null;
 
+  const subject = emphasisSubject([...present, ...missing].map((fact) => fact.source));
+
   if (total === 1) {
     const only = (present[0] ?? missing[0]) as FeatureFact;
 
     if (present.length) {
-      return sentence(
-        `You picked out ${only.phrase} here, and this car has it`,
-      );
+      return sentence(`${subject} ${only.phrase} here, and this car has it`);
     }
 
     return sentence(
-      `You picked out ${only.phrase} here`,
-      only.importance === "high" ? "and said it should count highly" : "",
-      `, and this car doesn't have it`,
+      `${subject} ${only.phrase} here`,
+      only.importance === "high" ? "as counting highly" : "",
+      `, but ${absentPronounClause(only.key)}`,
     );
   }
 
-  const opener = `You picked out ${joinSelection([...present, ...missing])}.`;
+  const opener = `${subject} ${joinSelection([...present, ...missing])}.`;
 
   if (!missing.length) {
     return sentence(opener, `This car has ${coverage(total, total)}`);
   }
 
   if (!present.length) {
-    return sentence(opener, `This car has ${coverage(0, total)}`);
+    return sentence(opener, `This car has ${coverage(0, total)}: ${absentList(missing.map((fact) => fact.key))}`);
   }
 
   /* Naming the car that does have it turns a gap into a choice. */
@@ -121,10 +130,6 @@ function describeSelection(
     missing.some((item) => item.key === fact.key),
   );
 
-  /*
-   * Name whichever side is shorter. Listing four missing features straight
-   * after listing all five is the same sentence twice.
-   */
   if (present.length < missing.length) {
     return sentence(
       opener,
@@ -138,11 +143,11 @@ function describeSelection(
   return sentence(
     opener,
     `This car has ${coverage(present.length, total)} —`,
-    `it doesn't have ${joinSelection(missing)}`,
+    absentList(missing.map((fact) => fact.key)),
     highMisses.length && highMisses.length < missing.length
-      ? `, and you said ${joinSelection(highMisses)} should count highly`
+      ? `, including ${joinSelection(highMisses)}, which counts highly`
       : "",
-    rivalHasIt && rival ? `, which ${rival.name} does` : "",
+    rivalHasIt && rival ? `, which ${rival.name} has` : "",
   );
 }
 
@@ -170,7 +175,7 @@ function describeCoverage(
 
   if (total === 0) return null;
 
-  const figure = `it has ${present.length} of the ${total} features this priority covers`;
+  const figure = `it has ${present.length} of the ${total} things this priority checks that FINN answers for it`;
 
   /*
    * A car with none of the category's equipment is a real finding, and
@@ -183,8 +188,8 @@ function describeCoverage(
   }
 
   return sentence(
-    `You didn't pick out particular ${phraseLabel(label)} features, so this`,
-    `priority is judged on everything it covers: ${figure}`,
+    `Nothing is raised under ${phraseLabel(label)}, so everything it checks`,
+    `counts the same: ${figure}`,
   );
 }
 
@@ -200,6 +205,12 @@ function measurementPhrase(fact: MeasurementFact): string {
   switch (fact.label) {
     case "Seats":
       return `${fact.display} seats`;
+    case "Length":
+      return `a length of ${fact.display}`;
+    case LOAD_VOLUME:
+      return `a load volume of ${fact.display} as FINN lists it, without saying whether that's with the rear seats folded`;
+    case DC_CHARGING:
+      return `DC charging from 10 to 80% in ${formatNumber(fact.value, 0)} minutes, which Lens shows but doesn't score`;
     case "Doors":
       return `${fact.display} doors`;
     case "Boot space":
@@ -401,6 +412,51 @@ function describeStanding(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Limits and gaps                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * An electric car's range under Long Distance: said when it limited the
+ * result, and said to make no difference when it didn't.
+ */
+function describeRangeLimit(breakdown: PriorityBreakdown): string | null {
+  const factor = breakdown.tripFactor;
+  const range = breakdown.numeric;
+
+  if (factor == null || !range) return null;
+
+  return factor < 1
+    ? sentence(
+        `Its ${range.display} electric range limits this priority: under 480 km`,
+        "Lens reduces the Long Distance result, because stops come round sooner",
+      )
+    : sentence(
+        `Its ${range.display} electric range doesn't limit this priority —`,
+        "past 480 km, range makes no further difference here",
+      );
+}
+
+/**
+ * What FINN's data didn't answer inside a priority that was still judged.
+ *
+ * Standard equipment FINN's list leaves out isn't said here: every surface
+ * that shows these sentences also shows the standard items, checked one by
+ * one, with that follow-up beside them.
+ */
+function describeGaps(breakdown: PriorityBreakdown): string | null {
+  const unknown = breakdown.unknown.filter((key) => key !== "bootVolume");
+
+  return paragraph(
+    unknown.length && breakdown.hasEvidence
+      ? sentence(
+          `FINN doesn't give ${joinList(unknown.map(unknownPhrase))}, so`,
+          unknown.length === 1 ? "that isn't counted" : "those aren't counted",
+        )
+      : null,
+  ).join(" ") || null;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Missing data                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -411,22 +467,22 @@ function describeStanding(
  * because the user singled out no features, which is answered by measuring
  * the category's whole catalogue instead.
  */
-function describeMissingData(breakdown: PriorityBreakdown): string[] {
-  const noFeatures = breakdown.matched.length + breakdown.missing.length === 0;
-
+function describeMissingData(
+  breakdown: PriorityBreakdown,
+  vehicle: PinnedFinnCar,
+): string[] {
   return paragraph(
     sentence(
-      `FINN's data doesn't tell us enough to compare these cars on`,
-      phraseLabel(breakdown.label),
+      `Lens can't judge this car on ${phraseLabel(breakdown.label)}: FINN doesn't publish`,
+      breakdown.unknown.length && breakdown.priority !== "environmental"
+        ? breakdown.unknown.length === breakdown.matched.length + breakdown.missing.length + breakdown.unknown.length
+          ? "its equipment list"
+          : joinList(breakdown.unknown.map(unknownPhrase))
+        : unassessedPhrase(breakdown.priority, vehicle.fuelType === "Electric"),
     ),
-    noFeatures
-      ? sentence(
-          "This priority has no feature list to check and the pinned cars carry no",
-          "measurement we can rank them on, so it isn't affecting your result",
-        )
-      : sentence(
-          "The figures this priority depends on weren't supplied for these cars",
-        ),
+    sentence(
+      "So this priority is left out of the car's result rather than guessed at",
+    ),
   );
 }
 
@@ -448,7 +504,7 @@ export function reasonAboutPriority(
 
   const sentences =
     standing === "unsupported"
-      ? describeMissingData(breakdown)
+      ? describeMissingData(breakdown, vehicle)
       : paragraph(
           describeSelection(features, rival),
           describeCoverage(
@@ -472,6 +528,9 @@ export function reasonAboutPriority(
                 describeSupportingMeasurements(measurements),
                 describeDrivetrain(traits),
               )),
+
+          describeRangeLimit(breakdown),
+          describeGaps(breakdown),
 
           describeStanding(
             standing,

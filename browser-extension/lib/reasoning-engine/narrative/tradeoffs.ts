@@ -12,7 +12,8 @@ import type {
   Tradeoff,
 } from "./types";
 
-import { AVAILABLE_CATEGORY_FEATURES } from "../constants";
+import { hasSignal } from "../evidence";
+import { absentList, emphasisClause } from "./evidence-phrases";
 import { formatEUR } from "../format";
 import { featureFact } from "./facts";
 import {
@@ -27,6 +28,7 @@ import {
   paragraph,
   phraseLabel,
   sentence,
+  toSentenceStart,
 } from "./phrase";
 
 /**
@@ -74,8 +76,7 @@ function featureGap(
   return selected
     .filter(
       (preference) =>
-        Boolean(other.features?.[preference.key]) &&
-        !subject.features?.[preference.key],
+        hasSignal(other, preference.key) && !hasSignal(subject, preference.key),
     )
     .map((preference) => featureFact(preference.key, preference.importance));
 }
@@ -112,11 +113,11 @@ function missingSelected(
 
   /* Which alternative would give the reader the missing piece back. */
   const rescuer = alternatives.find((candidate) =>
-    missing.some((fact) => candidate.features?.[fact.key]),
+    missing.some((fact) => hasSignal(candidate, fact.key)),
   );
 
   const rescued = rescuer
-    ? missing.filter((fact) => rescuer.features?.[fact.key])
+    ? missing.filter((fact) => hasSignal(rescuer, fact.key))
     : [];
 
   const sameList =
@@ -124,7 +125,7 @@ function missingSelected(
     rescued.every((fact) => missing.some((item) => item.key === fact.key));
 
   const evidence = sentence(
-    `This car doesn't have ${labels}`,
+    toSentenceStart(absentList(missing.map((fact) => fact.key), 5, "this car")),
     rescuer
       ? sameList
         ? `— ${rescuer.name} ${missing.length === 1 ? "has it" : "has them"}`
@@ -136,17 +137,20 @@ function missingSelected(
   );
 
   const high = missing.filter((fact) => fact.importance === "high");
+  const who = emphasisClause(missing.map((fact) => fact.source));
 
   const relevance = high.length
     ? sentence(
+        toSentenceStart(who),
         high.length === missing.length && missing.length === 1
-          ? `You said it should count highly under`
-          : `You said ${joinCapped(high.map((fact) => fact.phrase), 5)} should count highly under`,
+          ? "it as counting highly under"
+          : `${joinCapped(high.map((fact) => fact.phrase), 5)} as counting highly under`,
         `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
         "so this is the compromise here most worth weighing",
       )
     : sentence(
-        `You picked ${missing.length === 1 ? "it" : "them"} out under`,
+        toSentenceStart(who),
+        `${missing.length === 1 ? "it" : "them"} under`,
         `${phraseLabel(reasoning.label)}, your #${reasoning.rank} priority,`,
         "so it's worth weighing before you decide",
       );
@@ -167,7 +171,7 @@ function missingSelected(
       missing.some((fact) => fact.importance === "high")
         ? "high"
         : severityFor(reasoning.rank),
-    headline: `No ${missing.map((fact) => inSentence(fact.label)).join(", no ")}`,
+    headline: `Not listed: ${missing.map((fact) => inSentence(fact.label)).join(", ")}`,
     evidence,
     relevance,
     rival: rescuer ? { vehicleId: rescuer.id, name: rescuer.name } : null,
@@ -289,7 +293,8 @@ function priorityDeficit(
       : gained.length
         ? sentence(
             `${rival.name} has`,
-            `${joinCapped(gained.map((fact) => inSentence(fact.label)))}, which this car doesn't`,
+            `${joinCapped(gained.map((fact) => inSentence(fact.label)))};`,
+            absentList(gained.map((fact) => fact.key), 3, "this car"),
           )
         : null;
 
@@ -353,11 +358,13 @@ function whatTheExtraBuys(
      * them" for a reader who picked nothing — which is the opposite of true,
      * since the score separated them on the catalogue.
      */
-    const looksAt = AVAILABLE_CATEGORY_FEATURES[reasoning.priority] ?? [];
+    const looksAt = [
+      ...reasoning.features.coverage.present,
+      ...reasoning.features.coverage.missing,
+    ].map((fact) => fact.key);
 
     const gained = looksAt.filter(
-      (key) =>
-        Boolean(evaluation.vehicle.features?.[key]) && !other.features?.[key],
+      (key) => hasSignal(evaluation.vehicle, key) && !hasSignal(other, key),
     );
 
     if (gained.length) {

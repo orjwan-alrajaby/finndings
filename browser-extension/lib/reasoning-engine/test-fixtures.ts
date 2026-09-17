@@ -26,7 +26,8 @@ export interface CarOverrides {
   /** The EU efficiency class. Empty means FINN supplied none. */
   co2Class?: string;
   range?: number | null;
-  features?: FeatureId[];
+  /** Equipment keys the car lists. Derived signals are set by their own fields. */
+  features?: readonly (FeatureId | string)[];
   /**
    * Whether FINN supplied an equipment list at all.
    *
@@ -40,6 +41,11 @@ export interface CarOverrides {
    * them.
    */
   featuresSupplied?: boolean;
+  /** Length in millimetres. */
+  length?: number;
+  doors?: string;
+  driverAssistanceLevel?: 1 | 2 | null;
+  dcChargeMinutes?: number | null;
 }
 
 export function makeCar(overrides: CarOverrides): PinnedFinnCar {
@@ -58,6 +64,10 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     range = null,
     features = [],
     featuresSupplied,
+    length = 4500,
+    doors = "5",
+    driverAssistanceLevel,
+    dcChargeMinutes,
   } = overrides;
 
   const featureMap: Record<string, boolean> = {};
@@ -81,7 +91,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
 
     isRefurbished: false,
     vehicleType: "SUV",
-    doors: "5",
+    doors,
 
     availability: {
       expectedHandover: { from: null, to: undefined },
@@ -127,8 +137,10 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
 
     features: featureMap,
     ...(featuresSupplied === undefined ? {} : { featuresSupplied }),
+    ...(driverAssistanceLevel === undefined ? {} : { driverAssistanceLevel }),
+    ...(dcChargeMinutes === undefined ? {} : { dcChargeMinutes }),
 
-    dimensions: { length: 4500, width: 1800, height: 1500, unit: "mm" },
+    dimensions: { length, width: 1800, height: 1500, unit: "mm" },
 
     url: `https://www.finn.com/car/${id}`,
     pinnedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),

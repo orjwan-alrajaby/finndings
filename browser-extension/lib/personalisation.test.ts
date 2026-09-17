@@ -134,16 +134,21 @@ describe("the shipped defaults, as something to reason from", () => {
      * mention them.
      */
     it("are reported as things the reader was assumed to want", () => {
-        const analysis = analyse(["hasEmergencyBrakingAssist"]);
+        const analysis = analyse(["hasEmergencyBrakingAssist", "hasBlindSpotAssist"]);
 
         const safety = analysis.priorities.find(
             (priority) => priority.priority === "safetyAssistance",
         );
 
-        expect(safety?.picked.length).toBe(5);
-        expect(
-            safety?.picked.filter((pick) => pick.state === "present"),
-        ).toHaveLength(1);
+        expect(safety?.picked.length).toBe(
+            DEFAULT_CATEGORY_FEATURES.safetyAssistance.length,
+        );
+        expect(safety?.picked.length).toBeGreaterThan(0);
+
+        /* Marked as the starting profile's, never as the reader's own. */
+        for (const pick of safety?.picked ?? []) {
+            expect(pick.source).toBe("profile");
+        }
     });
 
     it("say nothing about a car FINN listed no equipment for", () => {

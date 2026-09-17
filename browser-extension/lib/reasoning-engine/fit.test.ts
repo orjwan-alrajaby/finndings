@@ -4,6 +4,8 @@ import { buildFitAnalysis, classifyFit, describeFit, hasEquipmentData } from "./
 import { buildRecommendation } from "./index";
 import { AVAILABLE_CATEGORY_FEATURES, CATEGORY_IDS } from "./constants";
 import { makeCar, prefs } from "./test-fixtures";
+import { BASELINE } from "./test-garage";
+import { LOAD_VOLUME } from "./narrative/facts";
 import type { CategoryId, FeatureSelection } from "./types";
 
 /**
@@ -64,17 +66,16 @@ describe("hasEquipmentData", () => {
   });
 
   /*
-   * The case this exists for. FINN answered about this car and the answer was
-   * no, to all of it. That is a bare car, not an unknown one — it gets a real
-   * band, a badge on its card, and "it doesn't have these" rather than a
-   * shrug.
+   * FINN sends every key on every car, so a list that says no to all of it is
+   * an unfilled form. On the live inventory those are cars that plainly carry
+   * emergency braking — read as unknown, not as bare.
    */
-  it("is true for a car FINN answered about that has nothing", () => {
+  it("is false for a list that answers nothing with a yes", () => {
     expect(
       hasEquipmentData(
         makeCar({ id: 1, features: [], featuresSupplied: true }),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("is false when FINN supplied no equipment list", () => {
@@ -122,8 +123,12 @@ describe("hasEquipmentData", () => {
   });
 });
 
-describe("a car FINN says has nothing", () => {
-  const bare = makeCar({ id: 1, features: [], featuresSupplied: true });
+describe("a car FINN lists only baseline equipment for", () => {
+  const bare = makeCar({
+    id: 1,
+    features: ["hasEmergencyBrakingAssist", "hasAirConditioning"],
+    featuresSupplied: true,
+  });
 
   it("gets a real verdict rather than a shrug", () => {
     const analysis = buildFitAnalysis(bare, ["safetyAssistance"], prefs());
@@ -146,7 +151,7 @@ describe("a car FINN says has nothing", () => {
 
   /* And it is genuinely worse than a car that has some of them. */
   it("scores below a car that has some of the same catalogue", () => {
-    const equipped = makeCar({ id: 2, features: SAFETY.slice(0, 6) });
+    const equipped = makeCar({ id: 2, features: SAFETY.slice(0, 2) });
 
     const bareAnalysis = buildFitAnalysis(bare, ["safetyAssistance"], prefs());
 
@@ -176,13 +181,13 @@ describe("buildFitAnalysis", () => {
     );
   });
 
-  it("scores the catalogue the car actually carries", () => {
-    const car = makeCar({ id: 1, features: SAFETY.slice(0, 8) });
+  it("scores the evidence the car actually carries", () => {
+    const car = makeCar({ id: 1, features: SAFETY.slice(0, 2) });
 
     const analysis = buildFitAnalysis(car, priorities, prefs());
     const safety = analysis.priorities[0];
 
-    expect(safety?.covered).toBe(8);
+    expect(safety?.covered).toBe(2);
     expect(safety?.catalogueSize).toBe(SAFETY.length);
   });
 
@@ -197,12 +202,12 @@ describe("buildFitAnalysis", () => {
     expect(prose).not.toMatch(/against/i);
   });
 
-  it("reports the figure a priority is about even though nothing scored it", () => {
-    const car = makeCar({ id: 1, trunk: 520, features: PRACTICALITY });
+  it("reports FINN's load volume, labelled as FINN's and never scored", () => {
+    const car = makeCar({ id: 1, trunk: 520, features: PRACTICALITY as never });
 
     const analysis = buildFitAnalysis(car, ["practicality"], prefs());
     const boot = analysis.priorities[0]?.measurements.find(
-      (fact) => fact.label === "Boot space",
+      (fact) => fact.label === LOAD_VOLUME,
     );
 
     expect(boot?.value).toBe(520);
@@ -210,12 +215,15 @@ describe("buildFitAnalysis", () => {
     expect(boot?.rival).toBeNull();
   });
 
+  /* Range limits Long Distance for an electric car, so it is a scored figure. */
   it("reports an electric car's range under long distance", () => {
     const car = makeCar({
       id: 1,
       fuelType: "Electric",
       range: 450,
       consumption: 16,
+      co2: 0,
+      features: ["hasLumbarSupport"],
     });
 
     const analysis = buildFitAnalysis(car, ["longDistance"], prefs());
@@ -224,7 +232,7 @@ describe("buildFitAnalysis", () => {
     );
 
     expect(range?.value).toBe(450);
-    expect(range?.scored).toBe(false);
+    expect(range?.scored).toBe(true);
   });
 
   it("splits the reader's own picks into what the car has and hasn't", () => {
@@ -281,7 +289,7 @@ describe("buildFitAnalysis", () => {
 
     expect(missing).toBeDefined();
     expect(missing?.rival).toBeNull();
-    expect(missing?.sentences.join(" ")).toContain("doesn't have");
+    expect(missing?.sentences.join(" ")).toContain("FINN doesn't list");
     expect(analysis.overall.level).not.toBe("unknown");
   });
 
@@ -364,7 +372,7 @@ describe("buildFitAnalysis", () => {
   });
 
   it("gives reasons drawn from priorities the car actually serves", () => {
-    const car = makeCar({ id: 1, features: SAFETY });
+    const car = makeCar({ id: 1, features: [...SAFETY, ...BASELINE] });
 
     const analysis = buildFitAnalysis(car, ["safetyAssistance"], prefs());
 
@@ -423,8 +431,9 @@ describe("buildFitAnalysis", () => {
    * than a different scoring model.
    */
   it("scores on plain coverage when nothing is picked out", () => {
-    const subject = makeCar({ id: 1, features: SAFETY.slice(0, 9) });
-    const other = makeCar({ id: 2, features: SAFETY.slice(0, 3) });
+    /* Safety's standard kit listed, so no confirmed gap takes anything off. */
+    const subject = makeCar({ id: 1, features: [...SAFETY.slice(0, 9), ...BASELINE] });
+    const other = makeCar({ id: 2, features: [...SAFETY.slice(0, 3), ...BASELINE] });
 
     const nothingPicked = Object.fromEntries(
       CATEGORY_IDS.map((id) => [id, []]),
@@ -505,52 +514,54 @@ describe("describeFit", () => {
 });
 
 describe("what the car has, in the reader's terms and the category's", () => {
-  const [first, , third] = SAFETY as [string, string, string];
+  /* Climate's evidence: eight items, of which the car has the first four. */
+  const CLIMATE = AVAILABLE_CATEGORY_FEATURES.climateSuitability;
+  const [first, , third] = CLIMATE as [string, string, string];
 
   const analysis = () =>
     buildFitAnalysis(
-      makeCar({ id: 1, features: SAFETY.slice(0, 6) as never }),
-      ["safetyAssistance"],
+      makeCar({ id: 1, features: CLIMATE.slice(0, 4) as never }),
+      ["climateSuitability"],
       prefs(),
       picks({
-        safetyAssistance: [
+        climateSuitability: [
           { key: first as never, importance: "high" },
           { key: third as never, importance: "low" },
-          { key: SAFETY[9] as never, importance: "medium" },
+          { key: CLIMATE[7] as never, importance: "medium" },
         ],
       }),
     );
 
   it("keeps the reader's picks apart from the rest of the category", () => {
-    const safety = analysis().priorities[0];
+    const climate = analysis().priorities[0];
 
-    const pickedKeys = safety?.picked.map((item) => item.key) ?? [];
-    const restKeys = safety?.alsoCounted.map((item) => item.key) ?? [];
+    const pickedKeys = climate?.picked.map((item) => item.key) ?? [];
+    const restKeys = climate?.alsoCounted.map((item) => item.key) ?? [];
 
     /* A pick is listed once, under the reader's own heading. */
     for (const key of pickedKeys) expect(restKeys).not.toContain(key);
 
     expect(pickedKeys).toHaveLength(3);
-    expect(pickedKeys.length + restKeys.length).toBe(SAFETY.length);
+    expect(pickedKeys.length + restKeys.length).toBe(CLIMATE.length);
   });
 
   it("says which of the category's features the car hasn't got", () => {
-    const safety = analysis().priorities[0];
+    const climate = analysis().priorities[0];
 
-    const absent = safety?.alsoCounted.filter(
+    const absent = climate?.alsoCounted.filter(
       (item) => item.state === "absent",
     );
 
-    /* Six of fifteen present, three of those picked out. */
-    expect(safety?.alsoCounted.filter((i) => i.state === "present")).toHaveLength(4);
-    expect(absent?.length).toBe(SAFETY.length - 6 - 1);
+    /* Four of eight present, two of those picked out. */
+    expect(climate?.alsoCounted.filter((i) => i.state === "present")).toHaveLength(2);
+    expect(absent?.length).toBe(CLIMATE.length - 4 - 1);
   });
 
   it("carries the level the reader gave each pick, present or absent", () => {
     const safety = analysis().priorities[0];
 
     const held = safety?.picked.find((item) => item.key === first);
-    const wanted = safety?.picked.find((item) => item.key === SAFETY[9]);
+    const wanted = safety?.picked.find((item) => item.key === CLIMATE[7]);
 
     expect(held?.state).toBe("present");
     expect(held?.importance).toBe("high");

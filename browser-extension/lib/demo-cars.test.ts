@@ -29,12 +29,15 @@ const ORDERS = DEFAULT_PROFILES.map((profile) => ({
     priorities: [...profile.priorities],
 }));
 
-function adviseOn(priorities: (typeof ORDERS)[number]["priorities"]) {
+function adviseOn(
+    priorities: (typeof ORDERS)[number]["priorities"],
+    features = DEFAULT_CATEGORY_FEATURES,
+) {
     const recommendation = buildRecommendation(
         demoCars(),
         priorities,
         DEFAULT_PREFERENCES,
-        DEFAULT_CATEGORY_FEATURES,
+        features,
     );
 
     if (!recommendation) return null;
@@ -199,12 +202,14 @@ describe("the worked example the setup flow shows", () => {
     });
 
     it("names something given up, on an order that has a clear winner", () => {
-        /* Emissions-led: the electric car wins and gives up space for it. */
-        const result = adviseOn([
-            "environmental",
-            "practicality",
-            "familyFriendly",
-        ]);
+        /*
+         * Emissions-led, with a powered tailgate raised: the electric car wins
+         * and gives up the tailgate the petrol SUV has.
+         */
+        const result = adviseOn(["environmental", "practicality", "cityParking"], {
+            ...DEFAULT_CATEGORY_FEATURES,
+            practicality: [{ key: "hasElectricTailgate", importance: "high" }],
+        });
 
         expect(result?.recommendation.winner.name).toBe("Aveline Lumo");
         expect(result?.narrative.tradeoffs.length).toBeGreaterThan(0);
@@ -218,8 +223,8 @@ describe("the worked example the setup flow shows", () => {
         ]);
 
         const spaceLed = adviseOn([
-            "familyFriendly",
             "practicality",
+            "safetyAssistance",
             "longDistance",
         ]);
 

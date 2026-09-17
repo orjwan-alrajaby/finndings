@@ -30,6 +30,7 @@ const settings = (over: Partial<LensSettings> = {}): LensSettings => ({
   categoryFeatures: DEFAULT_CATEGORY_FEATURES,
   profiles: DEFAULT_PROFILES,
   defaultProfileId: DEFAULT_DEFAULT_PROFILE_ID,
+  basedOn: DEFAULT_DEFAULT_PROFILE_ID,
   ...over,
 });
 
@@ -49,6 +50,7 @@ describe("stableStringify", () => {
       preferences: loaded.preferences,
       categoryFeatures: loaded.categoryFeatures,
       priorities: loaded.priorities,
+      basedOn: loaded.basedOn,
     } as LensSettings;
 
     expect(stableStringify(rebuilt)).toBe(stableStringify(loaded));

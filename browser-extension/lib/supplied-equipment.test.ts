@@ -24,10 +24,11 @@ describe("hasSuppliedEquipment", () => {
   });
 
   /*
-   * The case the whole distinction exists for: FINN answered, and the answer
-   * was no. Presence of the list is the test, never what is in it.
+   * FINN sends every key on every car, so a list that says no to everything
+   * is an unfilled form, not a bare car: in the live inventory those are an
+   * MG 4 Urban and two BYDs, cars that plainly carry emergency braking.
    */
-  it("is true for a list that says no to everything", () => {
+  it("is false for a list that says no to everything", () => {
     expect(
       hasSuppliedEquipment(
         config({
@@ -36,7 +37,13 @@ describe("hasSuppliedEquipment", () => {
           "ISOFIX": false,
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("ignores values that aren't a yes", () => {
+    expect(
+      hasSuppliedEquipment(config({ Sitzheizung: false, Länge: "4430 mm" })),
+    ).toBe(false);
   });
 
   it("is true for a list with equipment on it", () => {

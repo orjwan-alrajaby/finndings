@@ -1,6 +1,7 @@
 import type { HeadToHead, PriorityBreakdown } from "./types";
 
 import { featurePhrase } from "./scoring";
+import { absentList } from "./narrative/evidence-phrases";
 import {
   classifyTotalGap,
   comparableMeasurements,
@@ -50,9 +51,11 @@ function whatSeparates(
   const theirs = fromSubject ? versus.onlySubjectHas : versus.onlyOtherHas;
 
   if (theirs.length) {
-    return `it has ${joinCapped(
-      theirs.map(featurePhrase),
-    )}, which ${behindName} doesn't`;
+    return `it has ${joinCapped(theirs.map(featurePhrase))}; ${absentList(
+      theirs,
+      3,
+      behindName,
+    )}`;
   }
 
   const mine = breakdown.numeric;
