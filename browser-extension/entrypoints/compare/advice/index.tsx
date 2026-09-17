@@ -122,6 +122,7 @@ export function Advice({
                     cost={winnerCost}
                     priorities={context.priorities}
                     isFallback={isFallback}
+                    rentalFallback={recommendation.rentalFallback}
                     /* Nothing to challenge with means nowhere to send them. */
                     onChallenge={options.length ? onChallenge : null}
                 />

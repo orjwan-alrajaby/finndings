@@ -71,10 +71,22 @@ import {
   isNoticeable,
 } from "./narrative/magnitude";
 import { formatEUR } from "./format";
+import { isMonthString, rentalTier } from "./contract";
 
 /* -------------------------------------------------------------------------- */
 /* Re-exports                                                                 */
 /* -------------------------------------------------------------------------- */
+
+export {
+  addMonths,
+  fitContract,
+  monthLabel,
+  periodLabel,
+  rentalPeriodOf,
+  describeRentalProblem,
+  type ContractFit,
+  type RentalPeriod,
+} from "./contract";
 
 export {
   advertisedMonthlyPrice,
@@ -170,6 +182,22 @@ export function buildReasoningContext(
     weights: priorityWeights(ordered),
     ranked,
     budget: partitionByBudget(vehicles, costs, preferences),
+    rental: partitionByRental(vehicles, costs),
+  };
+}
+
+/** Splits vehicles by whether they fit the reader's rental period, keeping all of them. */
+function partitionByRental(
+  vehicles: PinnedFinnCar[],
+  costs: Record<number, CostBreakdown>,
+): ReasoningContext["rental"] {
+  const statusOf = (vehicle: PinnedFinnCar) => costs[vehicle.id]?.contract.status ?? "notSet";
+
+  return {
+    period: vehicles.length ? (costs[vehicles[0]!.id]?.contract.period ?? null) : null,
+    fits: vehicles.filter((vehicle) => ["fits", "notSet"].includes(statusOf(vehicle))),
+    doesNotFit: vehicles.filter((vehicle) => statusOf(vehicle) === "doesNotFit"),
+    unknown: vehicles.filter((vehicle) => statusOf(vehicle) === "unknown"),
   };
 }
 
@@ -793,6 +821,14 @@ export function recommendFrom(
     budget,
     topScorer,
     budgetChangedTheAnswer: topScorer.id !== winner.id,
+    rentalFallback:
+      context.rental.period == null
+        ? null
+        : rentalTier(context.costs[winner.id]?.contract.status ?? "unknown") === 2
+          ? "noneFit"
+          : rentalTier(context.costs[winner.id]?.contract.status ?? "unknown") === 1
+            ? "unconfirmed"
+            : null,
     alternatives,
     evidenceFallback: !winnerScore.judgeable,
     runnerUp,
@@ -1148,6 +1184,12 @@ export function migratePreferences(
     ),
     contractType:
       stored.contractType === "business" ? "business" : "private",
+    /* A period is kept only whole and in order; half of one means none. */
+    ...(isMonthString(stored.rentalFrom) &&
+    isMonthString(stored.rentalTo) &&
+    stored.rentalTo >= stored.rentalFrom
+      ? { rentalFrom: stored.rentalFrom, rentalTo: stored.rentalTo }
+      : { rentalFrom: null, rentalTo: null }),
   };
 }
 

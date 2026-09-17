@@ -9,6 +9,7 @@ import { formatEUR } from "../format";
 import { totalFor } from "../scoring";
 import { classifyTotalGap, isEffectivelyLevel } from "./magnitude";
 import { dependsOnFor } from "../decision";
+import { describeRentalProblem, periodLabel, rentalTier } from "../contract";
 import { absentList, emphasisClause, gapPhrase } from "./evidence-phrases";
 import {
   coverage,
@@ -158,6 +159,29 @@ function describeBudgetOverride(
 
   const topScorer = context.ranked[0];
   if (!topScorer) return null;
+
+  /*
+   * The rental period is weighed before the budget, so when it is what set
+   * the top scorer aside, it is what gets said — a budget sentence here would
+   * blame the wrong rule.
+   */
+  const topFit = context.costs[topScorer.id]?.contract;
+  const winnerFit = context.costs[evaluation.vehicle.id]?.contract;
+
+  if (
+    topFit?.period &&
+    winnerFit &&
+    rentalTier(topFit.status) > rentalTier(winnerFit.status)
+  ) {
+    return sentence(
+      `${topScorer.name} scores higher overall, but it`,
+      describeRentalProblem(topFit),
+      `— so ${evaluation.vehicle.name} is the strongest car you pinned that`,
+      winnerFit.status === "fits"
+        ? `fits ${periodLabel(topFit.period)}`
+        : `isn't ruled out for ${periodLabel(topFit.period)}, though FINN's data can't confirm it either`,
+    );
+  }
 
   const cost = context.costs[topScorer.id];
   const budget = context.budget.budget;

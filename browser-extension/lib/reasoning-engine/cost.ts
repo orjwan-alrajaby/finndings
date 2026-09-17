@@ -15,6 +15,14 @@ import type {
 } from "./types";
 
 import { FINN_INCLUDED_MONTHLY_KM } from "./constants";
+import {
+  describeRentalProblem,
+  fitContract,
+  monthLabel,
+  addMonths,
+  periodLabel,
+  type ContractFit,
+} from "./contract";
 import { formatEUR, formatKm, formatNumber, formatPrice } from "./format";
 
 /* -------------------------------------------------------------------------- */
@@ -47,10 +55,27 @@ export function advertisedMonthlyPrice(
   return isPositive(price) ? price : null;
 }
 
+/**
+ * The monthly subscription on the term Lens chose for this car.
+ *
+ * With FINN's terms in hand that is the fitted term's no-down-payment price;
+ * for a car stored before Lens read terms, the single price it was stored
+ * with.
+ */
 function subscriptionPrice(
   vehicle: PinnedFinnCar,
   preferences: LensPreferences,
+  contract: ContractFit,
 ): number | null {
+  if (contract.term) {
+    const price =
+      preferences.contractType === "business"
+        ? contract.term.businessMonthly
+        : contract.term.privateMonthly;
+
+    return isPositive(price) ? price : null;
+  }
+
   return advertisedMonthlyPrice(vehicle, preferences.contractType);
 }
 
@@ -91,8 +116,9 @@ function energyPriceFor(
 function subscriptionComponent(
   vehicle: PinnedFinnCar,
   preferences: LensPreferences,
+  contract: ContractFit,
 ): SubscriptionCost {
-  const amount = subscriptionPrice(vehicle, preferences);
+  const amount = subscriptionPrice(vehicle, preferences, contract);
 
   return {
     amount,
@@ -250,7 +276,8 @@ export function calculateCost(
   vehicle: PinnedFinnCar,
   preferences: LensPreferences,
 ): CostBreakdown {
-  const subscription = subscriptionComponent(vehicle, preferences);
+  const contract = fitContract(vehicle, preferences);
+  const subscription = subscriptionComponent(vehicle, preferences, contract);
   const energy = energyComponent(vehicle, preferences);
   const excessMileage = excessMileageComponent(vehicle, preferences);
 
@@ -289,6 +316,7 @@ export function calculateCost(
     budget,
     budgetDifference: budget == null ? null : totalMonthly - budget,
     budgetStatus: resolveBudgetStatus(totalMonthly, budget, complete),
+    contract,
   };
 }
 
@@ -361,7 +389,7 @@ const CONTRACT_LABEL: Record<CostBreakdown["contractType"], string> = {
 };
 
 function subscriptionLine(breakdown: CostBreakdown): CostLine {
-  const { subscription, contractType } = breakdown;
+  const { subscription, contractType, contract } = breakdown;
 
   const facts: CostFact[] = [
     {
@@ -370,6 +398,22 @@ function subscriptionLine(breakdown: CostBreakdown): CostLine {
       source: "user",
     },
   ];
+
+  if (contract.term) {
+    facts.push({
+      label: "Term",
+      value: `${contract.term.months} months, no down payment`,
+      source: contract.period ? "estimate" : "finn",
+    });
+  }
+
+  if (contract.period) {
+    facts.push({
+      label: "Your rental",
+      value: `${periodLabel(contract.period)} (${contract.period.months} months)`,
+      source: "user",
+    });
+  }
 
   if (subscription.amount != null) {
     facts.unshift({
@@ -386,7 +430,13 @@ function subscriptionLine(breakdown: CostBreakdown): CostLine {
     available: subscription.available,
     source: "finn",
     explanation: subscription.available
-      ? `Your ${CONTRACT_LABEL[contractType]} monthly subscription price, as advertised by FINN.${
+      ? `Your ${CONTRACT_LABEL[contractType]} monthly subscription price ${
+          contract.term
+            ? contract.period
+              ? `on the ${contract.term.months}-month term — the shortest FINN offers that covers your rental — with nothing paid upfront`
+              : `on FINN's default ${contract.term.months}-month term, with nothing paid upfront`
+            : "as FINN advertised it when you pinned the car"
+        }.${
           subscription.vatIncluded === true ? " VAT is included." : ""
         }`
       : `FINN hasn't supplied a ${CONTRACT_LABEL[contractType]} monthly price for this car, so it isn't part of the total below.`,
@@ -560,7 +610,10 @@ export function buildCostAnalysis(
     excessMileageLine(breakdown),
   ];
 
-  const caveats = breakdown.missing.map((reason) => MISSING_CAVEAT[reason]);
+  const caveats = [
+    ...rentalCaveats(breakdown.contract),
+    ...breakdown.missing.map((reason) => MISSING_CAVEAT[reason]),
+  ];
 
   const headline = breakdown.complete
     ? `We estimate this car will cost you around ${formatEUR(breakdown.totalMonthly)}/month.`
@@ -584,6 +637,28 @@ export function buildCostAnalysis(
       "Every figure in this bill is an estimate, built from the data FINN supplies about the car and the assumptions you've given us. " +
       "Your actual cost may differ if you drive more or less, energy prices change, or the contract terms differ.",
   };
+}
+
+/**
+ * What the reader's rental period means for this car, said where the money
+ * is: the months a longer term commits them to, or why it doesn't fit.
+ */
+function rentalCaveats(contract: ContractFit): string[] {
+  const { period, term, extraMonths } = contract;
+
+  if (!period) return [];
+
+  const problem = describeRentalProblem(contract);
+
+  if (problem) return [`This car ${problem}.`];
+
+  if (term && extraMonths && extraMonths > 0) {
+    return [
+      `FINN's shortest term that covers ${periodLabel(period)} is ${term.months} months, so the contract would run until the end of ${monthLabel(addMonths(period.from, term.months - 1))} — ${extraMonths} month${extraMonths === 1 ? "" : "s"} past when you need it. FINN's data doesn't say whether it can be ended early.`,
+    ];
+  }
+
+  return [];
 }
 
 function budgetSentence(breakdown: CostBreakdown): string | null {

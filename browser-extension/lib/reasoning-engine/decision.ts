@@ -1,6 +1,7 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
   BudgetPartition,
+  RentalPartition,
   DependsOnGap,
   ReasoningContext,
   VehicleScore,
@@ -13,14 +14,37 @@ import type {
  * questions the recommendation did without importing the recommendation.
  */
 
-/** The pool a winner may be drawn from, preferring certainty about the budget. */
+/**
+ * The pool a winner may be drawn from, preferring certainty.
+ *
+ * Two hard rules, and the rental period is weighed first: a car that can't be
+ * rented for the reader's dates is no use at any price, while one over budget
+ * is still a car they could take. Within each, confirmed beats unknown beats
+ * ruled out — so with no period set this is exactly the budget rule alone.
+ */
 export function pickEligible(
   budget: BudgetPartition,
   ranked: PinnedFinnCar[],
+  rental?: RentalPartition,
 ): PinnedFinnCar[] {
-  if (budget.within.length) return budget.within;
-  if (budget.unknown.length) return budget.unknown;
-  return ranked;
+  const ids = (cars: PinnedFinnCar[]) => new Set(cars.map((car) => car.id));
+
+  const within = ids(budget.within);
+  const budgetUnknown = ids(budget.unknown);
+  const fits = rental ? ids(rental.fits) : null;
+  const rentalUnknown = rental ? ids(rental.unknown) : null;
+
+  const tier = (vehicle: PinnedFinnCar) => {
+    const rentalRank = !fits || fits.has(vehicle.id) ? 0 : rentalUnknown!.has(vehicle.id) ? 1 : 2;
+    const budgetRank = within.has(vehicle.id) ? 0 : budgetUnknown.has(vehicle.id) ? 1 : 2;
+
+    return rentalRank * 3 + budgetRank;
+  };
+
+  const tiers = new Map(ranked.map((vehicle) => [vehicle.id, tier(vehicle)]));
+  const best = Math.min(...tiers.values());
+
+  return ranked.filter((vehicle) => tiers.get(vehicle.id) === best);
 }
 
 const scoreOf = (context: ReasoningContext, vehicle: PinnedFinnCar) =>
@@ -28,11 +52,8 @@ const scoreOf = (context: ReasoningContext, vehicle: PinnedFinnCar) =>
 
 /** The ranked cars in the winner's budget pool. */
 export function budgetPool(context: ReasoningContext): PinnedFinnCar[] {
-  const eligible = pickEligible(context.budget, context.ranked);
-
-  return context.ranked.filter((vehicle) =>
-    eligible.some((item) => item.id === vehicle.id),
-  );
+  /* Already in ranked order: `pickEligible` filters `ranked` itself. */
+  return pickEligible(context.budget, context.ranked, context.rental);
 }
 
 /**

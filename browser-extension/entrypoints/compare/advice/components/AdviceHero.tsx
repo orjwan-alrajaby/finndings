@@ -13,6 +13,8 @@ interface AdviceHeroProps {
     cost: CostBreakdown;
     priorities: CategoryId[];
     isFallback: boolean;
+    /** Set when the reader gave a rental period the winner isn't confirmed to fit. */
+    rentalFallback?: "noneFit" | "unconfirmed" | null;
     /**
      * Crosses to the challenge tab, or null when there is nothing to challenge
      * with — one pinned car is a recommendation with no rivals, and a button
@@ -119,9 +121,12 @@ export function AdviceHero({
     narrative,
     cost,
     priorities,
-    isFallback,
+    isFallback: overBudget,
+    rentalFallback = null,
     onChallenge,
 }: AdviceHeroProps) {
+    /* Either hard rule unmet colours the whole verdict, the way the budget always has. */
+    const isFallback = overBudget || rentalFallback === "noneFit";
     const winner = evaluation.vehicle;
     const { headline, budgetNote, marginNote, dependsNote } = narrative.verdict;
 
@@ -163,7 +168,11 @@ export function AdviceHero({
                             />
                         )}
 
-                        {isFallback
+                        {rentalFallback === "noneFit"
+                            ? "Closest match — nothing you pinned fits your rental period"
+                            : rentalFallback === "unconfirmed" && !overBudget
+                              ? "Your recommendation — FINN can't confirm it for your rental period"
+                              : isFallback
                             ? "Closest match — nothing you pinned fits your budget"
                             : estimate
                               ? "Best estimate — FINN's data is thin on your top priorities"

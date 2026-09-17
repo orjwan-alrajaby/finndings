@@ -5,7 +5,17 @@ import type {
     LensPreferences,
     PriorityWeight,
 } from "@/lib/reasoning-engine/types";
-import { formatEUR, formatKm, getCategory } from "@/lib/reasoning-engine";
+import {
+    formatEUR,
+    formatKm,
+    getCategory,
+    monthLabel,
+    rentalPeriodOf,
+} from "@/lib/reasoning-engine";
+
+/** "October 2026" → "Oct 2026", to fit the row. */
+const shortMonth = (month: string) =>
+    monthLabel(month).replace(/^(\w{3})\w*/, "$1");
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 
 interface AdviceSidebarProps {
@@ -47,6 +57,12 @@ export function AdviceSidebar({
             preferences.monthlyBudget > 0
                 ? `${formatEUR(preferences.monthlyBudget)}/month`
                 : "No limit set",
+        ],
+        [
+            "Rental period",
+            rentalPeriodOf(preferences)
+                ? `${shortMonth(preferences.rentalFrom!)} – ${shortMonth(preferences.rentalTo!)}`
+                : "Not set",
         ],
         ["Your mileage", `${formatKm(preferences.monthlyKm)}/month`],
         ["Included by FINN", `${formatKm(FINN_INCLUDED_MONTHLY_KM)}/month`],

@@ -1,6 +1,7 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type { CATEGORIES, FEATURES, PROFILES, SIGNALS } from "./constants";
 import type { EnvironmentalAssessment } from "./environmental";
+import type { ContractFit, RentalPeriod } from "./contract";
 
 /* -------------------------------------------------------------------------- */
 /* Configuration-derived types                                                */
@@ -38,6 +39,16 @@ export interface LensPreferences {
   dieselPrice: number;
   electricityPrice: number;
   contractType: ContractType;
+  /**
+   * The month the reader wants the car from, "2026-10", or null for no
+   * particular period. Set together with `rentalTo`.
+   *
+   * Like the budget, a hard eligibility rule and never a score: it picks which
+   * FINN term each car is priced on and whether it can be delivered in time.
+   */
+  rentalFrom: string | null;
+  /** The last month the reader wants the car for, included: "2027-05". */
+  rentalTo: string | null;
 }
 
 /**
@@ -52,6 +63,8 @@ export interface LegacyLensPreferences {
   dieselPrice?: number;
   electricityPrice?: number;
   contractType?: ContractType;
+  rentalFrom?: string | null;
+  rentalTo?: string | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -444,6 +457,9 @@ export interface CostBreakdown {
   /** totalMonthly − budget. Positive means over. null without a budget. */
   budgetDifference: number | null;
   budgetStatus: BudgetStatus;
+
+  /** Which FINN term the subscription is priced on, and whether it fits the reader's period. */
+  contract: ContractFit;
 }
 
 /**
@@ -676,6 +692,15 @@ export interface ReasoningContext {
   /** Every vehicle, best overall match first. Budget plays no part in this order. */
   ranked: PinnedFinnCar[];
   budget: BudgetPartition;
+  rental: RentalPartition;
+}
+
+export interface RentalPartition {
+  /** Null when the reader hasn't set a period — then every car is `notSet`. */
+  period: RentalPeriod | null;
+  fits: PinnedFinnCar[];
+  doesNotFit: PinnedFinnCar[];
+  unknown: PinnedFinnCar[];
 }
 
 export interface BudgetPartition {
@@ -717,6 +742,12 @@ export interface Recommendation {
   topScorer: PinnedFinnCar;
   /** True when `topScorer` is not `winner`. */
   budgetChangedTheAnswer: boolean;
+  /**
+   * Set when the reader gave a rental period and the winner isn't confirmed
+   * to fit it: `noneFit` when no pinned car does, `unconfirmed` when the best
+   * available couldn't be confirmed either way.
+   */
+  rentalFallback: "noneFit" | "unconfirmed" | null;
   /**
    * The realistic alternatives — the four cars closest to the winner overall.
    *

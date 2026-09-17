@@ -1020,6 +1020,8 @@ describe("preference migration", () => {
       dieselPrice: 1.81,
       electricityPrice: 0.41,
       contractType: "private",
+      rentalFrom: null,
+      rentalTo: null,
     });
   });
 

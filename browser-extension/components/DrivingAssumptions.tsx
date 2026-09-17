@@ -4,12 +4,13 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { InfoTip } from "@/components/InfoTip";
 import { NumberInput } from "@/components/NumberInput";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
+import { monthsInclusive } from "@/lib/reasoning-engine/contract";
 import type {
     ContractType,
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 
-type NumericField = Exclude<keyof LensPreferences, "contractType">;
+type NumericField = Exclude<keyof LensPreferences, "contractType" | "rentalFrom" | "rentalTo">;
 
 /**
  * What each driving figure is for, written from what the cost engine actually
@@ -33,6 +34,10 @@ export const DRIVING_EXPLANATIONS: Record<keyof LensPreferences, string> = {
         "What you pay for a kilowatt-hour where you usually charge. Used for electric cars only, against the car's own consumption figure — public fast charging costs more than this, so an estimate built on home charging is the optimistic one.",
     contractType:
         "Whether you would take the car privately or through a business. FINN advertises a different monthly price for each, and this picks which of the two Lens costs every car on — nothing else about the recommendation changes.",
+    rentalFrom:
+        "When you need the car from and until. FINN rents on fixed terms — often 6, 12, 18 or 24 months — so Lens prices each car on the shortest term it offers that covers your whole period, and tells you if that commits you for longer. Like the budget it decides which cars can be recommended, never a car's score: a car with no term long enough, or that FINN can't deliver in your first month, only wins if nothing else fits. Optional.",
+    rentalTo:
+        "The last month you need the car for, included.",
 };
 
 /**
@@ -151,6 +156,16 @@ export function DrivingAssumptions({
                 />
 
                 <div className="sm:col-span-2">
+                    <RentalPeriodInput
+                        from={preferences.rentalFrom}
+                        to={preferences.rentalTo}
+                        onChange={(rentalFrom, rentalTo) =>
+                            setPreferences({ ...preferences, rentalFrom, rentalTo })
+                        }
+                    />
+                </div>
+
+                <div className="sm:col-span-2">
                     <ContractTypeToggle
                         value={preferences.contractType}
                         onChange={(contractType) =>
@@ -172,6 +187,90 @@ export function DrivingAssumptions({
                        points from a car's score.`}
             </p>
         </section>
+    );
+}
+
+/**
+ * From one month to another, or no particular period.
+ *
+ * Months rather than days: FINN delivers inside a window of weeks and rents in
+ * whole months, so a day would be precision the data can't answer. The
+ * browser's own month picker, which every Chromium build ships.
+ */
+export function RentalPeriodInput({
+    from,
+    to,
+    onChange,
+    tone = "bg-finn-pale-blue",
+}: {
+    from: string | null;
+    to: string | null;
+    onChange: (from: string | null, to: string | null) => void;
+    /** The field ground, which differs between the drawer and Settings. */
+    tone?: string;
+}) {
+    const id = useId();
+    const months = from && to ? monthsInclusive(from, to) : null;
+    const backwards = months != null && months < 1;
+    const field = `mt-1 h-11 w-full rounded-2xl ${tone} px-3 text-sm font-bold text-finn-black shadow-sm outline-none focus:ring-2 focus:ring-finn-accent-blue`;
+
+    return (
+        <div>
+            <FieldLabel
+                id={`${id}-label`}
+                label="Rental period"
+                explanation={DRIVING_EXPLANATIONS.rentalFrom}
+            />
+
+            <div
+                role="group"
+                aria-labelledby={`${id}-label`}
+                className="mt-1 grid grid-cols-[1fr_auto_1fr_auto] items-end gap-2"
+            >
+                <label className="text-[11px] text-finn-iron">
+                    From
+                    <input
+                        type="month"
+                        value={from ?? ""}
+                        onChange={(event) => onChange(event.target.value || null, to)}
+                        className={field}
+                    />
+                </label>
+
+                <span className="pb-3 text-xs text-finn-iron">to</span>
+
+                <label className="text-[11px] text-finn-iron">
+                    Until
+                    <input
+                        type="month"
+                        value={to ?? ""}
+                        min={from ?? undefined}
+                        onChange={(event) => onChange(from, event.target.value || null)}
+                        aria-invalid={backwards || undefined}
+                        className={`${field} aria-invalid:text-finn-error`}
+                    />
+                </label>
+
+                <button
+                    type="button"
+                    onClick={() => onChange(null, null)}
+                    disabled={!from && !to}
+                    className="h-11 rounded-full px-3 text-xs font-bold text-finn-iron transition hover:text-finn-black disabled:invisible"
+                >
+                    Clear
+                </button>
+            </div>
+
+            <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                {backwards
+                    ? "The last month is before the first, so no period is applied."
+                    : months != null
+                      ? `${months} month${months === 1 ? "" : "s"}, both months included. Each car is priced on the shortest FINN term that covers it, with nothing paid upfront.`
+                      : from || to
+                        ? "Set both months to apply a period."
+                        : "No particular period: each car is priced on FINN's default term, with nothing paid upfront."}
+            </p>
+        </div>
     );
 }
 

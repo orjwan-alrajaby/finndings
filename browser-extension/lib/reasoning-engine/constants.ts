@@ -1149,4 +1149,6 @@ export const DEFAULT_PREFERENCES: LensPreferences = {
   electricityPrice: 0.32,
   monthlyBudget: DEFAULT_MONTHLY_BUDGET,
   contractType: "private",
+  rentalFrom: null,
+  rentalTo: null,
 };
