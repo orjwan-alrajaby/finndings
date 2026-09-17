@@ -278,6 +278,13 @@ export async function syncChatBubble(): Promise<void> {
     }
 
     if (host) {
+        /*
+         * FINN's own rendering can take the page's top-level nodes with it on
+         * a client-side navigation. A bubble that was built once and then
+         * quietly detached would never come back, so put it back.
+         */
+        if (!host.isConnected && panel) document.documentElement.append(host);
+
         host.style.display = "";
         return;
     }

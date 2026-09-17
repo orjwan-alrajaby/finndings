@@ -205,6 +205,31 @@ export function LensChat() {
         setEntries((all) => all.filter((entry) => entry.id !== id));
     }, []);
 
+    /*
+     * The page moved on under an open conversation — FINN navigates without
+     * reloading. Results already shown stay true for the cars they were about,
+     * but "cars on this page" now means different cars, and the reader should
+     * hear that from Lens rather than notice the header change.
+     */
+    const lastUrl = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!page) return;
+
+        const previous = lastUrl.current;
+        lastUrl.current = page.url;
+
+        if (previous == null || new URL(previous).pathname === new URL(page.url).pathname) return;
+        if (!entries.length) return;
+
+        push({
+            kind: "lens",
+            tone: "note",
+            text: `You've moved to another page. ${scopes.thisCar.cars.length ? `${scopes.thisCar.headline}; ` : ""}${scopes.page.headline.toLowerCase()}. Earlier results are about the cars they named.`,
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page?.url]);
+
     useEffect(() => {
         endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
     }, [entries.length, entries.at(-1)]);
