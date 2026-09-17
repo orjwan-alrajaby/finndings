@@ -1,9 +1,10 @@
 /**
  * The screens, in order.
  *
- * Five, and the count is deliberate. The first two teach and ask for
- * nothing; the middle two are the entire setup; the last one shows the
- * product working. Anything else a reader might want to configure lives in
+ * Six, and the count is deliberate. The first two teach and ask for
+ * nothing; the next two are the entire setup; the fifth offers Lens AI,
+ * which the reader may decline without typing anything; the last one shows
+ * the product working. Anything else a reader might want to configure lives in
  * Settings, because a setup flow that asks for everything is a settings page
  * with a progress bar on it.
  *
@@ -17,6 +18,7 @@ export type OnboardingScreen =
     | "tour"
     | "priorities"
     | "driving"
+    | "ai"
     | "preview";
 
 export const SCREEN_ORDER: OnboardingScreen[] = [
@@ -24,6 +26,7 @@ export const SCREEN_ORDER: OnboardingScreen[] = [
     "tour",
     "priorities",
     "driving",
+    "ai",
     "preview",
 ];
 
@@ -33,6 +36,7 @@ export const SCREEN_LABEL: Record<OnboardingScreen, string> = {
     tour: "What Lens adds",
     priorities: "Your priorities",
     driving: "Your driving",
+    ai: "Lens AI (optional)",
     preview: "See it work",
 };
 
@@ -47,7 +51,7 @@ export const SCREEN_LABEL: Record<OnboardingScreen, string> = {
  */
 export const SCREEN_PROMISE: Record<
     Exclude<OnboardingScreen, "welcome">,
-    { title: string; body: string; asks: boolean }
+    { title: string; body: string; asks: boolean; optional?: boolean }
 > = {
     tour: {
         title: "See what Lens adds to finn.com",
@@ -63,6 +67,12 @@ export const SCREEN_PROMISE: Record<
         title: "Say how much you drive",
         body: "So Lens can work out what a car costs you rather than what it advertises. Every field already has a workable answer.",
         asks: true,
+    },
+    ai: {
+        title: "Decide about Lens AI",
+        body: "Lens can also take what you need in your own words, using a free Gemini key of your own. Off unless you turn it on.",
+        asks: true,
+        optional: true,
     },
     preview: {
         title: "Read a worked example",

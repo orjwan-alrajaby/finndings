@@ -110,14 +110,18 @@ export function Welcome() {
                                         <span
                                             className={[
                                                 "rounded-full px-2 py-0.5 text-[10px] font-black",
-                                                promise.asks
+                                                promise.optional
+                                                    ? "bg-finn-cotton text-finn-iron"
+                                                    : promise.asks
                                                     ? "bg-finn-pale-blue text-finn-accent-blue"
                                                     : "bg-finn-cotton text-finn-iron",
                                             ].join(" ")}
                                         >
-                                            {promise.asks
-                                                ? "Asks you something"
-                                                : "Just shows you"}
+                                            {promise.optional
+                                                ? "Optional"
+                                                : promise.asks
+                                                  ? "Asks you something"
+                                                  : "Just shows you"}
                                         </span>
                                     </span>
 

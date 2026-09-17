@@ -47,7 +47,15 @@ import { Welcome } from "./screens/Welcome";
 import { Tour } from "./screens/Tour";
 import { Priorities, type ProfileSnapshot } from "./screens/Priorities";
 import { Driving } from "./screens/Driving";
+import { LensAi } from "./screens/LensAi";
 import { Preview } from "./screens/Preview";
+import type { KeyStatus } from "@/components/GeminiKeyField";
+import {
+    DEFAULT_LENS_AI_SETTINGS,
+    loadLensAiSettings,
+    saveLensAiSettings,
+    type LensAiSettings,
+} from "@/lib/lens-ai/settings";
 
 /**
  * Setting Finn Lens up, once.
@@ -102,6 +110,15 @@ export default function OnboardingPage() {
         }),
     );
 
+    /*
+     * Lens AI, offered on its own screen. "Not now" is the starting answer
+     * unless it's already on, and it's written at the end with everything
+     * else — and only if this flow changed it.
+     */
+    const [ai, setAi] = useState<LensAiSettings>(DEFAULT_LENS_AI_SETTINGS);
+    const [loadedAi, setLoadedAi] = useState(() => stableStringify(DEFAULT_LENS_AI_SETTINGS));
+    const [keyStatus, setKeyStatus] = useState<KeyStatus>("empty");
+
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(false);
 
@@ -112,6 +129,13 @@ export default function OnboardingPage() {
      */
     useEffect(() => {
         let alive = true;
+
+        void loadLensAiSettings().then((stored) => {
+            if (!alive) return;
+
+            setAi(stored);
+            setLoadedAi(stableStringify(stored));
+        });
 
         loadLensSettings()
             .then((settings) => {
@@ -183,6 +207,11 @@ export default function OnboardingPage() {
                 preferences,
                 ...(emphasisChanged ? { categoryFeatures, basedOn } : {}),
             });
+            /* On only with a key; turned on and left without one is "not now". */
+            const aiAnswer: LensAiSettings = { ...ai, enabled: ai.enabled && ai.apiKey.length > 0 };
+
+            if (stableStringify(aiAnswer) !== loadedAi) await saveLensAiSettings(aiAnswer);
+
             await markOnboardingComplete();
 
             then();
@@ -278,8 +307,23 @@ export default function OnboardingPage() {
         if (screen === "driving") {
             return {
                 onBack: () => step(-1),
+                label: "Next: Lens AI (optional)",
+                onNext: () => step(1),
+            };
+        }
+
+        if (screen === "ai") {
+            return {
+                onBack: () => step(-1),
                 label: "Show me Lens working",
                 onNext: () => step(1),
+                blockedBecause: !ai.enabled
+                    ? undefined
+                    : keyStatus === "empty"
+                      ? "Paste your Gemini key, or choose Not now."
+                      : keyStatus === "rejected"
+                        ? "Google didn't accept that key. Fix it, or choose Not now."
+                        : undefined,
             };
         }
 
@@ -405,6 +449,16 @@ export default function OnboardingPage() {
                         <Driving
                             preferences={preferences}
                             onChange={setPreferences}
+                        />
+                    )}
+
+                    {screen === "ai" && (
+                        <LensAi
+                            enabled={ai.enabled}
+                            apiKey={ai.apiKey}
+                            onChangeEnabled={(enabled) => setAi((current) => ({ ...current, enabled }))}
+                            onChangeKey={(apiKey) => setAi((current) => ({ ...current, apiKey }))}
+                            onKeyStatus={setKeyStatus}
                         />
                     )}
 
