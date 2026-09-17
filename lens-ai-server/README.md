@@ -48,6 +48,20 @@ It listens on `http://127.0.0.1:8787`. Then run the extension as usual
 With the server down, the compare page is exactly what it was; in development
 a single line says the experiment is offline.
 
+## Where it's used
+
+- **Ask Lens on finn.com** — the "Ask Lens" bubble on listing and car pages
+  opens a compact chat (`browser-extension/entrypoints/lens-chat`, framed in by
+  `entrypoints/content/lens-chat/bubble.ts`). It compares the cars on the page
+  Lens has data for, your pinned cars, or the car you're looking at, and says
+  which.
+- **The compare page** — "Tell Lens" above the recommendation and "Ask Lens"
+  under it.
+
+Both render nothing that depends on this server when it's down: the chat says
+it can't read free text and still gives a match from your Lens settings, "Why
+this car?", comparisons and pinning.
+
 ## Configuration
 
 | Variable | Default | |
