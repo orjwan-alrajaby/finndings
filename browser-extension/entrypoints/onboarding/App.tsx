@@ -454,6 +454,9 @@ export default function OnboardingPage() {
 
                     {screen === "ai" && (
                         <LensAi
+                            priorities={priorities}
+                            preferences={preferences}
+                            categoryFeatures={categoryFeatures}
                             enabled={ai.enabled}
                             apiKey={ai.apiKey}
                             onChangeEnabled={(enabled) => setAi((current) => ({ ...current, enabled }))}
