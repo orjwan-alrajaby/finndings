@@ -1,4 +1,5 @@
 import type { FinnCar, PinnedFinnCar } from "@/lib/types";
+import { refreshPinnedCars } from "@/lib/refresh-pinned";
 
 export interface FinnCarWithUrl extends FinnCar {
   url: string;
@@ -124,6 +125,19 @@ export async function mergeLoadedCars(
       });
     } catch (error) {
       console.error("[FinnLens] couldn't write the loaded-car cache", error);
+    }
+
+    /*
+     * The same fresh data keeps pins current: prices, terms and delivery
+     * windows change after a car is pinned, and a pin that kept the old ones
+     * would be costed on a price FINN no longer offers.
+     */
+    try {
+      const refreshed = refreshPinnedCars(await getPinnedCars(), newCars);
+
+      if (refreshed) await browser.storage.local.set({ pinnedCars: refreshed });
+    } catch (error) {
+      console.error("[FinnLens] couldn't refresh pinned cars", error);
     }
   });
 
