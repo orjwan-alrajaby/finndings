@@ -1,7 +1,7 @@
 import type {
     ConversationScope,
     LensVocabulary,
-} from "../../browser-extension/lib/lens-ai/contract.ts";
+} from "./contract";
 
 /**
  * JSON schemas for the model's structured output, built per request from the

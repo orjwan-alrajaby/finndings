@@ -7,14 +7,17 @@ import type {
     ConverseResult,
     InterpretRequest,
     InterpretResult,
-} from "../../../browser-extension/lib/lens-ai/contract.ts";
-import { ASK_INSTRUCTIONS, CONVERSE_INSTRUCTIONS, INTERPRET_INSTRUCTIONS } from "../prompts.ts";
-import { askSchema, converseSchema, interpretSchema } from "../schemas.ts";
-import { log } from "../log.ts";
-import { AdapterError, type Answered, type LensAiAdapter } from "./types.ts";
+} from "./contract";
+import { ASK_INSTRUCTIONS, CONVERSE_INSTRUCTIONS, INTERPRET_INSTRUCTIONS } from "./prompts";
+import { askSchema, converseSchema, interpretSchema } from "./schemas";
 
 /**
- * Gemini, through Google's official SDK, with JSON-schema structured output.
+ * Gemini, called from the extension with the reader's own key, through
+ * Google's official SDK and JSON-schema structured output.
+ *
+ * The key is one the reader created and typed into Settings; it is stored in
+ * this browser's extension storage and sent only to Google. Nothing here
+ * ships a key, and nothing runs unless the reader turned Lens AI on.
  *
  * Chosen because the Gemini API has a free tier (a key from Google AI Studio,
  * no card). Its conditions shape this file more than anything else:
@@ -24,13 +27,45 @@ import { AdapterError, type Answered, type LensAiAdapter } from "./types.ts";
  *   out of quota, overloaded or not offered to the key, and remembers which
  *   ones are out so a spent model costs no round trip until its window ends.
  * - **Content may be used to improve Google's products** — here, the reader's
- *   own words and the facts about their shortlist. Fine for an experiment;
- *   worth knowing.
- *
- * Both calls send fixed instructions, then Lens's vocabulary, then (for
- * questions) the facts, all as the system instruction; only the reader's words
- * go in the user turn. Gemini caches repeated prefixes implicitly.
+ *   own words and the facts about the cars being discussed. Settings says so
+ *   before the key is saved.
  */
+
+/** Which of Lens's three calls a request is, for the adapter and the logs. */
+export interface LensAiAdapter {
+    interpret(request: InterpretRequest): Promise<Answered<InterpretResult>>;
+    ask(request: AskRequest): Promise<Answered<AskResult>>;
+    converse(request: ConverseRequest): Promise<Answered<ConverseResult>>;
+}
+
+/** A result, and which model actually produced it — not always the first. */
+export interface Answered<T> {
+    result: T;
+    model: string | null;
+}
+
+/** A failure worth showing the reader in one sentence. */
+export class AdapterError extends Error {
+    readonly status: number;
+
+    constructor(message: string, status = 502) {
+        super(message);
+        this.status = status;
+    }
+}
+
+/* Development-only logging: token usage per call, never the reader's words. */
+const log = {
+    info(...parts: unknown[]) {
+        if (import.meta.env?.DEV) console.debug("[Lens AI]", ...parts);
+    },
+    error(route: string, ...parts: unknown[]) {
+        if (import.meta.env?.DEV) console.warn("[Lens AI]", `✕ ${route}`, ...parts);
+    },
+    debug(route: string, label: string, value: unknown) {
+        if (import.meta.env?.DEV) console.debug("[Lens AI]", `· ${route} ${label}`, value);
+    },
+};
 
 /** Models the free tier offers new keys, best first. Each has its own quota. */
 export const FREE_TIER_MODELS = [
@@ -57,10 +92,10 @@ const timedOut = (error: unknown) =>
 
 export function createGeminiAdapter({
     apiKey,
-    models,
+    models = FREE_TIER_MODELS,
 }: {
     apiKey: string;
-    models: string[];
+    models?: string[];
 }): LensAiAdapter {
     const client = new GoogleGenAI({ apiKey });
 
@@ -151,7 +186,7 @@ export function createGeminiAdapter({
                     );
                 }
                 if ((error.status === 400 && /api key/i.test(error.message)) || error.status === 401 || error.status === 403) {
-                    throw new AdapterError("The Lens AI server's Gemini API key was rejected.", 500);
+                    throw new AdapterError("Google rejected the Gemini API key saved in Settings.", 500);
                 }
                 if (error.status === 404) {
                     throw new AdapterError("None of Lens AI's Gemini models are available to this key.", 500);
@@ -204,8 +239,6 @@ export function createGeminiAdapter({
         request.scope ? `SCOPE\n${JSON.stringify(request.scope)}\n\n` : "";
 
     return {
-        name: "gemini",
-        model: models[0] ?? null,
 
         interpret(request) {
             return structured<InterpretResult>({
@@ -263,4 +296,34 @@ export function createGeminiAdapter({
             });
         },
     };
+}
+
+export type KeyCheck =
+    | { ok: true }
+    | { ok: false; reason: "rejected" | "unreachable"; message: string };
+
+/**
+ * Whether Google accepts a key, without spending any of its daily requests:
+ * reading a model's description is free, and fails the same way a bad key
+ * fails a real call.
+ */
+export async function checkGeminiKey(apiKey: string): Promise<KeyCheck> {
+    try {
+        await new GoogleGenAI({ apiKey }).models.get({
+            model: FREE_TIER_MODELS[FREE_TIER_MODELS.length - 1]!,
+            config: { abortSignal: AbortSignal.timeout(10_000) },
+        });
+
+        return { ok: true };
+    } catch (error) {
+        if (error instanceof ApiError && [400, 401, 403].includes(error.status)) {
+            return { ok: false, reason: "rejected", message: "Google didn't accept this key. Check that you copied all of it." };
+        }
+        if (error instanceof ApiError && error.status === 429) {
+            /* Rate limited, but only a real key gets that far. */
+            return { ok: true };
+        }
+
+        return { ok: false, reason: "unreachable", message: "Couldn't reach Google to check the key. Try again in a moment." };
+    }
 }

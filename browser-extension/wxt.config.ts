@@ -23,7 +23,7 @@ export default defineConfig({
       },
     },
   }),
-  manifest: ({ command }) => ({
+  manifest: () => ({
     /*
      * Set here rather than left to package.json, which would install this as
      * "finn-lens" — the npm package name, not the product's.
@@ -32,16 +32,11 @@ export default defineConfig({
     description:
       "Choose between FINN car subscriptions. Pin the cars you're weighing up and Lens ranks them against the things you said matter, with the reasoning and the compromises spelled out.",
     /*
-     * The Lens AI experiment's local server, in development only. Its own
-     * CORS headers already admit extension pages, so a built extension works
-     * without this; granting it under `npm run dev` just keeps Chrome's
-     * local-network rules out of the way while iterating. A production build
-     * asks for nothing new.
+     * Lens AI calls Google's Gemini API from extension pages, and only once
+     * the reader has turned it on with their own key. Google's API answers
+     * cross-origin requests itself, so no host permission is needed for it.
      */
-    host_permissions: [
-      "https://www.finn.com/*",
-      ...(command === "serve" ? ["http://127.0.0.1:8787/*"] : []),
-    ],
+    host_permissions: ["https://www.finn.com/*"],
     permissions: [
       "tabs",
       "activeTab",
@@ -73,8 +68,9 @@ export default defineConfig({
           /*
            * Ask Lens: the chat is an extension page framed into finn.com, so
            * the page and the script and style chunks it loads have to be
-           * reachable from there. Only on finn.com, and the page holds no
-           * secret — the AI key stays on the Lens AI server.
+           * reachable from there. Only on finn.com. The page runs on
+           * the extension's origin, so finn.com can frame it but can't read
+           * into it, or into the storage holding the reader's Lens AI key.
            */
           "lens-chat.html",
           "chunks/*",

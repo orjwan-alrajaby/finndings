@@ -1,36 +1,41 @@
 import type {
-    AiEnvelope,
     AskRequest,
     AskResult,
     ConverseRequest,
     ConverseResult,
-    HealthResult,
     InterpretRequest,
     InterpretResult,
 } from "./contract";
+import { AdapterError, createGeminiAdapter, type Answered, type LensAiAdapter } from "./gemini";
+import { lensAiUsable, loadLensAiSettings } from "./settings";
 
 /**
- * The extension's only door to the Lens AI server.
+ * The extension's only door to a model.
  *
- * No key lives on this side, and no provider is named: the server holds the
- * credential and decides which model answers. Every call resolves — to a
- * result or to a reason — so a server that isn't running, a slow model or a
- * malformed reply degrades one card on the page and nothing else.
- *
- * `WXT_LENS_AI_URL` points it elsewhere; the default is the local server the
- * repo ships (`lens-ai-server/`).
+ * Nothing is called unless the reader turned Lens AI on in Settings and gave
+ * it their own Gemini key. Every call resolves — to a result or to a reason —
+ * so a missing key, a slow model or a malformed reply degrades one card on
+ * the page and nothing else.
  */
 
-export const LENS_AI_URL: string =
-    (import.meta.env?.WXT_LENS_AI_URL as string | undefined) ??
-    "http://127.0.0.1:8787";
-
-/* Long enough for the server to try a slow model and fall back to the next. */
-const TIMEOUT_MS = 120_000;
-
 export type AiCall<T> =
-    | { ok: true; result: T; provider: string; model: string | null; ms: number }
+    | { ok: true; result: T; model: string | null; ms: number }
     | { ok: false; error: string };
+
+/* One adapter per key, so the models it learned are out of quota stay resting. */
+let cached: { apiKey: string; adapter: LensAiAdapter } | null = null;
+
+async function adapter(): Promise<LensAiAdapter | null> {
+    const settings = await loadLensAiSettings();
+
+    if (!lensAiUsable(settings)) return null;
+
+    if (cached?.apiKey !== settings.apiKey) {
+        cached = { apiKey: settings.apiKey, adapter: createGeminiAdapter({ apiKey: settings.apiKey }) };
+    }
+
+    return cached.adapter;
+}
 
 /* Dev-only tracing, so a session with the experiment can be read back. */
 function trace(label: string, payload: unknown) {
@@ -39,70 +44,44 @@ function trace(label: string, payload: unknown) {
     }
 }
 
-async function post<T>(path: string, body: unknown): Promise<AiCall<T>> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+async function call<T>(
+    route: string,
+    request: unknown,
+    run: (adapter: LensAiAdapter) => Promise<Answered<T>>,
+): Promise<AiCall<T>> {
     const started = performance.now();
+    const current = await adapter();
 
-    trace(`→ ${path}`, body);
+    if (!current) return { ok: false, error: "Lens AI is turned off. You can turn it on in Settings." };
+
+    trace(`→ ${route}`, request);
 
     try {
-        const response = await fetch(`${LENS_AI_URL}${path}`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(body),
-            signal: controller.signal,
-        });
+        const { result, model } = await run(current);
+        const ms = Math.round(performance.now() - started);
 
-        const envelope = (await response.json().catch(() => null)) as AiEnvelope<T> | null;
+        trace(`← ${route} (${ms} ms, ${model})`, result);
 
-        if (!envelope) {
-            return { ok: false, error: `The Lens AI server replied with ${response.status} and no answer.` };
-        }
-
-        trace(`← ${path} (${Math.round(performance.now() - started)} ms)`, envelope);
-
-        return envelope.ok
-            ? {
-                  ok: true,
-                  result: envelope.result,
-                  provider: envelope.provider,
-                  model: envelope.model,
-                  ms: envelope.ms,
-              }
-            : { ok: false, error: envelope.error };
+        return { ok: true, result, model, ms };
     } catch (error) {
-        trace(`✕ ${path}`, error);
+        trace(`✕ ${route}`, error);
+
+        if (error instanceof AdapterError) return { ok: false, error: error.message };
 
         return {
             ok: false,
             error:
-                error instanceof DOMException && error.name === "AbortError"
+                error instanceof Error && /timeout|abort/i.test(`${error.name} ${error.message}`)
                     ? "Lens AI took too long to answer."
-                    : "Lens AI isn't reachable right now.",
+                    : "Lens AI couldn't reach Google right now.",
         };
-    } finally {
-        clearTimeout(timer);
     }
 }
 
 export const interpret = (request: InterpretRequest) =>
-    post<InterpretResult>("/v1/interpret", request);
+    call<InterpretResult>("interpret", request, (ai) => ai.interpret(request));
 
-export const ask = (request: AskRequest) => post<AskResult>("/v1/ask", request);
+export const ask = (request: AskRequest) => call<AskResult>("ask", request, (ai) => ai.ask(request));
 
 export const converse = (request: ConverseRequest) =>
-    post<ConverseResult>("/v1/converse", request);
-
-/** Whether the server is up, and what's answering. Null when it isn't. */
-export async function health(): Promise<HealthResult | null> {
-    try {
-        const response = await fetch(`${LENS_AI_URL}/health`, {
-            signal: AbortSignal.timeout(2_500),
-        });
-
-        return response.ok ? ((await response.json()) as HealthResult) : null;
-    } catch {
-        return null;
-    }
-}
+    call<ConverseResult>("converse", request, (ai) => ai.converse(request));

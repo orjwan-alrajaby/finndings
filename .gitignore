@@ -147,3 +147,6 @@ gitIgnoreThisFolder
 # Python bytecode, from design/finn-lens-identity/generator
 __pycache__/
 *.pyc
+
+# Secrets
+.env

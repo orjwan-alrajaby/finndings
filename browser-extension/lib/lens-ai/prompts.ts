@@ -1,6 +1,6 @@
 /**
- * Instructions for the two jobs the model does. Nothing else in this server
- * speaks to the model, and nothing here knows how Lens scores.
+ * Instructions for the jobs the model does. Only `gemini.ts` sends them, and
+ * nothing here knows how Lens scores.
  *
  * Kept free of anything that varies per request, so the system prompt is a
  * stable, cacheable prefix; the vocabulary and facts follow it as their own

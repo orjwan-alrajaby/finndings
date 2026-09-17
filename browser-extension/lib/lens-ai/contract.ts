@@ -1,16 +1,15 @@
 /**
- * What crosses the wire between the extension and the Lens AI server.
+ * What Lens sends a model, and what it accepts back.
  *
- * Deliberately free of imports. The server reads these as types only, and
- * nothing in here may pull the reasoning engine — or anything else that
- * decides — across that boundary. Ids are plain strings on purpose: on the
+ * Deliberately free of imports: nothing in here may pull the reasoning
+ * engine — or anything else that decides — into what the model sees. Ids are plain strings on purpose: on the
  * way back they are *claims* by a language model, and `proposal.ts` is where
  * they are checked against the real vocabulary before anything uses them.
  *
  * The split the whole experiment rests on:
  *
- *   natural language ─► server (model) ─► ProposedChange ─► validate ─► Answers ─► engine
- *   engine result    ─► LensFacts      ─► server (model) ─► prose
+ *   natural language ─► model      ─► ProposedChange ─► validate ─► Answers ─► engine
+ *   engine result    ─► LensFacts  ─► model          ─► prose
  *
  * The model never sees a scoring function and never returns a score.
  */
@@ -293,18 +292,3 @@ export interface ConverseResult {
     scope?: ScopeKind | null;
 }
 
-export type AiEnvelope<T> =
-    | {
-          ok: true;
-          result: T;
-          provider: string;
-          model: string | null;
-          ms: number;
-      }
-    | { ok: false; error: string; provider?: string };
-
-export interface HealthResult {
-    ok: true;
-    provider: string;
-    model: string | null;
-}
