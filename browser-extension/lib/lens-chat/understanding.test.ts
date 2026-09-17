@@ -9,8 +9,10 @@ import { readEvidence } from "./evidence";
 import { evidenceForNeeds, tellFitStory } from "./fit-story";
 import { alternativesWithinLimits, runLens } from "./run";
 import {
+    groundInWhatWasSaid,
     diffUnderstanding,
     EMPTY_UNDERSTANDING,
+    type Understanding,
     readQuestion,
     readUnderstanding,
     toAnswers,
@@ -299,5 +301,52 @@ describe("explaining a match in the person's terms", () => {
 
         expect(suv.withinYourConstraints).toBe(false);
         expect(suv.evidence["Rear USB ports"]).toBe("listed");
+    });
+});
+
+describe("saying back only what the person said", () => {
+    const told =
+        "I have 2 young children. From the 8th of October until April. I have a total of 500 euros per month and I can't spend any more.";
+
+    const understood = (): Understanding => ({
+        ...EMPTY_UNDERSTANDING,
+        budget: { kind: "hardMax", monthly: 500, said: "€500 and no more" },
+        rental: { from: "2026-10", to: "2027-04", startDay: 8, said: "8 October until April" },
+        context: [
+            { label: "Two young children", said: "you have 2 young children" },
+            { label: "Children aged 1 and 4", said: "they're 1 and 4" },
+        ],
+        needs: [
+            {
+                id: "kids",
+                label: "Keeping children safe",
+                importance: "essential",
+                said: "your children are 1 and 4",
+                priorities: ["safetyAssistance"],
+                evidence: [],
+                notInData: null,
+                status: "active",
+            },
+        ],
+    });
+
+    it("drops a detail the model filled in, like children's ages nobody gave", () => {
+        const { reply, understanding } = groundInWhatWasSaid(
+            "Two young children and €500 as a firm ceiling. Since they're 1 and 4, I'll look at ISOFIX.",
+            understood(),
+            [told],
+            new Date("2026-09-17"),
+        );
+
+        expect(reply).toBe("Two young children and €500 as a firm ceiling.");
+        expect(understanding.context.map((item) => item.label)).toEqual(["Two young children"]);
+        expect(understanding.needs[0]?.said).toBe("");
+    });
+
+    it("keeps numbers that came from them, or from the limits Lens read out of what they said", () => {
+        const reply = "From 8 October 2026 to April 2027, with €500 as your maximum. Since they're 1 and 4, ISOFIX matters.";
+        const later = [told, "One is 1 and the other is 4."];
+
+        expect(groundInWhatWasSaid(reply, understood(), later, new Date("2026-09-17")).reply).toBe(reply);
     });
 });

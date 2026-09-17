@@ -266,6 +266,56 @@ export function readQuestion(
     };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Grounding                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Every number in a text, without thousands separators: "€1,000 on the 8th" → 1000, 8. */
+const numbersIn = (value: string): string[] =>
+    (value.match(/\d(?:[\d.,]*\d)?/g) ?? []).map((number) => number.replace(/[.,]/g, "").replace(/^0+(?=\d)/, ""));
+
+/**
+ * What the model says back about someone has to come from what they said.
+ * A model can fill a gap with a plausible detail — children "aged 1 and 4"
+ * when nobody gave an age — and presenting that as understanding is worse
+ * than saying less. Numbers are the checkable part: any sentence, context
+ * line or paraphrase carrying a number the person never wrote, and Lens
+ * didn't derive from what they wrote (the budget, the rental period), is
+ * dropped.
+ */
+export function groundInWhatWasSaid(
+    reply: string,
+    u: Understanding,
+    said: string[],
+    today = new Date(),
+): { reply: string; understanding: Understanding } {
+    const known = new Set([
+        ...said.flatMap(numbersIn),
+        String(today.getFullYear()),
+        String(today.getFullYear() + 1),
+    ]);
+    if (u.budget) known.add(String(u.budget.monthly));
+    if (u.monthlyKm) known.add(String(u.monthlyKm.value));
+    if (u.rental) {
+        for (const month of [u.rental.from, u.rental.to]) numbersIn(month.replace("-", " ")).forEach((n) => known.add(n));
+        if (u.rental.startDay) known.add(String(u.rental.startDay));
+    }
+
+    const grounded = (value: string) => numbersIn(value).every((number) => known.has(number));
+
+    const sentences = reply.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [];
+    const kept = sentences.filter(grounded).join("").trim();
+
+    return {
+        reply: kept || (sentences.length ? "Here's what I took from that." : reply),
+        understanding: {
+            ...u,
+            context: u.context.filter((item) => grounded(item.label) && grounded(item.said)),
+            needs: u.needs.map((need) => (grounded(need.said) ? need : { ...need, said: "" })),
+        },
+    };
+}
+
 /** The understanding sent back to the model on the next turn. */
 export const toWire = (u: Understanding): WireUnderstanding => ({ ...u, cleared: [] });
 

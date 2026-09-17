@@ -18,6 +18,7 @@ import {
     EMPTY_UNDERSTANDING,
     isEmptyUnderstanding,
     readQuestion,
+    groundInWhatWasSaid,
     readUnderstanding,
     toAnswers,
     toWire,
@@ -340,6 +341,7 @@ export function LensChat() {
                 return;
             }
 
+            const said = history.current.filter((line) => line.role === "reader").map((line) => line.text);
             const result = response.result;
 
             /* A question Lens asked is answered by whatever the person said next. */
@@ -362,24 +364,32 @@ export function LensChat() {
 
             if (result.kind === "whatIf") {
                 const before = current.applied?.understanding ?? current.understanding;
-                const after = readUnderstanding(result.understanding, before, enabledIds);
+                const { reply, understanding: after } = groundInWhatWasSaid(
+                    result.reply,
+                    readUnderstanding(result.understanding, before, enabledIds),
+                    said,
+                );
 
-                history.current.push({ role: "lens", text: result.reply });
-                push({ kind: "whatIf", reply: result.reply, after, lines: diffUnderstanding(before, after), status: "pending" });
+                history.current.push({ role: "lens", text: reply });
+                push({ kind: "whatIf", reply, after, lines: diffUnderstanding(before, after), status: "pending" });
                 return;
             }
 
-            const next = readUnderstanding(result.understanding, current.understanding, enabledIds);
+            const { reply, understanding: next } = groundInWhatWasSaid(
+                result.reply,
+                readUnderstanding(result.understanding, current.understanding, enabledIds),
+                said,
+            );
             const question = readQuestion(result.question, answered.current);
 
             setUnderstanding(next);
             setOpenQuestion(question);
-            history.current.push({ role: "lens", text: [result.reply, question?.ask].filter(Boolean).join(" ") });
+            history.current.push({ role: "lens", text: [reply, question?.ask].filter(Boolean).join(" ") });
 
             if (suggested) setScopeKind(suggested);
 
             if (isEmptyUnderstanding(next) && !question && !next.notModelled.length) {
-                say(result.reply);
+                say(reply);
                 return;
             }
 
@@ -393,7 +403,7 @@ export function LensChat() {
                 kind: "understanding",
                 understanding: next,
                 question,
-                reply: result.reply,
+                reply,
                 isUpdate: Boolean(current.run),
                 status: "pending",
             });
