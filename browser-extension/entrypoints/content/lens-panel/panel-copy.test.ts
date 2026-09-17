@@ -617,7 +617,7 @@ describe("what the panel leads with", () => {
 
     const text = (practicality?.textContent ?? "").replace(/\s+/g, " ");
 
-    expect(text).toContain("400 L of boot space");
+    expect(text).toContain("a load volume of 400 L as FINN lists it");
     expect(text.match(/400 L/g) ?? []).toHaveLength(1);
   });
 

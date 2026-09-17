@@ -133,12 +133,8 @@ export function FeatureCard({
                                 ].join(" ")}
                             >
                                 {featureCount > 0
-                                    ? `${featureCount} ${
-                                          featureCount === 1
-                                              ? "feature"
-                                              : "features"
-                                      } getting extra influence`
-                                    : "Judged on the whole priority"}
+                                    ? `${featureCount} raised for extra influence`
+                                    : "Nothing raised · everything it checks counts the same"}
                             </p>
                         </div>
                     </div>

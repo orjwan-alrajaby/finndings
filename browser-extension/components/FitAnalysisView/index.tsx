@@ -167,7 +167,7 @@ function BasisNote() {
     return (
         <p className="mt-3 text-[11px] leading-4 text-finn-iron">
             Measured against your saved Lens settings — your priorities, their
-            order, and the features you picked out. Someone with different
+            order, and what counts for more inside each. Someone with different
             settings would see a different answer.
         </p>
     );

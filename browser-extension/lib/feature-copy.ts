@@ -1,181 +1,328 @@
-import type { FeatureImportance } from "./reasoning-engine/types";
 import type { FitFeature, FitPriority } from "./reasoning-engine/fit";
-import type { RowTone } from "./row-tone";
+import type { FeatureFact, StandardFact } from "./reasoning-engine/narrative/types";
+import type { FeatureId } from "./reasoning-engine/types";
 
-import {
-  DEFAULT_FEATURE_IMPORTANCE,
-  FEATURE_IMPORTANCE,
-  IMPORTANCE_LEVELS,
-} from "./reasoning-engine/constants";
 
-/**
- * What the car has and hasn't in one priority, in the five groups that answer
- * five different questions.
- *
- * The grouping used to be written out twice — once in the in-page panel and
- * once in the pinned car's card — with the same five titles typed in both
- * places and a different colour scheme either side. Two surfaces describing
- * one audit, free to drift on which question they were answering.
- *
- * The order is the order a reader cares about: what they asked for and got,
- * what they asked for and didn't, what else counted either way, and last what
- * FINN never said.
- */
+
+
+/* -------------------------------------------------------------------------- */
+/* The feature table                                                          */
+/* -------------------------------------------------------------------------- */
+
+/** What FINN's list says about one item on one car. */
+export type ItemState = "listed" | "unlisted" | "unknown";
 
 /**
- * What a chip is saying about its feature.
+ * How each state looks, everywhere an item is drawn.
  *
- * `rivalOnly` says "this counted, but you never singled it out". It sits on
- * the white ground of a group's row, where the group's own edge has already
- * said whether the car has the thing.
- *
- * The three levels are for chips already filed under a heading naming their
- * level: there the chip's colour is the reader's own answer about this
- * feature, in the same three hues the picker gave them — rose, orange, emerald
- * — rather than a fourth thing to learn.
+ * Colour means one thing in this table: what FINN lists. Green with a tick
+ * for listed, rose with a cross for not listed, a dashed grey outline with a
+ * question mark where FINN didn't say. It used to mean the level the reader
+ * raised an item to, so a missing "somewhat" item was drawn green and struck
+ * through — the colour of good news on a gap. The level is a small badge now.
  */
-export type FeatureChipTone = "present" | "missing" | "rivalOnly" | FeatureImportance;
-
-export const FEATURE_CHIP_TONE: Record<FeatureChipTone, string> = {
-  present: "bg-finn-pale-blue text-finn-highlight-navy",
-  missing: "bg-finn-warning/15 text-finn-warning-deep",
-  rivalOnly: "bg-finn-cotton text-finn-iron",
-  high: FEATURE_IMPORTANCE.high.chipClass,
-  medium: FEATURE_IMPORTANCE.medium.chipClass,
-  low: FEATURE_IMPORTANCE.low.chipClass,
+export const ITEM_STATE: Record<
+  ItemState,
+  {
+    label: string;
+    icon: "circle-check" | "circle-x" | "circle-question-mark";
+    /** The icon's colour on a chip: the state, readable in any section. */
+    iconInk: string;
+    /** The chip's label colour: a gap reads as one before its icon is seen. */
+    labelInk: string;
+    bar: string;
+    ink: string;
+  }
+> = {
+  listed: {
+    label: "Listed",
+    icon: "circle-check",
+    iconInk: "text-emerald-600",
+    labelInk: "text-finn-black",
+    bar: "bg-finn-success",
+    ink: "text-finn-influence-emerald",
+  },
+  unlisted: {
+    label: "Not listed",
+    icon: "circle-x",
+    iconInk: "text-rose-600",
+    labelInk: "text-rose-800",
+    bar: "bg-finn-error",
+    ink: "text-finn-influence-red",
+  },
+  unknown: {
+    label: "FINN didn't say",
+    icon: "circle-question-mark",
+    iconInk: "text-finn-iron",
+    labelInk: "text-finn-iron",
+    bar: "bg-finn-iron/30",
+    ink: "text-finn-iron",
+  },
 };
 
+/** The colour of a section, which says what kind of items it holds. */
+export type SectionPalette = "gold" | "green" | "red" | "blue" | "grey";
+
 /**
- * One level of influence, and the picks the reader gave it.
- *
- * A group of things the car hasn't got is not a flat list: the reader said
- * some of them should count about four times as much as a feature left on
- * standard and others about twice, and which is which is the difference
- * between a reason to keep looking and a shrug. The level was on each chip as
- * a coloured dot, which asks the reader to decode five dots rather than read
- * three headings.
+ * Each section on its own tinted card: gold for what the reader raised, green
+ * for other counted items the car lists, red for those it doesn't, blue for
+ * standard equipment. Chips are white on every card, so their icon — a tick
+ * or a cross — carries the state inside the two mixed sections.
  */
-export interface InfluenceBand {
-  level: FeatureImportance;
-  /** "Highly influential" — the level as the picker names it. */
+export const SECTION_LOOK: Record<
+  SectionPalette,
+  { card: string; title: string; tally: string; chip: string }
+> = {
+  gold: {
+    card: "bg-amber-50 ring-1 ring-amber-300",
+    title: "text-amber-900",
+    tally: "text-amber-800",
+    chip: "ring-amber-200",
+  },
+  green: {
+    card: "bg-emerald-50 ring-1 ring-emerald-300",
+    title: "text-emerald-900",
+    tally: "text-emerald-800",
+    chip: "ring-emerald-200",
+  },
+  red: {
+    card: "bg-rose-50 ring-1 ring-rose-300",
+    title: "text-rose-900",
+    tally: "text-rose-800",
+    chip: "ring-rose-200",
+  },
+  blue: {
+    card: "bg-blue-50 ring-1 ring-blue-300",
+    title: "text-blue-900",
+    tally: "text-blue-800",
+    chip: "ring-blue-200",
+  },
+  grey: {
+    card: "bg-finn-snow ring-1 ring-black/10",
+    title: "text-finn-black",
+    tally: "text-finn-iron",
+    chip: "ring-black/10",
+  },
+};
+
+export interface TableItem {
+  fact: FeatureFact;
+  state: ItemState;
+}
+
+export interface Tally {
+  listed: number;
+  unlisted: number;
+  unknown: number;
+}
+
+export interface FeatureTableGroup {
+  id: "raised" | "countedListed" | "countedUnlisted" | "countedUnknown" | "standard";
   title: string;
-  /** What the level actually does to the result, behind the heading's "i". */
-  meaning: string;
-  /**
-   * The heading's ink: the level's own accent, so the title and the chips
-   * under it are plainly one thing rather than a grey label over a colour.
-   */
-  accent: string;
-  features: FitFeature[];
+  /** "2 of 3 listed" for a mixed section; the count for a single-state one. */
+  tallyLabel: string;
+  tally: Tally;
+  palette: SectionPalette;
+  items: TableItem[];
+  /** Behind the row's "i": where "standard" comes from. Standard equipment only. */
+  info: StandardInfo | null;
+}
+
+export interface FeatureTable {
+  tally: Tally;
+  /** "5 listed · 3 not listed · 1 FINN didn't say", skipping any that are zero. */
+  summary: string;
+  /** The same, one part per state, so each count can wear its state's colour. */
+  summaryParts: { state: ItemState; text: string }[];
+  groups: FeatureTableGroup[];
+}
+
+const STATE_ORDER: ItemState[] = ["listed", "unlisted", "unknown"];
+const LEVEL_ORDER = ["high", "medium", "low"] as const;
+
+const tallyOf = (items: TableItem[]): Tally => ({
+  listed: items.filter((item) => item.state === "listed").length,
+  unlisted: items.filter((item) => item.state === "unlisted").length,
+  unknown: items.filter((item) => item.state === "unknown").length,
+});
+
+const tallyLabelOf = (tally: Tally): string => {
+  const known = tally.listed + tally.unlisted;
+  const base = known ? `${tally.listed} of ${known} listed` : "Not in FINN's list";
+
+  return tally.unknown && known ? `${base} · ${tally.unknown} unknown` : base;
+};
+
+/** Listed first, then gaps, then unknowns; within each, the strongest raise first. */
+const sorted = (items: TableItem[]): TableItem[] =>
+  [...items].sort(
+    (a, b) =>
+      STATE_ORDER.indexOf(a.state) - STATE_ORDER.indexOf(b.state) ||
+      LEVEL_ORDER.indexOf(a.fact.importance ?? "low") - LEVEL_ORDER.indexOf(b.fact.importance ?? "low"),
+  );
+
+const fromFit = (feature: FitFeature): TableItem => ({
+  fact: feature,
+  state: feature.state === "present" ? "listed" : feature.state === "absent" ? "unlisted" : "unknown",
+});
+
+export interface FeatureTableInput {
+  picked: TableItem[];
+  counted: TableItem[];
+  standard: StandardFact[];
+}
+
+/** The input for a car judged on its own, as the fit panel and the pinned card read it. */
+export function tableInputOf(priority: FitPriority): FeatureTableInput {
+  return {
+    picked: priority.picked.map(fromFit),
+    counted: priority.alsoCounted.map(fromFit),
+    standard: priority.standard,
+  };
 }
 
 /**
- * The reader's picks under the level they gave each one, strongest first.
- *
- * A pick always carries a level — the picker applies the default the moment
- * one is made — so the fallback here is that same default rather than a fourth
- * heading for features that have somehow lost theirs.
+ * One priority's equipment as coloured sections under one summary: what you
+ * raised (gold), other counted items the car lists (green) and doesn't (red),
+ * and its standard equipment (blue). An unknown counted item, which is rare,
+ * gets a grey section of its own rather than a colour that would claim an
+ * answer.
  */
-export function byInfluence(features: FitFeature[]): InfluenceBand[] {
-  return IMPORTANCE_LEVELS.map((level) => {
-    const step = FEATURE_IMPORTANCE[level];
+export function featureTableOf(input: FeatureTableInput): FeatureTable | null {
+  const raised = sorted(input.picked);
+  const counted = sorted(input.counted);
+  /* A standard item the reader raised is said once, under what they raised. */
+  const raisedKeys = new Set(raised.map((item) => item.fact.key));
+  const standardFacts = input.standard.filter((fact) => !raisedKeys.has(fact.key));
+  const standard = sorted(standardFacts.map((fact) => ({ fact, state: fact.state })));
+
+  const group = (
+    id: FeatureTableGroup["id"],
+    title: string,
+    palette: SectionPalette,
+    items: TableItem[],
+    mixed: boolean,
+    info: StandardInfo | null = null,
+  ): FeatureTableGroup | null => {
+    if (!items.length) return null;
+
+    const tally = tallyOf(items);
 
     return {
-      level,
-      title: step.badgeLabel,
-      meaning: step.meaning,
-      accent: step.accentTextClass,
-      features: features.filter(
-        (feature) => (feature.importance ?? DEFAULT_FEATURE_IMPORTANCE) === level,
-      ),
+      id,
+      title,
+      tallyLabel: mixed ? tallyLabelOf(tally) : String(items.length),
+      tally,
+      palette,
+      items,
+      info,
     };
-  }).filter((band) => band.features.length > 0);
+  };
+
+  const countedIn = (state: ItemState) => counted.filter((item) => item.state === state);
+
+  const groups = [
+    group("raised", "You raised", "gold", raised, true),
+    group("countedListed", "Also counted · listed", "green", countedIn("listed"), false),
+    group("countedUnlisted", "Also counted · not listed", "red", countedIn("unlisted"), false),
+    group("countedUnknown", "Also counted · FINN didn't say", "grey", countedIn("unknown"), false),
+    group(
+      "standard",
+      "Standard equipment",
+      "blue",
+      standard,
+      true,
+      standardInfoOf(standardFacts.map((fact) => fact.key as FeatureId)),
+    ),
+  ].filter((item): item is FeatureTableGroup => item != null);
+
+  if (!groups.length) return null;
+
+  const all = groups.flatMap((item) => item.items);
+  const tally = tallyOf(all);
+
+  const summaryParts = (
+    [
+      ["listed", `${tally.listed} listed`],
+      ["unlisted", `${tally.unlisted} not listed`],
+      ["unknown", `${tally.unknown} FINN didn't say`],
+    ] as const
+  )
+    .filter(([state]) => tally[state] > 0)
+    .map(([state, text]) => ({ state, text }));
+
+  return {
+    tally,
+    summary: summaryParts.map((part) => part.text).join(" · "),
+    summaryParts,
+    groups,
+  };
 }
 
-export interface FeatureGroup {
-  id: "pickedPresent" | "pickedAbsent" | "present" | "absent" | "unknown";
-  /** The question this group answers, as a sentence about the reader. */
+/* -------------------------------------------------------------------------- */
+/* Standard equipment                                                         */
+/* -------------------------------------------------------------------------- */
+
+/** A law the "i" cites, numbered in the order it's first needed. */
+export interface StandardReference {
+  label: string;
+  url: string;
+}
+
+export interface StandardInfo {
   title: string;
-  features: FitFeature[];
-  /**
-   * The row's edge. Blue for a pick the car meets, red for one it misses,
-   * green for equipment that counted anyway, grey for the rest. Red because a
-   * missed pick is the one thing here the reader told us mattered and the car
-   * doesn't give them.
-   */
-  tone: RowTone;
-  /** How the chips inside it are drawn. */
-  chip: FeatureChipTone;
-  /** Whether the car lacks these, which strikes the chip's label through. */
-  struck: boolean;
-  /**
-   * The features under the level the reader gave them, for the two groups
-   * that are made of their picks. Null for the other three, where nothing was
-   * picked and so no level was ever stated.
-   */
-  bands: InfluenceBand[] | null;
+  /** One or two sentences, with superscript marks where laws are cited. */
+  body: string;
+  references: StandardReference[];
 }
 
-export function featureGroupsOf(priority: FitPriority): FeatureGroup[] {
-  const has = (feature: FitFeature) => feature.state === "present";
-  const hasnt = (feature: FitFeature) => feature.state === "absent";
-  const unknown = (feature: FitFeature) => feature.state === "unknown";
+const GENERAL_SAFETY: StandardReference = {
+  label: "EU General Safety Regulation (EU) 2019/2144",
+  url: "https://eur-lex.europa.eu/eli/reg/2019/2144/oj",
+};
 
-  const asked = priority.picked;
-  const rest = priority.alsoCounted;
+/*
+ * Only what the regulations actually require, in the form FINN names it.
+ * Everything else is standard because nearly every car on finn.com has it,
+ * and the "i" says only that.
+ */
+const EU_LAW: Partial<Record<FeatureId, StandardReference>> = {
+  hasEmergencyBrakingAssist: GENERAL_SAFETY,
+  hasLaneKeepingAssist: GENERAL_SAFETY,
+  hasTirePressureMonitoringSystem: {
+    label: "EU vehicle safety Regulation (EC) No 661/2009",
+    url: "https://eur-lex.europa.eu/eli/reg/2009/661/oj",
+  },
+  hasEmergencyCallSystem: {
+    label: "EU eCall Regulation (EU) 2015/758",
+    url: "https://eur-lex.europa.eu/eli/reg/2015/758/oj",
+  },
+};
 
-  const groups: FeatureGroup[] = [
-    {
-      id: "pickedPresent",
-      title: "You gave extra influence, and it has",
-      features: asked.filter(has),
-      tone: "info",
-      chip: "present",
-      struck: false,
-      bands: byInfluence(asked.filter(has)),
-    },
-    {
-      id: "pickedAbsent",
-      title: "You gave extra influence, but it doesn't have",
-      features: asked.filter(hasnt),
-      tone: "error",
-      chip: "missing",
-      struck: true,
-      bands: byInfluence(asked.filter(hasnt)),
-    },
-    {
-      id: "present",
-      title: asked.length ? "Also counted here, and it has" : "It has",
-      features: rest.filter(has),
-      tone: "success",
-      chip: "rivalOnly",
-      struck: false,
-      bands: null,
-    },
-    {
-      /*
-       * A gap in equipment nobody asked for is a fact, not a problem: struck
-       * through so the answer is legible, but never coloured like a missed
-       * pick two rows above it.
-       */
-      id: "absent",
-      title: asked.length ? "Also counted here, but it doesn't have" : "It doesn't have",
-      features: rest.filter(hasnt),
-      tone: "neutral",
-      chip: "rivalOnly",
-      struck: true,
-      bands: null,
-    },
-    {
-      id: "unknown",
-      title: "FINN didn't say either way",
-      features: [...asked, ...rest].filter(unknown),
-      tone: "neutral",
-      chip: "rivalOnly",
-      struck: false,
-      bands: null,
-    },
-  ];
+const SUPERSCRIPT = ["¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"];
 
-  return groups.filter((group) => group.features.length > 0);
+/**
+ * Where "standard" comes from, in a sentence: what a modern car should have,
+ * required by EU law where it is (cited), and what nearly every car on
+ * finn.com comes with. No figures — the reader needs the source, not the
+ * arithmetic.
+ */
+export function standardInfoOf(keys: readonly FeatureId[]): StandardInfo {
+  const references: StandardReference[] = [];
+
+  for (const key of keys) {
+    const law = EU_LAW[key];
+    if (law && !references.includes(law)) references.push(law);
+  }
+
+  const marks = references.map((_, index) => SUPERSCRIPT[index] ?? `(${index + 1})`).join("");
+
+  return {
+    title: "Standard equipment",
+    body: references.length
+      ? `What a modern car should have. EU law requires some of it on new cars${marks}, and nearly every car on finn.com comes with it.`
+      : "What a modern car should have — nearly every car on finn.com comes with it.",
+    references,
+  };
 }
+

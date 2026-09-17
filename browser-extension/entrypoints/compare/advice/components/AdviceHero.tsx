@@ -123,7 +123,10 @@ export function AdviceHero({
     onChallenge,
 }: AdviceHeroProps) {
     const winner = evaluation.vehicle;
-    const { headline, budgetNote, marginNote } = narrative.verdict;
+    const { headline, budgetNote, marginNote, dependsNote } = narrative.verdict;
+
+    /* Recommended on too little of the top two priorities to judge it on. */
+    const estimate = !evaluation.score.judgeable;
 
     const palette = isFallback ? PALETTE.overBudget : PALETTE.fits;
 
@@ -162,7 +165,9 @@ export function AdviceHero({
 
                         {isFallback
                             ? "Closest match — nothing you pinned fits your budget"
-                            : "Your recommendation"}
+                            : estimate
+                              ? "Best estimate — FINN's data is thin on your top priorities"
+                              : "Your recommendation"}
                     </div>
 
                     <h2
@@ -198,7 +203,7 @@ export function AdviceHero({
                         {headline}
                     </p>
 
-                    {(budgetNote || marginNote) && (
+                    {(budgetNote || marginNote || dependsNote) && (
                         <div
                             className={`mt-4 max-w-2xl space-y-2 border-l-2 pl-4 ${palette.rule}`}
                         >
@@ -215,6 +220,14 @@ export function AdviceHero({
                                     className={`text-sm leading-6 ${palette.note}`}
                                 >
                                     {marginNote}
+                                </p>
+                            )}
+
+                            {dependsNote && (
+                                <p
+                                    className={`text-sm leading-6 ${palette.note}`}
+                                >
+                                    {dependsNote}
                                 </p>
                             )}
                         </div>

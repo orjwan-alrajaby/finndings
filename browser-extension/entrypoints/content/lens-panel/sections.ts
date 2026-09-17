@@ -20,10 +20,13 @@ import {
 import type { Tradeoff } from "@/lib/reasoning-engine/narrative/types";
 import { ROW_TONE, type RowTone } from "@/lib/row-tone";
 import {
-  featureGroupsOf,
-  FEATURE_CHIP_TONE,
-  type FeatureGroup,
-  type InfluenceBand,
+  featureTableOf,
+  ITEM_STATE,
+  SECTION_LOOK,
+  tableInputOf,
+  type FeatureTable,
+  type FeatureTableGroup,
+  type TableItem,
 } from "@/lib/feature-copy";
 import { readTradeoff } from "@/lib/tradeoff-copy";
 
@@ -206,6 +209,8 @@ function infoTip(options: {
   /** Bold first line of the tooltip, when there is one. */
   title: string | null;
   body: string;
+  /** Sources the body cites by number, drawn as numbered links under it. */
+  references?: { label: string; url: string }[];
   buttonClass: string;
   /** Swapped rather than stacked: with both present, the stylesheet's order wins. */
   idleClass: string;
@@ -230,6 +235,22 @@ function infoTip(options: {
         class: `${options.title ? "mt-0.5 " : ""}text-[11px] font-normal leading-4 text-white/85`,
         text: options.body,
       }),
+      options.references?.length
+        ? el(
+            "ol",
+            { class: "mt-1.5 space-y-0.5 text-[11px] leading-4 text-white/85" },
+            options.references.map((reference, index) =>
+              el("li", { class: "flex gap-1" }, [
+                el("span", { text: `${index + 1}.` }),
+                el("a", {
+                  class: "font-bold text-white underline underline-offset-2",
+                  text: reference.label,
+                  attrs: { href: reference.url, target: "_blank", rel: "noreferrer" },
+                }),
+              ]),
+            ),
+          )
+        : null,
     ],
   );
 
@@ -601,7 +622,7 @@ function basisNote(usingDefaults: boolean): HTMLElement {
     class: "mt-3 text-[11px] leading-4 text-finn-iron",
     text: usingDefaults
       ? "Measured against the priorities and picks Lens starts you on, not ones you have given it. Someone with different settings would see a different answer."
-      : "Measured against your saved Lens settings — your priorities, their order, and the features you picked out. Someone with different settings would see a different answer.",
+      : "Measured against your saved Lens settings — your priorities, their order, and what counts for more inside each. Someone with different settings would see a different answer.",
   });
 }
 
@@ -746,7 +767,7 @@ function prioritySection(priority: FitPriority): HTMLElement {
 
       environmental ? impactBreakdown(priority.impact, priority.band) : null,
 
-      featureGroups(priority),
+      featureTable(priority),
 
       /*
        * Only when the prose above is absent. The engine writes the same facts
@@ -1165,142 +1186,179 @@ function comparisonFigure(options: {
 }
 
 /**
- * What the car has and hasn't, in this priority, in four groups.
+ * What the car has and hasn't in this priority — the twin of
+ * `components/FeatureTable.tsx`, with the words and colours decided in
+ * `featureTableOf`.
  *
- * The same four the Advice page draws, and in the same order, because they
- * answer four different questions and collapsing them loses the distinction:
- * what you asked for and got, what you asked for and didn't, what else counted
- * and it has, and what else counted and it hasn't. The reader's own picks lead
- * — they wrote them — and everything else follows under a heading that says it
- * counted too, because a reader who singled out three features has to be able
- * to see that Lens looked at more than three.
- *
- * Each group is its own block rather than a heading over a list. Four labels
- * of the same size, a line apart, in a column 26rem wide, are read as one
- * long list with words in it: the distinction the grouping exists to make was
- * being lost in the layout that carried it.
- *
- * So each block is tinted in the colour of the answer it carries, in the same
- * hues the Advice page uses for the same four facts — the reader's own picks
- * met in blue, a gap in one of them in amber, equipment that counted anyway
- * in green, and everything unanswered in grey. They were five identical snow
- * cards before, which is a grouping a reader has to read to see. Now the
- * shape of the section is legible before a single word of it is.
+ * A summary bar, then a card per section: what you raised (gold), other
+ * counted items the car lists (green) and doesn't (red), and the standard
+ * equipment (blue).
  */
-function featureGroups(priority: FitPriority): HTMLElement | null {
-  const groups = featureGroupsOf(priority);
+function featureTable(priority: FitPriority): HTMLElement | null {
+  const table = featureTableOf(tableInputOf(priority));
 
-  if (!groups.length) return null;
+  if (!table) return null;
 
-  return factTable(groups.map(featureGroup));
+  return el("div", { class: "flex flex-col gap-2", attrs: { "data-feature-table": "" } }, [
+    tallyHeader(table),
+    ...table.groups.map(featureSection),
+  ]);
 }
 
-/**
- * One group of features, as a row of that table.
- *
- * This was five tinted cards, each with its own ground, label ink, dot and
- * chip colour — four things to keep in agreement per group, and a pale blue
- * chip that vanished into the pale blue block around it. The row keeps one
- * colour, on its edge, and the chips take the tint that goes with it on the
- * white the row is drawn on.
- *
- * The five titles and their colours come from `lib/feature-copy`, shared with
- * the pinned car's card so the two surfaces answer the same five questions.
- */
-function featureGroup(group: FeatureGroup): HTMLElement {
-  return el(
-    "div",
-    /* A row carrying three headings and three clouds of chips needs more room
-       than one carrying a label and a line of them. */
-    {
-      class: `${rowEdge(group.tone)} px-3.5 ${group.bands ? "py-4" : "py-3"}`,
-      attrs: { "data-group": group.id },
-    },
-    [
-      el("p", {
-        class: "text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron",
-        text: `${group.title} (${group.features.length})`,
-      }),
+/** The whole priority at a glance: a bar split by state, and the counts in words. */
+function tallyHeader(table: FeatureTable): HTMLElement {
+  const total = table.tally.listed + table.tally.unlisted + table.tally.unknown;
 
-      /*
-       * The picks the car hasn't got are sorted under the level the reader
-       * gave each one; every other group is one cloud of chips. Each chip's
-       * "i" opens its own tooltip, so nothing opens under the group.
-       */
-      group.bands
-        ? /*
-           * Room to breathe. Three headings, three clouds of chips and the
-           * group's own title at 10px were stacked a few pixels apart, which
-           * read as one block of small type rather than as four things — and
-           * the grouping is the whole point of it.
-           */
-          el(
-            "div",
-            { class: "mt-3.5 flex flex-col gap-4" },
-            group.bands.map(influenceBand),
-          )
-        : el(
-            "ul",
-            { class: "mt-2.5 flex flex-wrap gap-1.5" },
-            group.features.map((feature) =>
-              /* The chip strikes a missing feature through from its own state. */
-              el("li", {}, [featureChip(feature, FEATURE_CHIP_TONE[group.chip])]),
-            ),
-          ),
-    ],
-  );
-}
-
-/**
- * One level of influence, and the picks the car is missing at that level.
- *
- * The heading says the level in the picker's own words and the "i" beside it
- * says what the level actually does to the result — which is the question a
- * reader has at exactly this moment, having just been told the car misses
- * something they called highly influential. The chips take the level's own
- * colour, so the three bands are told apart before they are read.
- */
-function influenceBand(band: InfluenceBand): HTMLElement {
-  return el("div", { attrs: { "data-band": band.level } }, [
+  return el("div", { class: "px-0.5", attrs: { "data-tally": "" } }, [
+    el(
+      "div",
+      { class: "flex h-1.5 overflow-hidden rounded-full bg-finn-cotton", attrs: { "aria-hidden": "true" } },
+      (["listed", "unlisted", "unknown"] as const)
+        .filter((state) => table.tally[state])
+        .map((state) =>
+          el("span", {
+            class: `block h-full ${ITEM_STATE[state].bar}`,
+            attrs: { style: `width:${(100 * table.tally[state]) / total}%` },
+          }),
+        ),
+    ),
     el(
       "p",
-      { class: `flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.1em] ${band.accent}` },
-      [
-        el("span", { text: `${band.title} (${band.features.length})` }),
-
-        infoTip({
-          label: `What is ${band.title}?`,
-          title: band.title,
-          body: band.meaning,
-          buttonClass: [
-            "inline-flex h-4 w-4 shrink-0 items-center justify-center",
-            "rounded-full align-middle transition-colors hover:text-finn-accent-blue",
-          ].join(" "),
-          idleClass: "opacity-60",
-          activeClass: "opacity-100",
-        }),
-      ],
-    ),
-
-    el(
-      "ul",
-      { class: "mt-2 flex flex-wrap gap-1.5" },
-      band.features.map((feature) =>
-        el("li", {}, [featureChip(feature, FEATURE_CHIP_TONE[band.level], false)]),
+      { class: "mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-bold" },
+      table.summaryParts.map((part) =>
+        el("span", { class: `inline-flex items-center gap-1 ${ITEM_STATE[part.state].ink}` }, [
+          el("span", { class: `h-2 w-2 rounded-full ${ITEM_STATE[part.state].bar}`, attrs: { "aria-hidden": "true" } }),
+          el("span", { text: part.text }),
+        ]),
       ),
     ),
   ]);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Feature chips                                                              */
-/* -------------------------------------------------------------------------- */
+function featureSection(group: FeatureTableGroup): HTMLElement {
+  const look = SECTION_LOOK[group.palette];
+  const infoId = group.info ? `finn-lens-standard-info-${(sectionIds += 1)}` : null;
 
-const STATE_LABEL: Record<FitFeature["state"], string> = {
-  present: "has it",
-  absent: "doesn't have it",
-  unknown: "not available",
-};
+  const infoPanel =
+    group.info && infoId
+      ? el(
+          "div",
+          {
+            class: "mt-2 hidden rounded-lg bg-white px-3 py-2 text-[11px] leading-4 text-finn-iron",
+            attrs: { id: infoId },
+          },
+          [
+            el("p", { text: group.info.body }),
+            group.info.references.length
+              ? el(
+                  "ol",
+                  { class: "mt-1.5 space-y-0.5" },
+                  group.info.references.map((reference, index) =>
+                    el("li", { class: "flex gap-1" }, [
+                      el("span", { text: `${index + 1}.` }),
+                      el("a", {
+                        class: "font-bold text-finn-accent-blue underline-offset-2 hover:underline",
+                        text: reference.label,
+                        attrs: { href: reference.url, target: "_blank", rel: "noreferrer" },
+                      }),
+                    ]),
+                  ),
+                )
+              : null,
+          ],
+        )
+      : null;
+
+  const toggle =
+    infoPanel && infoId
+      ? el(
+          "button",
+          {
+            class: "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity hover:opacity-100",
+            attrs: {
+              type: "button",
+              "aria-label": "Where does standard equipment come from?",
+              "aria-expanded": "false",
+              "aria-controls": infoId,
+            },
+          },
+          [icon("info", "h-4 w-4")],
+        )
+      : null;
+
+  toggle?.addEventListener("click", () => {
+    const open = infoPanel?.classList.toggle("hidden") === false;
+    toggle.setAttribute("aria-expanded", String(open));
+  });
+
+  return el(
+    "section",
+    {
+      class: `rounded-xl px-3.5 py-3 ${look.card}`,
+      attrs: { "data-group": group.id, "data-palette": group.palette },
+    },
+    [
+      el("div", { class: "flex items-center justify-between gap-3" }, [
+        el("h4", { class: `flex items-center gap-1 text-[12px] font-black ${look.title}` }, [
+          el("span", { text: group.title }),
+          toggle,
+        ]),
+        el("span", { class: `shrink-0 text-[11px] font-bold ${look.tally}`, text: group.tallyLabel }),
+      ]),
+
+      infoPanel,
+
+      el(
+        "ul",
+        { class: "mt-2 flex flex-wrap gap-1.5" },
+        group.items.map((item) => el("li", {}, [stateChip(item, group)])),
+      ),
+    ],
+  );
+}
+
+/**
+ * One item: a white chip in its section's ring, its state as an icon, the
+ * level it was raised to where that applies, and what it is behind the "i".
+ */
+function stateChip(item: TableItem, group: FeatureTableGroup): HTMLElement {
+  const state = ITEM_STATE[item.state];
+  const level =
+    group.id === "raised" && item.fact.importance ? FEATURE_IMPORTANCE[item.fact.importance] : null;
+
+  return el(
+    "span",
+    {
+      class: `inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-2 pr-2.5 text-[11px] font-bold shadow-sm ring-1 ${SECTION_LOOK[group.palette].chip} ${state.labelInk}`,
+      attrs: { "data-state": item.state },
+    },
+    [
+      icon(state.icon, `h-3.5 w-3.5 shrink-0 ${state.iconInk}`),
+      el("span", { text: item.fact.label }),
+      level
+        ? el("span", {
+            class: "rounded-full bg-amber-100 px-1.5 text-[9px] font-black uppercase tracking-wide text-amber-900",
+            text: level.label,
+            attrs: { title: `You said this should count ${level.inSentence}` },
+          })
+        : null,
+      item.fact.explanation
+        ? infoTip({
+            label: `What is ${item.fact.label}?`,
+            title: item.fact.label,
+            body: item.fact.explanation,
+            buttonClass: [
+              "-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center",
+              "rounded-full align-middle transition-opacity hover:opacity-100",
+            ].join(" "),
+            idleClass: "opacity-60",
+            activeClass: "opacity-100",
+          })
+        : null,
+      el("span", { class: "sr-only", text: state.label }),
+    ],
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Efficiency                                                                 */
@@ -1386,94 +1444,6 @@ function efficiencyContent(analysis: FitAnalysis): HTMLElement {
      * disclaimer under it. What each number means opens from the row's "i".
      */
     el("div", { class: "@container mt-3" }, [comparisonTable(reading.table)]),
-  );
-}
-
-/**
- * One feature, as the Advice page draws it.
- *
- * This was a list of ticks and crosses with the level bolted on the end. The
- * Advice page had already settled the same problem better: a chip carrying
- * the name, a dot in the colour of the level the reader gave it, and its own
- * "i" — read as one object rather than as a row of columns, and small enough
- * that a dozen of them fit a 26rem column. The two surfaces describe the same
- * analysis, so they now describe it in the same shapes.
- *
- * What is missing is struck through rather than crossed off in a column of
- * its own, and the group's label and colour say which of the four answers
- * this is — which is also where the chip's own colour comes from now, handed
- * down rather than worked out again from facts the group already knew.
- */
-/**
- * `withLevel` is false where the chips are already sorted under a heading
- * naming their level and tinted in its colour: a dot and a badge saying the
- * same thing a third time is noise, not emphasis.
- */
-function featureChip(
-  feature: FitFeature,
-  chipClass: string,
-  withLevel = true,
-): HTMLElement {
-  const level =
-    withLevel && feature.importance ? FEATURE_IMPORTANCE[feature.importance] : null;
-
-  const info = feature.explanation
-    ? infoTip({
-        label: `What is ${feature.label}?`,
-        title: feature.label,
-        body: feature.explanation,
-        buttonClass: [
-          "-mr-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center",
-          "rounded-full align-middle transition-opacity hover:opacity-100",
-        ].join(" "),
-        idleClass: "opacity-70",
-        activeClass: "opacity-100",
-      })
-    : null;
-
-  return el(
-    "span",
-    {
-      class: [
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1",
-        "text-[11px] font-bold",
-        chipClass,
-      ].join(" "),
-    },
-    [
-      level
-        ? el("span", {
-            class: `h-2 w-2 shrink-0 rounded-full ${level.dotClass}`,
-            attrs: {
-              title: `You said this should count ${level.inSentence}`,
-            },
-          })
-        : null,
-
-      el("span", {
-        class: feature.state === "absent" ? "line-through" : "",
-        text: feature.label,
-      }),
-
-      /*
-       * Only the top level is spelled out. Which of the three a reader chose
-       * matters most at the top, and writing the level on every chip is the
-       * noise the row layout was already making.
-       */
-      withLevel && feature.importance === "high"
-        ? el("span", {
-            class: "text-[10px] font-black opacity-70",
-            attrs: {
-              title: "You said this should have the most influence",
-            },
-            text: FEATURE_IMPORTANCE.high.badgeLabel,
-          })
-        : null,
-
-      info,
-
-      el("span", { class: "sr-only", text: STATE_LABEL[feature.state] }),
-    ],
   );
 }
 

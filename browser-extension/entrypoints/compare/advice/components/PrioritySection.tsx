@@ -4,9 +4,17 @@ import type {
     PriorityReasoning,
     PriorityStanding,
 } from "@/lib/reasoning-engine/narrative";
-import { FeatureChip, type FeatureChipTone } from "@/components/FeatureChip";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
+import { FeatureTable } from "@/components/FeatureTable";
+import {
+    featureTableOf,
+    ITEM_STATE,
+    type FeatureTable as FeatureTableModel,
+    type FeatureTableInput,
+    type ItemState,
+    type TableItem,
+} from "@/lib/feature-copy";
 import { EnvironmentalResult } from "@/components/EnvironmentalResult";
 import { classifyFit } from "@/lib/reasoning-engine/fit";
 import { ExportTable, type ExportRow } from "@/components/ExportTable";
@@ -53,28 +61,10 @@ export function PrioritySection({
     const { features } = reasoning;
 
     /*
-     * Two questions, shown separately.
-     *
-     * The reader's own picks come first and carry both halves, present and
-     * missing, because a gap in something they singled out is the point. The
-     * category coverage below it shows only what the car has — fifteen
-     * struck-through chips of equipment nobody asked about is a dump, not
-     * evidence — but it is labelled as counting, because it did.
+     * The same table the fit panel draws: what was raised, what else counts,
+     * and the standard kit, each chip coloured by what FINN lists.
      */
-    const picked = features.picked;
-    const hasPicks = picked.present.length + picked.missing.length > 0;
-
-    /*
-     * A feature the reader singled out is already stated above as a pick, so
-     * the coverage list below it drops the duplicate rather than saying the
-     * same thing twice under a weaker label.
-     */
-    const alsoCounted = hasPicks
-        ? features.coverage.present.filter(
-              (fact) =>
-                  !picked.present.some((item) => item.key === fact.key),
-          )
-        : features.coverage.present;
+    const table = featureTableOf(adviceTableInput(features));
 
     return (
         /*
@@ -157,46 +147,19 @@ export function PrioritySection({
                     )}
 
                     {/*
-                      * The same three lists, twice. On screen they are chips
-                      * with their explanations a tap away, which is what a
-                      * reader wants when only one word in twenty puzzles
-                      * them. In the exported file a tap reveals nothing, so
-                      * everything behind one is laid out flat instead — see
-                      * components/ExportTable.
+                      * The table on screen; in the exported file, where a tap
+                      * reveals nothing, the same items laid out flat with what
+                      * each one is — see components/ExportTable.
                       */}
-                    <div className="finn-lens-screen-only mt-3 space-y-2">
-                        {hasPicks && (
-                            <>
-                                <ChipRow
-                                    label="You gave extra influence, and it has"
-                                    facts={picked.present}
-                                    tone="present"
-                                />
-
-                                <ChipRow
-                                    label="You gave extra influence, but it doesn't have"
-                                    facts={picked.missing}
-                                    tone="missing"
-                                />
-                            </>
-                        )}
-
-                        <ChipRow
-                            label={
-                                hasPicks
-                                    ? "Also counted here, and it has"
-                                    : "It has"
-                            }
-                            facts={alsoCounted}
-                            tone="rivalOnly"
-                        />
+                    <div className="finn-lens-screen-only mt-3">
+                        <FeatureTable table={table} />
                     </div>
 
                     <ExportTable
-                        caption={`Every feature counted under ${reasoning.label}`}
-                        subjectHeading="Feature · where it stands"
+                        caption={`Every item counted under ${reasoning.label}`}
+                        subjectHeading="Item · where it stands"
                         detailHeading="What it is"
-                        rows={featureRows(picked, alsoCounted, hasPicks)}
+                        rows={tableRows(table)}
                     />
                 </div>
             </div>
@@ -204,104 +167,74 @@ export function PrioritySection({
     );
 }
 
-/**
- * The same features as the chip rows, flattened for the exported file.
- *
- * Three things that are one tap away on screen are simply present here: what
- * the feature is, whether the car has it, and — for anything the reader gave
- * extra influence to — how much they said it should count. On a chip the
- * first sits behind an "i" and the last behind a coloured dot with a
- * tooltip, and a photograph of the page keeps neither.
- *
- * The order is the chips' own: what the reader asked for and got, what they
- * asked for and didn't, then what counted anyway. That is the order of
- * interest, and it also puts the amber rows where a reader scanning the
- * left edge will find them together.
- */
-function featureRows(
-    picked: { present: FeatureFact[]; missing: FeatureFact[] },
-    alsoCounted: FeatureFact[],
-    hasPicks: boolean,
-): ExportRow[] {
-    return [
-        ...picked.present.map((fact) =>
-            featureRow(fact, "positive", "Has it · you asked for it"),
-        ),
-        ...picked.missing.map((fact) =>
-            featureRow(fact, "caution", "Doesn't have it · you asked for it"),
-        ),
-        ...alsoCounted.map((fact) =>
-            featureRow(
-                fact,
-                "neutral",
-                hasPicks ? "Has it · counted anyway" : "Has it",
-            ),
-        ),
-    ];
-}
+/** The advice narrative's evidence, as the feature table reads it. */
+function adviceTableInput(features: PriorityReasoning["features"]): FeatureTableInput {
+    const withState = (facts: FeatureFact[], state: ItemState): TableItem[] =>
+        facts.map((fact) => ({ fact, state }));
 
-function featureRow(
-    fact: FeatureFact,
-    tone: ExportRow["tone"],
-    standing: string,
-): ExportRow {
-    const level = fact.importance ? FEATURE_IMPORTANCE[fact.importance] : null;
+    const { picked, coverage } = features;
+    const pickedKeys = new Set(
+        [...picked.present, ...picked.missing, ...picked.unknown].map((fact) => fact.key),
+    );
+    const rest = (facts: FeatureFact[]) => facts.filter((fact) => !pickedKeys.has(fact.key));
 
     return {
-        /*
-         * A feature can appear in at most one of the three lists, so its own
-         * id is unique across the table.
-         */
-        key: fact.key,
-        tone,
-        subject: (
-            <>
-                {fact.label}
-
-                {level && (
-                    <span
-                        className={[
-                            "ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide",
-                            level.chipClass,
-                        ].join(" ")}
-                    >
-                        {level.badgeLabel}
-                    </span>
-                )}
-            </>
-        ),
-        standing,
-        detail: fact.explanation,
+        picked: [
+            ...withState(picked.present, "listed"),
+            ...withState(picked.missing, "unlisted"),
+            ...withState(picked.unknown, "unknown"),
+        ],
+        counted: [
+            ...withState(rest(coverage.present), "listed"),
+            ...withState(rest(coverage.missing), "unlisted"),
+            ...withState(rest(coverage.unknown), "unknown"),
+        ],
+        standard: features.standard,
     };
 }
 
+const EXPORT_TONE: Record<ItemState, ExportRow["tone"]> = {
+    listed: "positive",
+    unlisted: "caution",
+    unknown: "neutral",
+};
+
 /**
- * The named features, each carrying its own explanation.
- *
- * The `i` is the answer to the reader's actual next question — "what is
- * adaptive cruise control?" — asked and answered without leaving the page.
+ * The table flattened for the exported file: every item with its state, the
+ * row it sits in, the level it was raised to, and what it is — the things a
+ * photograph of a chip with an "i" keeps none of.
  */
-function ChipRow({
-    label,
-    facts,
-    tone,
-}: {
-    label: string;
-    facts: FeatureFact[];
-    tone: FeatureChipTone;
-}) {
-    if (!facts.length) return null;
+function tableRows(table: FeatureTableModel | null): ExportRow[] {
+    return (table?.groups ?? []).flatMap((group) =>
+        group.items.map((item) => {
+            const level =
+                group.id === "raised" && item.fact.importance
+                    ? FEATURE_IMPORTANCE[item.fact.importance]
+                    : null;
 
-    return (
-        <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wide text-finn-iron">
-                {label}
-            </span>
+            return {
+                key: `${group.id}-${item.fact.key}`,
+                tone: EXPORT_TONE[item.state],
+                subject: (
+                    <>
+                        {item.fact.label}
 
-            {facts.map((fact) => (
-                <FeatureChip key={fact.key} fact={fact} tone={tone} />
-            ))}
-        </div>
+                        {level && (
+                            <span
+                                className={[
+                                    "ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide",
+                                    level.chipClass,
+                                ].join(" ")}
+                            >
+                                {level.badgeLabel}
+                            </span>
+                        )}
+                    </>
+                ),
+                standing: `${ITEM_STATE[item.state].label} · ${group.title}`,
+                detail: item.fact.explanation,
+            };
+        }),
     );
 }
 

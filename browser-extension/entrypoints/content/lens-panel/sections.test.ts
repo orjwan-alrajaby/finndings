@@ -4,12 +4,13 @@ import { parseHTML } from "linkedom";
 import { buildFitAnalysis } from "@/lib/reasoning-engine/fit";
 import {
   DEFAULT_PREFERENCES,
-  DEFAULT_PRIORITIES,
+  PROFILES,
+  profileEmphasis,
 } from "@/lib/reasoning-engine/constants";
 import { makeCar } from "@/lib/reasoning-engine/test-fixtures";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { FEATURE_IMPORTANCE, IMPORTANCE_LEVELS } from "@/lib/reasoning-engine/constants";
+import { CATEGORIES, FEATURES, FEATURE_IMPORTANCE, IMPORTANCE_LEVELS } from "@/lib/reasoning-engine/constants";
 import { analysisBody, closeInfoTip } from "./sections";
 
 /**
@@ -35,15 +36,24 @@ function render(): HTMLElement {
         "hasAppleCarPlaySlashAndroidAuto",
         "hasSplitFoldingRearSeats",
         "hasHeatedSeats",
+        "hasRainSlashLightSensors",
+        "hasRearCrosswalkWarning",
       ],
     }),
     pinnedAt: "2026-01-01",
   };
 
+  /*
+   * Nervous Driver, because its emphasis raises items at more than one level:
+   * blind spot warning and rear cross-traffic alert highly, matrix LED
+   * somewhat. This car has the cross-traffic alert and not the other two, so
+   * its first priority shows a pick it meets and misses at two levels.
+   */
   const analysis = buildFitAnalysis(
     car,
-    DEFAULT_PRIORITIES,
+    [...PROFILES.nervous.priorities],
     DEFAULT_PREFERENCES,
+    profileEmphasis("nervous"),
   );
 
   const host = document.createElement("div");
@@ -101,7 +111,7 @@ describe("prioritySection", () => {
 
     expect(header.getAttribute("aria-expanded")).toBe("true");
     expect(body.classList.contains("hidden")).toBe(false);
-    expect(body.textContent).toContain("Automatic emergency braking");
+    expect(body.textContent).toContain("Blind spot warning");
   });
 
   it("folds away when the header is clicked", () => {
@@ -148,138 +158,81 @@ describe("prioritySection", () => {
   });
 });
 
-describe("feature groups", () => {
-  it("counts what is in each group, in its own block", () => {
-    const labels = [...root.querySelectorAll("p")]
-      .map((node) => node.textContent ?? "")
-      .filter((text) => text.includes("extra influence"));
+describe("the feature table", () => {
+  /*
+   * A summary, then a card per section, each in its own colour: what you
+   * raised gold, other counted items green when listed and red when not, and
+   * the standard equipment blue.
+   */
+  it("draws a summary and a coloured card per section, in order", () => {
+    const sections = [...root.querySelectorAll<HTMLElement>("[data-group]")];
+    const order = ["raised", "countedListed", "countedUnlisted", "countedUnknown", "standard"];
+    const palette = {
+      raised: "gold",
+      countedListed: "green",
+      countedUnlisted: "red",
+      countedUnknown: "grey",
+      standard: "blue",
+    } as const;
 
-    expect(labels.length).toBeGreaterThan(0);
-    expect(labels.every((text) => /\(\d+\)$/.test(text.trim()))).toBe(true);
+    expect(root.querySelector("[data-tally]")?.textContent).toMatch(/\d+ listed/);
+
+    for (const table of root.querySelectorAll("[data-feature-table]")) {
+      const ids = [...table.querySelectorAll("[data-group]")].map((section) => section.getAttribute("data-group"));
+      expect(ids).toEqual(order.filter((id) => ids.includes(id)));
+    }
+
+    for (const section of sections) {
+      const id = section.getAttribute("data-group") as keyof typeof palette;
+
+      expect(section.getAttribute("data-palette")).toBe(palette[id]);
+      expect(section.tagName.toLowerCase()).toBe("section");
+    }
+
+    const card = (id: string) => root.querySelector(`[data-group="${id}"]`)?.getAttribute("class") ?? "";
+
+    expect(card("raised")).toContain("bg-amber-50");
+    expect(card("standard")).toContain("bg-blue-50");
+    expect(card("countedListed")).toContain("bg-emerald-50");
+    expect(card("countedUnlisted")).toContain("bg-rose-50");
   });
 
-  /*
-   * These were five tinted cards, each with a ground, a label ink, a dot and a
-   * chip colour to keep in agreement — and a pale blue chip that vanished into
-   * the pale blue block around it. They are rows of the table the environmental
-   * result and "How much it uses" are drawn in: one colour per row, on its
-   * edge, and chips that read on the white underneath.
-   */
-  it("draws the groups as rows of one table, edged in what each one says", () => {
-    const { body } = firstPriority();
-    const groups = [...body.querySelectorAll("[data-group]")];
-
-    expect(groups.length).toBeGreaterThan(1);
-
-    /* One table for the priority, not one box per group. */
-    const tables = new Set(groups.map((group) => group.parentElement));
-
-    expect(tables.size).toBe(1);
-    expect([...tables][0]?.parentElement?.getAttribute("class")).toContain(
-      "border border-finn-cotton",
-    );
-
-    const edge = (id: string) =>
-      root.querySelector(`[data-group="${id}"]`)?.getAttribute("class") ?? "";
-
-    /* Blue for a pick it meets, red for one it misses, green for the rest. */
-    if (root.querySelector('[data-group="pickedPresent"]')) {
-      expect(edge("pickedPresent")).toContain("border-l-finn-accent-blue");
-    }
-
-    if (root.querySelector('[data-group="pickedAbsent"]')) {
-      expect(edge("pickedAbsent")).toContain("border-l-finn-error");
-    }
-
-    if (root.querySelector('[data-group="present"]')) {
-      expect(edge("present")).toContain("border-l-finn-success");
-    }
-
-    /* And the chips are legible on white, where they used to be white on tint. */
-    for (const chip of root.querySelectorAll("[data-group] li > span")) {
-      expect(chip.getAttribute("class")).not.toContain("bg-white");
-    }
+  it("calls the raised section \"You raised\", whoever set the raises", () => {
+    expect(root.querySelector('[data-group="raised"] h4')?.textContent).toBe("You raised");
   });
 
-  /*
-   * The level the reader gave a feature used to ride on the chip itself — a
-   * coloured dot, and the top level also spelled out in a badge. Both groups
-   * made of their picks are sorted under headings that name the level now, so
-   * the chip saying it again would be the third statement of one fact. It
-   * still rides on the chip where nothing else says it: the Advice page's own
-   * rows, which are not grouped this way.
-   *
-   * Read from the constants rather than spelled out here, so rewording the
-   * scale is a rewording rather than a broken test.
-   */
-  it("leaves the level to the heading, rather than repeating it on every chip", () => {
-    expect(root.querySelector("[data-band]")).not.toBeNull();
-    expect(root.textContent).toContain(FEATURE_IMPORTANCE.high.badgeLabel);
+  it("keeps each counted section to one state, and tallies the mixed ones", () => {
+    const states = (id: string) =>
+      [...root.querySelectorAll(`[data-group="${id}"] [data-state]`)].map((chip) => chip.getAttribute("data-state"));
 
-    expect(root.querySelector('[title^="You said this should count"]')).toBeNull();
+    for (const state of states("countedListed")) expect(state).toBe("listed");
+    for (const state of states("countedUnlisted")) expect(state).toBe("unlisted");
 
-    for (const chip of root.querySelectorAll("li > span")) {
-      for (const level of IMPORTANCE_LEVELS) {
-        expect(chip.textContent).not.toContain(FEATURE_IMPORTANCE[level].badgeLabel);
-      }
+    for (const section of root.querySelectorAll<HTMLElement>('[data-group="raised"], [data-group="standard"]')) {
+      const chips = [...section.querySelectorAll("[data-state]")];
+      const listed = chips.filter((chip) => chip.getAttribute("data-state") === "listed").length;
+      const unlisted = chips.filter((chip) => chip.getAttribute("data-state") === "unlisted").length;
+
+      if (listed + unlisted) expect(section.textContent).toContain(`${listed} of ${listed + unlisted} listed`);
     }
   });
 
-  /*
-   * The picks the car hasn't got, under the level the reader gave each one.
-   *
-   * A flat list of five asks the reader to decode five coloured dots to find
-   * out which of the gaps they actually called important. The level is a
-   * heading now — so the chips underneath stop repeating it, and the question
-   * it raises ("what does highly influential actually do?") is answered by an
-   * "i" beside the heading rather than left hanging.
-   */
-  it("sorts both groups of picks under their level, strongest first", () => {
-    /* Both, because the level is what the reader said about the feature —
-       true of one they got as much as one they missed. */
-    expect(root.querySelector('[data-group="pickedPresent"] [data-band]')).not.toBeNull();
+  it("marks each chip's state with its icon, and strikes nothing", () => {
+    for (const chip of root.querySelectorAll<HTMLElement>("[data-state]")) {
+      const icon = chip.querySelector("svg")?.getAttribute("class") ?? "";
 
-    const group = root.querySelector('[data-group="pickedAbsent"]');
-    const bands = [...(group?.querySelectorAll("[data-band]") ?? [])];
+      if (chip.getAttribute("data-state") === "listed") expect(icon).toContain("text-emerald-600");
+      if (chip.getAttribute("data-state") === "unlisted") expect(icon).toContain("text-rose-600");
+    }
 
-    expect(bands.length).toBeGreaterThan(1);
-    expect(bands.map((band) => band.getAttribute("data-band"))).toEqual(
-      [...IMPORTANCE_LEVELS].filter((level) =>
-        bands.some((band) => band.getAttribute("data-band") === level),
-      ),
-    );
+    expect(root.querySelector(".line-through")).toBeNull();
+  });
 
-    for (const band of bands) {
-      const level = band.getAttribute("data-band") as "high" | "medium" | "low";
-      const step = FEATURE_IMPORTANCE[level];
+  it("shows the level a raised item was given as a badge, and only on raised items", () => {
+    expect(root.querySelector('[data-group="raised"] [title^="You said this should count"]')).not.toBeNull();
 
-      /* The level, named and counted. */
-      expect(band.querySelector("p")?.textContent).toContain(
-        `${step.badgeLabel} (${band.querySelectorAll("li").length})`,
-      );
-
-      /* The heading in the level's ink, and its chips in the level's tint. */
-      expect(band.querySelector("p")?.getAttribute("class")).toContain(step.accentTextClass);
-
-      for (const chip of band.querySelectorAll("li > span")) {
-        expect(chip.getAttribute("class")).toContain(step.chipClass);
-      }
-
-      expect(band.querySelector('[title^="You said this should count"]')).toBeNull();
-      expect(band.querySelector("ul")?.textContent).not.toContain(step.badgeLabel);
-
-      /* And what the level does, behind the heading's own "i". */
-      const info = band.querySelector(`button[aria-label="What is ${step.badgeLabel}?"]`) as HTMLElement;
-
-      expect(info).not.toBeNull();
-
-      info.click();
-
-      expect(root.querySelector(`#${info.getAttribute("aria-controls")}`)?.textContent).toContain(
-        step.meaning,
-      );
-
-      info.click();
+    for (const section of root.querySelectorAll('[data-group]:not([data-group="raised"])')) {
+      expect(section.querySelector('[title^="You said this should count"]')).toBeNull();
     }
   });
 });
@@ -378,3 +331,49 @@ describe("chip explanations", () => {
   });
 });
 
+
+describe("standard equipment", () => {
+  it("lists every standard item under a priority, each with this car's answer", () => {
+    const { body } = firstPriority();
+    const block = body.querySelector<HTMLElement>('[data-group="standard"]');
+
+    if (!block) throw new Error("no standard equipment row");
+
+    const states = Object.fromEntries(
+      [...block.querySelectorAll("[data-state]")].map((chip) => [
+        chip.querySelector("span")?.textContent,
+        chip.getAttribute("data-state"),
+      ]),
+    );
+
+    /* Safety's five, less any the profile raised: this car lists emergency braking. */
+    expect(block.querySelectorAll("[data-state]").length).toBe(CATEGORIES.safetyAssistance.expected.length);
+    expect(states[FEATURES.hasEmergencyBrakingAssist.label]).toBe("listed");
+    expect(states[FEATURES.hasLaneKeepingAssist.label]).toBe("unlisted");
+    expect(block.textContent).not.toMatch(/counts against|FINN Lens counted|%/i);
+  });
+
+  it("opens where standard comes from in place, with the laws linked", () => {
+    const block = firstPriority().body.querySelector<HTMLElement>('[data-group="standard"]')!;
+    const toggle = block.querySelector<HTMLButtonElement>(
+      'button[aria-label="Where does standard equipment come from?"]',
+    )!;
+    const panel = block.querySelector<HTMLElement>(`#${toggle.getAttribute("aria-controls")}`)!;
+
+    expect(panel.classList.contains("hidden")).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    toggle.click();
+
+    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(panel.textContent).toMatch(/nearly every car on finn\.com comes with it/);
+    expect([...panel.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toContain(
+      "https://eur-lex.europa.eu/eli/reg/2019/2144/oj",
+    );
+
+    toggle.click();
+
+    expect(panel.classList.contains("hidden")).toBe(true);
+  });
+});

@@ -75,7 +75,7 @@ export function Tip({
                     className="z-[70] max-w-[260px] rounded-xl bg-finn-black px-3 py-2.5 text-[11px] leading-4 text-white shadow-lg"
                 >
                     <p className="font-black">{subject}</p>
-                    <p className="mt-1 text-white/80">{children}</p>
+                    <div className="mt-1 text-white/80">{children}</div>
                     <Tooltip.Arrow className="fill-finn-black" />
                 </Tooltip.Content>
             </Tooltip.Portal>

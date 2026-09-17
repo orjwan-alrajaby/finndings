@@ -160,7 +160,7 @@ describe("the advice card says what the panel says", () => {
       text.indexOf("Your priority #3"),
     );
 
-    expect(practicality).toContain("400 L of boot space");
+    expect(practicality).toContain("a load volume of 400 L as FINN lists it");
     expect(practicality.match(/400 L/g) ?? []).toHaveLength(1);
   });
 

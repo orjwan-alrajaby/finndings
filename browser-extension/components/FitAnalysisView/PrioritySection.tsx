@@ -2,16 +2,10 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { ChevronDown } from "lucide-react";
 
 import { EnvironmentalResult } from "@/components/EnvironmentalResult";
-import { FactRow, FactTable } from "@/components/FactTable";
-import { FeatureChip } from "@/components/FeatureChip";
-import { InfoTip } from "@/components/InfoTip";
 import { PriorityIcon } from "@/components/PriorityIcon";
 import { describeCoverage } from "@/lib/car-labels";
-import {
-    featureGroupsOf,
-    type FeatureGroup,
-    type InfluenceBand,
-} from "@/lib/feature-copy";
+import { featureTableOf, tableInputOf } from "@/lib/feature-copy";
+import { FeatureTable } from "@/components/FeatureTable";
 import type { FitPriority } from "@/lib/reasoning-engine/fit";
 
 import { BandChip } from "./parts";
@@ -112,7 +106,7 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
                         )
                     )}
 
-                    <FeatureGroups priority={priority} />
+                    <FeatureTable table={featureTableOf(tableInputOf(priority))} />
 
                     {/*
                       * Only where the prose above is absent. The engine writes
@@ -153,115 +147,3 @@ export function PrioritySection({ priority }: { priority: FitPriority }) {
     );
 }
 
-/**
- * What the car has and hasn't, in this priority, in the five groups
- * `featureGroupsOf` sorts it into.
- *
- * One table rather than five soft grey boxes. Each group is a row edged in the
- * colour of its answer — blue for a pick the car meets, red for one it
- * misses, green for equipment that counted anyway, grey for the rest — which
- * is the same edge the environmental result and "How much it uses" use, and it
- * carries the distinction the grouping exists to make before a word is read.
- *
- * The panel's twin is `featureGroups` in `lens-panel/sections.ts`; the five
- * titles and their colours are decided in `lib/feature-copy` so the two
- * surfaces can't drift on which question they are answering.
- */
-function FeatureGroups({ priority }: { priority: FitPriority }) {
-    const groups = featureGroupsOf(priority);
-
-    if (!groups.length) return null;
-
-    return (
-        <FactTable>
-            {groups.map((group) => (
-                <Group key={group.id} group={group} />
-            ))}
-        </FactTable>
-    );
-}
-
-function Group({ group }: { group: FeatureGroup }) {
-    return (
-        /* A row carrying three headings and three clouds of chips needs more
-           room than one carrying a label and a line of them. */
-        <FactRow
-            tone={group.tone}
-            data-group={group.id}
-            className={`px-3.5 ${group.bands ? "py-4" : "py-3"}`}
-        >
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-finn-iron">
-                {group.title} ({group.features.length})
-            </p>
-
-            {/*
-              * The picks the car hasn't got are sorted under the level the
-              * reader gave each one; every other group is one cloud of chips.
-              * Chips, the way the Advice page draws the same facts — a column
-              * of ticks and crosses read as a form; these read as the things
-              * themselves, and a dozen fit where six rows did.
-              */}
-            {group.bands ? (
-                /*
-                  * Room to breathe. Three headings, three clouds of chips and
-                  * the group's own title at 10px were stacked a few pixels
-                  * apart, which read as one block of small type rather than as
-                  * four things — and the grouping is the whole point of it.
-                  */
-                <div className="mt-3.5 flex flex-col gap-4">
-                    {group.bands.map((band) => (
-                        <Band key={band.level} band={band} struck={group.struck} />
-                    ))}
-                </div>
-            ) : (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {group.features.map((feature) => (
-                        <FeatureChip
-                            key={feature.key}
-                            fact={feature}
-                            tone={group.chip}
-                            struck={group.struck}
-                        />
-                    ))}
-                </div>
-            )}
-        </FactRow>
-    );
-}
-
-/**
- * One level of influence, and the picks the car is missing at that level.
- *
- * The heading says the level in the picker's own words and the "i" beside it
- * says what the level actually does to the result — which is the question a
- * reader has at exactly this moment, having just been told the car misses
- * something they called highly influential. The chips take the level's colour,
- * so the three bands are told apart before they are read.
- */
-function Band({ band, struck }: { band: InfluenceBand; struck: boolean }) {
-    return (
-        <div data-band={band.level}>
-            <p
-                className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.1em] ${band.accent}`}
-            >
-                <span>
-                    {band.title} ({band.features.length})
-                </span>
-
-                <InfoTip subject={band.title}>{band.meaning}</InfoTip>
-            </p>
-
-            <div className="mt-2 flex flex-wrap gap-1.5">
-                {band.features.map((feature) => (
-                    <FeatureChip
-                        key={feature.key}
-                        fact={feature}
-                        tone={band.level}
-                        struck={struck}
-                        withLevel={false}
-                    />
-                ))}
-            </div>
-        </div>
-    );
-}
