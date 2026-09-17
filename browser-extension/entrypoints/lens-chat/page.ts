@@ -1,4 +1,10 @@
-import type { ChatToPage, PageChanged, PageContext } from "@/lib/lens-chat/messages";
+import type {
+    ChatHandshake,
+    ChatToPage,
+    PageChanged,
+    PageContext,
+    VerifyChat,
+} from "@/lib/lens-chat/messages";
 
 /**
  * The chat's side of the page bridge.
@@ -9,13 +15,57 @@ import type { ChatToPage, PageChanged, PageContext } from "@/lib/lens-chat/messa
  * opened outside finn.com while developing, degrades instead of throwing.
  */
 
-/** Set by the content script in the frame's URL; names this chat in broadcasts. */
-export const chatToken =
-    new URLSearchParams(window.location.hash.slice(1)).get("token") ?? "";
+/**
+ * The token this chat proves itself with, once the page has handed it over.
+ *
+ * Handed over by postMessage from the page this frame is in — but finn.com's
+ * own scripts share that origin and could post a token too. So every token
+ * offered is checked with the background script, which knows the one this
+ * tab's content script registered, and only a confirmed one is kept. A forged
+ * token can at most leave a forged frame unable to act; it can never give one
+ * the page.
+ */
+let confirmed: string | null = null;
+let resolveToken: (token: string) => void = () => {};
+const tokenReady = new Promise<string>((resolve) => {
+    resolveToken = resolve;
+});
 
-async function send<T>(message: ChatToPage): Promise<T | null> {
+window.addEventListener("message", (event: MessageEvent<ChatHandshake>) => {
+    if (confirmed || event.source !== window.parent) return;
+    if (event.origin !== "https://www.finn.com" || event.data?.source !== "finn-lens-chat") return;
+
+    const offered = event.data.token;
+    if (typeof offered !== "string") return;
+
+    void browser.runtime
+        .sendMessage({ type: "LENS_CHAT_VERIFY", token: offered } satisfies VerifyChat)
+        .then((valid) => {
+            if (valid && !confirmed) {
+                confirmed = offered;
+                resolveToken(offered);
+            }
+        })
+        .catch(() => {});
+});
+
+/** Waits briefly for the handshake; a chat opened anywhere else gets no page. */
+function withToken(): Promise<string | null> {
+    return Promise.race([
+        tokenReady,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ]);
+}
+
+type Request = ChatToPage extends infer M ? (M extends ChatToPage ? Omit<M, "token"> : never) : never;
+
+async function send<T>(message: Request): Promise<T | null> {
+    const token = await withToken();
+
+    if (!token) return null;
+
     try {
-        return ((await browser.runtime.sendMessage(message)) as T) ?? null;
+        return ((await browser.runtime.sendMessage({ ...message, token })) as T) ?? null;
     } catch (error) {
         if (import.meta.env.DEV) console.debug("[Lens chat] page request failed", message, error);
         return null;
@@ -36,7 +86,7 @@ export const requestClose = () => send<{ closed: boolean }>({ type: "LENS_CHAT_C
 /** Calls `handler` whenever this chat's page says it changed. */
 export function onPageChanged(handler: () => void): () => void {
     const listener = (message: PageChanged) => {
-        if (message?.type === "LENS_CHAT_PAGE_CHANGED" && message.token === chatToken) {
+        if (message?.type === "LENS_CHAT_PAGE_CHANGED" && confirmed && message.token === confirmed) {
             handler();
         }
     };

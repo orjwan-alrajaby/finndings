@@ -1,4 +1,4 @@
-import type { ChatToPage, PageContext, PageKind } from "@/lib/lens-chat/messages";
+import type { ChatHandshake, ChatToPage, PageContext, PageKind, RegisterChat } from "@/lib/lens-chat/messages";
 
 import { DETAILS_PAGE_SELECTOR, HOME_PAGE_SELECTOR, LISTINGS_PAGE_SELECTOR } from "../constants";
 import { brandMark, el, panelStyles } from "../lens-panel/dom";
@@ -38,8 +38,25 @@ let panel: HTMLElement | null = null;
 let bubbleLabel: HTMLElement | null = null;
 let isOpen = false;
 
-/** Identifies this page's chat frame in broadcasts, so other tabs ignore them. */
+/**
+ * The secret this page's chat frame proves itself with.
+ *
+ * Registered with the background script for this tab, and handed only to the
+ * frame this script creates — by a postMessage addressed to the extension's
+ * origin, which finn.com's scripts can neither read nor redirect. It lives in
+ * the content script's isolated world, never in the DOM.
+ */
 const token = crypto.randomUUID();
+
+let registered: Promise<unknown> | null = null;
+
+function register(): Promise<unknown> {
+    registered ??= browser.runtime
+        .sendMessage({ type: "LENS_CHAT_REGISTER", token } satisfies RegisterChat)
+        .catch((error: unknown) => console.error("[FinnLens] couldn't register Ask Lens", error));
+
+    return registered;
+}
 
 /* -------------------------------------------------------------------------- */
 /* What the page shows                                                        */
@@ -190,8 +207,13 @@ function listen(): void {
      * rather than by returning a promise: that is the form every Chromium
      * version honours without a polyfill.
      */
-    browser.runtime.onMessage.addListener((message: ChatToPage, _sender, sendResponse) => {
+    browser.runtime.onMessage.addListener((message: ChatToPage, sender, sendResponse) => {
         if (!message?.type?.startsWith("LENS_CHAT_") || message.type === ("LENS_CHAT_PAGE_CHANGED" as string)) {
+            return undefined;
+        }
+
+        /* Only ever relayed by this extension's background, and only with this page's token. */
+        if (sender.id !== browser.runtime.id || sender.tab || message.token !== token) {
             return undefined;
         }
 
@@ -233,14 +255,29 @@ function setOpen(next: boolean): void {
     isOpen = next;
 
     if (next && !frame) {
+        const src = browser.runtime.getURL("/lens-chat.html" as never) as string;
+
         frame = el("iframe", {
             class: "block h-full w-full border-0 bg-transparent",
-            attrs: {
-                src: `${browser.runtime.getURL("/lens-chat.html" as never)}#token=${token}`,
-                title: "Ask Lens",
-                allow: "",
-            },
+            attrs: { title: "Ask Lens", allow: "" },
         });
+
+        /*
+         * The token goes in only once registration has landed, and again on
+         * every load of the frame, addressed to the extension's origin so no
+         * other document can receive it.
+         */
+        const handshake = () => {
+            void register().then(() => {
+                frame?.contentWindow?.postMessage(
+                    { source: "finn-lens-chat", token } satisfies ChatHandshake,
+                    new URL(src).origin,
+                );
+            });
+        };
+
+        frame.addEventListener("load", handshake);
+        void register().then(() => frame?.setAttribute("src", src));
 
         panel.append(frame);
     }

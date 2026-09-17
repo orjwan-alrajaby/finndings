@@ -28,12 +28,19 @@ export interface PageContext {
     carUrls: Record<number, string>;
 }
 
-/** Sent by the chat, relayed by the background script to the tab's top frame. */
-export type ChatToPage =
+/**
+ * Sent by the chat, relayed by the background script to the tab's top frame.
+ *
+ * Every request carries the token the tab's content script registered. The
+ * chat page is web-accessible on finn.com, so FINN's own scripts could frame a
+ * copy of it; the token is what makes such a copy unable to act on the page.
+ */
+export type ChatToPage = { token: string } & (
     | { type: "LENS_CHAT_CONTEXT" }
     | { type: "LENS_CHAT_PIN"; carId: number; pinned: boolean }
     | { type: "LENS_CHAT_SHOW_CAR"; carId: number }
-    | { type: "LENS_CHAT_CLOSE" };
+    | { type: "LENS_CHAT_CLOSE" }
+);
 
 export const CHAT_TO_PAGE_TYPES = new Set<string>([
     "LENS_CHAT_CONTEXT",
@@ -41,6 +48,26 @@ export const CHAT_TO_PAGE_TYPES = new Set<string>([
     "LENS_CHAT_SHOW_CAR",
     "LENS_CHAT_CLOSE",
 ]);
+
+/** Content script → background: the token this tab's chat frame will present. */
+export interface RegisterChat {
+    type: "LENS_CHAT_REGISTER";
+    token: string;
+}
+
+/** Chat → background: is this the token my tab registered? */
+export interface VerifyChat {
+    type: "LENS_CHAT_VERIFY";
+    token: string;
+}
+
+/** Content script → its own chat frame, by postMessage to the extension's origin. */
+export interface ChatHandshake {
+    source: "finn-lens-chat";
+    token: string;
+}
+
+export const TOKENS_KEY = "lensChatTokens";
 
 /** Sent by the content script when what the page shows has changed. */
 export interface PageChanged {
