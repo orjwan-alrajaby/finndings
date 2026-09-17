@@ -486,6 +486,12 @@ export const FEATURES = {
     explanation:
       "The rear bench folds down in sections, so you can carry something long and still seat a passenger in the back.",
   },
+  hasHeatPump: {
+    article: "a",
+    label: "Heat pump",
+    explanation:
+      "Heats the cabin of an electric car more efficiently than a plain electric heater, so cold weather takes less of its range.",
+  },
   hasBackUSBPorts: {
     label: "Rear USB ports",
     explanation:

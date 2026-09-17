@@ -49,6 +49,8 @@ const FEATURE_KEYS = {
   hasParkingAssistant: "Parkassistent",
   hasParkingSensors: "Parksensoren",
   hasAuxiliaryHeater: "Standheizung",
+  /* Read for Ask Lens's evidence, not scored: on 49 of 728 cars, all electric. */
+  hasHeatPump: "Wärmepumpe",
   hasBlindSpotAssist: "Toter-Winkel-Assistent",
   hasRearCrosswalkWarning: "Verkehrsquerenwarnung hinten",
   hasThreeSixtyDegreesCamera: "360°-Kamera",
