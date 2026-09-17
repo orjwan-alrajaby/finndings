@@ -103,6 +103,7 @@ export function interpretSchema(vocabulary: LensVocabulary, scope?: Conversation
     return object({
         summary: { type: "string" },
         change: changeSchema(vocabulary),
+        reply: { type: "string" },
         ...scopeField(scope),
     });
 }
@@ -130,6 +131,10 @@ export function converseSchema(
     const said = { type: "string" };
 
     const understanding = object({
+        tension: {
+            type: "string",
+            description: "Where the choice between these cars will really be made, in one short sentence without numbers; empty if nothing pulls against anything.",
+        },
         budget: nullable(
             object({
                 kind: { type: "string", enum: ["hardMax", "target"] },
@@ -165,13 +170,20 @@ export function converseSchema(
             items: object({ label: { type: "string" }, said, lessRelevant: { type: "array", items: evidence } }),
         },
         droppedPriorities: { type: "array", items: { type: "string", enum: categories } },
-        notModelled: { type: "array", items: object({ said, explanation: { type: "string" } }) },
+        notModelled: {
+            type: "array",
+            items: object({
+                said,
+                stance: { type: "string", enum: ["wants", "doesntCare"] },
+                explanation: { type: "string" },
+            }),
+        },
         cleared: { type: "array", items: { type: "string", enum: ["budget", "rental", "monthlyKm"] } },
     });
 
     return object({
         kind: { type: "string", enum: ["understanding", "answer", "whatIf"] },
-        reply: { type: "string" },
+        /* Understanding before reply: the model works out the situation, then speaks. */
         understanding: nullable(understanding),
         question: nullable(
             object({
@@ -179,6 +191,7 @@ export function converseSchema(
                 why: { type: "string" },
                 options: { type: "array", items: { type: "string" } },
                 blocking: { type: "boolean" },
+                affects: { type: "array", items: evidence },
             }),
         ),
         ...scopeField(scope),

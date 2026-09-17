@@ -355,9 +355,15 @@ export function LensChat() {
                     ? result.scope
                     : null;
 
+            /*
+             * Before any comparison there are no facts to answer from, so an
+             * "answer" that carries an understanding is really one.
+             */
+            if (result.kind === "answer" && !current.run && result.understanding) result.kind = "understanding";
+
             if (result.kind === "answer" || !result.understanding) {
                 say(result.reply);
-                setOpenQuestion(readQuestion(result.question, answered.current) ?? (result.kind === "answer" ? current.openQuestion : null));
+                setOpenQuestion(readQuestion(result.question, answered.current, current.scopes[current.kind].cars) ?? (result.kind === "answer" ? current.openQuestion : null));
                 if (suggested) switchScope(suggested);
                 return;
             }
@@ -380,7 +386,7 @@ export function LensChat() {
                 readUnderstanding(result.understanding, current.understanding, enabledIds),
                 said,
             );
-            const question = readQuestion(result.question, answered.current);
+            const question = readQuestion(result.question, answered.current, current.scopes[current.kind].cars);
 
             setUnderstanding(next);
             setOpenQuestion(question);

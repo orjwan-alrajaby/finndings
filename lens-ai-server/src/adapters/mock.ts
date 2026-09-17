@@ -275,6 +275,7 @@ function converseMock(request: ConverseRequest): ConverseResult {
         ...previous,
         budget,
         needs,
+        tension: previous.tension ?? "",
         notModelled: [
             ...previous.notModelled,
             ...(/\b(red|blue|colou?r)\b/i.test(text) ? [{ said: "colour", explanation: "Lens doesn't use a car's colour." }] : []),
@@ -286,7 +287,7 @@ function converseMock(request: ConverseRequest): ConverseResult {
     const agesKnown = request.answered.some((item) => /old/i.test(item.question)) || /\b\d+\s*(and|&)\s*\d+\b|\byears?\b/i.test(text);
     const question =
         /\byoung\b/i.test(text) && !agesKnown
-            ? { ask: "How old are your children?", why: "if either still uses a child seat, ISOFIX matters", options: ["Under 4", "4–12", "Older"], blocking: true }
+            ? { ask: "How old are your children?", why: "if either still uses a child seat, ISOFIX matters", options: ["Under 4", "4–12", "Older"], blocking: true, affects: ["hasIsofix"] }
             : null;
 
     return {

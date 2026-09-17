@@ -39,6 +39,7 @@ const wire = (overrides: Partial<WireUnderstanding>): WireUnderstanding => ({
     context: [],
     capabilities: [],
     droppedPriorities: [],
+    tension: "",
     notModelled: [],
     cleared: [],
     ...overrides,
@@ -132,6 +133,20 @@ describe("reading an understanding", () => {
         expect(readUnderstanding(wire({ cleared: ["budget"] }), second).budget).toBeNull();
     });
 
+    it("keeps what they want and Lens can't check, not what they don't care about", () => {
+        const u = readUnderstanding(
+            wire({
+                notModelled: [
+                    { said: "a fast car", stance: "doesntCare", explanation: "Lens doesn't consider speed." },
+                    { said: "feels luxurious", stance: "wants", explanation: "Lens has no measure of luxury." },
+                ],
+            }),
+            EMPTY_UNDERSTANDING,
+        );
+
+        expect(u.notModelled.map((item) => item.said)).toEqual(["feels luxurious"]);
+    });
+
     it("refuses constraints that don't make sense", () => {
         const u = readUnderstanding(
             wire({
@@ -150,6 +165,20 @@ describe("reading an understanding", () => {
 
         expect(readQuestion({ ask: "How old are your children?", why: "", options: [], blocking: true }, answered)).toBeNull();
         expect(readQuestion({ ask: "What part of driving makes you most nervous?", why: "", options: ["Parking"], blocking: false }, answered)?.options).toEqual(["Parking"]);
+    });
+
+    it("doesn't ask what no answer could change: evidence every car here has", () => {
+        const cars = [
+            garageCar({ id: 1, extra: ["hasIsofix"] }),
+            garageCar({ id: 2, extra: ["hasIsofix", "hasBlindSpotAssist"] }),
+            garageCar({ id: 3, extra: ["hasIsofix"] }),
+        ];
+        const ages = { ask: "How old is your child?", why: "", options: [], blocking: false, affects: ["hasIsofix"] };
+        const nerves = { ask: "What makes you nervous?", why: "", options: [], blocking: false, affects: ["hasIsofix", "hasBlindSpotAssist"] };
+
+        expect(readQuestion(ages, [], cars)).toBeNull();
+        expect(readQuestion(nerves, [], cars)?.ask).toBe("What makes you nervous?");
+        expect(readQuestion({ ...ages, affects: [] }, [], cars)?.ask).toBe("How old is your child?");
     });
 });
 

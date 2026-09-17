@@ -240,7 +240,10 @@ export interface WireUnderstanding {
     /** Priorities they said they don't care about. */
     droppedPriorities: string[];
     /** Things they said that Lens can't use, and why. */
-    notModelled: { said: string; explanation: string }[];
+    /** Where the choice will really be made, when needs pull against each other. Empty otherwise. */
+    tension: string;
+    /** "doesntCare" items are read and discarded: nothing to set aside when Lens never weighed it. */
+    notModelled: { said: string; stance?: "wants" | "doesntCare"; explanation: string }[];
     /** What they explicitly withdrew this turn, so it isn't carried over: "budget", "rental", "monthlyKm". */
     cleared: string[];
 }
@@ -253,6 +256,8 @@ export interface WireQuestion {
     options: string[];
     /** True when comparing before the answer would likely give the wrong recommendation. */
     blocking: boolean;
+    /** Evidence ids whose use depends on the answer; empty when it bears on something else. */
+    affects: string[];
 }
 
 export interface ConverseRequest {

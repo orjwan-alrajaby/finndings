@@ -146,7 +146,26 @@ export function UnderstandingCard({
 }) {
     const [showWeights, setShowWeights] = useState(false);
 
-    if (status === "superseded") return null;
+    /*
+     * A newer understanding replaced this one, but what Lens said and asked
+     * stays in the conversation — the answer below it has to read as an
+     * answer to something.
+     */
+    if (status === "superseded") {
+        if (!reply && !question) return null;
+
+        return (
+            <section className="rounded-[22px] bg-finn-pale-blue/60 px-4 py-3">
+                {reply && <p className="text-sm leading-6 text-finn-black">{reply}</p>}
+                {question && (
+                    <p className={`${reply ? "mt-1.5" : ""} flex gap-1.5 text-sm font-black text-finn-black`}>
+                        <ShieldQuestion aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 text-finn-accent-blue" />
+                        {question.ask}
+                    </p>
+                )}
+            </section>
+        );
+    }
 
     const active = u.needs.filter((need) => need.status === "active");
     const dropped = u.needs.filter((need) => need.status === "dropped");
@@ -159,6 +178,15 @@ export function UnderstandingCard({
             <div className="px-4 pt-4">
                 <Eyebrow>{isUpdate ? "What I understand now" : "Here's what I understood"}</Eyebrow>
                 {reply && <p className="mt-1.5 text-sm font-semibold leading-6 text-finn-black">{reply}</p>}
+                {u.tension && (
+                    <p className="mt-2 flex gap-1.5 rounded-2xl bg-finn-warning/10 px-3 py-2 text-xs leading-5 text-finn-black">
+                        <Scale aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-finn-warning-deep" />
+                        <span>
+                            <span className="font-black">Where the choice will be made: </span>
+                            {u.tension.charAt(0).toLowerCase() + u.tension.slice(1)}
+                        </span>
+                    </p>
+                )}
             </div>
 
             {(u.budget || u.rental) && (

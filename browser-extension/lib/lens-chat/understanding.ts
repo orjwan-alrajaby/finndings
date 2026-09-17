@@ -14,7 +14,12 @@ import type {
 } from "@/lib/lens-ai/contract";
 
 import type { Answers } from "@/entrypoints/compare/store";
-import { EVIDENCE, isEvidenceId, type EvidenceId } from "./evidence";
+import type { FinnCar } from "@/lib/types";
+
+import { coverage, EVIDENCE, isEvidenceId, type EvidenceId } from "./evidence";
+
+/** Evidence on at least this share of the cars in scope can't tell them apart. */
+const UNIVERSAL_SHARE = 0.9;
 
 /**
  * A person's situation, as Lens can use it.
@@ -47,6 +52,8 @@ export interface Understanding {
     context: { label: string; said: string }[];
     capabilities: { label: string; said: string; lessRelevant: EvidenceId[] }[];
     droppedPriorities: CategoryId[];
+    /** Where the choice will really be made, in the reader's terms. */
+    tension: string;
     notModelled: { said: string; explanation: string }[];
 }
 
@@ -58,6 +65,7 @@ export const EMPTY_UNDERSTANDING: Understanding = {
     context: [],
     capabilities: [],
     droppedPriorities: [],
+    tension: "",
     notModelled: [],
 };
 
@@ -222,7 +230,9 @@ export function readUnderstanding(
     const wanted = new Set(needs.filter((need) => need.status === "active").flatMap((need) => need.priorities));
 
     const notModelled = [
-        ...listOf<{ said: string; explanation: string }>(wire.notModelled)
+        ...listOf<{ said: string; stance?: string; explanation: string }>(wire.notModelled)
+            /* Saying you don't care about speed isn't a wish Lens has to decline. */
+            .filter((item) => item?.stance !== "doesntCare")
             .map((item) => ({ said: text(item?.said, 120), explanation: text(item?.explanation, 220) }))
             .filter((item) => item.said && item.explanation),
         ...previous.notModelled,
@@ -237,6 +247,7 @@ export function readUnderstanding(
         context: context.slice(0, 8),
         capabilities: capabilities.slice(0, 5),
         droppedPriorities: droppedPriorities.filter((id) => !wanted.has(id)),
+        tension: typeof wire.tension === "string" ? text(wire.tension, 200) : previous.tension,
         notModelled,
     };
 }
@@ -245,6 +256,7 @@ export function readUnderstanding(
 export function readQuestion(
     raw: unknown,
     answered: { question: string; answer: string }[],
+    cars: FinnCar[] = [],
 ): WireQuestion | null {
     const wire = raw as Partial<WireQuestion> | null;
     const ask = text(wire?.ask, 160);
@@ -255,6 +267,22 @@ export function readQuestion(
 
     if (answered.some((item) => normalise(item.question) === normalise(ask))) return null;
 
+    const affects = (Array.isArray(wire?.affects) ? wire.affects : []).filter(isEvidenceId);
+
+    /*
+     * A question is only worth the reader's time if its answer could separate
+     * the cars. When everything it would change is listed on nearly every car
+     * here — ISOFIX on 22 of 24 — any answer leads to the same comparison.
+     */
+    if (affects.length && cars.length >= 2) {
+        const separates = affects.some((id) => {
+            const { listed, total } = coverage(cars, id);
+            return listed / total < UNIVERSAL_SHARE;
+        });
+
+        if (!separates) return null;
+    }
+
     return {
         ask,
         why: text(wire?.why, 200),
@@ -263,6 +291,7 @@ export function readQuestion(
             .filter(Boolean)
             .slice(0, 4),
         blocking: Boolean(wire?.blocking),
+        affects,
     };
 }
 
@@ -310,6 +339,7 @@ export function groundInWhatWasSaid(
         reply: kept || (sentences.length ? "Here's what I took from that." : reply),
         understanding: {
             ...u,
+            tension: grounded(u.tension) ? u.tension : "",
             context: u.context.filter((item) => grounded(item.label) && grounded(item.said)),
             needs: u.needs.map((need) => (grounded(need.said) ? need : { ...need, said: "" })),
         },
