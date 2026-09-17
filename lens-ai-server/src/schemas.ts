@@ -45,6 +45,14 @@ function changeSchema(vocabulary: LensVocabulary) {
                 reason,
             }),
         }),
+        removePriorities: {
+            type: "array",
+            description: "Only priorities the reader explicitly said don't matter to them.",
+            items: object({
+                category: { type: "string", enum: categories },
+                reason,
+            }),
+        },
         raise: {
             type: "array",
             items: object({

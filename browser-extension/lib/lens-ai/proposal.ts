@@ -133,13 +133,31 @@ export function validateChange(
 
     /* -- Priority order ------------------------------------------------ */
 
+    /*
+     * Removals are only what the reader explicitly let go of. Mentioning some
+     * concerns and not others is not a removal: the reader's other current
+     * priorities follow the mentioned ones, in their existing order. That is
+     * what stops "my partner hates big cars" quietly un-ranking Comfort.
+     */
+    const removed = new Set<CategoryId>();
+    const removalReasons = new Map<CategoryId, string>();
+
+    for (const entry of Array.isArray(change.removePriorities) ? change.removePriorities : []) {
+        if (isCategory(entry?.category, enabled)) {
+            removed.add(entry.category);
+            removalReasons.set(entry.category, text(entry.reason));
+        } else {
+            ignored.push(`Removing a priority called "${text(entry?.category, 40)}", which isn't one of Lens's priorities.`);
+        }
+    }
+
     let priorities: ValidatedChange["priorities"] = null;
 
-    if (Array.isArray(change.priorityOrder)) {
+    if (Array.isArray(change.priorityOrder) || removed.size) {
         const seen = new Set<CategoryId>();
         const valid: { id: CategoryId; reason: string | null; kept: boolean }[] = [];
 
-        for (const entry of change.priorityOrder) {
+        for (const entry of Array.isArray(change.priorityOrder) ? change.priorityOrder : []) {
             const id = entry?.category;
 
             if (!isCategory(id, enabled)) {
@@ -149,7 +167,7 @@ export function validateChange(
                 continue;
             }
 
-            if (seen.has(id)) continue;
+            if (seen.has(id) || removed.has(id)) continue;
             seen.add(id);
 
             if (valid.length >= MAX_PRIORITIES) {
@@ -162,19 +180,43 @@ export function validateChange(
             valid.push({ id, reason: text(entry.reason) || null, kept: false });
         }
 
-        /*
-         * Too few to rank on: fill from the order the reader already has,
-         * in its own sequence, and say those were kept rather than chosen.
-         */
-        for (const id of [...baseOrder, ...CATEGORY_IDS]) {
-            if (valid.length >= MIN_PRIORITIES) break;
-            if (seen.has(id) || !enabled.includes(id)) continue;
+        /* The reader's own order follows, minus what they let go of. */
+        for (const id of baseOrder) {
+            if (valid.length >= MAX_PRIORITIES) break;
+            if (seen.has(id) || removed.has(id) || !enabled.includes(id)) continue;
 
             seen.add(id);
             valid.push({ id, reason: null, kept: true });
         }
 
-        priorities = valid.length ? valid : null;
+        /*
+         * Lens ranks at least three. A removal that would leave fewer is
+         * undone, most important first, and said; only then is the order
+         * topped up from the rest of Lens's priorities.
+         */
+        for (const id of baseOrder) {
+            if (valid.length >= MIN_PRIORITIES) break;
+            if (!removed.has(id) || seen.has(id)) continue;
+
+            seen.add(id);
+            removed.delete(id);
+            valid.push({ id, reason: null, kept: true });
+            ignored.push(
+                `Removing ${CATEGORIES[id].label}: Lens ranks at least ${MIN_PRIORITIES} priorities, so it stays.`,
+            );
+        }
+
+        for (const id of CATEGORY_IDS) {
+            if (valid.length >= MIN_PRIORITIES) break;
+            if (seen.has(id) || removed.has(id) || !enabled.includes(id)) continue;
+
+            seen.add(id);
+            valid.push({ id, reason: null, kept: false });
+        }
+
+        const unchanged = valid.map((item) => item.id).join() === baseOrder.join();
+
+        priorities = valid.length && !(unchanged && !profile && !Array.isArray(change.priorityOrder)) ? valid : null;
     }
 
     /* -- Raised features ----------------------------------------------- */

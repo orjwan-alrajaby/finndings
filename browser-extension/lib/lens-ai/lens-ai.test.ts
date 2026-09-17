@@ -44,6 +44,7 @@ const answers = (overrides: Partial<Answers> = {}): Answers => ({
 const change = (overrides: Partial<ProposedChange>): ProposedChange => ({
     startFromProfile: null,
     priorityOrder: null,
+    removePriorities: [],
     raise: [],
     budget: null,
     budgetWithoutFigure: null,
@@ -82,11 +83,13 @@ describe("validateChange", () => {
             "safetyAssistance",
             "climateSuitability",
             "longDistance",
+            "practicality",
+            "comfort",
         ]);
         expect(result.ignored.join(" ")).toMatch(/familyFriendly/);
     });
 
-    it("fills a short order from the reader's own, marked as kept", () => {
+    it("puts what the reader mentioned first and keeps the rest of their order after it", () => {
         const result = validateChange(
             change({ priorityOrder: [{ category: "longDistance", reason: "road trips" }] }),
             answers(),
@@ -96,7 +99,38 @@ describe("validateChange", () => {
             { id: "longDistance", reason: "road trips", kept: false },
             { id: "safetyAssistance", reason: null, kept: true },
             { id: "practicality", reason: null, kept: true },
+            { id: "comfort", reason: null, kept: true },
+            { id: "cityParking", reason: null, kept: true },
         ]);
+    });
+
+    it("removes only what the reader let go of", () => {
+        const before = answers();
+        const result = validateChange(
+            change({ removePriorities: [{ category: "comfort", reason: "you don't care about comfort" }] }),
+            before,
+        );
+
+        expect(result.priorities?.map((item) => item.id)).toEqual([
+            "safetyAssistance",
+            "practicality",
+            "cityParking",
+            "environmental",
+        ]);
+        expect(describeChange(before, applyChange(before, result), result).dropped.map((item) => item.id)).toEqual([
+            "comfort",
+        ]);
+    });
+
+    it("won't remove below three priorities, and says so", () => {
+        const three = answers({ priorities: ["safetyAssistance", "practicality", "comfort"] });
+        const result = validateChange(
+            change({ removePriorities: [{ category: "comfort", reason: "" }] }),
+            three,
+        );
+
+        expect(result.priorities).toBeNull();
+        expect(result.ignored.join(" ")).toMatch(/at least 3 priorities/);
     });
 
     it("never ranks more than five, or a priority switched off", () => {
@@ -223,6 +257,10 @@ describe("applyChange and describeChange", () => {
                     { category: "comfort", reason: "long days in the car" },
                     { category: "safetyAssistance", reason: "" },
                     { category: "practicality", reason: "" },
+                ],
+                removePriorities: [
+                    { category: "cityParking", reason: "you don't mind parking" },
+                    { category: "environmental", reason: "emissions don't matter to you" },
                 ],
                 raise: [
                     { category: "comfort", feature: "hasElectricFrontSeatAdjustment", importance: "high", reason: "a bad back" },

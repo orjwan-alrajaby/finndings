@@ -78,8 +78,14 @@ export type ProposedImportance = "high" | "medium" | "low" | "standard";
 export interface ProposedChange {
     /** Start from a profile's order and emphasis, before the edits below. */
     startFromProfile: string | null;
-    /** The complete new order, most important first. Null leaves it alone. */
+    /**
+     * The priorities the reader's words put first, most important first. Lens
+     * keeps their other current priorities after these. Null leaves the order
+     * alone.
+     */
     priorityOrder: { category: string; reason: string }[] | null;
+    /** Priorities the reader explicitly said no longer matter to them. */
+    removePriorities: { category: string; reason: string }[];
     /** Features to raise, re-level, or put back to standard. */
     raise: {
         category: string;

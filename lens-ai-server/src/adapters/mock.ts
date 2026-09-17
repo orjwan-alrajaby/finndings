@@ -75,6 +75,7 @@ function emptyChange(): ProposedChange {
     return {
         startFromProfile: null,
         priorityOrder: null,
+        removePriorities: [],
         raise: [],
         budget: null,
         budgetWithoutFigure: null,
