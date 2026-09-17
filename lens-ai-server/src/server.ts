@@ -4,7 +4,7 @@ import type {
     AskRequest,
     InterpretRequest,
 } from "../../browser-extension/lib/lens-ai/contract.ts";
-import { createGeminiAdapter } from "./adapters/gemini.ts";
+import { createGeminiAdapter, FREE_TIER_MODELS } from "./adapters/gemini.ts";
 import { createMockAdapter } from "./adapters/mock.ts";
 import { AdapterError, type LensAiAdapter } from "./adapters/types.ts";
 import { log } from "./log.ts";
@@ -21,8 +21,8 @@ import { log } from "./log.ts";
  * Environment:
  *   GEMINI_API_KEY           a free key from https://aistudio.google.com/apikey
  *   LENS_AI_PROVIDER         "gemini" | "mock"  (default: gemini if a key is set, else mock)
- *   LENS_AI_MODEL            default gemini-3.8-flash
- *   LENS_AI_FALLBACK_MODEL   tried when the first is overloaded or rate limited; default gemini-2.5-flash, "none" to disable
+ *   LENS_AI_MODELS           comma-separated, tried in order; default every free-tier flash model
+ *   LENS_AI_MODEL            shorthand for a single model (no fallbacks)
  *   LENS_AI_PORT / HOST      default 8787 on 127.0.0.1
  *   LENS_AI_ALLOWED_ORIGINS  comma-separated exact origins; default any chrome-/moz-extension origin
  *   LENS_AI_DEBUG=1          log raw model output
@@ -55,13 +55,14 @@ function chooseAdapter(): LensAiAdapter {
             throw new Error("LENS_AI_PROVIDER is gemini but GEMINI_API_KEY isn't set. Get a free key at https://aistudio.google.com/apikey");
         }
 
+        const models = (process.env.LENS_AI_MODELS ?? process.env.LENS_AI_MODEL ?? "")
+            .split(",")
+            .map((model) => model.trim())
+            .filter(Boolean);
+
         return createGeminiAdapter({
             apiKey,
-            model: process.env.LENS_AI_MODEL ?? "gemini-3.8-flash",
-            fallbackModel:
-                process.env.LENS_AI_FALLBACK_MODEL === "none"
-                    ? null
-                    : (process.env.LENS_AI_FALLBACK_MODEL ?? "gemini-2.5-flash"),
+            models: models.length ? models : FREE_TIER_MODELS,
         });
     }
 
@@ -164,7 +165,7 @@ const server = createServer(async (req, res) => {
         return send(res, 200, { ok: true, provider: adapter.name, model: adapter.model });
     }
 
-    const routes: Record<string, (body: unknown) => Promise<unknown>> = {
+    const routes: Record<string, (body: unknown) => Promise<{ result: unknown; model: string | null }>> = {
         "/v1/interpret": (body) => adapter.interpret(checkInterpret(body)),
         "/v1/ask": (body) => adapter.ask(checkAsk(body)),
     };
@@ -176,13 +177,13 @@ const server = createServer(async (req, res) => {
     const started = performance.now();
 
     try {
-        const result = await handler(await readJson(req));
+        const { result, model } = await handler(await readJson(req));
         const ms = Math.round(performance.now() - started);
 
-        log.info(`✓ ${req.url} ${adapter.name} ${ms}ms`);
+        log.info(`✓ ${req.url} ${adapter.name}${model ? ` ${model}` : ""} ${ms}ms`);
         log.debug(req.url!, "result", result);
 
-        return send(res, 200, { ok: true, result, provider: adapter.name, model: adapter.model, ms });
+        return send(res, 200, { ok: true, result, provider: adapter.name, model, ms });
     } catch (error) {
         const ms = Math.round(performance.now() - started);
 

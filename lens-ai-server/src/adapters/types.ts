@@ -14,9 +14,16 @@ import type {
  */
 export interface LensAiAdapter {
     readonly name: string;
+    /** The model tried first, for the health check. */
     readonly model: string | null;
-    interpret(request: InterpretRequest): Promise<InterpretResult>;
-    ask(request: AskRequest): Promise<AskResult>;
+    interpret(request: InterpretRequest): Promise<Answered<InterpretResult>>;
+    ask(request: AskRequest): Promise<Answered<AskResult>>;
+}
+
+/** A result, and which model actually produced it — not always the first. */
+export interface Answered<T> {
+    result: T;
+    model: string | null;
 }
 
 /** A failure worth showing the reader in one sentence. */

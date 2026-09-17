@@ -79,8 +79,6 @@ type Entry = { id: number } & (
           run: LensRun;
           /** What the reader had said when they asked, so the card can't drift. */
           story: { toldMe: string[]; understood: string | null };
-          /** A model's one-line bridge: null while it loads, undefined when there's none. */
-          inShort?: string | null;
       }
     | { kind: "compare"; run: LensRun }
     | {
@@ -345,34 +343,21 @@ export function LensChat() {
 
     /* -- Asking -------------------------------------------------------------- */
 
+    /*
+     * Built from the engine alone, and deliberately without a model: the
+     * card already connects what the reader said to what Lens weighed and
+     * what the car did, and on the free tier every model call is one of a
+     * handful a day. A reader who wants it in other words can ask.
+     */
     const showWhy = useCallback(
         (target: LensRun) => {
-            const id = push({
+            push({
                 kind: "why",
                 run: target,
                 story: { toldMe: [...story.current.toldMe], understood: story.current.understood },
-                inShort: aiReady ? null : undefined,
-            });
-
-            if (!aiReady || !latest.current.answers) return;
-
-            void ask({
-                question:
-                    "In one or two short sentences, connect what I told Lens to why this car is my match, quoting only the facts.",
-                vocabulary: latest.current.vocabulary,
-                current: describeCurrent(target.answers),
-                facts: buildLensFacts(target.recommendation, target.narrative),
-                history: story.current.toldMe.map((said) => ({ question: "What the reader told Lens", answer: said })),
-                scope: conversationScope(target.scope, latest.current.scopes),
-            }).then((response) => {
-                update(id, (entry) =>
-                    entry.kind === "why"
-                        ? { ...entry, inShort: response.ok && response.result.kind === "answer" ? response.result.answer : undefined }
-                        : entry,
-                );
             });
         },
-        [aiReady, push, update],
+        [push],
     );
 
     const askLens = useCallback(
@@ -878,7 +863,7 @@ function EntryView({
             );
 
         case "why":
-            return <WhyCard why={explainWhy(entry.run, entry.story)} inShort={entry.inShort} />;
+            return <WhyCard why={explainWhy(entry.run, entry.story)} />;
 
         case "compare":
             return <CompareCard rows={compareRows(entry.run)} headline={entry.run.scopeHeadline} actions={actions} />;

@@ -9,38 +9,73 @@ import type {
 import { ASK_INSTRUCTIONS, INTERPRET_INSTRUCTIONS } from "../prompts.ts";
 import { askSchema, interpretSchema } from "../schemas.ts";
 import { log } from "../log.ts";
-import { AdapterError, type LensAiAdapter } from "./types.ts";
+import { AdapterError, type Answered, type LensAiAdapter } from "./types.ts";
 
 /**
  * Gemini, through Google's official SDK, with JSON-schema structured output.
  *
  * Chosen because the Gemini API has a free tier (a key from Google AI Studio,
- * no card). The free tier's condition is that Google may use the content to
- * improve its products — which here means the reader's own words and the
- * facts about their shortlist. Fine for an experiment; worth knowing.
+ * no card). Its conditions shape this file more than anything else:
+ *
+ * - **Quotas are small and per model** — on a new key, 20 requests a day for
+ *   each. So the adapter holds a list of models and moves down it when one is
+ *   out of quota, overloaded or not offered to the key, and remembers which
+ *   ones are out so a spent model costs no round trip until its window ends.
+ * - **Content may be used to improve Google's products** — here, the reader's
+ *   own words and the facts about their shortlist. Fine for an experiment;
+ *   worth knowing.
  *
  * Both calls send fixed instructions, then Lens's vocabulary, then (for
  * questions) the facts, all as the system instruction; only the reader's words
- * go in the user turn. Gemini caches repeated prefixes implicitly, so asking
- * several questions about one recommendation reuses the facts without any
- * cache markers here.
+ * go in the user turn. Gemini caches repeated prefixes implicitly.
  */
+
+/** Models the free tier offers new keys, best first. Each has its own quota. */
+export const FREE_TIER_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+];
+
+/** Worth trying the next model for: out of quota, overloaded, or not offered to this key. */
+const MOVE_ON = new Set([429, 503, 404]);
+
 export function createGeminiAdapter({
     apiKey,
-    model,
-    fallbackModel,
+    models,
 }: {
     apiKey: string;
-    model: string;
-    /**
-     * Tried when `model` is overloaded (503) or out of free-tier quota (429).
-     * Free-tier quotas are per model, so a second model is often still open.
-     */
-    fallbackModel: string | null;
+    models: string[];
 }): LensAiAdapter {
-    const models = [model, ...(fallbackModel && fallbackModel !== model ? [fallbackModel] : [])];
-
     const client = new GoogleGenAI({ apiKey });
+
+    /** When each spent model is worth asking again. */
+    const restingUntil = new Map<string, number>();
+
+    function rest(model: string, error: ApiError): void {
+        const message = error.message ?? "";
+
+        if (error.status === 404) {
+            /* Not offered to this key: no point asking again this run. */
+            restingUntil.set(model, Number.POSITIVE_INFINITY);
+        } else if (error.status === 429) {
+            const retry = Number(message.match(/"retryDelay":"(\d+)s"/)?.[1] ?? 60);
+            const daily = /PerDay/i.test(message);
+
+            /* A daily quota resets on Google's clock; an hour is a cheap, safe guess. */
+            restingUntil.set(model, Date.now() + (daily ? 60 * 60_000 : retry * 1000));
+        }
+    }
+
+    const awake = () => {
+        const now = Date.now();
+        const available = models.filter((model) => (restingUntil.get(model) ?? 0) <= now);
+
+        /* Every model resting: try the first anyway rather than refuse outright. */
+        return available.length ? available : models.slice(0, 1);
+    };
 
     async function structured<T>({
         route,
@@ -52,12 +87,14 @@ export function createGeminiAdapter({
         system: string[];
         schema: Record<string, unknown>;
         user: string;
-    }): Promise<T> {
+    }): Promise<Answered<T>> {
+        const candidates = awake();
         let response;
-        let served = model;
+        let served = candidates[0]!;
+        let dailyQuota = false;
 
         try {
-            for (const [index, candidate] of models.entries()) {
+            for (const [index, candidate] of candidates.entries()) {
                 try {
                     served = candidate;
                     response = await client.models.generateContent({
@@ -71,12 +108,14 @@ export function createGeminiAdapter({
                     });
                     break;
                 } catch (error) {
-                    const retryable =
-                        error instanceof ApiError && (error.status === 503 || error.status === 429);
+                    if (!(error instanceof ApiError) || !MOVE_ON.has(error.status)) throw error;
 
-                    if (!retryable || index === models.length - 1) throw error;
+                    rest(candidate, error);
+                    dailyQuota ||= error.status === 429 && /PerDay/i.test(error.message ?? "");
 
-                    log.info(`· ${route} ${candidate} returned ${(error as ApiError).status}, trying ${models[index + 1]}`);
+                    if (index === candidates.length - 1) throw error;
+
+                    log.info(`· ${route} ${candidate} returned ${error.status}, trying ${candidates[index + 1]}`);
                 }
             }
         } catch (error) {
@@ -85,18 +124,17 @@ export function createGeminiAdapter({
 
                 if (error.status === 429) {
                     throw new AdapterError(
-                        "Lens AI has hit the free tier's rate limit — wait a minute and try again.",
+                        dailyQuota
+                            ? "Lens AI has used today's free Gemini requests. They reset daily — everything else in Lens still works."
+                            : "Lens AI has hit the free tier's rate limit — wait a minute and try again.",
                         429,
                     );
                 }
-                if (error.status === 400 && /api key/i.test(error.message)) {
-                    throw new AdapterError("The Lens AI server's Gemini API key was rejected.", 500);
-                }
-                if (error.status === 401 || error.status === 403) {
+                if ((error.status === 400 && /api key/i.test(error.message)) || error.status === 401 || error.status === 403) {
                     throw new AdapterError("The Lens AI server's Gemini API key was rejected.", 500);
                 }
                 if (error.status === 404) {
-                    throw new AdapterError(`The model "${served}" isn't available to this key.`, 500);
+                    throw new AdapterError("None of Lens AI's Gemini models are available to this key.", 500);
                 }
                 if (error.status === 400) {
                     throw new AdapterError("The model rejected the request.", 502);
@@ -133,21 +171,21 @@ export function createGeminiAdapter({
         log.debug(route, "raw output", text);
 
         try {
-            return JSON.parse(text) as T;
+            return { result: JSON.parse(text) as T, model: served };
         } catch {
             throw new AdapterError("The model's answer wasn't readable.", 502);
         }
     }
 
-    const scopeBlock = (request: InterpretRequest | AskRequest) =>
-        request.scope ? `SCOPE\n${JSON.stringify(request.scope)}\n\n` : "";
-
     const vocabularyBlock = (request: InterpretRequest | AskRequest) =>
         `LENS_VOCABULARY\n${JSON.stringify(request.vocabulary)}`;
 
+    const scopeBlock = (request: InterpretRequest | AskRequest) =>
+        request.scope ? `SCOPE\n${JSON.stringify(request.scope)}\n\n` : "";
+
     return {
         name: "gemini",
-        model,
+        model: models[0] ?? null,
 
         interpret(request) {
             return structured<InterpretResult>({

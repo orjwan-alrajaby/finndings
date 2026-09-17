@@ -241,11 +241,11 @@ export function createMockAdapter(): LensAiAdapter {
         model: null,
         async interpret(request: InterpretRequest) {
             await pause();
-            return interpretText(request.text);
+            return { result: interpretText(request.text), model: null };
         },
         async ask(request: AskRequest) {
             await pause();
-            return askQuestion(request);
+            return { result: askQuestion(request), model: null };
         },
     };
 }

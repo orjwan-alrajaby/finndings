@@ -244,15 +244,12 @@ function WhySection({ label, children }: { label: string; children: ReactNode })
     );
 }
 
-export function WhyCard({ why, inShort }: { why: WhyExplanation; inShort: string | null | undefined }) {
+export function WhyCard({ why }: { why: WhyExplanation }) {
     return (
         <section className="overflow-hidden rounded-[22px] bg-white ring-1 ring-finn-cotton">
             <div className="bg-finn-pale-blue px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-finn-accent-blue">Why this car</p>
                 <h3 className="mt-0.5 text-sm font-black text-finn-black">{why.carName}</h3>
-                {inShort === undefined ? null : inShort ? (
-                    <p className="mt-1 text-xs leading-5 text-finn-black">{inShort}</p>
-                ) : null}
             </div>
 
             <WhySection label="You told me">

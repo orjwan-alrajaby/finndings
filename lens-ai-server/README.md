@@ -68,8 +68,8 @@ this car?", comparisons and pinning.
 |---|---|---|
 | `GEMINI_API_KEY` | — | Free from [Google AI Studio](https://aistudio.google.com/apikey), no card. Server-side only. |
 | `LENS_AI_PROVIDER` | `gemini` if a key is set, else `mock` | |
-| `LENS_AI_MODEL` | `gemini-3.8-flash` | |
-| `LENS_AI_FALLBACK_MODEL` | `gemini-2.5-flash` | Used when the first model is overloaded (503) or out of quota (429). `none` disables it. |
+| `LENS_AI_MODELS` | every free-tier flash model, newest first | Comma-separated, tried in order. Each free model has its own daily quota, so the list is what keeps Lens answering after one runs out. |
+| `LENS_AI_MODEL` | — | A single model and no fallbacks. |
 | `LENS_AI_PORT` / `LENS_AI_HOST` | `8787` / `127.0.0.1` | |
 | `LENS_AI_ALLOWED_ORIGINS` | any `chrome-extension://` / `moz-extension://` | Set to your extension's exact origin to lock it down. |
 | `LENS_AI_DEBUG` | off | `1` logs raw model output. |
@@ -81,8 +81,13 @@ The extension reads `WXT_LENS_AI_URL` if the server lives elsewhere.
 - Google may use free-tier prompts and responses to improve its products. Here
   that means what the reader types and the facts about their pinned cars.
   Don't put anything in it you wouldn't want read.
-- Limits are per key and shown in [AI Studio](https://aistudio.google.com/rate-limit).
-  A `429` surfaces in Lens as "hit the free tier's rate limit — wait a minute".
+- Quotas are small and per model — on a new key, 20 requests a day for each
+  (see [AI Studio](https://aistudio.google.com/rate-limit)). The server moves
+  down its model list when one is out, overloaded or not offered to the key,
+  and skips a spent model until its window ends. When every model is spent,
+  Lens says so and everything that doesn't need the AI keeps working.
+- Each chat message that needs the AI costs one request. Explaining a match,
+  comparing and pinning cost none.
 
 ## Adding a provider
 
