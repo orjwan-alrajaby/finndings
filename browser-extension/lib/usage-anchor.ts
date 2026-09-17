@@ -1,5 +1,6 @@
 /**
- * The way from the environmental result to "How much it uses".
+ * The way from the environmental result to "How much it uses". The scrolling
+ * itself is `section-anchor`, shared with the standard-equipment link.
  *
  * The environmental result points at that section in words, and the words are
  * a link. Three surfaces draw both — the in-page panel, the pinned car's card
@@ -9,39 +10,17 @@
  * describing the same car.
  */
 
+import { goToSection, sectionNear } from "./section-anchor";
+
 /** On every "How much it uses" section, as `data-section`. */
 export const USAGE_SECTION = "usage";
 
 /** The nearest "How much it uses" to `from`, or null where there isn't one. */
 export function usageSectionNear(from: Element): HTMLElement | null {
-  for (let node: Element | null = from; node; node = node.parentElement) {
-    const found = node.querySelector<HTMLElement>(`[data-section="${USAGE_SECTION}"]`);
-
-    if (found) return found;
-  }
-
-  return null;
+  return sectionNear(from, USAGE_SECTION);
 }
 
-/**
- * Scrolls to it, and moves focus there so a keyboard or screen-reader user
- * lands where a sighted one does. Returns whether there was anywhere to go.
- */
+/** Scrolls to it and moves focus there. Returns whether there was anywhere to go. */
 export function goToUsage(from: Element): boolean {
-  const target = usageSectionNear(from);
-
-  if (!target) return false;
-
-  const reduced =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  target.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "start" });
-
-  if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
-
-  target.focus?.({ preventScroll: true });
-
-  return true;
+  return goToSection(from, USAGE_SECTION);
 }
