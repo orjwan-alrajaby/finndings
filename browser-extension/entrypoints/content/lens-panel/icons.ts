@@ -28,6 +28,38 @@ export const LENS_PANEL_ICONS: Record<string, IconNode> = {
       }
     ]
   ],
+  "parking": [
+    [
+      "path",
+      {
+        "d": "M11 15h2"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 12v3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 19v3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M15.282 19a1 1 0 0 0 .948-.68l2.37-6.988a7 7 0 1 0-13.2 0l2.37 6.988a1 1 0 0 0 .948.68z"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9 9a3 3 0 1 1 6 0"
+      }
+    ]
+  ],
   "users": [
     [
       "path",
@@ -497,6 +529,50 @@ export const LENS_PANEL_ICONS: Record<string, IconNode> = {
       "path",
       {
         "d": "m16 9-5.5 5.5L8 12"
+      }
+    ]
+  ],
+  "circle-x": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m15 9-6 6"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "m9 9 6 6"
+      }
+    ]
+  ],
+  "circle-question-mark": [
+    [
+      "circle",
+      {
+        "cx": "12",
+        "cy": "12",
+        "r": "10"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"
+      }
+    ],
+    [
+      "path",
+      {
+        "d": "M12 17h.01"
       }
     ]
   ]

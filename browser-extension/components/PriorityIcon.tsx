@@ -21,6 +21,7 @@ import {
     CarFront,
     Leaf,
     Navigation,
+    ParkingMeter,
     Scale,
     ShieldCheck,
     Snowflake,
@@ -54,6 +55,8 @@ import { MARK_TONES, NEUTRAL_TONE } from "@/lib/priority-marks";
 const ICONS: Record<string, LucideIcon> = {
     /* Categories. */
     shield: ShieldCheck,
+    /* A parking meter rather than the "P" sign: the P is inside a square, and filled it's a plain square. */
+    parking: ParkingMeter,
     users: Users,
     backpack: Briefcase,
     road: CarFront,

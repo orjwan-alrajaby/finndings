@@ -48,6 +48,7 @@ export const NEUTRAL_TONE: MarkTone = {
 export const MARK_TONES: Record<string, MarkTone> = {
     /* Categories, in the hue each one's `color` already named. */
     shield: { line: "text-blue-700", fill: "fill-blue-200" },
+    parking: { line: "text-teal-700", fill: "fill-teal-200" },
     users: { line: "text-orange-700", fill: "fill-orange-200" },
     backpack: { line: "text-cyan-700", fill: "fill-cyan-200" },
     road: { line: "text-amber-700", fill: "fill-amber-200" },
@@ -125,6 +126,18 @@ export const SURFACE_TONES: Record<string, SurfaceTone> = {
         bar: "bg-blue-500",
         track: "bg-blue-100",
         wash: "from-blue-100",
+    },
+    parking: {
+        ground: "bg-teal-50",
+        groundHover: "hover:bg-teal-100",
+        edge: "ring-teal-200",
+        edgeHover: "hover:ring-teal-400",
+        edgeStrong: "ring-teal-600",
+        ink: "text-teal-700",
+        solid: "bg-teal-700",
+        bar: "bg-teal-500",
+        track: "bg-teal-100",
+        wash: "from-teal-100",
     },
     users: {
         ground: "bg-orange-50",

@@ -31,6 +31,7 @@ export const PANEL_ICONS = {
      see `components/PriorityIcon` for why briefcase and navigation stand in
      for backpack and compass. */
   shield: "shield-check",
+  parking: "parking-meter",
   users: "users",
   backpack: "briefcase",
   road: "car-front",
@@ -65,6 +66,9 @@ export const PANEL_ICONS = {
   /* Verdicts on the total: over a budget the reader set, and within it. */
   "triangle-alert": "triangle-alert",
   "circle-check": "circle-check",
+  /* The feature table's three states: listed, not listed, FINN didn't say. */
+  "circle-x": "circle-x",
+  "circle-question-mark": "circle-question-mark",
 };
 
 export const PANEL_ICON_NAMES = Object.keys(PANEL_ICONS);
