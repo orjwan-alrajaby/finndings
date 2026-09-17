@@ -15,7 +15,8 @@ export type FinnApiConfig = {
   equipment_line: string | null;
   trim_name: string;
 
-  fuel: "Benzin" | "Diesel" | "Elektro" | "Plug-in Hybrid";
+  /* FINN's live API sends "Plug-In-Hybrid"; `germanToEnglish` reads every spelling. */
+  fuel: "Benzin" | "Diesel" | "Elektro" | "Plug-in Hybrid" | "Plug-In-Hybrid";
   gearshift: "Automatik" | "Manuell";
   config_drive: string;
 
@@ -176,6 +177,20 @@ export interface FinnCar {
    * from FINN's API since carries the real answer.
    */
   featuresSupplied?: boolean;
+
+  /**
+   * FINN's `Fahrerassistenz` entry: level 1 or level 2 driver assistance.
+   *
+   * Null when FINN's list doesn't give a level. Optional because cars pinned
+   * by earlier builds were stored without it, and those read as unknown too.
+   */
+  driverAssistanceLevel?: 1 | 2 | null;
+
+  /**
+   * DC charging time from 10 to 80%, in minutes, as FINN lists it for some
+   * electric cars. Shown in explanations, never scored.
+   */
+  dcChargeMinutes?: number | null;
 
   dimensions: {
     length: number;

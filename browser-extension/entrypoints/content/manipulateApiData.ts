@@ -6,6 +6,8 @@ import {
   extractAvailability,
   extractPricing,
   extractDriveType,
+  extractDriverAssistanceLevel,
+  extractDcChargeMinutes,
 } from "@/lib/helpers";
 import { germanToEnglish } from "@/lib/translate";
 
@@ -83,6 +85,8 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
 
     features: extractFeatures(config),
     featuresSupplied: hasSuppliedEquipment(config),
+    driverAssistanceLevel: extractDriverAssistanceLevel(config),
+    dcChargeMinutes: isElectric ? extractDcChargeMinutes(config) : null,
 
     dimensions: {
       length: config.vehicle_size.length_mm,

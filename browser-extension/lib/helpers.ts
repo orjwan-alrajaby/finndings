@@ -89,30 +89,67 @@ const FEATURE_KEYS = {
  * inventing an absence. So the answer is taken here, where the raw response
  * is still in hand, and carried on the car.
  *
- * Presence of the list is the whole test, not what is in it. A list that says
- * false to all fifty features is FINN answering the question — that is a bare
- * car, and it is exactly the case that used to be mistaken for missing data.
+ * A list with no `true` in it is not an answer. FINN sends every key on every
+ * car, so presence alone proves nothing, and in the September 2026 inventory
+ * the cars whose lists say false to everything are an MG 4 Urban and two BYDs
+ * — cars that plainly carry emergency braking and air conditioning. What FINN
+ * sent there is an unfilled form, and it is read as "not supplied".
  */
 export function hasSuppliedEquipment(config: FinnApiConfig): boolean {
   const list = config.closed_features_list;
 
   if (!list || typeof list !== "object") return false;
 
-  return Object.keys(list).length > 0;
+  return Object.values(list).includes(true);
 }
 
 export function extractFeatures(config: FinnApiConfig): Record<string, boolean> {
   const features = Object.fromEntries(
     Object.entries(FEATURE_KEYS).map(([key, germanName]) => [
       key,
-      Boolean(getFeature(config, germanName)),
+      getFeature(config, germanName) === true,
     ])
   ) as Record<keyof typeof FEATURE_KEYS, boolean>;
 
   return {
     ...features,
+    /*
+     * FINN lists keyless entry and start either as one entry or as two, and
+     * the two disagree on 82 cars. Either way of saying it counts.
+     */
+    hasKeylessEntryAndStart:
+      features.hasKeylessEntryAndStart ||
+      (getFeature(config, "Keyless Entry") === true &&
+        getFeature(config, "Keyless Start") === true),
     hasTowbar: config.has_hitch === "true",
   };
+}
+
+/**
+ * FINN's driver assistance level: "Level 1" or "Level 2".
+ *
+ * Null when the entry is missing or says something else, so an unlisted level
+ * reads as unknown rather than as level 1.
+ */
+export function extractDriverAssistanceLevel(config: FinnApiConfig): 1 | 2 | null {
+  const value = getFeature(config, "Fahrerassistenz");
+
+  if (value === "Level 2") return 2;
+  if (value === "Level 1") return 1;
+
+  return null;
+}
+
+/** "26 Min." → 26. Null for anything that isn't a positive number of minutes. */
+export function extractDcChargeMinutes(config: FinnApiConfig): number | null {
+  const value = getFeature(config, "Ladezeit DC (10–80%)");
+
+  if (typeof value === "number") return value > 0 ? value : null;
+  if (typeof value !== "string") return null;
+
+  const minutes = Number.parseFloat(value.replace(",", "."));
+
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
 }
 
 export function extractAvailability(config: FinnApiConfig) {
