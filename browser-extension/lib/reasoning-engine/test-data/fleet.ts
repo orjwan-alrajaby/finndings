@@ -36,13 +36,47 @@ function toConfig(car: SnapshotCar): FinnApiConfig {
 
   return {
     ...fields,
+    ...termsFromSnapshot(fields),
     brand: { ...(fields.brand as object), picture: { url: "" } },
-    availability_by_term: {},
     color: { id: "", specific: "", color_hex: "" },
     picture: { url: "", type: "" },
     pictures: [],
     closed_features_list: list,
   } as unknown as FinnApiConfig;
+}
+
+/**
+ * Terms and prices for a snapshot taken before Lens read them.
+ *
+ * The committed snapshot kept only FINN's down-payment prices. Lens now prices
+ * cars with nothing upfront, from `price` and `available_terms`, which that
+ * snapshot doesn't have — so without this every car would map to a price of
+ * zero. The fleet tests only ever compare cars' prices with each other, which
+ * the down-payment list orders the same way, so it stands in for `price`
+ * here. A snapshot refreshed with the current script carries the real fields
+ * and this passes them through untouched.
+ */
+function termsFromSnapshot(fields: Record<string, unknown>): Partial<FinnApiConfig> {
+  if (fields.price && fields.available_terms) return {};
+
+  const list = ((fields.downpayment_prices as { available_price_list?: Record<string, number> })
+    ?.available_price_list ?? {}) as Record<string, number>;
+
+  const terms = [
+    ...new Set(
+      Object.keys(list)
+        .map((key) => /^b2[bc]_(\d+)$/.exec(key)?.[1])
+        .filter(Boolean)
+        .map(Number),
+    ),
+  ];
+
+  return {
+    price: list,
+    available_terms: terms,
+    default_term: fields.default_downpayment_term as number,
+    availability_by_term: {},
+  };
 }
 
 let cached: PinnedFinnCar[] | null = null;

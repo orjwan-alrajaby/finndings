@@ -5,6 +5,7 @@ import {
   hasSuppliedEquipment,
   extractAvailability,
   extractPricing,
+  extractContract,
   extractDriveType,
   extractDriverAssistanceLevel,
   extractDcChargeMinutes,
@@ -43,6 +44,7 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
 
     availability: extractAvailability(config),
     pricing: extractPricing(config),
+    contract: extractContract(config),
 
     consumption: {
       combined: config.consumption,

@@ -70,6 +70,13 @@ const cars = raw.map((car) => {
     seats: car.seats,
     doors: car.doors,
     default_downpayment_term: term,
+    /* The no-down-payment price per term, and the terms and delivery windows on offer. */
+    available_terms: car.available_terms,
+    default_term: car.default_term,
+    price: Object.fromEntries(
+      Object.entries(car.price ?? {}).filter(([key]) => /^b2[bc]_\d+$/.test(key)),
+    ),
+    availability_by_term: car.availability_by_term,
     downpayment_prices: {
       msrp: car.downpayment_prices?.msrp,
       available_price_list: car.downpayment_prices?.available_price_list,

@@ -1,4 +1,4 @@
-import type { DriveType, FinnApiConfig } from "@/lib/types";
+import type { ContractOffer, ContractTerm, DriveType, FinnApiConfig } from "@/lib/types";
 import { addTimeToDate } from "@/lib/utils";
 
 export function brand(config: FinnApiConfig) {
@@ -169,23 +169,72 @@ export function extractAvailability(config: FinnApiConfig) {
   };
 }
 
+/**
+ * The monthly price Lens quotes when the reader hasn't said how long they want
+ * the car: FINN's own default term, with nothing paid upfront.
+ *
+ * This used to read `downpayment_prices` — FINN's price *after* a €1,500 down
+ * payment — and never counted the €1,500, so every car looked about €125 a
+ * month cheaper over twelve months than it is. The plain `price` object is
+ * the no-down-payment price, and it is the one read now.
+ */
 export function extractPricing(config: FinnApiConfig) {
-  type PriceKeys = keyof typeof config.downpayment_prices.available_price_list;
-  const term = config.default_downpayment_term;
-  const prices = config.downpayment_prices;
-
-  const priceFor = (audience: "b2c" | "b2b") => ({
-    price: prices.available_price_list?.[`${audience}_${term}` as PriceKeys] ?? 0,
-    oldPrice: prices.available_price_list?.[`${audience}_${term}_old` as PriceKeys] ?? null,
-  });
+  const offer = extractContract(config);
+  const term =
+    offer.terms.find((item) => item.months === offer.defaultMonths) ??
+    offer.terms[0];
 
   return {
-    grossValue: prices?.msrp ?? null,
-    customerMonthly: priceFor("b2c"),
-    businessMonthly: priceFor("b2b"),
-    extraKmPrice: prices?.extra_km_price ?? null,
+    grossValue: config.downpayment_prices?.msrp ?? null,
+    // 0 means "not supplied" downstream; see advertisedMonthlyPrice.
+    customerMonthly: { price: term?.privateMonthly ?? 0, oldPrice: null },
+    businessMonthly: { price: term?.businessMonthly ?? 0, oldPrice: null },
+    extraKmPrice: config.downpayment_prices?.extra_km_price ?? null,
     currency: "€",
   };
+}
+
+const positive = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+
+/**
+ * Every contract term FINN offers, with its no-down-payment price and its
+ * delivery window.
+ *
+ * `available_terms` is the list of what can be booked. The price object also
+ * carries figures for terms that aren't on offer — a car sold only on six
+ * months still lists a 24-month price — so prices are read through that list
+ * and never the other way round.
+ */
+export function extractContract(config: FinnApiConfig): ContractOffer {
+  const offered = Array.isArray(config.available_terms)
+    ? config.available_terms
+    : [];
+
+  const terms = [...new Set(offered)]
+    .filter((months) => Number.isInteger(months) && months > 0)
+    .sort((a, b) => a - b)
+    .map((months): ContractTerm => {
+      const window = config.availability_by_term?.[String(months)];
+
+      return {
+        months,
+        privateMonthly: positive(config.price?.[`b2c_${months}`]),
+        businessMonthly: positive(config.price?.[`b2b_${months}`]),
+        deliveryFrom: window?.available_from?.slice(0, 10) ?? null,
+        deliveryTo: window?.available_to?.slice(0, 10) ?? null,
+        deviationWeeks:
+          typeof window?.deviation_in_weeks === "number"
+            ? window.deviation_in_weeks
+            : null,
+      };
+    });
+
+  const defaultMonths = terms.some((item) => item.months === config.default_term)
+    ? (config.default_term as number)
+    : null;
+
+  return { terms, defaultMonths };
 }
 
 const DRIVE_TYPE_MAP: Record<string, DriveType> = {

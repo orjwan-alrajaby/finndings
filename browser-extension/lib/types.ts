@@ -27,6 +27,18 @@ export type FinnApiConfig = {
 
   default_downpayment_term: number;
 
+  /** The contract lengths FINN offers for this car, in months. */
+  available_terms?: number[];
+  /** The term FINN shows first. */
+  default_term?: number;
+
+  /**
+   * The monthly price for each term with nothing paid upfront: `b2c_12`,
+   * `b2b_24`. It can also hold prices for terms the car isn't offered on, so
+   * it is only ever read through `available_terms`.
+   */
+  price?: Record<string, number | Record<string, number> | undefined>;
+
   downpayment_prices: {
     msrp: number;
     available_price_list: {
@@ -41,7 +53,7 @@ export type FinnApiConfig = {
   };
 
   availability_by_term: {
-    [key: number]: {
+    [key: string]: {
       available_from: string;
       available_to: string;
       deviation_in_weeks: number;
@@ -198,6 +210,36 @@ export interface FinnCar {
     height: number;
     unit: "mm";
   };
+
+  /**
+   * The contracts FINN offers for this car: each term's monthly price with
+   * nothing paid upfront, and the window it can be delivered in.
+   *
+   * Optional because cars pinned by earlier builds were stored without it;
+   * Lens reads its absence as "FINN's terms aren't known for this car".
+   */
+  contract?: ContractOffer;
+}
+
+export interface ContractTerm {
+  /** Length in months. */
+  months: number;
+  /** Monthly price with no down payment, or null when FINN didn't publish one. */
+  privateMonthly: number | null;
+  businessMonthly: number | null;
+  /** Earliest delivery FINN lists for this term, as an ISO date. */
+  deliveryFrom: string | null;
+  /** Latest delivery FINN currently lists for this term. */
+  deliveryTo: string | null;
+  /** How many weeks the earliest delivery may slip, as FINN states it. */
+  deviationWeeks: number | null;
+}
+
+export interface ContractOffer {
+  /** Every term on offer, shortest first. */
+  terms: ContractTerm[];
+  /** The term FINN shows first, when it is one of `terms`. */
+  defaultMonths: number | null;
 }
 
 export interface PinnedFinnCar extends FinnCar {
