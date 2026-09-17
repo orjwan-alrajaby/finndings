@@ -65,17 +65,13 @@ describe("hasEquipmentData", () => {
     ).toBe(true);
   });
 
-  /*
-   * FINN sends every key on every car, so a list that says no to all of it is
-   * an unfilled form. On the live inventory those are cars that plainly carry
-   * emergency braking — read as unknown, not as bare.
-   */
-  it("is false for a list that answers nothing with a yes", () => {
+  /* FINN's answer is taken as sent: a list of noes is data, not a gap. */
+  it("is true for a list that says no to everything", () => {
     expect(
       hasEquipmentData(
         makeCar({ id: 1, features: [], featuresSupplied: true }),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("is false when FINN supplied no equipment list", () => {
@@ -100,9 +96,9 @@ describe("hasEquipmentData", () => {
   });
 
   /*
-   * Cars pinned before the flag existed have no recorded answer, so the old
-   * heuristic is all there is for them — and it has to keep working, because
-   * those cars are sitting in readers' storage right now.
+   * Cars pinned before the flag existed have no recorded answer. What's stored
+   * is what FINN sent, so a features record counts as a list, and only a
+   * missing or empty one doesn't.
    */
   describe("cars stored before the flag existed", () => {
     const legacy = (features: string[]) => {
@@ -113,12 +109,18 @@ describe("hasEquipmentData", () => {
       return car;
     };
 
-    it("guesses no data from an all-false record", () => {
-      expect(hasEquipmentData(legacy([]))).toBe(false);
+    it("reads an all-false record as data", () => {
+      const allFalse = legacy([]);
+      (allFalse as { features: object }).features = { hasIsofix: false, hasHeatedSeats: false };
+
+      expect(hasEquipmentData(allFalse)).toBe(true);
     });
 
-    it("guesses data from anything true", () => {
-      expect(hasEquipmentData(legacy(["hasIsofix"]))).toBe(true);
+    it("reads a missing or empty record as no data", () => {
+      const empty = legacy([]);
+      (empty as { features: object }).features = {};
+
+      expect(hasEquipmentData(empty)).toBe(false);
     });
   });
 });

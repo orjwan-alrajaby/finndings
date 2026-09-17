@@ -192,12 +192,29 @@ describe("unknown is never read as absent", () => {
     expect(detail.exactScore).toBeCloseTo((100 * 2) / 3, 10);
   });
 
-  it("reads an all-false equipment list as no list at all", () => {
+  /* FINN is the source of truth: an all-false list is a car with none of it. */
+  it("reads an all-false equipment list as a car without that equipment", () => {
     const allFalse = makeCar({ id: 1, features: [], featuresSupplied: true });
     const detail = categoryDetail("safetyAssistance", allFalse, [allFalse], prefs());
 
+    expect(detail.assessed).toBe(true);
+    expect(detail.unknown).not.toContain("hasIsofix");
+  });
+
+  it("reads only a missing equipment list as unknown", () => {
+    const noList = makeCar({ id: 1, features: [], featuresSupplied: false });
+    const detail = categoryDetail("safetyAssistance", noList, [noList], prefs());
+
     expect(detail.assessed).toBe(false);
     expect(detail.unknown.length).toBeGreaterThan(0);
+  });
+
+  it("reads an entry FINN left empty as unknown, and one it answered false as absent", () => {
+    const car = { ...makeCar({ id: 1, features: [], featuresSupplied: true }), unansweredFeatures: ["hasBlindSpotAssist"] };
+    const detail = categoryDetail("safetyAssistance", car, [car], prefs());
+
+    expect(detail.unknown).toContain("hasBlindSpotAssist");
+    expect(detail.missing).not.toContain("hasBlindSpotAssist");
   });
 
   it("never scores a missing CO₂ figure as a neutral fifty", () => {

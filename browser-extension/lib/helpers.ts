@@ -76,33 +76,28 @@ const FEATURE_KEYS = {
   hasSpareWheel: "Ersatzrad",
 } as const;
 
+/** Nothing there: absent, null, or an empty string, array or object. */
+export function isBlank(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object") return Object.keys(value).length === 0;
+
+  return false;
+}
+
 /**
  * Whether FINN supplied an equipment list for this car at all.
  *
- * The one question `extractFeatures` cannot answer afterwards. It reads a
- * German equipment list and turns everything it can't find into `false`, so
- * by the time anyone downstream sees the result, a car FINN told us nothing
- * about looks exactly like a car FINN told us has nothing — every key false,
- * in both cases.
- *
- * Those are completely different claims. "It doesn't have adaptive cruise
- * control" is a fact worth scoring and worth saying out loud; "we don't know
- * what it has" is a gap, and reporting it as the first is the product
- * inventing an absence. So the answer is taken here, where the raw response
- * is still in hand, and carried on the car.
- *
- * A list with no `true` in it is not an answer. FINN sends every key on every
- * car, so presence alone proves nothing, and in the September 2026 inventory
- * the cars whose lists say false to everything are an MG 4 Urban and two BYDs
- * — cars that plainly carry emergency braking and air conditioning. What FINN
- * sent there is an unfilled form, and it is read as "not supplied".
+ * FINN is the source of truth: Lens reads what it sends, not what it might
+ * have meant. A list that says `false` to everything is FINN saying the car
+ * has none of it, and it's scored that way. Only a list that isn't there —
+ * absent, null, or empty — is "not supplied".
  */
 export function hasSuppliedEquipment(config: FinnApiConfig): boolean {
   const list = config.closed_features_list;
 
-  if (!list || typeof list !== "object") return false;
-
-  return Object.values(list).includes(true);
+  return !isBlank(list) && typeof list === "object" && !Array.isArray(list);
 }
 
 export function extractFeatures(config: FinnApiConfig): Record<string, boolean> {
@@ -125,6 +120,30 @@ export function extractFeatures(config: FinnApiConfig): Record<string, boolean> 
         getFeature(config, "Keyless Start") === true),
     hasTowbar: config.has_hitch === "true",
   };
+}
+
+/**
+ * The equipment FINN's list leaves unanswered on a car it did send a list
+ * for: the entry is missing, null or empty. `extractFeatures` has to write
+ * those as `false`, so they're recorded here and read as unknown — while an
+ * entry FINN answered `false` stays a real no.
+ */
+export function extractUnansweredFeatures(config: FinnApiConfig): string[] {
+  if (!hasSuppliedEquipment(config)) return [];
+
+  const unanswered = (Object.entries(FEATURE_KEYS) as [string, string][])
+    .filter(([, germanName]) => isBlank(getFeature(config, germanName)))
+    .map(([key]) => key);
+
+  /* Keyless is answered by either way FINN has of saying it. */
+  const keylessAnswered =
+    !isBlank(getFeature(config, "Keyless Entry & Start")) ||
+    (!isBlank(getFeature(config, "Keyless Entry")) && !isBlank(getFeature(config, "Keyless Start")));
+
+  return [
+    ...unanswered.filter((key) => key !== "hasKeylessEntryAndStart" || !keylessAnswered),
+    ...(isBlank(config.has_hitch) ? ["hasTowbar"] : []),
+  ];
 }
 
 /**

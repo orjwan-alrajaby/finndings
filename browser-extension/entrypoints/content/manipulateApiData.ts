@@ -3,6 +3,7 @@ import {
   getFeature,
   extractFeatures,
   hasSuppliedEquipment,
+  extractUnansweredFeatures,
   extractAvailability,
   extractPricing,
   extractContract,
@@ -87,6 +88,7 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
 
     features: extractFeatures(config),
     featuresSupplied: hasSuppliedEquipment(config),
+    unansweredFeatures: extractUnansweredFeatures(config),
     driverAssistanceLevel: extractDriverAssistanceLevel(config),
     dcChargeMinutes: isElectric ? extractDcChargeMinutes(config) : null,
 

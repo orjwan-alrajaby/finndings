@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractFeatures, hasSuppliedEquipment } from "./helpers";
+import { extractFeatures, extractUnansweredFeatures, hasSuppliedEquipment } from "./helpers";
 import type { FinnApiConfig } from "./types";
 
 /**
@@ -24,11 +24,10 @@ describe("hasSuppliedEquipment", () => {
   });
 
   /*
-   * FINN sends every key on every car, so a list that says no to everything
-   * is an unfilled form, not a bare car: in the live inventory those are an
-   * MG 4 Urban and two BYDs, cars that plainly carry emergency braking.
+   * FINN is the source of truth. A list that says no to everything is FINN
+   * saying the car has none of it, and Lens takes it as sent.
    */
-  it("is false for a list that says no to everything", () => {
+  it("is true for a list that says no to everything", () => {
     expect(
       hasSuppliedEquipment(
         config({
@@ -37,13 +36,7 @@ describe("hasSuppliedEquipment", () => {
           "ISOFIX": false,
         }),
       ),
-    ).toBe(false);
-  });
-
-  it("ignores values that aren't a yes", () => {
-    expect(
-      hasSuppliedEquipment(config({ Sitzheizung: false, Länge: "4430 mm" })),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("is true for a list with equipment on it", () => {
@@ -54,6 +47,26 @@ describe("hasSuppliedEquipment", () => {
   it("is false for a list that isn't an object", () => {
     expect(hasSuppliedEquipment(config("nope"))).toBe(false);
     expect(hasSuppliedEquipment(config(null))).toBe(false);
+    expect(hasSuppliedEquipment(config([]))).toBe(false);
+  });
+});
+
+describe("extractUnansweredFeatures", () => {
+  it("lists entries FINN left missing, null or empty, and not ones it answered false", () => {
+    const unanswered = extractUnansweredFeatures(
+      config({ Sitzheizung: false, Isofix: null, "Toter-Winkel-Assistent": "", Klimaanlage: true }),
+    );
+
+    expect(unanswered).toContain("hasIsofix");
+    expect(unanswered).toContain("hasBlindSpotAssist");
+    expect(unanswered).not.toContain("hasHeatedSeats");
+    expect(unanswered).not.toContain("hasAirConditioning");
+    /* Not in the list at all. */
+    expect(unanswered).toContain("hasHeadUpDisplay");
+  });
+
+  it("has nothing to add when there's no list — the whole list is the gap", () => {
+    expect(extractUnansweredFeatures(config(undefined))).toEqual([]);
   });
 
   /*

@@ -51,13 +51,10 @@ describe("the mapper over FINN's inventory snapshot", () => {
     expect(cars.length).toBeGreaterThan(500);
   });
 
-  it("reads an all-false equipment list as not supplied", () => {
-    const unsupplied = cars.filter((car) => !car.featuresSupplied);
-
-    expect(unsupplied.length).toBeLessThan(cars.length * 0.02);
-    for (const car of unsupplied) {
-      expect(Object.values(car.features).some(Boolean)).toBe(false);
-    }
+  /* FINN sends a list for every car in the snapshot, and each list is taken as sent. */
+  it("reads every car's equipment list as supplied, including all-false ones", () => {
+    expect(cars.every((car) => car.featuresSupplied)).toBe(true);
+    expect(cars.some((car) => !Object.values(car.features).some(Boolean))).toBe(true);
   });
 
   it("gives every car a length", () => {

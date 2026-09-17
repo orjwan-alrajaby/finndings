@@ -181,14 +181,20 @@ export interface FinnCar {
   features: ReturnType<typeof extractFeatures>;
 
   /**
-   * Whether FINN supplied an equipment list for this car, as distinct from
-   * having supplied one that says no to everything.
+   * Whether FINN supplied an equipment list for this car at all. False only
+   * when the list is absent or empty; a list of `false`s is supplied, and
+   * means the car has none of it.
    *
-   * Optional because cars pinned by earlier builds were stored without it —
-   * `hasEquipmentData` falls back to a heuristic for those. Everything mapped
-   * from FINN's API since carries the real answer.
+   * Optional because cars pinned by earlier builds were stored without it;
+   * those are read as supplied, since what's stored is what FINN sent.
    */
   featuresSupplied?: boolean;
+
+  /**
+   * Feature keys FINN's list left unanswered — missing, null or empty — on a
+   * car it did supply a list for. Read as unknown rather than as a no.
+   */
+  unansweredFeatures?: string[];
 
   /**
    * FINN's `Fahrerassistenz` entry: level 1 or level 2 driver assistance.

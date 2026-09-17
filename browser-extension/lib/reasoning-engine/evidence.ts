@@ -104,16 +104,17 @@ export const tripFactor = (rangeKm: number): number =>
 /* -------------------------------------------------------------------------- */
 
 /**
- * Whether FINN supplied a usable equipment list.
+ * Whether FINN supplied an equipment list.
  *
- * Mapped cars carry the answer as `featuresSupplied`; cars pinned before that
- * field existed fall back to whether anything at all is listed. Either way an
- * all-false list is not supplied — see `hasSuppliedEquipment`.
+ * FINN's data is taken as it's sent: a list that says no to everything is a
+ * car with none of it, not missing data. Only an absent or empty list is
+ * unknown — `featuresSupplied` on mapped cars, and for cars stored before
+ * that field existed, whether a features record is there at all.
  */
 export function equipmentKnown(car: FinnCar): boolean {
-  const anyListed = Object.values(car.features ?? {}).some(Boolean);
+  if (car.featuresSupplied !== undefined) return car.featuresSupplied;
 
-  return car.featuresSupplied === false ? false : anyListed;
+  return Object.keys(car.features ?? {}).length > 0;
 }
 
 /** "5" → 5. Null for zero, blanks and anything that isn't a whole count. */
@@ -184,6 +185,8 @@ export function signalUtility(key: SignalId, car: FinnCar): number | null {
     default:
       if (!(key in FEATURES)) return null;
       if (!equipmentKnown(car)) return null;
+      /* An entry FINN left empty is unknown; one it answered false is a no. */
+      if (car.unansweredFeatures?.includes(key)) return null;
 
       return car.features?.[key] ? 1 : 0;
   }
