@@ -4,33 +4,33 @@ import { ArrowUp, Check, Save, X } from "lucide-react";
 import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import { isPersonalised } from "@/lib/personalisation";
-import { ask, interpret } from "@/lib/lens-ai/client";
+import { converse } from "@/lib/lens-ai/client";
 import { buildLensFacts } from "@/lib/lens-ai/context";
-import type { ScopeKind } from "@/lib/lens-ai/contract";
-import type { Outcome } from "@/lib/lens-ai/outcome";
-import { carLabel } from "@/lib/lens-ai/outcome";
-import {
-    applyChange,
-    isEmptyChange,
-    validateChange,
-    type ValidatedChange,
-} from "@/lib/lens-ai/proposal";
-import { buildVocabulary, describeCurrent } from "@/lib/lens-ai/vocabulary";
+import type { ScopeKind, WireQuestion } from "@/lib/lens-ai/contract";
+import { carLabel, compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
+import { buildVocabulary } from "@/lib/lens-ai/vocabulary";
 import type { PageContext } from "@/lib/lens-chat/messages";
+import { evidenceCatalogue } from "@/lib/lens-chat/evidence";
+import { evidenceForNeeds, tellFitStory } from "@/lib/lens-chat/fit-story";
+import { alternativesWithinLimits, compareRows, runLens, summariseMatch, type LensRun } from "@/lib/lens-chat/run";
 import {
-    compareRows,
-    explainWhy,
-    runLens,
-    summariseMatch,
-    type LensRun,
-} from "@/lib/lens-chat/run";
+    diffUnderstanding,
+    EMPTY_UNDERSTANDING,
+    isEmptyUnderstanding,
+    readQuestion,
+    readUnderstanding,
+    toAnswers,
+    toWire,
+    type Translation,
+    type Understanding,
+} from "@/lib/lens-chat/understanding";
 import { copyFeatures, type Answers } from "@/entrypoints/compare/store";
 import { OutcomeCard } from "@/entrypoints/compare/lens-ai/OutcomeCard";
-import { ProposalReview } from "@/entrypoints/compare/lens-ai/ProposalReview";
-import { proposalFor, runProposal, useLensAiStatus, type Proposal } from "@/entrypoints/compare/lens-ai/hooks";
+import { useLensAiStatus } from "@/entrypoints/compare/lens-ai/hooks";
 import { AiError, PrimaryButton, SecondaryButton, Thinking } from "@/entrypoints/compare/lens-ai/parts";
 
-import { CompareCard, MatchCard, SmallButton, WhyCard, type CarActions } from "./cards";
+import { CompareCard, SmallButton, type CarActions } from "./cards";
+import { FitCard, UnderstandingCard, WhatIfCard, WhyCard } from "./conversation-cards";
 import { onPageChanged, requestClose, requestPageContext, requestPin, requestShowCar } from "./page";
 import {
     buildScopes,
@@ -44,20 +44,22 @@ import {
 /**
  * Ask Lens, on finn.com.
  *
- * The conversation moves between a few kinds of turn, and the difference
- * between them is the whole idea:
+ * The conversation is about understanding a person, and only then about cars:
  *
- * - **The reader describes what they want.** The model maps it onto Lens's
- *   own settings; the reader sees that mapping and nothing changes until they
- *   say "use these".
- * - **Lens answers.** The existing engine runs over the chosen candidate set
- *   and the chat shows its result. No model decides anything here.
- * - **The reader asks about it.** Explanations are the engine's own reasoning
- *   laid out ("why this car"), or a model's answer grounded in the facts Lens
- *   sent. A "what if" comes back as a proposed change for the engine to run.
+ * - **Each message updates what Lens understands** — constraints, needs,
+ *   context, what they're already confident with, what Lens can't use — and
+ *   Lens may ask one question when the answer would change the recommendation.
+ *   The understanding carries across messages; nothing is re-asked.
+ * - **Nothing changes the comparison until the person says so.** "Compare
+ *   cars" turns the understanding into Lens's own answers, deterministically,
+ *   and the engine ranks the chosen set.
+ * - **The result is explained in their terms**: what they told Lens, what Lens
+ *   found on this car, and the catch — every fact read off the car.
+ * - **Questions and what-ifs use the same understanding.** A what-if is a
+ *   proposed version of it that the engine runs before anything is kept.
  *
- * Preferences confirmed here belong to this conversation. The reader's saved
- * settings and pinned cars change only when they press the button that says so.
+ * Preferences confirmed here belong to this conversation; saved settings and
+ * pinned cars change only when the person presses the button that says so.
  */
 
 type Entry = { id: number } & (
@@ -66,27 +68,23 @@ type Entry = { id: number } & (
     | { kind: "thinking"; text: string }
     | { kind: "error"; text: string; retry: (() => void) | null }
     | {
-          kind: "interpretation";
-          said: string;
-          summary: string;
-          change: ValidatedChange;
-          budgetFigure: number | null;
-          status: "pending" | "applied" | "cancelled" | "superseded";
+          kind: "understanding";
+          understanding: Understanding;
+          question: WireQuestion | null;
+          reply: string;
+          isUpdate: boolean;
+          status: "pending" | "applied" | "superseded";
       }
-    | { kind: "match"; run: LensRun }
-    | {
-          kind: "why";
-          run: LensRun;
-          /** What the reader had said when they asked, so the card can't drift. */
-          story: { toldMe: string[]; understood: string | null };
-      }
+    | { kind: "fit"; run: LensRun; understanding: Understanding; translation: Translation; question: WireQuestion | null }
+    | { kind: "why"; run: LensRun; understanding: Understanding; translation: Translation; question: WireQuestion | null }
     | { kind: "compare"; run: LensRun }
     | {
           kind: "whatIf";
-          answer: string;
-          change: ValidatedChange;
+          reply: string;
+          after: Understanding;
+          lines: { label: string; from: string; to: string }[];
           status: "pending" | "ran" | "used" | "cancelled";
-          ran?: { outcome: Outcome; proposal: Proposal };
+          ran?: { outcome: Outcome; run: LensRun; translation: Translation };
       }
     | { kind: "saveOffer"; saved: boolean }
 );
@@ -94,12 +92,12 @@ type Entry = { id: number } & (
 type EntryInput = Entry extends infer E ? (E extends Entry ? Omit<E, "id"> : never) : never;
 
 const STARTERS = [
-    "I have two kids and want something practical.",
-    "I'm a nervous driver and care about safety.",
+    "I have two young kids and want them safe and entertained.",
+    "I'm a nervous driver.",
+    "I drive through cold winters.",
+    "I can't spend more than €500 a month.",
+    "I only care about safety and staying under €500.",
     "I do a lot of motorway driving.",
-    "I live somewhere hot.",
-    "Keep the cost as low as possible.",
-    "What would change if safety mattered more?",
 ];
 
 const WHY = /^\s*why\s+(this|that|the)\s+(car|one)\s*\??\s*$|^\s*why\s*\??\s*$/i;
@@ -110,7 +108,7 @@ export function LensChat() {
 
     const [settings, setSettings] = useState<LensSettings | null>(null);
     const [personalised, setPersonalised] = useState(true);
-    const [answers, setAnswers] = useState<Answers | null>(null);
+    const [base, setBase] = useState<Answers | null>(null);
     const [page, setPage] = useState<PageContext | null>(null);
     const [pageLoaded, setPageLoaded] = useState(false);
     const [stored, setStored] = useState<StoredCars>({ pinned: {}, loaded: {} });
@@ -118,11 +116,16 @@ export function LensChat() {
     const [entries, setEntries] = useState<Entry[]>([]);
     const [input, setInput] = useState("");
     const [busy, setBusy] = useState(false);
+
+    /* What the conversation has established. */
+    const [understanding, setUnderstanding] = useState<Understanding>(EMPTY_UNDERSTANDING);
+    const [openQuestion, setOpenQuestion] = useState<WireQuestion | null>(null);
+    const [applied, setApplied] = useState<{ understanding: Understanding; translation: Translation } | null>(null);
     const [run, setRun] = useState<LensRun | null>(null);
 
+    const answered = useRef<{ question: string; answer: string }[]>([]);
+    const history = useRef<{ role: "reader" | "lens"; text: string }[]>([]);
     const nextId = useRef(1);
-    const story = useRef<{ toldMe: string[]; understood: string | null }>({ toldMe: [], understood: null });
-    const history = useRef<{ question: string; answer: string }[]>([]);
     const pinQueue = useRef<Promise<unknown>>(Promise.resolve());
     const endRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -140,7 +143,7 @@ export function LensChat() {
         void (async () => {
             const loaded = await loadLensSettings();
             setSettings(loaded);
-            setAnswers({
+            setBase({
                 priorities: loaded.priorities,
                 preferences: loaded.preferences,
                 features: copyFeatures(loaded.categoryFeatures),
@@ -186,8 +189,8 @@ export function LensChat() {
     const pinnedIds = useMemo(() => new Set(Object.keys(stored.pinned).map(Number)), [stored]);
 
     /* Latest values for the async flows below, which outlive a render. */
-    const latest = useRef({ answers, scopes, kind, run, vocabulary, enabled });
-    latest.current = { answers, scopes, kind, run, vocabulary, enabled };
+    const latest = useRef({ base, scopes, kind, run, vocabulary, enabled, understanding, openQuestion, applied });
+    latest.current = { base, scopes, kind, run, vocabulary, enabled, understanding, openQuestion, applied };
 
     /* -- The conversation --------------------------------------------------- */
 
@@ -205,12 +208,15 @@ export function LensChat() {
         setEntries((all) => all.filter((entry) => entry.id !== id));
     }, []);
 
-    /*
-     * The page moved on under an open conversation — FINN navigates without
-     * reloading. Results already shown stay true for the cars they were about,
-     * but "cars on this page" now means different cars, and the reader should
-     * hear that from Lens rather than notice the header change.
-     */
+    const say = useCallback(
+        (text: string, tone?: "note") => {
+            push({ kind: "lens", text, tone });
+            history.current.push({ role: "lens", text });
+        },
+        [push],
+    );
+
+    /* The page moved on under an open conversation — say so. */
     const lastUrl = useRef<string | null>(null);
 
     useEffect(() => {
@@ -234,212 +240,177 @@ export function LensChat() {
         endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
     }, [entries.length, entries.at(-1)]);
 
-    /** Runs the engine over a scope and shows the result. */
-    const showRun = useCallback(
-        (nextAnswers: Answers, nextKind: ScopeKind, intro?: string) => {
-            const target = latest.current.scopes[nextKind];
+    /** Ranks a scope with an understanding and shows why the result fits. */
+    const compareWith = useCallback(
+        (u: Understanding, nextKind: ScopeKind, intro?: string) => {
+            const current = latest.current;
+            if (!current.base) return null;
+
+            const target = current.scopes[nextKind];
 
             if (!target.cars.length) {
-                push({
-                    kind: "lens",
-                    text:
-                        nextKind === "pinned"
-                            ? "You haven't pinned any cars yet, so there's nothing in that set to compare."
-                            : nextKind === "thisCar"
-                              ? "There's no single car on this page for Lens to look at."
-                              : "None of the cars on this page have reached Lens yet. Scroll the page so FINN loads them, then ask again.",
-                    tone: "note",
-                });
+                say(
+                    nextKind === "pinned"
+                        ? "You haven't pinned any cars yet, so there's nothing in that set to compare."
+                        : nextKind === "thisCar"
+                          ? "There's no single car on this page for Lens to look at."
+                          : "None of the cars on this page have reached Lens yet. Scroll the page so FINN loads them, then ask again.",
+                    "note",
+                );
                 return null;
             }
 
-            const result = runLens(target.cars, nextAnswers, nextKind, target.headline);
+            const translation = toAnswers(current.base, u, current.enabled.length ? current.enabled : undefined);
+            const result = runLens(target.cars, translation.answers, nextKind, target.headline);
 
             if (!result) return null;
 
-            /* A result fixes the scope: cars loading later mustn't move it under the reader. */
             setScopeKind(nextKind);
             setRun(result);
-            if (intro) push({ kind: "lens", text: intro });
-            push({ kind: "match", run: result });
+            setApplied({ understanding: u, translation });
+
+            if (intro) say(intro, "note");
+
+            push({ kind: "fit", run: result, understanding: u, translation, question: current.openQuestion });
+            history.current.push({
+                role: "lens",
+                text: `Compared ${target.headline.toLowerCase()}; the strongest match is ${carLabel(result.recommendation.winner, result.recommendation.context.vehicles)}.`,
+            });
 
             return result;
         },
-        [push],
+        [push, say],
     );
 
     const switchScope = useCallback(
-        (nextKind: ScopeKind, rerun: boolean) => {
-            if (nextKind === latest.current.kind && !rerun) return;
+        (nextKind: ScopeKind) => {
+            const current = latest.current;
+            if (nextKind === current.kind && !current.run) return;
 
             setScopeKind(nextKind);
 
-            const target = latest.current.scopes[nextKind];
-
-            if (rerun && latest.current.answers) {
-                showRun(latest.current.answers, nextKind, `${target.headline}.`);
+            if (current.run && current.applied) {
+                compareWith(current.applied.understanding, nextKind, `${current.scopes[nextKind].headline}.`);
             } else {
-                push({ kind: "lens", text: `${target.headline}.`, tone: "note" });
+                say(`${current.scopes[nextKind].headline}.`, "note");
             }
         },
-        [push, showRun],
+        [compareWith, say],
     );
 
-    const scopeFor = (suggested: ScopeKind | null | undefined): ScopeKind | null =>
-        suggested && latest.current.scopes[suggested]?.cars.length ? suggested : null;
-
-    /* -- Describing ---------------------------------------------------------- */
-
-    const describe = useCallback(
-        async (text: string, pending: Extract<Entry, { kind: "interpretation" }> | null) => {
-            const current = latest.current;
-            if (!current.answers) return;
-
-            if (pending) update(pending.id, (entry) => ({ ...(entry as typeof pending), status: "superseded" }));
-
-            const said = pending ? `${pending.said}\n\nThen they added: ${text}` : text;
-            const thinking = push({ kind: "thinking", text: "Reading that as Lens settings…" });
-
-            const response = await interpret({
-                text: said,
-                vocabulary: current.vocabulary,
-                current: describeCurrent(current.answers),
-                scope: conversationScope(current.kind, current.scopes),
-            });
-
-            remove(thinking);
-
-            if (!response.ok) {
-                push({ kind: "error", text: response.error, retry: () => void describe(text, null) });
-                return;
-            }
-
-            const change = validateChange(response.result.change, latest.current.answers!, latest.current.enabled);
-            const suggested = scopeFor(response.result.scope);
-
-            if (suggested && suggested !== latest.current.kind) switchScope(suggested, false);
-
-            if (isEmptyChange(change) && !change.budgetWithoutFigure) {
-                if (suggested) {
-                    showRun(latest.current.answers!, suggested, "Using your current Lens settings.");
-                    return;
-                }
-
-                push({
-                    kind: "interpretation",
-                    said,
-                    summary: response.result.summary,
-                    change,
-                    budgetFigure: null,
-                    status: "pending",
-                });
-                return;
-            }
-
-            story.current.toldMe.push(text);
-
-            push({
-                kind: "interpretation",
-                said,
-                summary: response.result.summary,
-                change,
-                budgetFigure: null,
-                status: "pending",
-            });
-        },
-        [push, remove, switchScope, showRun, update],
-    );
-
-    const useInterpretation = (entry: Extract<Entry, { kind: "interpretation" }>) => {
-        if (!answers) return;
-
-        const next = applyChange(answers, entry.change, entry.budgetFigure);
-
-        setAnswers(next);
-        story.current.understood = entry.summary;
-        update(entry.id, (current) => ({ ...(current as typeof entry), status: "applied" }));
-
-        const shown = showRun(next, kind, "Here's what Lens recommends with those preferences.");
-
-        if (shown && !entries.some((item) => item.kind === "saveOffer")) {
-            push({ kind: "saveOffer", saved: false });
-        }
-    };
-
-    /* -- Asking -------------------------------------------------------------- */
-
-    /*
-     * Built from the engine alone, and deliberately without a model: the
-     * card already connects what the reader said to what Lens weighed and
-     * what the car did, and on the free tier every model call is one of a
-     * handful a day. A reader who wants it in other words can ask.
-     */
     const showWhy = useCallback(
         (target: LensRun) => {
-            push({
-                kind: "why",
-                run: target,
-                story: { toldMe: [...story.current.toldMe], understood: story.current.understood },
-            });
+            const current = latest.current;
+            const u = current.applied?.understanding ?? EMPTY_UNDERSTANDING;
+            const translation = current.applied?.translation ?? toAnswers(current.base!, u);
+
+            push({ kind: "why", run: target, understanding: u, translation, question: current.openQuestion });
         },
         [push],
     );
 
-    const askLens = useCallback(
-        async (text: string) => {
+    const talk = useCallback(
+        async (message: string) => {
             const current = latest.current;
-            if (!current.answers || !current.run) return;
+            const thinking = push({ kind: "thinking", text: current.run ? "Thinking about that…" : "Listening…" });
 
-            const thinking = push({ kind: "thinking", text: "Reading Lens's results…" });
-
-            const response = await ask({
-                question: text,
+            const response = await converse({
+                message,
                 vocabulary: current.vocabulary,
-                current: describeCurrent(current.answers),
-                facts: buildLensFacts(current.run.recommendation, current.run.narrative),
-                history: history.current.slice(-3),
+                understanding: toWire(current.understanding),
+                openQuestion: current.openQuestion,
+                answered: answered.current,
+                evidence: evidenceCatalogue(current.scopes[current.kind].cars),
+                facts: current.run
+                    ? {
+                          ...buildLensFacts(current.run.recommendation, current.run.narrative),
+                          yourSituation: toWire(current.applied?.understanding ?? current.understanding),
+                          evidenceForYourNeeds: evidenceForNeeds(current.run, current.applied?.understanding ?? current.understanding),
+                      }
+                    : null,
+                history: history.current.slice(-8),
                 scope: conversationScope(current.kind, current.scopes),
+                today: new Date().toISOString().slice(0, 10),
             });
 
             remove(thinking);
 
             if (!response.ok) {
-                push({ kind: "error", text: response.error, retry: () => void askLens(text) });
+                push({ kind: "error", text: response.error, retry: () => void talk(message) });
                 return;
             }
 
-            const { kind: answerKind, answer, change } = response.result;
-            history.current.push({ question: text, answer });
+            const result = response.result;
 
-            const suggested = scopeFor(response.result.scope);
+            /* A question Lens asked is answered by whatever the person said next. */
+            if (current.openQuestion) {
+                answered.current.push({ question: current.openQuestion.ask, answer: message });
+            }
 
-            if (suggested && suggested !== latest.current.kind) {
-                push({ kind: "lens", text: answer });
-                switchScope(suggested, true);
+            const enabledIds = current.enabled.length ? current.enabled : undefined;
+            const suggested =
+                result.scope && result.scope !== current.kind && current.scopes[result.scope]?.cars.length
+                    ? result.scope
+                    : null;
+
+            if (result.kind === "answer" || !result.understanding) {
+                say(result.reply);
+                setOpenQuestion(readQuestion(result.question, answered.current) ?? (result.kind === "answer" ? current.openQuestion : null));
+                if (suggested) switchScope(suggested);
                 return;
             }
 
-            if (answerKind === "whatIf" && change) {
-                push({
-                    kind: "whatIf",
-                    answer,
-                    change: validateChange(change, latest.current.answers!, latest.current.enabled),
-                    status: "pending",
-                });
+            if (result.kind === "whatIf") {
+                const before = current.applied?.understanding ?? current.understanding;
+                const after = readUnderstanding(result.understanding, before, enabledIds);
+
+                history.current.push({ role: "lens", text: result.reply });
+                push({ kind: "whatIf", reply: result.reply, after, lines: diffUnderstanding(before, after), status: "pending" });
                 return;
             }
 
-            push({ kind: "lens", text: answer });
+            const next = readUnderstanding(result.understanding, current.understanding, enabledIds);
+            const question = readQuestion(result.question, answered.current);
+
+            setUnderstanding(next);
+            setOpenQuestion(question);
+            history.current.push({ role: "lens", text: [result.reply, question?.ask].filter(Boolean).join(" ") });
+
+            if (suggested) setScopeKind(suggested);
+
+            if (isEmptyUnderstanding(next) && !question && !next.notModelled.length) {
+                say(result.reply);
+                return;
+            }
+
+            setEntries((all) =>
+                all.map((entry) =>
+                    entry.kind === "understanding" && entry.status === "pending" ? { ...entry, status: "superseded" } : entry,
+                ),
+            );
+
+            push({
+                kind: "understanding",
+                understanding: next,
+                question,
+                reply: result.reply,
+                isUpdate: Boolean(current.run),
+                status: "pending",
+            });
+
+            /* "Compare my cars" with nothing new to understand: just compare. */
+            if (suggested && current.run) compareWith(next, suggested);
         },
-        [push, remove, switchScope],
+        [compareWith, push, remove, say, switchScope],
     );
 
     const send = async (raw: string) => {
         const text = raw.trim();
-        if (!text || busy || !answers) return;
+        if (!text || busy || !base) return;
 
         setInput("");
         push({ kind: "user", text });
+        history.current.push({ role: "reader", text });
 
         const currentRun = latest.current.run;
 
@@ -449,29 +420,32 @@ export function LensChat() {
         }
 
         if (!aiReady) {
-            push({
-                kind: "lens",
-                tone: "note",
-                text: "Lens can't read free text right now. You can still get a recommendation from your Lens settings, ask why, compare and pin.",
-            });
+            say("Lens can't read free text right now. You can still get a match from your Lens settings, ask why, compare and pin.", "note");
             return;
         }
 
         setBusy(true);
 
         try {
-            const pending = [...entries]
-                .reverse()
-                .find((entry): entry is Extract<Entry, { kind: "interpretation" }> =>
-                    entry.kind === "interpretation" && entry.status === "pending",
-                );
-
-            if (!currentRun || pending) await describe(text, pending ?? null);
-            else await askLens(text);
+            await talk(text);
         } finally {
             setBusy(false);
             inputRef.current?.focus();
         }
+    };
+
+    const confirmUnderstanding = (entry: Extract<Entry, { kind: "understanding" }>) => {
+        const shown = compareWith(latest.current.understanding, latest.current.kind);
+
+        if (!shown) return;
+
+        setEntries((all) =>
+            all.map((item) =>
+                item.id === entry.id ? { ...item, status: "applied" } as Entry : item,
+            ),
+        );
+
+        if (!entries.some((item) => item.kind === "saveOffer")) push({ kind: "saveOffer", saved: false });
     };
 
     /* -- Acting on cars ----------------------------------------------------- */
@@ -496,22 +470,33 @@ export function LensChat() {
     };
 
     const runWhatIf = (entry: Extract<Entry, { kind: "whatIf" }>) => {
-        if (!answers || !run) return;
+        const current = latest.current;
+        if (!current.base || !current.run) return;
 
-        const proposal = proposalFor(entry.change, answers);
-        const ran = runProposal(scopes[run.scope].cars, proposal);
+        const translation = toAnswers(current.base, entry.after, current.enabled.length ? current.enabled : undefined);
+        const cars = current.scopes[current.run.scope].cars;
+        const after = runLens(cars, translation.answers, current.run.scope, current.run.scopeHeadline);
 
-        if (!ran) return;
+        if (!after) return;
 
-        update(entry.id, (current) => ({ ...(current as typeof entry), status: "ran", ran: { outcome: ran.outcome, proposal } }));
+        const outcome = compareOutcomes({
+            cars,
+            before: current.run.recommendation,
+            after: after.recommendation,
+            beforeAnswers: current.run.answers,
+            afterAnswers: translation.answers,
+        });
+
+        update(entry.id, (item) => (item.kind === "whatIf" ? { ...item, status: "ran", ran: { outcome, run: after, translation } } : item));
     };
 
     const useWhatIf = (entry: Extract<Entry, { kind: "whatIf" }>) => {
-        if (!entry.ran || !run) return;
+        if (!entry.ran) return;
 
-        setAnswers(entry.ran.proposal.after);
-        update(entry.id, (current) => ({ ...(current as typeof entry), status: "used" }));
-        showRun(entry.ran.proposal.after, run.scope);
+        setUnderstanding(entry.after);
+        update(entry.id, (item) => (item.kind === "whatIf" ? { ...item, status: "used" } : item));
+        latest.current.understanding = entry.after;
+        compareWith(entry.after, entry.ran.run.scope);
     };
 
     /* -- Suggestions --------------------------------------------------------- */
@@ -523,8 +508,7 @@ export function LensChat() {
                   ? [
                         {
                             label: `Why not the ${carLabel(run.recommendation.runnerUp, run.recommendation.context.vehicles)}?`,
-                            act: () =>
-                                void send(`Why didn't you choose the ${carLabel(run.recommendation.runnerUp!, run.recommendation.context.vehicles)}?`),
+                            act: () => void send(`Why didn't you choose the ${carLabel(run.recommendation.runnerUp!, run.recommendation.context.vehicles)}?`),
                         },
                     ]
                   : []),
@@ -534,21 +518,21 @@ export function LensChat() {
                         { label: "What about the cheaper one?", act: () => void send("What am I giving up with the cheaper option?") },
                     ]
                   : []),
-              { label: "Good for long road trips?", act: () => void send("Would this still make sense for long road trips?") },
-              { label: "What if safety mattered more?", act: () => void send("What would change if safety mattered more?") },
-              { label: "Too expensive", act: () => void send("Too expensive.") },
+              ...(applied?.understanding.budget?.kind === "hardMax"
+                  ? [{ label: "What if I could spend €100 more?", act: () => void send("What if I could spend €100 more per month?") }]
+                  : [{ label: "Too expensive", act: () => void send("Too expensive.") }]),
           ].filter((item) => aiReady || ["Why this car?", "Compare these cars"].includes(item.label))
-        : aiReady
+        : aiReady && entries.length === 0
           ? STARTERS.map((label) => ({ label, act: () => void send(label) }))
           : [];
 
     /* -- Rendering ----------------------------------------------------------- */
 
-    const ready = Boolean(answers && pageLoaded);
+    const ready = Boolean(base && pageLoaded);
 
     return (
         <div className="flex h-screen flex-col bg-white font-sans text-finn-black">
-            <Header scope={scope} scopes={scopes} kind={kind} onScope={(next) => switchScope(next, Boolean(run))} />
+            <Header scope={scope} scopes={scopes} kind={kind} onScope={(next) => switchScope(next)} />
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-finn-snow px-3 py-3">
                 {!ready ? (
@@ -561,49 +545,143 @@ export function LensChat() {
                         aiState={status.state}
                         personalised={personalised}
                         onRetryAi={retryHealth}
-                        onUseSettings={() => answers && showRun(answers, kind, `Using your ${personalised ? "" : "default "}Lens settings.`)}
+                        onUseSettings={() => compareWith(EMPTY_UNDERSTANDING, kind, `Using your ${personalised ? "" : "default "}Lens settings.`)}
                     />
                 ) : (
                     <div className="space-y-3">
-                        {entries.map((entry) => (
-                            <EntryView
-                                key={entry.id}
-                                entry={entry}
-                                answers={answers!}
-                                actions={actions}
-                                onUseInterpretation={useInterpretation}
-                                onBudgetFigure={(id, figure) =>
-                                    update(id, (current) =>
-                                        current.kind === "interpretation" ? { ...current, budgetFigure: figure } : current,
-                                    )
-                                }
-                                onCancel={(id) =>
-                                    update(id, (current) =>
-                                        current.kind === "interpretation" || current.kind === "whatIf"
-                                            ? ({ ...current, status: "cancelled" } as Entry)
-                                            : current,
-                                    )
-                                }
-                                onCorrect={() => {
-                                    setInput("");
-                                    inputRef.current?.focus();
-                                }}
-                                onWhy={showWhy}
-                                onCompare={(target) => push({ kind: "compare", run: target })}
-                                onRunWhatIf={runWhatIf}
-                                onUseWhatIf={useWhatIf}
-                                onSave={async (id) => {
-                                    if (!answers) return;
-                                    await saveLensSettings({
-                                        priorities: answers.priorities,
-                                        preferences: answers.preferences,
-                                        categoryFeatures: answers.features,
-                                        basedOn: answers.basedOn,
-                                    });
-                                    update(id, (current) => (current.kind === "saveOffer" ? { ...current, saved: true } : current));
-                                }}
-                            />
-                        ))}
+                        {entries.map((entry) => {
+                            switch (entry.kind) {
+                                case "user":
+                                    return (
+                                        <p key={entry.id} className="ml-auto w-fit max-w-[85%] rounded-[18px] rounded-br-md bg-finn-highlight-navy px-3 py-2 text-sm leading-5 text-white">
+                                            {entry.text}
+                                        </p>
+                                    );
+
+                                case "lens":
+                                    return (
+                                        <p key={entry.id} className={`max-w-[92%] text-sm leading-6 ${entry.tone === "note" ? "text-finn-iron" : "text-finn-black"}`}>
+                                            {entry.text}
+                                        </p>
+                                    );
+
+                                case "thinking":
+                                    return <Thinking key={entry.id}>{entry.text}</Thinking>;
+
+                                case "error":
+                                    return <AiError key={entry.id} message={entry.text} onRetry={entry.retry ?? undefined} />;
+
+                                case "understanding":
+                                    return (
+                                        <UnderstandingCard
+                                            key={entry.id}
+                                            understanding={entry.understanding}
+                                            translation={toAnswers(base!, entry.understanding, enabled.length ? enabled : undefined)}
+                                            reply={entry.reply}
+                                            question={entry.question}
+                                            cars={scope.cars}
+                                            scopeLabel={scope.headline.replace(/^Comparing /, "").replace(/^Looking at /, "")}
+                                            isUpdate={entry.isUpdate}
+                                            status={entry.status}
+                                            busy={busy}
+                                            onCompare={() => confirmUnderstanding(entry)}
+                                            onAnswer={(answer) => void send(answer)}
+                                            onCorrect={() => {
+                                                setInput("");
+                                                inputRef.current?.focus();
+                                            }}
+                                        />
+                                    );
+
+                                case "fit":
+                                    return (
+                                        <FitCard
+                                            key={entry.id}
+                                            story={tellFitStory(entry.run, entry.understanding, entry.translation.lessRelevant, entry.question)}
+                                            match={summariseMatch(entry.run)}
+                                            alternatives={alternativesWithinLimits(entry.run)}
+                                            actions={actions}
+                                            busy={busy}
+                                            onWhy={() => showWhy(entry.run)}
+                                            onCompare={() => push({ kind: "compare", run: entry.run })}
+                                            onAnswer={(answer) => void send(answer)}
+                                        />
+                                    );
+
+                                case "why":
+                                    return (
+                                        <WhyCard
+                                            key={entry.id}
+                                            story={tellFitStory(entry.run, entry.understanding, entry.translation.lessRelevant, entry.question)}
+                                            translation={entry.translation}
+                                        />
+                                    );
+
+                                case "compare":
+                                    return <CompareCard key={entry.id} rows={compareRows(entry.run)} headline={entry.run.scopeHeadline} actions={actions} />;
+
+                                case "whatIf":
+                                    if (entry.status === "ran" && entry.ran) {
+                                        return (
+                                            <OutcomeCard key={entry.id} outcome={entry.ran.outcome}>
+                                                <PrimaryButton onClick={() => useWhatIf(entry)}>Use this</PrimaryButton>
+                                                <SecondaryButton onClick={() => update(entry.id, (item) => (item.kind === "whatIf" ? { ...item, status: "cancelled" } : item))}>
+                                                    Go back
+                                                </SecondaryButton>
+                                            </OutcomeCard>
+                                        );
+                                    }
+
+                                    if (entry.status === "used") {
+                                        return (
+                                            <p key={entry.id} className="inline-flex items-center gap-1 text-xs font-bold text-finn-influence-emerald">
+                                                <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                                                Using the changed situation.
+                                            </p>
+                                        );
+                                    }
+
+                                    return (
+                                        <WhatIfCard
+                                            key={entry.id}
+                                            reply={entry.reply}
+                                            lines={entry.lines}
+                                            status={entry.status}
+                                            busy={busy}
+                                            onRun={() => runWhatIf(entry)}
+                                            onCancel={() => update(entry.id, (item) => (item.kind === "whatIf" ? { ...item, status: "cancelled" } : item))}
+                                        />
+                                    );
+
+                                case "saveOffer":
+                                    return (
+                                        <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-white px-3 py-2.5">
+                                            <p className="min-w-0 flex-1 text-[11px] leading-4 text-finn-iron">
+                                                {entry.saved
+                                                    ? "Saved. Lens's badges, panel and Compare page now use these preferences too."
+                                                    : "This applies to this conversation only. Your saved Lens settings haven't changed."}
+                                            </p>
+                                            {!entry.saved && (
+                                                <SmallButton
+                                                    onClick={async () => {
+                                                        if (!applied) return;
+                                                        await saveLensSettings({
+                                                            priorities: applied.translation.answers.priorities,
+                                                            preferences: applied.translation.answers.preferences,
+                                                            categoryFeatures: applied.translation.answers.features,
+                                                            basedOn: null,
+                                                        });
+                                                        update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
+                                                    }}
+                                                >
+                                                    <Save aria-hidden="true" className="h-3.5 w-3.5" />
+                                                    Save as my settings
+                                                </SmallButton>
+                                            )}
+                                        </div>
+                                    );
+                            }
+                        })}
                         <div ref={endRef} />
                     </div>
                 )}
@@ -637,7 +715,7 @@ export function LensChat() {
                         ref={inputRef}
                         value={input}
                         rows={1}
-                        maxLength={600}
+                        maxLength={1200}
                         disabled={!ready}
                         onChange={(event) => setInput(event.target.value)}
                         onKeyDown={(event) => {
@@ -649,9 +727,11 @@ export function LensChat() {
                         placeholder={
                             !aiReady
                                 ? "Lens can't read free text right now"
-                                : run
-                                  ? "Ask about these cars, or “what if…”"
-                                  : "Tell Lens what you're looking for…"
+                                : openQuestion
+                                  ? "Answer, or tell Lens something else…"
+                                  : run
+                                    ? "Ask about these cars, or “what if…”"
+                                    : "Tell Lens what you're looking for…"
                         }
                         aria-label="Message Lens"
                         className="max-h-24 min-h-9 flex-1 resize-none bg-transparent py-2 text-sm leading-5 outline-none placeholder:text-finn-iron/70"
@@ -787,168 +867,3 @@ function EmptyState({
     );
 }
 
-function EntryView({
-    entry,
-    answers,
-    actions,
-    onUseInterpretation,
-    onBudgetFigure,
-    onCancel,
-    onCorrect,
-    onWhy,
-    onCompare,
-    onRunWhatIf,
-    onUseWhatIf,
-    onSave,
-}: {
-    entry: Entry;
-    answers: Answers;
-    actions: CarActions;
-    onUseInterpretation: (entry: Extract<Entry, { kind: "interpretation" }>) => void;
-    onBudgetFigure: (id: number, figure: number | null) => void;
-    onCancel: (id: number) => void;
-    onCorrect: () => void;
-    onWhy: (run: LensRun) => void;
-    onCompare: (run: LensRun) => void;
-    onRunWhatIf: (entry: Extract<Entry, { kind: "whatIf" }>) => void;
-    onUseWhatIf: (entry: Extract<Entry, { kind: "whatIf" }>) => void;
-    onSave: (id: number) => void;
-}) {
-    switch (entry.kind) {
-        case "user":
-            return (
-                <p className="ml-auto w-fit max-w-[85%] rounded-[18px] rounded-br-md bg-finn-highlight-navy px-3 py-2 text-sm leading-5 text-white">
-                    {entry.text}
-                </p>
-            );
-
-        case "lens":
-            return (
-                <p className={`max-w-[92%] text-sm leading-6 ${entry.tone === "note" ? "text-finn-iron" : "text-finn-black"}`}>
-                    {entry.text}
-                </p>
-            );
-
-        case "thinking":
-            return <Thinking>{entry.text}</Thinking>;
-
-        case "error":
-            return <AiError message={entry.text} onRetry={entry.retry ?? undefined} />;
-
-        case "interpretation": {
-            const proposal = proposalFor(entry.change, answers, entry.budgetFigure);
-            const empty = isEmptyChange(entry.change) && entry.budgetFigure == null;
-
-            if (entry.status === "superseded") return null;
-
-            if (entry.status !== "pending") {
-                return (
-                    <p className="text-xs font-bold text-finn-iron">
-                        {entry.status === "applied" ? (
-                            <span className="inline-flex items-center gap-1 text-finn-influence-emerald">
-                                <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                                Using these preferences for this conversation.
-                            </span>
-                        ) : (
-                            "Left your preferences as they were."
-                        )}
-                    </p>
-                );
-            }
-
-            return (
-                <ProposalReview
-                    proposal={proposal}
-                    eyebrow="Here's what I understood"
-                    title={empty ? "Nothing here maps onto a Lens setting" : "Your words, as Lens settings"}
-                    summary={entry.summary}
-                    budgetFigure={entry.budgetFigure}
-                    onBudgetFigure={(figure) => onBudgetFigure(entry.id, figure)}
-                >
-                    {!empty && <PrimaryButton onClick={() => onUseInterpretation(entry)}>Use these preferences</PrimaryButton>}
-                    <SecondaryButton onClick={onCorrect}>{empty ? "Try again" : "Not quite"}</SecondaryButton>
-                    <SecondaryButton onClick={() => onCancel(entry.id)}>Cancel</SecondaryButton>
-                    {!empty && (
-                        <p className="basis-full text-[11px] leading-4 text-finn-iron">
-                            Not quite right? Just tell Lens what to change.
-                        </p>
-                    )}
-                </ProposalReview>
-            );
-        }
-
-        case "match":
-            return (
-                <MatchCard
-                    match={summariseMatch(entry.run)}
-                    actions={actions}
-                    onWhy={() => onWhy(entry.run)}
-                    onCompare={() => onCompare(entry.run)}
-                />
-            );
-
-        case "why":
-            return <WhyCard why={explainWhy(entry.run, entry.story)} />;
-
-        case "compare":
-            return <CompareCard rows={compareRows(entry.run)} headline={entry.run.scopeHeadline} actions={actions} />;
-
-        case "whatIf": {
-            if (entry.status === "cancelled") {
-                return <p className="text-xs font-bold text-finn-iron">Left as it was.</p>;
-            }
-
-            if (entry.status === "used") {
-                return (
-                    <p className="inline-flex items-center gap-1 text-xs font-bold text-finn-influence-emerald">
-                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                        Using the changed preferences.
-                    </p>
-                );
-            }
-
-            if (entry.status === "ran" && entry.ran) {
-                return (
-                    <OutcomeCard outcome={entry.ran.outcome}>
-                        <PrimaryButton onClick={() => onUseWhatIf(entry)}>Use this</PrimaryButton>
-                        <SecondaryButton onClick={() => onCancel(entry.id)}>Go back</SecondaryButton>
-                    </OutcomeCard>
-                );
-            }
-
-            const proposal = proposalFor(entry.change, answers);
-            const empty = isEmptyChange(entry.change);
-
-            return (
-                <div className="space-y-2">
-                    <p className="text-sm leading-6">{entry.answer}</p>
-                    <ProposalReview
-                        proposal={proposal}
-                        eyebrow="Try this change?"
-                        title={empty ? "Lens can't test that as a setting" : "Lens would re-run with these answers"}
-                    >
-                        {!empty && <PrimaryButton onClick={() => onRunWhatIf(entry)}>Run comparison</PrimaryButton>}
-                        <SecondaryButton onClick={() => onCancel(entry.id)}>Cancel</SecondaryButton>
-                    </ProposalReview>
-                </div>
-            );
-        }
-
-        case "saveOffer":
-            return (
-                <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white px-3 py-2.5">
-                    <p className="min-w-0 flex-1 text-[11px] leading-4 text-finn-iron">
-                        {entry.saved
-                            ? "Saved. Lens's badges, panel and Compare page now use these preferences too."
-                            : "These preferences apply to this conversation only. Your saved Lens settings haven't changed."}
-                    </p>
-                    {!entry.saved && (
-                        <SmallButton onClick={() => onSave(entry.id)}>
-                            <Save aria-hidden="true" className="h-3.5 w-3.5" />
-                            Save as my settings
-                        </SmallButton>
-                    )}
-                </div>
-            );
-    }
-}
