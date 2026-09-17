@@ -15,6 +15,7 @@ import { Tradeoffs } from "./components/Tradeoffs";
 import { WhyItWins } from "./components/WhyItWins";
 import { ExportButton, usePdfExport } from "./usePdfExport";
 import { useRecommendation } from "./useRecommendation";
+import { AskLens } from "../lens-ai/AskLens";
 
 /**
  * The recommendation: one car, and the case for it.
@@ -127,6 +128,17 @@ export function Advice({
                     onChallenge={options.length ? onChallenge : null}
                 />
             )}
+
+            {/*
+              * Experimental, and screen-only: questions about the result
+              * directly under it. Renders nothing unless the Lens AI server
+              * is answering, so the page reads exactly as before without it.
+              */}
+            <AskLens
+                cars={cars}
+                recommendation={recommendation}
+                narrative={winnerNarrative}
+            />
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="space-y-6">

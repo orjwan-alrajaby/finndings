@@ -12,6 +12,7 @@ import { Spinner } from "@/components/Spinner";
 import { AdjustDrawer } from "./components/AdjustDrawer";
 import { Advice } from "./advice";
 import { Challenge } from "./advice/Challenge";
+import { TellLens } from "./lens-ai/TellLens";
 import { useCompareStore } from "./store";
 
 /**
@@ -170,6 +171,13 @@ export default function CompareTab({
             <Loading>Reading your settings…</Loading>
           ) : (
             <>
+              {/*
+                * Experimental: describe yourself in words and review how
+                * that maps onto these same answers. Renders nothing unless
+                * the Lens AI server is answering.
+                */}
+              <TellLens cars={cars} />
+
               {/*
                 * Two readings of one set of answers, and the tabs say which is
                 * which before either is read. Above the page rather than inside

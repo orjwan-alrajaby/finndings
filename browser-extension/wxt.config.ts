@@ -23,7 +23,7 @@ export default defineConfig({
       },
     },
   }),
-  manifest: () => ({
+  manifest: ({ command }) => ({
     /*
      * Set here rather than left to package.json, which would install this as
      * "finn-lens" — the npm package name, not the product's.
@@ -31,7 +31,17 @@ export default defineConfig({
     name: "Finn Lens",
     description:
       "Choose between FINN car subscriptions. Pin the cars you're weighing up and Lens ranks them against the things you said matter, with the reasoning and the compromises spelled out.",
-    host_permissions: ["https://www.finn.com/*"],
+    /*
+     * The Lens AI experiment's local server, in development only. Its own
+     * CORS headers already admit extension pages, so a built extension works
+     * without this; granting it under `npm run dev` just keeps Chrome's
+     * local-network rules out of the way while iterating. A production build
+     * asks for nothing new.
+     */
+    host_permissions: [
+      "https://www.finn.com/*",
+      ...(command === "serve" ? ["http://127.0.0.1:8787/*"] : []),
+    ],
     permissions: [
       "tabs",
       "activeTab",
