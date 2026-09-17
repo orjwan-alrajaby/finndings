@@ -42,6 +42,7 @@ export default function CompareTab({
 }) {
   const loadSettings = useCompareStore((state) => state.loadSettings);
   const settingsLoaded = useCompareStore((state) => state.settingsLoaded);
+  const answersRevision = useCompareStore((state) => state.answersRevision);
 
   const [adjusting, setAdjusting] = useState(false);
 
@@ -215,6 +216,11 @@ export default function CompareTab({
 
         {ready && (
           <AdjustDrawer
+            /*
+              * Re-seeded when answers arrive from Lens AI rather than from
+              * the drawer itself — see `answersRevision` in the store.
+              */
+            key={answersRevision}
             open={adjusting}
             onOpenChange={setAdjusting}
             onSettings={onSettings}

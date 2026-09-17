@@ -82,14 +82,26 @@ interface CompareState extends Answers {
     /** On the page: the car in the hot seat. Null means the winner. */
     challengerId: number | null;
 
+    /**
+     * Bumped whenever answers arrive from somewhere other than the drawer —
+     * Lens AI, today. The drawer seeds its draft once and keeps it across
+     * closes, so without this it would go on holding the answers from before
+     * and its Save would quietly put them back. Keying the drawer on this
+     * re-seeds it from what the page is actually reasoning from.
+     */
+    answersRevision: number;
+
     /* ---------------------------------------------------------------- */
     /* Actions                                                          */
     /* ---------------------------------------------------------------- */
 
     loadSettings: () => Promise<void>;
 
-    /** Take a drawer's saved draft as this run's answers. */
-    applyAnswers: (answers: Answers) => void;
+    /**
+     * Take a new set of answers for this run: a drawer's saved draft, or a
+     * change the reader accepted from Lens AI.
+     */
+    applyAnswers: (answers: Answers, from?: "drawer" | "lensAi") => void;
 
     setChallengerId: (id: number | null) => void;
 }
@@ -132,6 +144,7 @@ export const useCompareStore = create<CompareState>((set, get) => ({
     basedOn: DEFAULT_DEFAULT_PROFILE_ID,
 
     challengerId: null,
+    answersRevision: 0,
 
     /**
      * Read the saved settings in, once. Later calls are ignored on purpose:
@@ -169,16 +182,18 @@ export const useCompareStore = create<CompareState>((set, get) => ({
      * reasoning, and the new answers may not rank it anywhere near where it
      * was.
      */
-    applyAnswers({ priorities, preferences, features, basedOn }) {
+    applyAnswers({ priorities, preferences, features, basedOn }, from = "drawer") {
         persistPriorities(priorities, basedOn);
 
-        set({
+        set((state) => ({
             priorities,
             preferences,
             features: copyFeatures(features),
             basedOn,
             challengerId: null,
-        });
+            answersRevision:
+                from === "drawer" ? state.answersRevision : state.answersRevision + 1,
+        }));
     },
 
     setChallengerId(challengerId) {
