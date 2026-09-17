@@ -26,18 +26,26 @@ export default defineContentScript({
       console.error("[FinnLens] injection failed", e);
     }
 
-    browser.runtime.onMessage.addListener(async (message) => {
-      if (message.type !== "GET_PAGE_STATS") return;
+    /*
+     * Not `async`: an async listener returns a promise for every message,
+     * including the ones it ignores, and Chrome takes that as this frame's
+     * answer — so it replied `undefined` to anything sent to the page before
+     * the listener that owned the message could.
+     */
+    browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message?.type !== "GET_PAGE_STATS") return undefined;
 
-      const pinnedCars = await getPinnedCars();
+      void getPinnedCars().then((pinnedCars) =>
+        sendResponse({
+          detectedCount: document.querySelectorAll(
+            '[data-finn-lens-processed="true"]'
+          ).length,
+          pinnedCount: Object.keys(pinnedCars ?? {}).length,
+          pinnedCars,
+        }),
+      );
 
-      return {
-        detectedCount: document.querySelectorAll(
-          '[data-finn-lens-processed="true"]'
-        ).length,
-        pinnedCount: Object.keys(pinnedCars ?? {}).length,
-        pinnedCars,
-      };
+      return true;
     });
 
     /*
