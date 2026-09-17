@@ -40,8 +40,8 @@ export function CalculatedPriorityDetails({
                 </p>
 
                 <p className="mt-1 text-xs leading-5 text-finn-iron">
-                    Because it's judged on figures rather than equipment,
-                    there's no feature list here to single one out of. Where
+                    Because it's judged on the car's CO₂ figure alone,
+                    there's no list here to raise anything in. Where
                     you put this priority in your order is what decides how
                     much it counts.
                 </p>

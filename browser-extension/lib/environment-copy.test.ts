@@ -184,7 +184,7 @@ describe("the answer", () => {
       plain: "This car produces 30 g of CO₂ for every kilometre you drive in the official EU test, which assumes you plug it in regularly.",
     });
     expect(reading.meaning).toEqual([
-      "Its 30 g/km holds only while the battery is kept charged, and FINN Lens can't know how often you'd plug it in. So it's a partial match for your environmental priority, and never a strong one.",
+      "Its 30 g/km holds only while the battery is kept charged, and FINN Lens can't know how often you'd plug it in. So it's a good match for your environmental priority, and never a strong one.",
     ]);
   });
 

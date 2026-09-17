@@ -126,10 +126,11 @@ function energyComponent(
   const raw = Number(vehicle.consumption?.combined);
   const consumption = isPositive(raw) ? raw : null;
 
-  const caveat =
-    vehicle.fuelType === "Plug-in Hybrid"
-      ? "FINN reports one combined consumption figure for plug-in hybrids, so this estimate prices all of it as fuel. Real cost depends on how much of your driving is done on electricity."
-      : null;
+  const isPlugIn = vehicle.fuelType === "Plug-in Hybrid";
+
+  const caveat = isPlugIn
+    ? "FINN reports one combined consumption figure for plug-in hybrids, so this prices it as fuel and leaves out the electricity the car charges on. The real energy cost is higher, by an amount that depends on how much of your driving is done on electricity."
+    : null;
 
   const base = {
     consumption,
@@ -137,6 +138,12 @@ function energyComponent(
     energyPrice: price,
     energyLabel: label,
     caveat,
+    /*
+     * A plug-in hybrid's combined litres figure assumes part of the driving is
+     * electric, and that electricity isn't in it — so the fuel it prices is a
+     * floor, never an estimate of the whole.
+     */
+    isFloor: isPlugIn,
   } as const;
 
   if (consumption == null) {
@@ -257,6 +264,9 @@ export function calculateCost(
   const missing = components
     .map((component) => component.reason)
     .filter((reason): reason is CostUnavailableReason => reason != null);
+
+  /* A plug-in hybrid's energy is a floor, so its total can't be confirmed. */
+  if (energy.available && energy.isFloor) missing.push("plugInElectricityExcluded");
 
   const budget = isPositive(preferences.monthlyBudget)
     ? preferences.monthlyBudget
@@ -521,6 +531,8 @@ function excessMileageLine(breakdown: CostBreakdown): CostLine {
 }
 
 const MISSING_CAVEAT: Record<CostUnavailableReason, string> = {
+  plugInElectricityExcluded:
+    "The energy line leaves out the electricity a plug-in hybrid charges on, so the real cost is higher and Lens can't confirm it fits a budget.",
   missingSubscriptionPrice:
     "We couldn't include the subscription price because FINN hasn't supplied one for this contract type.",
   missingConsumption:

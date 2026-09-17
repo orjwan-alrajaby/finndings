@@ -1,3 +1,4 @@
+import { GOOD_FROM, STRONG_FROM } from "./bands";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -339,12 +340,13 @@ describe("plug-in hybrids", () => {
   it("won't call one a strong match on its official figure alone", () => {
     /*
      * A 30 g/km official figure would otherwise sit near the top of the scale.
-     * On-road studies put real emissions several times higher where the car is
-     * charged less than the test assumes, so the top of the scale is refused.
+     * Its figure depends on a charging habit FINN's data can't show, so Lens
+     * refuses it the Strong rating: the top of Good is as high as it goes.
      */
     const assessment = assessEnvironment(phev(30, 1.4));
 
-    expect(assessment?.score).toBeLessThanOrEqual(60);
+    expect(assessment?.score).toBeLessThan(STRONG_FROM);
+    expect(assessment?.score).toBeGreaterThanOrEqual(GOOD_FROM);
     expect(assessment?.confidence).toBe("optimistic");
   });
 

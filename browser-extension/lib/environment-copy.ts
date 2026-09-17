@@ -268,6 +268,10 @@ const CLASS_MEANING: Record<string, { words: string; tone: RowTone }> = {
  * letter depends on how often it's charged, and a green "Low emissions" beside
  * a note saying real emissions can be several times higher would be the table
  * arguing with itself.
+ *
+ * So a plug-in hybrid is never green. At best it reaches the top of Good — a
+ * rating Lens gives the figure while refusing Strong — and its colour stays
+ * the amber of a result that depends on something Lens can't see.
  */
 const BAND_TONE: Record<FitLevel, RowTone> = {
   strong: "success",
@@ -276,6 +280,9 @@ const BAND_TONE: Record<FitLevel, RowTone> = {
   limited: "error",
   unknown: "neutral",
 };
+
+const plugInTone = (band: FitBand): RowTone =>
+  band.level === "limited" ? "error" : "warning";
 
 /**
  * The colour of a fuel-use step, shared with "How much it uses".
@@ -361,7 +368,7 @@ function verdictFor(
   if (isPlugIn(assessment)) {
     return {
       words: `${meaning?.words ?? "Low emissions"}, if you charge it often`,
-      tone: BAND_TONE[band.level],
+      tone: plugInTone(band),
       plain: `This car produces ${grams} g of CO₂ for every kilometre you drive in the official EU test, which assumes you plug it in regularly.`,
     };
   }
@@ -552,7 +559,7 @@ function co2Row(assessment: EnvironmentalAssessment, band: FitBand): Environment
       car: { value: `${grams} g/km`, meaning: "Only if you charge the battery often", info: null },
       comparison: "If charged often",
       relation: null,
-      tone: BAND_TONE[band.level],
+      tone: plugInTone(band),
     };
   }
 

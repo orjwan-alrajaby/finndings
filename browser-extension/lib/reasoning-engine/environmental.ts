@@ -1,6 +1,8 @@
 import type { FinnCar, FuelType } from "@/lib/types";
 
 import { formatNumber } from "./format";
+import { GOOD_FROM, STRONG_FROM } from "./bands";
+import { piecewise, type Anchors } from "./evidence";
 
 /**
  * What a car emits, how efficiently it uses what it burns, and what neither
@@ -88,31 +90,32 @@ export const CO2_CLASSES: readonly { letter: string; from: number; upTo: number 
   }));
 
 /**
- * Where each class sits on the 0–100 the rest of the engine speaks in.
+ * Where a CO₂ figure lands on the 0–100 the rest of the engine speaks in.
  *
- * The one product judgement in this file, and a single table tied to the
- * official classes rather than a set of ceilings pulled out of the air.
+ * The one product judgement in this file. The anchors sit on the official
+ * class boundaries and the score runs in straight lines between them, so every
+ * class still reads as its band — A and B strong, C good, D and E partial, F
+ * and G limited — while one gram either side of a boundary moves the score by
+ * about a point rather than the eight a stepped table used to.
  *
- * Each class occupies a range rather than a point, and every range sits wholly
- * inside one of the reader's bands: A and B read as a strong match, C as good,
- * D and E as partial, F and G as limited. So the class a car is in decides the
- * word a reader sees, and where it sits inside that class decides where in the
- * band — two class D cars twenty grams apart are not reported as the same car,
- * and neither of them is ever reported as better than a class C one.
- *
- * D is the commonest class among cars that burn fuel. A car of average
- * emissions reading as a partial match to somebody who put the environment
- * near the top of their list is the intended result, not an accident.
+ * The step from 0 to 1 g/km is kept on purpose: no tailpipe at all is a
+ * different kind of result from a very low one.
  */
-const CLASS_POSITION: Record<string, { from: number; to: number }> = {
-  A: { from: 100, to: 100 },
-  B: { from: 88, to: 70 },
-  C: { from: 64, to: 52 },
-  D: { from: 44, to: 34 },
-  E: { from: 33, to: 28 },
-  F: { from: 22, to: 14 },
-  G: { from: 12, to: 0 },
-};
+export const CO2_SCORE_ANCHORS: Anchors = [
+  [1, 88],
+  [95, 65],
+  [115, 45],
+  [135, 35],
+  [155, 25],
+  [175, 12],
+  [195, 0],
+];
+
+/** The top of the plug-in hybrid scale: one below Strong. See `phevScore`. */
+const PHEV_CEILING = STRONG_FROM - 1;
+
+/** The highest a non-zero official figure can score, where the PHEV scale starts. */
+const TOP_NON_ZERO_SCORE = CO2_SCORE_ANCHORS[0]?.[1] ?? 88;
 
 /**
  * Grams of CO₂ per litre burned.
@@ -365,25 +368,33 @@ export function co2ClassFor(gPerKm: number): string {
  * doesn't belong to.
  */
 export function positionForCo2(gPerKm: number): number {
-  for (let index = 0; index < CO2_CLASS_BANDS.length; index += 1) {
-    const band = CO2_CLASS_BANDS[index] as { letter: string; upTo: number };
+  if (gPerKm <= 0) return 100;
 
-    if (gPerKm > band.upTo) continue;
+  return piecewise(CO2_SCORE_ANCHORS, gPerKm);
+}
 
-    const { from, to } = CLASS_POSITION[band.letter] as {
-      from: number;
-      to: number;
-    };
+/**
+ * A plug-in hybrid's score: its official figure, refused the Strong rating.
+ *
+ * A policy about which word Lens will use, not a claim about real-world
+ * emissions. The official figure assumes the car is charged often, and FINN's
+ * data can't say whether it will be, so Lens won't call a plug-in hybrid a
+ * strong environmental match on that figure — and doesn't pretend to know how
+ * much worse real use is either, so it goes no lower than that.
+ *
+ * Compressed, not clipped: a score above the Good threshold is scaled into the
+ * Good band, so two plug-in hybrids keep their order; a score at or below it
+ * is left alone. Never above a non-plug-in car with the same official figure.
+ */
+export function phevScore(normal: number): number {
+  if (normal <= GOOD_FROM) return normal;
 
-    /* Where in its own class this car sits: 0 at the clean end, 1 at the dirty. */
-    const floor = index === 0 ? 0 : (CO2_CLASS_BANDS[index - 1]?.upTo ?? 0) + 1;
-    const span = band.upTo - floor;
-    const into = span > 0 ? Math.min(1, (gPerKm - floor) / span) : 0;
+  const scaled =
+    GOOD_FROM +
+    ((normal - GOOD_FROM) * (PHEV_CEILING - GOOD_FROM)) /
+      (TOP_NON_ZERO_SCORE - GOOD_FROM);
 
-    return Math.round(from + (to - from) * into);
-  }
-
-  return 0;
+  return Math.min(PHEV_CEILING, scaled);
 }
 
 /**
@@ -903,27 +914,10 @@ export function assessEnvironment(
   let score = co2 ? positionForCo2(co2.gPerKm) : null;
   let confidence: EmissionsConfidence = co2 ? "measured" : "unknown";
 
-  /*
-   * A plug-in hybrid's scale is compressed rather than its figure corrected.
-   *
-   * The research is clear that official plug-in hybrid CO₂ understates real
-   * emissions by a large and growing margin, and equally clear that the size
-   * of the gap depends on how one particular driver charges — which FINN's
-   * data cannot tell us. So no real-world figure is invented here. What is
-   * refused is the top of the scale: this will not call a car a strong
-   * environmental match on a number that assumes a habit we can't check.
-   *
-   * Compressed and not clipped, because clipping flattened them. A plug-in
-   * hybrid at 26 g/km and one at 75 g/km both hit the ceiling and came out
-   * identical, which threw away the one real distinction between them. Scaling
-   * the whole range keeps them ordered against each other while keeping all of
-   * them below the cars whose figures don't need this caveat.
-   */
+  /* See `phevScore`: refused the Strong rating, order among them kept. */
   if (score != null && fuel === "Plug-in Hybrid") {
     confidence = "optimistic";
-    score = Math.round(
-      score * ((CLASS_POSITION.C as { to: number }).to / 100),
-    );
+    score = phevScore(score);
   }
 
   return {
@@ -1103,8 +1097,8 @@ export const ENVIRONMENTAL_METHOD: EnvironmentalMethodNote[] = [
   {
     group: "limits",
     icon: "plug",
-    heading: "Plug-in hybrids can't reach the top",
-    body: "Their official CO₂ assumes the car is plugged in regularly, and studies of cars on the road find real emissions several times higher when it isn't. Nobody can tell from FINN's data how often you'd charge, so no corrected figure is invented — the whole plug-in scale is pushed down instead. They keep their order against each other, but a plug-in hybrid ends up behind cars whose figures don't rest on a habit we can't check, including some that emit more on paper.",
+    heading: "Plug-in hybrids can't be rated Strong",
+    body: "Their official CO₂ assumes the car is plugged in regularly, and studies of cars on the road find real emissions several times higher when it isn't. Nobody can tell from FINN's data how often you'd charge, so Lens won't give the Strong rating on that figure — the best a plug-in hybrid can reach is the top of Good. No corrected figure is invented, and among plug-in hybrids a lower official figure still ranks higher.",
   },
   {
     group: "limits",

@@ -62,7 +62,7 @@ const GROUP_ICON: Record<MethodGroup["icon"], typeof Cloud> = {
  * `CATEGORIES` with `numericOnly: true`.
  */
 export const ENVIRONMENTAL_LEAD =
-    "Rank this high and Lens will favour cars that put out less CO₂ over a kilometre of driving — an electric car over a petrol one, a frugal petrol car over a thirsty one. It's the only priority judged on the car's own figures rather than on the equipment it carries.";
+    "Rank this high and Lens will favour cars that put out less CO₂ over a kilometre of driving — an electric car over a petrol one, a frugal petrol car over a thirsty one. It's judged on the car's own CO₂ figure alone, not on any of the equipment it carries.";
 
 /**
  * The whole method, behind one fold.
