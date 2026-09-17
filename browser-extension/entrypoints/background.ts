@@ -1,7 +1,32 @@
 import type { PublicPath } from "wxt/browser";
 import { needsOnboarding } from "@/lib/onboarding";
+import { CHAT_TO_PAGE_TYPES } from "@/lib/lens-chat/messages";
 
 export default defineBackground(() => {
+  /*
+   * The Lens chat on finn.com is an extension page inside an iframe. It can't
+   * reach the content script in its own tab directly, so its requests come
+   * here and go on to that tab's top frame. `sender.tab` is filled in by the
+   * browser, which is what stops a page — or another tab — from speaking for
+   * a chat it doesn't host.
+   */
+  browser.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (!CHAT_TO_PAGE_TYPES.has(req?.type)) return undefined;
+
+    const tabId = sender.tab?.id;
+
+    if (tabId == null || !sender.url?.startsWith(browser.runtime.getURL("/lens-chat.html"))) {
+      return undefined;
+    }
+
+    browser.tabs
+      .sendMessage(tabId, req, { frameId: 0 })
+      .then(sendResponse, () => sendResponse(null));
+
+    /* Keeps the channel open for the page's answer. */
+    return true;
+  });
+
   browser.runtime.onMessage.addListener((req) => {
     if (req.type === "OPEN_COMPARE_PAGE") { 
       void openOrFocusNewPage("/compare.html");

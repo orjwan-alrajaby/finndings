@@ -74,6 +74,31 @@ function syncCardButton(id: number, pinned: boolean): void {
 }
 
 /**
+ * Pin or unpin one car, and only when the reader asked for exactly that.
+ *
+ * For the chat, which acts on a car by id rather than from a button on it.
+ * Idempotent where `updatePinnedCars` toggles: asking to pin a car that is
+ * already pinned changes nothing, so a repeated or stale request can never
+ * unpin a car the reader meant to keep. Same storage writer, same card sync,
+ * same broadcast as the panel's button.
+ */
+export async function setCarPinned(
+  car: PinnedFinnCar,
+  pinned: boolean,
+): Promise<boolean> {
+  const isPinned = Boolean((await getPinnedCars())[car.id]);
+
+  if (isPinned === pinned) return isPinned;
+
+  await updatePinnedCars(car.id, { ...car, url: urlFor(car) });
+
+  syncCardButton(car.id, pinned);
+  announcePinnedCarsChanged();
+
+  return pinned;
+}
+
+/**
  * The pin controls currently on screen, so a change made elsewhere reaches
  * them.
  *

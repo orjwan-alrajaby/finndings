@@ -28,6 +28,21 @@ async function finnFetch<T = any>(path: string): Promise<T> {
   return response.json();
 }
 
+/**
+ * FINN's whole list of available cars, in one request.
+ *
+ * For Ask Lens only, when the reader opens it on a page whose cars haven't
+ * reached Lens: listing pages are rendered on FINN's server, so the page's
+ * own `/api/cars` calls — which the interceptor copies — may not have happened
+ * yet. One list call covers every card a listing draws; it is made because the
+ * reader opened the chat, never on page load.
+ */
+export function loadListingCars(): Promise<FinnCarsResponse> {
+  return finnFetch<FinnCarsResponse>(
+    "/api/cars?group_by=brand-model&hide_related=true&limit=200&view=available_cars",
+  );
+}
+
 export async function loadCarsFromFinnApi({
   isHomePage,
   isListingsPage,

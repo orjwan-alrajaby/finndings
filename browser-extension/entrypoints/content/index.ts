@@ -8,6 +8,7 @@ import {
   mergeLoadedCars,
 } from "./injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { closePanel } from "./lens-panel/panel";
+import { notifyPageChanged, syncChatBubble } from "./lens-chat/bubble";
 import {
   applyFitVerdicts,
   injectFitButtons,
@@ -135,6 +136,11 @@ export default defineContentScript({
 
       /* The verdict follows whenever there is one to give. */
       scheduleBadgePass();
+
+      /* Ask Lens, wherever there are cars to ask about. */
+      void syncChatBubble().catch((error: unknown) => {
+        console.error("[FinnLens] couldn't add Ask Lens", error);
+      });
     };
 
     const startObserving = () => {
@@ -198,6 +204,7 @@ export default defineContentScript({
       navDebounceTimer = setTimeout(() => {
         navDebounceTimer = null;
         handleNavigation();
+        notifyPageChanged();
       }, 150);
     };
 
@@ -242,7 +249,11 @@ export default defineContentScript({
         (key) => key in changes,
       );
 
-      if (carsChanged) scheduleBadgePass();
+      if (carsChanged) {
+        scheduleBadgePass();
+        /* More cars reached Lens: an open chat's "cars on this page" grew. */
+        notifyPageChanged();
+      }
     });
 
     handleNavigation();

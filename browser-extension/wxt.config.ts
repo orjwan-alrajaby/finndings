@@ -70,6 +70,15 @@ export default defineConfig({
           "content-scripts/content.css",
           "fonts/*",
           "icon/*",
+          /*
+           * Ask Lens: the chat is an extension page framed into finn.com, so
+           * the page and the script and style chunks it loads have to be
+           * reachable from there. Only on finn.com, and the page holds no
+           * secret — the AI key stays on the Lens AI server.
+           */
+          "lens-chat.html",
+          "chunks/*",
+          "assets/*",
         ],
         matches: ["https://www.finn.com/*"]
       }
