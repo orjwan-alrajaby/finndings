@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { buildRecommendation } from "@/lib/reasoning-engine";
 import type { CategoryId, Recommendation } from "@/lib/reasoning-engine/types";
-import type { HealthResult } from "@/lib/lens-ai/contract";
-import { health } from "@/lib/lens-ai/client";
+import {
+    lensAiUsable,
+    loadLensAiSettings,
+    watchLensAiSettings,
+    type LensAiSettings,
+} from "@/lib/lens-ai/settings";
 import { compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
 import {
     applyChange,
@@ -38,42 +42,28 @@ export function useEnabledCategories(): CategoryId[] {
     );
 }
 
-export type LensAiStatus =
-    | { state: "checking" }
-    | { state: "offline" }
-    | { state: "ready"; provider: string; model: string | null };
-
-/* One health check per page load, shared by every surface that asks. */
-let shared: Promise<HealthResult | null> | null = null;
+export type LensAiStatus = { state: "checking" } | { state: "off" } | { state: "ready" };
 
 /**
- * Whether the Lens AI server is answering. Checked once, and again on demand.
+ * Whether Lens AI is switched on, with a key, in Settings — kept current, so
+ * turning it off on the Settings page takes the AI surfaces off every open
+ * page without a reload.
  *
- * Every AI surface reads this first. Offline is a normal state, not an error:
- * the page it sits on works exactly as it did before the experiment existed.
+ * Every AI surface reads this first. Off is the default, not an error: the
+ * page it sits on works exactly as it does without the AI.
  */
 export function useLensAiStatus() {
     const [status, setStatus] = useState<LensAiStatus>({ state: "checking" });
 
-    const check = useCallback(async (fresh = false) => {
-        setStatus({ state: "checking" });
+    useEffect(() => {
+        const show = (settings: LensAiSettings) => setStatus({ state: lensAiUsable(settings) ? "ready" : "off" });
 
-        if (fresh || !shared) shared = health();
+        void loadLensAiSettings().then(show);
 
-        const result = await shared;
-
-        setStatus(
-            result
-                ? { state: "ready", provider: result.provider, model: result.model }
-                : { state: "offline" },
-        );
+        return watchLensAiSettings(show);
     }, []);
 
-    useEffect(() => {
-        void check();
-    }, [check]);
-
-    return { status, retry: () => void check(true) };
+    return { status };
 }
 
 /** A validated change, with what it does to the answers, before anything runs. */

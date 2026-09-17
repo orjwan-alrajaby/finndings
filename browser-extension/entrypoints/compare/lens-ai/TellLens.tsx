@@ -24,7 +24,6 @@ import { ProposalReview } from "./ProposalReview";
 import {
     AiError,
     ExperimentTag,
-    OfflineHint,
     PrimaryButton,
     SecondaryButton,
     Thinking,
@@ -58,7 +57,7 @@ type Phase =
     | { step: "applied"; outcome: Outcome; previous: Answers };
 
 export function TellLens({ cars }: { cars: PinnedFinnCar[] }) {
-    const { status, retry } = useLensAiStatus();
+    const { status } = useLensAiStatus();
     const answers = useCurrentAnswers();
     const enabled = useEnabledCategories();
     const applyAnswers = useCompareStore((state) => state.applyAnswers);
@@ -81,8 +80,7 @@ export function TellLens({ cars }: { cars: PinnedFinnCar[] }) {
         [phase, answers],
     );
 
-    if (status.state === "checking") return null;
-    if (status.state === "offline") return <OfflineHint onRetry={retry} />;
+    if (status.state !== "ready") return null;
 
     const submit = async () => {
         const said = text.trim();

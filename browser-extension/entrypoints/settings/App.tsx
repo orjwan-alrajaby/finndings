@@ -38,6 +38,13 @@ import { PrioritiesSettings } from "./tabs/PrioritiesSettings";
 import { ProfilesSettings } from "./tabs/ProfileSettings";
 import { DrivingSettings } from "./tabs/DrivingSettings";
 import { DataSettings } from "./tabs/DataSettings";
+import { LensAiSettings } from "./tabs/LensAiSettings";
+import {
+  DEFAULT_LENS_AI_SETTINGS,
+  loadLensAiSettings,
+  saveLensAiSettings,
+  type LensAiSettings as AiSettings,
+} from "@/lib/lens-ai/settings";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SaveControl } from "@/components/SaveControl";
 import { getProfileIssues } from "./utils/PriorityValidation";
@@ -66,6 +73,14 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     categoryFeatures: Record<CategoryId, FeatureSelection>;
     basedOn: SettingsBasis;
   } | null>(null);
+
+  /*
+   * Lens AI is saved with everything else, by the same button, but kept out
+   * of `LensSettings`: it's whether a model may be called, not how Lens
+   * judges a car, and restoring the defaults shouldn't forget a key.
+   */
+  const [ai, setAi] = useState<AiSettings>(DEFAULT_LENS_AI_SETTINGS);
+  const [persistedAi, setPersistedAi] = useState<string>(stableStringify(DEFAULT_LENS_AI_SETTINGS));
 
   const [saved, setSaved] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -102,6 +117,11 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
   }, []);
 
   useEffect(() => {
+    void loadLensAiSettings().then((stored) => {
+      setAi(stored);
+      setPersistedAi(stableStringify(stored));
+    });
+
     loadLensSettings().then((settings) => {
       setPreferences(settings.preferences);
       setPriorities(settings.priorities);
@@ -139,8 +159,10 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     const settings = currentSettings();
 
     await saveLensSettings(settings);
+    await saveLensAiSettings(ai);
 
     setPersisted(stableStringify(settings));
+    setPersistedAi(stableStringify(ai));
     flashSaved();
   };
 
@@ -220,6 +242,11 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
     /* This page never hears its own PINNED_CARS_UPDATED, so it is told here. */
     if (groups.includes("pinnedCars")) setPinnedCount(0);
 
+    if (groups.includes("lensAi")) {
+      setAi(DEFAULT_LENS_AI_SETTINGS);
+      setPersistedAi(stableStringify(DEFAULT_LENS_AI_SETTINGS));
+    }
+
     if (!groups.includes("settings")) return;
 
     for (const p of priorityDefinitions) {
@@ -297,7 +324,9 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
    * plain data, and a deep equality helper would be a second description of
    * the same shape to keep in step with the first.
    */
-  const dirty = persisted !== null && stableStringify(currentSettings()) !== persisted;
+  const dirty =
+    (persisted !== null && stableStringify(currentSettings()) !== persisted) ||
+    stableStringify(ai) !== persistedAi;
 
   const profilesNeedingAttention = profiles.filter((p) => getProfileIssues(p, priorityDefinitions).length > 0).length;
 
@@ -328,7 +357,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
         <header className="mb-7">
           <h1 className="text-3xl font-black tracking-tight">Settings</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-finn-iron">
-            Change the priorities, profiles, and driving assumptions Finn Lens uses when explaining your pinned cars.
+            Change the priorities, profiles, driving assumptions and optional AI Finn Lens uses when explaining your pinned cars.
           </p>
         </header>
 
@@ -385,6 +414,7 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
             />
           )}
           {tab === "driving" && <DrivingSettings preferences={preferences} onChange={setPreferences} />}
+          {tab === "ai" && <LensAiSettings settings={ai} onChange={setAi} />}
           {tab === "data" && <DataSettings onCleared={handleDataCleared} />}
         </div>
 
@@ -396,8 +426,8 @@ export default function SettingsPage({ onBack }: { onBack?: () => void }) {
           */}
         <p className="mt-8 text-center text-[11px] leading-4 text-finn-iron">
           Settings are local to this extension — stored in this browser only,
-          with no account behind them and nothing sent anywhere. Changes
-          affect future recommendations.
+          with no account behind them. Nothing is sent anywhere unless you turn
+          on Lens AI. Changes affect future recommendations.
         </p>
       </div>
 

@@ -59,41 +59,12 @@ export function AiError({ message, onRetry }: { message: string; onRetry?: () =>
     );
 }
 
-/** "Experimental", and in development which provider is answering. */
-export function ExperimentTag({ status }: { status: LensAiStatus }) {
+/** "Experimental": the AI is optional, and says so wherever it appears. */
+export function ExperimentTag(_: { status?: LensAiStatus }) {
     return (
         <span className="inline-flex items-center gap-1.5 rounded-full bg-finn-cotton px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-finn-iron">
             Experimental
-            {import.meta.env.DEV && status.state === "ready" && (
-                <span className="font-bold normal-case tracking-normal">
-                    · {status.model ?? status.provider}
-                </span>
-            )}
         </span>
-    );
-}
-
-/**
- * What an offline server looks like: nothing, for a reader; one quiet line
- * for someone developing the experiment, who needs to know why it's missing.
- */
-export function OfflineHint({ onRetry }: { onRetry: () => void }) {
-    if (!import.meta.env.DEV) return null;
-
-    return (
-        <p className="finn-lens-screen-only mb-4 flex flex-wrap items-center gap-2 text-[11px] text-finn-iron">
-            Lens AI (experimental) is offline — start it with{" "}
-            <code className="rounded bg-finn-cotton px-1.5 py-0.5 font-mono text-[10px]">
-                cd lens-ai-server && npm start
-            </code>
-            <button
-                type="button"
-                onClick={onRetry}
-                className="font-bold text-finn-accent-blue hover:underline"
-            >
-                Check again
-            </button>
-        </p>
     );
 }
 

@@ -174,7 +174,7 @@ export default function CompareTab({
               {/*
                 * Experimental: describe yourself in words and review how
                 * that maps onto these same answers. Renders nothing unless
-                * the Lens AI server is answering.
+                * Lens AI is turned on in Settings.
                 */}
               <TellLens cars={cars} />
 

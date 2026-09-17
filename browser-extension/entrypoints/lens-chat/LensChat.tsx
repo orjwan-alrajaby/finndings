@@ -5,6 +5,7 @@ import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import { isPersonalised } from "@/lib/personalisation";
 import { converse } from "@/lib/lens-ai/client";
+import { openBrowserTab } from "@/lib/utils";
 import { buildLensFacts } from "@/lib/lens-ai/context";
 import type { ScopeKind, WireQuestion } from "@/lib/lens-ai/contract";
 import { carLabel, compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
@@ -104,7 +105,7 @@ const STARTERS = [
 const WHY = /^\s*why\s+(this|that|the)\s+(car|one)\s*\??\s*$|^\s*why\s*\??\s*$/i;
 
 export function LensChat() {
-    const { status, retry: retryHealth } = useLensAiStatus();
+    const { status } = useLensAiStatus();
     const aiReady = status.state === "ready";
 
     const [settings, setSettings] = useState<LensSettings | null>(null);
@@ -436,7 +437,7 @@ export function LensChat() {
         }
 
         if (!aiReady) {
-            say("Lens can't read free text right now. You can still get a match from your Lens settings, ask why, compare and pin.", "note");
+            say("Lens AI is turned off, so Lens can't read free text. You can still get a match from your Lens settings, ask why, compare and pin — or turn Lens AI on in Settings.", "note");
             return;
         }
 
@@ -560,7 +561,7 @@ export function LensChat() {
                         scope={scope}
                         aiState={status.state}
                         personalised={personalised}
-                        onRetryAi={retryHealth}
+                        onOpenSettings={() => void openBrowserTab("OPEN_SETTINGS_PAGE")}
                         onUseSettings={() => compareWith(EMPTY_UNDERSTANDING, kind, `Using your ${personalised ? "" : "default "}Lens settings.`)}
                     />
                 ) : (
@@ -742,7 +743,7 @@ export function LensChat() {
                         }}
                         placeholder={
                             !aiReady
-                                ? "Lens can't read free text right now"
+                                ? "Lens AI is off — turn it on in Settings"
                                 : openQuestion
                                   ? "Answer, or tell Lens something else…"
                                   : run
@@ -835,13 +836,13 @@ function EmptyState({
     scope,
     aiState,
     personalised,
-    onRetryAi,
+    onOpenSettings,
     onUseSettings,
 }: {
     scope: Scope;
-    aiState: "checking" | "offline" | "ready";
+    aiState: "checking" | "off" | "ready";
     personalised: boolean;
-    onRetryAi: () => void;
+    onOpenSettings: () => void;
     onUseSettings: () => void;
 }) {
     return (
@@ -861,13 +862,13 @@ function EmptyState({
                     : "Lens doesn't have data for any cars in this set yet."}
             </p>
 
-            {aiState === "offline" && (
+            {aiState === "off" && (
                 <div className="mt-4 rounded-2xl bg-white px-3 py-3">
                     <p className="text-xs leading-5 text-finn-iron">
-                        Lens can't read free text right now — the Lens AI server isn't answering. Everything else still works.
+                        Lens AI is turned off, so Lens can't read free text. Everything else still works.
                     </p>
-                    <button type="button" onClick={onRetryAi} className="mt-1 text-xs font-black text-finn-accent-blue hover:underline">
-                        Check again
+                    <button type="button" onClick={onOpenSettings} className="mt-1 text-xs font-black text-finn-accent-blue hover:underline">
+                        Open Settings
                     </button>
                 </div>
             )}

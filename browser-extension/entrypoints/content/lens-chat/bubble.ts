@@ -13,6 +13,7 @@ import {
     mergeLoadedCars,
 } from "../injectors/inject-pin-button/injectPinCarButtonIntoNode/storage";
 import { mapFinnConfigToAll } from "../manipulateApiData";
+import { lensAiUsable, loadLensAiSettings, watchLensAiSettings } from "@/lib/lens-ai/settings";
 
 /**
  * "Ask Lens" on finn.com: a small bubble, and the chat it opens.
@@ -305,8 +306,36 @@ export function notifyPageChanged(): void {
         .catch(() => {});
 }
 
-/** Adds the bubble where there are cars to talk about; removes it where there aren't. */
+/*
+ * Ask Lens exists only while Lens AI is on. Read once, then kept current, so
+ * switching it off in Settings takes the bubble off an open finn.com tab and
+ * switching it on brings it back, without a reload.
+ */
+let aiOn: Promise<boolean> | null = null;
+
+function lensAiOn(): Promise<boolean> {
+    if (!aiOn) {
+        aiOn = loadLensAiSettings().then(lensAiUsable);
+
+        watchLensAiSettings((settings) => {
+            aiOn = Promise.resolve(lensAiUsable(settings));
+            void syncChatBubble();
+        });
+    }
+
+    return aiOn;
+}
+
+/** Adds the bubble where there are cars to talk about and Lens AI is on; removes it otherwise. */
 export async function syncChatBubble(): Promise<void> {
+    if (!(await lensAiOn())) {
+        if (host) {
+            if (isOpen) setOpen(false);
+            host.style.display = "none";
+        }
+        return;
+    }
+
     listen();
 
     if (!pageHasCars()) {

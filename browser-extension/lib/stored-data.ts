@@ -24,7 +24,8 @@ export type StoredDataGroupId =
     | "settings"
     | "pinnedCars"
     | "browsingCache"
-    | "setup";
+    | "setup"
+    | "lensAi";
 
 export interface StoredDataGroup {
     id: StoredDataGroupId;
@@ -80,6 +81,15 @@ export const STORED_DATA_GROUPS: StoredDataGroup[] = [
         consequence:
             "The getting-started checklist comes back in the popup. The setup flow itself is always available from this page.",
         keys: ["finnLensOnboarding"],
+    },
+    {
+        id: "lensAi",
+        label: "Lens AI key",
+        description:
+            "Whether Lens AI is switched on, and the Gemini API key you gave it.",
+        consequence:
+            "Lens AI turns off and forgets your key. Everything else in Lens keeps working; you can add the key again in Settings.",
+        keys: ["finnLensAi"],
     },
 ];
 
@@ -139,6 +149,8 @@ export async function summariseStoredData(): Promise<StoredDataCount[]> {
 
     const setupPresent = stored.finnLensOnboarding !== undefined;
 
+    const ai = stored.finnLensAi as { enabled?: boolean; apiKey?: string } | undefined;
+
     return [
         {
             id: "settings",
@@ -166,6 +178,15 @@ export async function summariseStoredData(): Promise<StoredDataCount[]> {
             id: "setup",
             present: setupPresent,
             summary: setupPresent ? "Recorded" : "Nothing recorded",
+        },
+        {
+            id: "lensAi",
+            present: ai !== undefined,
+            summary: ai?.apiKey
+                ? ai.enabled
+                    ? "Key saved — Lens AI is on"
+                    : "Key saved — Lens AI is off"
+                : "No key saved",
         },
     ];
 }

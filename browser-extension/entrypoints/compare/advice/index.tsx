@@ -131,8 +131,8 @@ export function Advice({
 
             {/*
               * Experimental, and screen-only: questions about the result
-              * directly under it. Renders nothing unless the Lens AI server
-              * is answering, so the page reads exactly as before without it.
+              * directly under it. Renders nothing unless Lens AI is turned
+              * on in Settings, so the page reads exactly as before without it.
               */}
             <AskLens
                 cars={cars}
