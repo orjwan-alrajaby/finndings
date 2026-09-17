@@ -346,22 +346,29 @@ export async function syncChatBubble(): Promise<void> {
 
     shadow.append(el("style", { text: await panelStyles() }));
 
+    /*
+     * Two shapes. On a phone the chat is a sheet inset evenly from both edges
+     * of the screen, sized to the dynamic viewport so browser chrome sliding
+     * in doesn't hide its input; from 640px up it is a panel beside the bubble.
+     */
     panel = el("div", {
         class: [
-            "absolute bottom-16 right-0 overflow-hidden rounded-[24px] bg-white shadow-2xl ring-1 ring-black/5",
-            "w-[min(420px,calc(100vw-24px))] h-[min(680px,calc(100vh-110px))]",
+            "overflow-hidden rounded-[24px] bg-white shadow-2xl ring-1 ring-black/5",
+            "fixed inset-x-3 bottom-[76px] h-[min(680px,calc(100dvh-96px))]",
+            "xs:absolute xs:inset-x-auto xs:right-0 xs:bottom-16 xs:w-[420px] xs:h-[min(680px,calc(100vh-110px))]",
         ].join(" "),
         attrs: { role: "dialog", "aria-label": "Ask Lens", "aria-hidden": "true" },
     });
     panel.style.display = "none";
 
-    bubbleLabel = el("span", { text: "Ask Lens" });
+    /* Visible from 640px; on a phone the bubble is the mark alone, covering less of FINN's cards. */
+    bubbleLabel = el("span", { class: "max-xs:sr-only", text: "Ask Lens" });
 
     const bubble = el(
         "button",
         {
             class: [
-                "flex h-12 items-center gap-2 rounded-full bg-finn-highlight-navy pl-1.5 pr-4",
+                "flex h-12 items-center gap-2 rounded-full bg-finn-highlight-navy pl-1.5 pr-4 max-xs:pr-1.5",
                 "text-[13px] font-black text-white shadow-xl ring-1 ring-white/10",
                 "transition hover:bg-finn-accent-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-finn-accent-blue",
             ].join(" "),
