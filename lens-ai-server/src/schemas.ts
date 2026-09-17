@@ -1,4 +1,7 @@
-import type { LensVocabulary } from "../../browser-extension/lib/lens-ai/contract.ts";
+import type {
+    ConversationScope,
+    LensVocabulary,
+} from "../../browser-extension/lib/lens-ai/contract.ts";
 
 /**
  * JSON schemas for the model's structured output, built per request from the
@@ -81,17 +84,26 @@ function changeSchema(vocabulary: LensVocabulary) {
     });
 }
 
-export function interpretSchema(vocabulary: LensVocabulary) {
+/** A scope field only where scope can change, limited to the scopes on offer. */
+function scopeField(scope: ConversationScope | undefined): Record<string, object> {
+    const kinds = scope?.available.filter((item) => item.count > 0).map((item) => item.kind) ?? [];
+
+    return kinds.length ? { scope: nullable({ type: "string", enum: kinds }) } : {};
+}
+
+export function interpretSchema(vocabulary: LensVocabulary, scope?: ConversationScope) {
     return object({
         summary: { type: "string" },
         change: changeSchema(vocabulary),
+        ...scopeField(scope),
     });
 }
 
-export function askSchema(vocabulary: LensVocabulary) {
+export function askSchema(vocabulary: LensVocabulary, scope?: ConversationScope) {
     return object({
         kind: { type: "string", enum: ["answer", "whatIf"] },
         answer: { type: "string" },
         change: nullable(changeSchema(vocabulary)),
+        ...scopeField(scope),
     });
 }

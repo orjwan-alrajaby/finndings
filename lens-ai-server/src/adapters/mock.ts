@@ -153,6 +153,18 @@ type Facts = {
 function askQuestion(request: AskRequest): AskResult {
     const question = request.question;
     const facts = request.facts as Facts;
+    const scope = /\bmy (pinned )?cars\b/i.test(question)
+        ? "pinned"
+        : /\bthis car\b/i.test(question)
+          ? "thisCar"
+          : /\b(these|this page)\b/i.test(question)
+            ? "page"
+            : null;
+
+    if (scope && scope !== request.scope?.current && request.scope?.available.some((item) => item.kind === scope && item.count > 0)) {
+        return { kind: "answer", answer: "(Mock) I'll switch to those cars.", change: null, scope };
+    }
+
     const whatIf = /\b(what if|if i|if my|suppose|would .* if|imagine)\b/i.test(question);
 
     if (whatIf) {

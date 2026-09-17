@@ -122,16 +122,42 @@ export type LensFacts = Record<string, unknown>;
 /* Requests and responses                                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Which cars a conversation can be about.
+ *
+ * - `page` — the configurations on the finn.com page whose data Lens holds.
+ * - `pinned` — the cars the reader explicitly pinned.
+ * - `thisCar` — the one configuration the reader is looking at.
+ */
+export type ScopeKind = "page" | "pinned" | "thisCar";
+
+export interface ScopeOption {
+    kind: ScopeKind;
+    /** "the 12 configurations on this finn.com page Lens has data for". */
+    description: string;
+    count: number;
+}
+
+/** The scopes on offer where the reader is, and which one is in use. */
+export interface ConversationScope {
+    current: ScopeKind | null;
+    available: ScopeOption[];
+}
+
 export interface InterpretRequest {
     text: string;
     vocabulary: LensVocabulary;
     current: CurrentAnswers;
+    /** Present when the conversation happens on finn.com, where scope can change. */
+    scope?: ConversationScope;
 }
 
 export interface InterpretResult {
     /** One or two sentences, in the reader's terms, of what was understood. */
     summary: string;
     change: ProposedChange;
+    /** The set of cars the reader's words point at, when they point at one. */
+    scope?: ScopeKind | null;
 }
 
 export interface AskRequest {
@@ -141,6 +167,7 @@ export interface AskRequest {
     facts: LensFacts;
     /** The last few exchanges, oldest first. Short-lived by design. */
     history: { question: string; answer: string }[];
+    scope?: ConversationScope;
 }
 
 export interface AskResult {
@@ -151,6 +178,8 @@ export interface AskResult {
     kind: "answer" | "whatIf";
     answer: string;
     change: ProposedChange | null;
+    /** The set of cars the question is about, when that differs from the one in use. */
+    scope?: ScopeKind | null;
 }
 
 export type AiEnvelope<T> =

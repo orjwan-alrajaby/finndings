@@ -139,6 +139,9 @@ export function createGeminiAdapter({
         }
     }
 
+    const scopeBlock = (request: InterpretRequest | AskRequest) =>
+        request.scope ? `SCOPE\n${JSON.stringify(request.scope)}\n\n` : "";
+
     const vocabularyBlock = (request: InterpretRequest | AskRequest) =>
         `LENS_VOCABULARY\n${JSON.stringify(request.vocabulary)}`;
 
@@ -149,9 +152,9 @@ export function createGeminiAdapter({
         interpret(request) {
             return structured<InterpretResult>({
                 route: "interpret",
-                schema: interpretSchema(request.vocabulary),
+                schema: interpretSchema(request.vocabulary, request.scope),
                 system: [INTERPRET_INSTRUCTIONS, vocabularyBlock(request)],
-                user: `CURRENT_ANSWERS\n${JSON.stringify(request.current)}\n\nWHAT_THEY_SAID\n${request.text}`,
+                user: `CURRENT_ANSWERS\n${JSON.stringify(request.current)}\n\n${scopeBlock(request)}WHAT_THEY_SAID\n${request.text}`,
             });
         },
 
@@ -164,13 +167,13 @@ export function createGeminiAdapter({
 
             return structured<AskResult>({
                 route: "ask",
-                schema: askSchema(request.vocabulary),
+                schema: askSchema(request.vocabulary, request.scope),
                 system: [
                     ASK_INSTRUCTIONS,
                     vocabularyBlock(request),
                     `CURRENT_ANSWERS\n${JSON.stringify(request.current)}\n\nLENS_FACTS\n${JSON.stringify(request.facts)}`,
                 ],
-                user: `${history}QUESTION\n${request.question}`,
+                user: `${scopeBlock(request)}${history}QUESTION\n${request.question}`,
             });
         },
     };
