@@ -115,3 +115,72 @@ export function askSchema(vocabulary: LensVocabulary, scope?: ConversationScope)
         ...scopeField(scope),
     });
 }
+
+/**
+ * The conversational turn. Evidence ids and priorities are enums of what
+ * Lens actually has, so a need can only point at things Lens can check.
+ */
+export function converseSchema(
+    vocabulary: LensVocabulary,
+    evidenceIds: string[],
+    scope?: ConversationScope,
+) {
+    const categories = vocabulary.categories.map((category) => category.id);
+    const evidence = { type: "string", enum: evidenceIds };
+    const said = { type: "string" };
+
+    const understanding = object({
+        budget: nullable(
+            object({
+                kind: { type: "string", enum: ["hardMax", "target"] },
+                monthly: { type: "number" },
+                said,
+            }),
+        ),
+        rental: nullable(
+            object({
+                from: { type: "string", description: "YYYY-MM" },
+                to: { type: "string", description: "YYYY-MM, included" },
+                startDay: nullable({ type: "number" }),
+                said,
+            }),
+        ),
+        monthlyKm: nullable(object({ value: { type: "number" }, said })),
+        needs: {
+            type: "array",
+            items: object({
+                id: { type: "string" },
+                label: { type: "string" },
+                importance: { type: "string", enum: ["essential", "important", "niceToHave"] },
+                said,
+                priorities: { type: "array", items: { type: "string", enum: categories } },
+                evidence: { type: "array", items: object({ id: evidence, use: { type: "string" } }) },
+                notInData: nullable({ type: "string" }),
+                status: { type: "string", enum: ["active", "dropped"] },
+            }),
+        },
+        context: { type: "array", items: object({ label: { type: "string" }, said }) },
+        capabilities: {
+            type: "array",
+            items: object({ label: { type: "string" }, said, lessRelevant: { type: "array", items: evidence } }),
+        },
+        droppedPriorities: { type: "array", items: { type: "string", enum: categories } },
+        notModelled: { type: "array", items: object({ said, explanation: { type: "string" } }) },
+        cleared: { type: "array", items: { type: "string", enum: ["budget", "rental", "monthlyKm"] } },
+    });
+
+    return object({
+        kind: { type: "string", enum: ["understanding", "answer", "whatIf"] },
+        reply: { type: "string" },
+        understanding: nullable(understanding),
+        question: nullable(
+            object({
+                ask: { type: "string" },
+                why: { type: "string" },
+                options: { type: "array", items: { type: "string" } },
+                blocking: { type: "boolean" },
+            }),
+        ),
+        ...scopeField(scope),
+    });
+}

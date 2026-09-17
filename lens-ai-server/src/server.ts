@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import type {
     AskRequest,
+    ConverseRequest,
     InterpretRequest,
 } from "../../browser-extension/lib/lens-ai/contract.ts";
 import { createGeminiAdapter, FREE_TIER_MODELS } from "./adapters/gemini.ts";
@@ -136,6 +137,24 @@ function checkAsk(body: unknown): AskRequest {
     };
 }
 
+function checkConverse(body: unknown): ConverseRequest {
+    if (!isObject(body) || !isObject(body.vocabulary) || !isObject(body.understanding) || !Array.isArray(body.evidence)) {
+        throw new AdapterError("Request is missing Lens's vocabulary, evidence or understanding.", 400);
+    }
+
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+
+    if (!message) throw new AdapterError("Tell Lens something first.", 400);
+    if (message.length > 2_000) throw new AdapterError("That's a bit long — try under 2,000 characters.", 400);
+
+    return {
+        ...(body as unknown as ConverseRequest),
+        message,
+        history: Array.isArray(body.history) ? (body.history as ConverseRequest["history"]).slice(-8) : [],
+        answered: Array.isArray(body.answered) ? (body.answered as ConverseRequest["answered"]).slice(-8) : [],
+    };
+}
+
 /* -------------------------------------------------------------------------- */
 
 const server = createServer(async (req, res) => {
@@ -168,6 +187,7 @@ const server = createServer(async (req, res) => {
     const routes: Record<string, (body: unknown) => Promise<{ result: unknown; model: string | null }>> = {
         "/v1/interpret": (body) => adapter.interpret(checkInterpret(body)),
         "/v1/ask": (body) => adapter.ask(checkAsk(body)),
+        "/v1/converse": (body) => adapter.converse(checkConverse(body)),
     };
 
     const handler = req.method === "POST" && req.url ? routes[req.url] : undefined;

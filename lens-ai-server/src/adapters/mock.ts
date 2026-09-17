@@ -1,6 +1,10 @@
 import type {
     AskRequest,
     AskResult,
+    ConverseRequest,
+    ConverseResult,
+    WireNeed,
+    WireUnderstanding,
     InterpretRequest,
     InterpretResult,
     ProposedChange,
@@ -233,6 +237,67 @@ function askQuestion(request: AskRequest): AskResult {
     };
 }
 
+/** Keyword stand-in for the conversational turn: crude, but the same shape. */
+const MOCK_NEEDS: { pattern: RegExp; need: WireNeed }[] = [
+    {
+        pattern: /\b(kids?|child|children|baby)\b/i,
+        need: { id: "family", label: "Travelling with children", importance: "important", said: "you have children", priorities: ["practicality"], evidence: [{ id: "rearDoors", use: "make getting them in and out easier" }, { id: "hasIsofix", use: "could anchor child seats" }], notInData: null, status: "active" },
+    },
+    {
+        pattern: /\bentertain/i,
+        need: { id: "kids-entertained", label: "Keeping the kids occupied", importance: "niceToHave", said: "you'd like to keep them entertained", priorities: [], evidence: [{ id: "hasBackUSBPorts", use: "could keep their own tablets charged" }], notInData: "a built-in rear entertainment system", status: "active" },
+    },
+    {
+        pattern: /\b(nervous|anxious|safe|safety)\b/i,
+        need: { id: "confidence", label: "Feeling safer on the road", importance: "important", said: "you're a nervous driver", priorities: ["safetyAssistance"], evidence: [{ id: "hasBlindSpotAssist", use: "could warn you about cars you can't see" }, { id: "hasRearCrosswalkWarning", use: "could warn you when reversing out" }], notInData: null, status: "active" },
+    },
+    {
+        pattern: /\b(winter|cold|snow|ice)\b/i,
+        need: { id: "winter", label: "Coping with winter", importance: "important", said: "you'll drive through winter", priorities: ["climateSuitability"], evidence: [{ id: "hasHeatedSeats", use: "could warm you up on cold mornings" }, { id: "hasHeatedSteeringWheel", use: "could keep your hands warm" }], notInData: null, status: "active" },
+    },
+];
+
+function converseMock(request: ConverseRequest): ConverseResult {
+    const text = request.message;
+    const previous = request.understanding;
+
+    const needs = [...previous.needs];
+    for (const { pattern, need } of MOCK_NEEDS) {
+        if (pattern.test(text) && !needs.some((item) => item.id === need.id)) needs.push(need);
+    }
+
+    const figure = euros(text);
+    const budget = figure
+        ? { kind: /can.?t|no more|maximum|max\b|at most|total/i.test(text) ? ("hardMax" as const) : ("target" as const), monthly: figure, said: "the figure you gave" }
+        : previous.budget;
+
+    const understanding: WireUnderstanding = {
+        ...previous,
+        budget,
+        needs,
+        notModelled: [
+            ...previous.notModelled,
+            ...(/\b(red|blue|colou?r)\b/i.test(text) ? [{ said: "colour", explanation: "Lens doesn't use a car's colour." }] : []),
+            ...(/luxur/i.test(text) ? [{ said: "feels luxurious", explanation: "Lens has no measure of luxury; it can only check listed comfort equipment." }] : []),
+        ],
+        cleared: [],
+    };
+
+    const agesKnown = request.answered.some((item) => /old/i.test(item.question)) || /\b\d+\s*(and|&)\s*\d+\b|\byears?\b/i.test(text);
+    const question =
+        /\byoung\b/i.test(text) && !agesKnown
+            ? { ask: "How old are your children?", why: "if either still uses a child seat, ISOFIX matters", options: ["Under 4", "4–12", "Older"], blocking: true }
+            : null;
+
+    return {
+        kind: "understanding",
+        reply: question ? "(Mock) Before I compare cars, one thing that could change the answer:" : "(Mock) Got it — here's what I understood.",
+        understanding,
+        question,
+        scope: null,
+    };
+}
+
 export function createMockAdapter(): LensAiAdapter {
     const pause = () => new Promise((resolve) => setTimeout(resolve, 450));
 
@@ -246,6 +311,10 @@ export function createMockAdapter(): LensAiAdapter {
         async ask(request: AskRequest) {
             await pause();
             return { result: askQuestion(request), model: null };
+        },
+        async converse(request: ConverseRequest) {
+            await pause();
+            return { result: converseMock(request), model: null };
         },
     };
 }

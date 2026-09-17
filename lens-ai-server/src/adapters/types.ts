@@ -1,6 +1,8 @@
 import type {
     AskRequest,
     AskResult,
+    ConverseRequest,
+    ConverseResult,
     InterpretRequest,
     InterpretResult,
 } from "../../../browser-extension/lib/lens-ai/contract.ts";
@@ -18,6 +20,7 @@ export interface LensAiAdapter {
     readonly model: string | null;
     interpret(request: InterpretRequest): Promise<Answered<InterpretResult>>;
     ask(request: AskRequest): Promise<Answered<AskResult>>;
+    converse(request: ConverseRequest): Promise<Answered<ConverseResult>>;
 }
 
 /** A result, and which model actually produced it — not always the first. */

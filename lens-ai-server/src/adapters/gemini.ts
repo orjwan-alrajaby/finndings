@@ -3,11 +3,13 @@ import { ApiError, FinishReason, GoogleGenAI } from "@google/genai";
 import type {
     AskRequest,
     AskResult,
+    ConverseRequest,
+    ConverseResult,
     InterpretRequest,
     InterpretResult,
 } from "../../../browser-extension/lib/lens-ai/contract.ts";
-import { ASK_INSTRUCTIONS, INTERPRET_INSTRUCTIONS } from "../prompts.ts";
-import { askSchema, interpretSchema } from "../schemas.ts";
+import { ASK_INSTRUCTIONS, CONVERSE_INSTRUCTIONS, INTERPRET_INSTRUCTIONS } from "../prompts.ts";
+import { askSchema, converseSchema, interpretSchema } from "../schemas.ts";
 import { log } from "../log.ts";
 import { AdapterError, type Answered, type LensAiAdapter } from "./types.ts";
 
@@ -41,6 +43,17 @@ export const FREE_TIER_MODELS = [
 
 /** Worth trying the next model for: out of quota, overloaded, or not offered to this key. */
 const MOVE_ON = new Set([429, 503, 404]);
+
+/**
+ * How long one model may take before the next is tried. A free-tier model
+ * under load can take most of a minute just to say it's overloaded; the
+ * reader shouldn't wait for that when another model is free. The last model
+ * in the list gets no limit of its own.
+ */
+const PER_MODEL_MS = 30_000;
+
+const timedOut = (error: unknown) =>
+    error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError" || /aborted/i.test(error.message));
 
 export function createGeminiAdapter({
     apiKey,
@@ -97,6 +110,8 @@ export function createGeminiAdapter({
             for (const [index, candidate] of candidates.entries()) {
                 try {
                     served = candidate;
+                    const last = index === candidates.length - 1;
+
                     response = await client.models.generateContent({
                         model: candidate,
                         contents: user,
@@ -104,18 +119,23 @@ export function createGeminiAdapter({
                             systemInstruction: system.join("\n\n"),
                             responseMimeType: "application/json",
                             responseJsonSchema: schema,
+                            ...(last ? {} : { abortSignal: AbortSignal.timeout(PER_MODEL_MS) }),
                         },
                     });
                     break;
                 } catch (error) {
-                    if (!(error instanceof ApiError) || !MOVE_ON.has(error.status)) throw error;
+                    const slow = timedOut(error);
 
-                    rest(candidate, error);
-                    dailyQuota ||= error.status === 429 && /PerDay/i.test(error.message ?? "");
+                    if (!slow && (!(error instanceof ApiError) || !MOVE_ON.has(error.status))) throw error;
+
+                    if (error instanceof ApiError) {
+                        rest(candidate, error);
+                        dailyQuota ||= error.status === 429 && /PerDay/i.test(error.message ?? "");
+                    }
 
                     if (index === candidates.length - 1) throw error;
 
-                    log.info(`· ${route} ${candidate} returned ${error.status}, trying ${candidates[index + 1]}`);
+                    log.info(`· ${route} ${candidate} ${slow ? `took over ${PER_MODEL_MS / 1000}s` : `returned ${(error as ApiError).status}`}, trying ${candidates[index + 1]}`);
                 }
             }
         } catch (error) {
@@ -177,10 +197,10 @@ export function createGeminiAdapter({
         }
     }
 
-    const vocabularyBlock = (request: InterpretRequest | AskRequest) =>
+    const vocabularyBlock = (request: { vocabulary: InterpretRequest["vocabulary"] }) =>
         `LENS_VOCABULARY\n${JSON.stringify(request.vocabulary)}`;
 
-    const scopeBlock = (request: InterpretRequest | AskRequest) =>
+    const scopeBlock = (request: { scope?: InterpretRequest["scope"] }) =>
         request.scope ? `SCOPE\n${JSON.stringify(request.scope)}\n\n` : "";
 
     return {
@@ -193,6 +213,34 @@ export function createGeminiAdapter({
                 schema: interpretSchema(request.vocabulary, request.scope),
                 system: [INTERPRET_INSTRUCTIONS, vocabularyBlock(request)],
                 user: `CURRENT_ANSWERS\n${JSON.stringify(request.current)}\n\n${scopeBlock(request)}WHAT_THEY_SAID\n${request.text}`,
+            });
+        },
+
+        converse(request) {
+            const block = (label: string, value: unknown) => `${label}\n${JSON.stringify(value)}`;
+
+            return structured<ConverseResult>({
+                route: "converse",
+                schema: converseSchema(request.vocabulary, request.evidence.map((item) => item.id), request.scope),
+                system: [
+                    CONVERSE_INSTRUCTIONS,
+                    vocabularyBlock(request),
+                    block("EVIDENCE", request.evidence),
+                    ...(request.facts ? [block("FACTS", request.facts)] : []),
+                ],
+                user: [
+                    `TODAY\n${request.today}`,
+                    request.scope ? block("SCOPE", request.scope) : "",
+                    block("UNDERSTANDING", request.understanding),
+                    block("OPEN_QUESTION", request.openQuestion),
+                    block("ANSWERED", request.answered),
+                    request.history.length
+                        ? `CONVERSATION_SO_FAR\n${request.history.map((turn) => `${turn.role === "reader" ? "Reader" : "Lens"}: ${turn.text}`).join("\n")}`
+                        : "",
+                    `MESSAGE\n${request.message}`,
+                ]
+                    .filter(Boolean)
+                    .join("\n\n"),
             });
         },
 
