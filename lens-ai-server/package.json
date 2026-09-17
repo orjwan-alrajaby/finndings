@@ -1,0 +1,23 @@
+{
+  "name": "lens-ai-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Experimental: the server-side boundary between FINN Lens and a language model. Holds the API key; never scores anything.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
+    "mock": "LENS_AI_PROVIDER=mock node --env-file-if-exists=.env src/server.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^2.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "typescript": "^7.0.2"
+  }
+}
