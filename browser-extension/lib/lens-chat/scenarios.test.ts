@@ -9,7 +9,7 @@ import {
 import { fleet } from "@/lib/reasoning-engine/test-data/fleet";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { asPhrase, barePhrase, evidenceMet, measuredDisplay, readEvidence } from "./evidence";
+import { evidenceMet, measuredDisplay, readEvidence, ruleLabel } from "./evidence";
 import { tellFitStory, type FitStory } from "./fit-story";
 import { runLens } from "./run";
 import { SCENARIOS, type Scenario } from "./scenarios.fixture";
@@ -516,9 +516,16 @@ describe("a budget with a stretch the reader named", () => {
 
 describe("naming a rule in a sentence", () => {
     it("reads as English in both directions", () => {
-        expect(`No ${barePhrase("seatsSixPlus")}`).toBe("No seven-seater");
-        expect(`Must be ${asPhrase("seatsFivePlus")}`).toBe("Must be a five-seater or bigger");
-        expect(`Must be ${asPhrase("electricCar")}`).toBe("Must be an electric car");
-        expect(`No ${barePhrase("suvBody")}`).toBe("No SUV");
+        expect(ruleLabel("seatsSixPlus", "without")).toBe("No seven-seater");
+        expect(ruleLabel("seatsFivePlus", "must")).toBe("Must be a five-seater or bigger");
+        expect(ruleLabel("electricCar", "must")).toBe("Must be an electric car");
+        expect(ruleLabel("suvBody", "without")).toBe("No SUV");
+    });
+
+    /* What a car is, versus what it has: "Must be rear doors" is neither. */
+    it("says have for equipment and be for a kind of car", () => {
+        expect(ruleLabel("rearDoors", "must")).toBe("Must have rear doors");
+        expect(ruleLabel("hasIsofix", "must")).toBe("Must have isofix child seat anchors");
+        expect(ruleLabel("hasAutomaticTransmission", "must")).toBe("Must be an automatic");
     });
 });

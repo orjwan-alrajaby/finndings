@@ -243,6 +243,20 @@ const PHRASES: Partial<Record<EvidenceId, string>> = {
 
 export const asPhrase = (id: EvidenceId): string => PHRASES[id] ?? EVIDENCE[id].label.toLowerCase();
 
+/** Evidence that describes what kind of car it is, rather than what it carries. */
+const KINDS = new Set<EvidenceId>(["electricCar", "suvBody", "seatsSixPlus", "seatsFivePlus", "hasAutomaticTransmission"]);
+
+/**
+ * A rule in a sentence. A kind of car is something the car *is*; everything
+ * else is something it *has*, and "Must be rear doors" is neither.
+ */
+export const ruleLabel = (id: EvidenceId, mode: "without" | "must"): string =>
+    mode === "without"
+        ? `No ${barePhrase(id)}`
+        : KINDS.has(id)
+          ? `Must be ${asPhrase(id)}`
+          : `Must have ${EVIDENCE[id].label.toLowerCase()}`;
+
 /**
  * What a piece of equipment does, for someone who has never read a car
  * review. One sentence: what it is, and what it does for you — never why you
