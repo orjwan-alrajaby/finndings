@@ -248,3 +248,31 @@ describe("corrections, mid-conversation", () => {
         expect(understanding.needs.map((need) => need.id)).toEqual(expect.arrayContaining(["range", "comfort"]));
     });
 });
+
+describe("a need the model left unplaced", () => {
+    it("still counts where its evidence is scored", () => {
+        const understanding = readUnderstanding(
+            {
+                ...scenario("city-parent").reading,
+                needs: [
+                    {
+                        id: "seats",
+                        label: "Room for the child seat",
+                        importance: "essential",
+                        said: "your child is in a car seat",
+                        priorities: [],
+                        evidence: [{ id: "hasIsofix", use: "anchors the seat" }],
+                        notInData: null,
+                        status: "active",
+                    },
+                ],
+            },
+            EMPTY_UNDERSTANDING,
+            undefined,
+            "2026-09",
+        );
+
+        expect(understanding.needs[0]?.priorities).toEqual(["practicality"]);
+        expect(toAnswers(base(), understanding).order[0]?.id).toBe("practicality");
+    });
+});

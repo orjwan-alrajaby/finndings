@@ -187,6 +187,19 @@ export function readUnderstanding(
             ...evidence.map((entry) => scoredHome(entry.id)).filter(category),
         ].filter((value, index, all) => all.indexOf(value) === index);
 
+        /*
+         * A need whose evidence is all equipment nobody raises — ISOFIX, air
+         * conditioning — and whose priorities the model left out would carry
+         * no weight at all. Where it's scored is better than nowhere.
+         */
+        if (!priorities.length) {
+            for (const entry of evidence) {
+                const home = EVIDENCE[entry.id].scoredIn;
+
+                if (category(home) && !priorities.includes(home)) priorities.push(home);
+            }
+        }
+
         needs.push({
             id,
             label,
