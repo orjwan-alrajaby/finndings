@@ -437,8 +437,8 @@ export function tellFitStory(
 
             catchNote = {
                 /* Named by the need's own label, so the sentence can't inherit a paraphrase's grammar. */
-                text: EVIDENCE[gap.entry.id].undesirable
-                    ? `FINN files this one as ${measuredDisplay(winner, gap.entry.id) ?? lower(EVIDENCE[gap.entry.id].label)} — worth weighing for ${lower(gap.need.label)}.`
+                text: (gap.entry.unwanted ?? EVIDENCE[gap.entry.id].undesirable)
+                    ? `FINN lists this one as ${measuredDisplay(winner, gap.entry.id) ?? asPhrase(gap.entry.id)} — worth weighing for ${lower(gap.need.label)}.`
                     : `FINN doesn't list ${lower(EVIDENCE[gap.entry.id].label)} for this car — worth weighing for ${lower(gap.need.label)}.`,
                 alternative: gap.alternative
                     ? `${name(gap.alternative)} ${gap.entry.unwanted ?? EVIDENCE[gap.entry.id].undesirable ? "isn't one" : "has it"}${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}.`

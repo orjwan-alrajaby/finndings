@@ -439,3 +439,38 @@ describe("a rule about the car itself", () => {
         );
     });
 });
+
+describe("the catch, when the car has what they didn't want", () => {
+    it("says the car has it rather than that FINN doesn't list it", () => {
+        const selfDriving = cars.find((car) => readEvidence(car, "driverAssistLevel2") === "listed")!;
+        const understanding = readUnderstanding(
+            {
+                ...scenario("no-big-suv").reading,
+                budget: null,
+                needs: [
+                    {
+                        id: "no-self-driving",
+                        label: "Safety without self-driving",
+                        importance: "important",
+                        said: "you don't want the car to drive for you",
+                        priorities: ["safetyAssistance"],
+                        evidence: [{ id: "driverAssistLevel2", use: "", unwanted: true }],
+                        notInData: null,
+                        status: "active",
+                    },
+                ],
+            },
+            EMPTY_UNDERSTANDING,
+            undefined,
+            "2026-09",
+        );
+        const translation = toAnswers(base(), understanding);
+        /* One car, so the line is about the car the test chose. */
+        const run = runLens([selfDriving], translation.answers, "thisCar", "this car")!;
+        const story = tellFitStory(run, understanding, translation.lessRelevant, null);
+        const line = story.sections.find((section) => section.key === "no-self-driving")!.lines[0]!;
+
+        expect(line.text).toMatch(/FINN lists this one as a car that steers itself|It isn't a car that steers itself/);
+        expect(story.catch?.text ?? "").not.toMatch(/doesn't list level 2 driver assistance/i);
+    });
+});
