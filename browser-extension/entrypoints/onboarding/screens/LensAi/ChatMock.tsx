@@ -139,6 +139,8 @@ export function ChatMock({
                             onCorrect={() => {}}
                             onAcceptSuggestion={onCompare}
                             onDeclineSuggestion={() => {}}
+                            onBudget={() => {}}
+                            onPeriod={() => {}}
                         />
                     </div>
                 )}

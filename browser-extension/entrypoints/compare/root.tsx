@@ -12,6 +12,7 @@ import { Spinner } from "@/components/Spinner";
 import { AdjustDrawer } from "./components/AdjustDrawer";
 import { Advice } from "./advice";
 import { Challenge } from "./advice/Challenge";
+import { CarriedOver } from "./lens-ai/CarriedOver";
 import { TellLens } from "./lens-ai/TellLens";
 import { useCompareStore } from "./store";
 
@@ -176,6 +177,13 @@ export default function CompareTab({
                 * that maps onto these same answers. Renders nothing unless
                 * Lens AI is turned on in Settings.
                 */}
+              {/*
+                * What the reader built in the chat on finn.com, offered here
+                * rather than left behind. Renders nothing when there is no
+                * recent conversation to carry over.
+                */}
+              <CarriedOver />
+
               <TellLens cars={cars} />
 
               {/*

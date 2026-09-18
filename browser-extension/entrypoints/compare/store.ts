@@ -101,7 +101,7 @@ interface CompareState extends Answers {
      * Take a new set of answers for this run: a drawer's saved draft, or a
      * change the reader accepted from Lens AI.
      */
-    applyAnswers: (answers: Answers, from?: "drawer" | "lensAi") => void;
+    applyAnswers: (answers: Answers, from?: "drawer" | "lensAi" | "session") => void;
 
     setChallengerId: (id: number | null) => void;
 }
@@ -183,7 +183,12 @@ export const useCompareStore = create<CompareState>((set, get) => ({
      * was.
      */
     applyAnswers({ priorities, preferences, features, basedOn }, from = "drawer") {
-        persistPriorities(priorities, basedOn);
+        /*
+         * A session is the conversation's own profile, carried onto this page
+         * for this visit. Writing it to the reader's saved priorities would be
+         * Lens changing their settings because they talked to it.
+         */
+        if (from !== "session") persistPriorities(priorities, basedOn);
 
         set((state) => ({
             priorities,

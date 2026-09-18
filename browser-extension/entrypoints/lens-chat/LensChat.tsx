@@ -12,6 +12,7 @@ import { carLabel, compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
 import { buildVocabulary } from "@/lib/lens-ai/vocabulary";
 import type { PageContext } from "@/lib/lens-chat/messages";
 import type { EvidenceId } from "@/lib/lens-chat/evidence";
+import { nameFor, saveSearch, saveSession, type LensSession } from "@/lib/lens-chat/session";
 import { evidenceCatalogue } from "@/lib/lens-chat/evidence";
 import { evidenceForNeeds, finnsOwnWords, quotesAreFinns, tellFitStory } from "@/lib/lens-chat/fit-story";
 import { alternativesWithinLimits, compareRows, runLens, summariseMatch, type LensRun } from "@/lib/lens-chat/run";
@@ -24,6 +25,7 @@ import {
     readSuggestions,
     readUnderstanding,
     ruledOut,
+    withBudget,
     withoutSuggestion,
     withSuggestion,
     toAnswers,
@@ -112,6 +114,31 @@ const STARTERS = [
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
 const WHY = /^\s*why\s+(this|that|the)\s+(car|one)\s*\??\s*$|^\s*why\s*\??\s*$/i;
+
+/** The conversation as something the rest of Lens can pick up. */
+function sessionFrom(
+    applied: { understanding: Understanding; translation: Translation },
+    scope: Scope,
+    kind: ScopeKind,
+    run: LensRun,
+): LensSession {
+    const { understanding, translation } = applied;
+
+    return {
+        at: new Date().toISOString(),
+        scope: kind,
+        headline: scope.headline,
+        summary:
+            understanding.tension ||
+            understanding.needs.filter((need) => need.status === "active").map((need) => need.label).join(" · "),
+        focus: translation.profile.focus,
+        rules: translation.profile.rules,
+        understanding,
+        answers: translation.answers,
+        carIds: scope.cars.map((car) => car.id),
+        winnerId: run.recommendation.winner.id,
+    };
+}
 
 export function LensChat() {
     const { status } = useLensAiStatus();
@@ -279,6 +306,24 @@ export function LensChat() {
             setScopeKind(nextKind);
             setRun(result);
             setApplied({ understanding: u, translation });
+
+            /*
+             * Left where the rest of Lens can pick it up. A reader who explains
+             * their life here and then opens the recommendation page should
+             * meet the same search, not their saved settings from last month.
+             */
+            void saveSession({
+                at: new Date().toISOString(),
+                scope: nextKind,
+                headline: target.headline,
+                summary: u.tension || u.needs.filter((need) => need.status === "active").map((need) => need.label).join(" · "),
+                focus: translation.profile.focus,
+                rules: translation.profile.rules,
+                understanding: u,
+                answers: translation.answers,
+                carIds: target.cars.map((car) => car.id),
+                winnerId: result.recommendation.winner.id,
+            });
 
             if (intro) say(intro, "note");
 
@@ -656,6 +701,29 @@ export function LensChat() {
                                                 if (offer) answerSuggestion(entry.id, id, offer.why, offer.needId, true);
                                             }}
                                             onDeclineSuggestion={(id) => answerSuggestion(entry.id, id, "", "", false)}
+                                            onBudget={(monthly) => {
+                                                const next = withBudget(
+                                                    latest.current.understanding,
+                                                    monthly,
+                                                    monthly ? `you said up to €${monthly} a month` : "you said you have no limit in mind",
+                                                );
+
+                                                setUnderstanding(next);
+                                                setEntries((all) =>
+                                                    all.map((item) =>
+                                                        item.id === entry.id && item.kind === "understanding" ? { ...item, understanding: next } : item,
+                                                    ),
+                                                );
+                                                history.current.push({
+                                                    role: "reader",
+                                                    text: monthly ? `My maximum is €${monthly} a month.` : "I don't have a fixed budget.",
+                                                });
+                                                if (latest.current.run) void compareWith(next, latest.current.kind);
+                                            }}
+                                            onPeriod={() => {
+                                                setInput("I need the car from ");
+                                                inputRef.current?.focus();
+                                            }}
                                             onCompare={() => confirmUnderstanding(entry)}
                                             onAnswer={(answer) => void send(answer)}
                                             onCorrect={() => {
@@ -730,9 +798,27 @@ export function LensChat() {
                                         <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-white px-3 py-2.5">
                                             <p className="min-w-0 flex-1 text-[11px] leading-4 text-finn-iron">
                                                 {entry.saved
-                                                    ? "Saved. Lens's badges, panel and Compare page now use these preferences too."
-                                                    : "This applies to this conversation only. Your saved Lens settings haven't changed."}
+                                                    ? "Kept. It's on the recommendation page too, and your saved settings are as they were."
+                                                    : "This applies to this conversation, and carries over to the recommendation page. Your saved Lens settings haven't changed."}
                                             </p>
+                                            {!entry.saved && applied && run && (
+                                                <SmallButton
+                                                    onClick={() => {
+                                                        const session = sessionFrom(applied, scope, kind, run);
+
+                                                        void saveSearch({
+                                                            ...session,
+                                                            id: `search-${Date.now()}`,
+                                                            name: nameFor(session),
+                                                            note: [session.summary, ...session.focus.map((item) => item.label)].filter(Boolean).join(" · "),
+                                                        });
+                                                        update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
+                                                    }}
+                                                >
+                                                    <Save aria-hidden="true" className="h-3.5 w-3.5" />
+                                                    Keep this search
+                                                </SmallButton>
+                                            )}
                                             {!entry.saved && (
                                                 <SmallButton
                                                     onClick={async () => {

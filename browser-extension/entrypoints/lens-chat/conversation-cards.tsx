@@ -25,7 +25,7 @@ import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { asPhrase, coverage, EVIDENCE, plainly, ruleLabel, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
-import { budgetCeiling, ruledOut } from "@/lib/lens-chat/understanding";
+import { budgetCeiling, missingEssentials, ruledOut } from "@/lib/lens-chat/understanding";
 import type { Need, Translation, Understanding } from "@/lib/lens-chat/understanding";
 import type { PinnedFinnCar } from "@/lib/types";
 
@@ -136,6 +136,8 @@ export function UnderstandingCard({
     onCorrect,
     onAcceptSuggestion,
     onDeclineSuggestion,
+    onBudget,
+    onPeriod,
 }: {
     understanding: Understanding;
     translation: Translation;
@@ -153,7 +155,11 @@ export function UnderstandingCard({
     onCorrect: () => void;
     onAcceptSuggestion: (id: EvidenceId) => void;
     onDeclineSuggestion: (id: EvidenceId) => void;
+    /** The budget and period Lens asks for itself when the reader hasn't said. */
+    onBudget: (monthly: number | null) => void;
+    onPeriod: () => void;
 }) {
+    const missing = missingEssentials(u);
     const [showWeights, setShowWeights] = useState(false);
 
     /*
@@ -378,6 +384,12 @@ export function UnderstandingCard({
                 </div>
             )}
 
+            {status === "pending" && (missing.budget || missing.period) && (
+                <div className="mt-3 px-4">
+                    <EssentialsBlock missing={missing} busy={busy} onBudget={onBudget} onPeriod={onPeriod} />
+                </div>
+            )}
+
             {suggestions.length > 0 && status === "pending" && (
                 <div className="mt-3 px-4">
                     <SuggestionBlock
@@ -502,6 +514,95 @@ function EvidenceChip({ id, use, unwanted, cars }: { id: EvidenceId; use?: strin
 
 const sentenceCase = (value: string): string =>
     `${value.charAt(0).toUpperCase()}${value.slice(1).replace(/[.\s]+$/, "")}.`;
+
+/** The amounts most readers pick, and the wording Lens keeps for each. */
+const BUDGET_CHOICES = [400, 500, 600, 750];
+
+/**
+ * What Lens needs and nobody thinks to say.
+ *
+ * A comparison without a budget ranks cars the reader can't have, and one
+ * without a period prices every car on FINN's longest term. Both are cheap to
+ * ask for and expensive to leave out, and neither needs the model — so the
+ * question is asked here, and answered in one tap.
+ */
+function EssentialsBlock({
+    missing,
+    busy,
+    onBudget,
+    onPeriod,
+}: {
+    missing: { budget: boolean; period: boolean };
+    busy: boolean;
+    onBudget: (monthly: number | null) => void;
+    onPeriod: () => void;
+}) {
+    return (
+        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-finn-accent-blue/25">
+            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-finn-accent-blue">
+                <Wallet aria-hidden="true" className="h-3.5 w-3.5" />
+                {missing.budget && missing.period ? "Two things Lens needs" : "One thing Lens needs"}
+            </p>
+
+            {missing.budget && (
+                <div className="mt-1.5">
+                    <p className="text-sm font-black text-finn-black">What's the most you'd spend a month?</p>
+                    <p className="text-[11px] leading-4 text-finn-iron">
+                        Lens counts the subscription and the running costs together, and won't recommend a car above it.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                        {BUDGET_CHOICES.map((amount) => (
+                            <button
+                                key={amount}
+                                type="button"
+                                disabled={busy}
+                                onClick={() => onBudget(amount)}
+                                className="rounded-full bg-finn-pale-blue px-3 py-1.5 text-[11px] font-bold text-finn-accent-blue transition hover:bg-finn-accent-blue hover:text-white disabled:opacity-50"
+                            >
+                                Up to {formatEUR(amount)}
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => onBudget(null)}
+                            className="rounded-full bg-finn-snow px-3 py-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black disabled:opacity-50"
+                        >
+                            No limit
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {missing.period && (
+                <div className={missing.budget ? "mt-3" : "mt-1.5"}>
+                    <p className="text-sm font-black text-finn-black">When do you need it, and for how long?</p>
+                    <p className="text-[11px] leading-4 text-finn-iron">
+                        FINN rents on fixed terms, so the months you need decide which term each car is priced on — and whether it can be delivered in time.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                        <button
+                            type="button"
+                            disabled={busy}
+                            onClick={onPeriod}
+                            className="rounded-full bg-finn-pale-blue px-3 py-1.5 text-[11px] font-bold text-finn-accent-blue transition hover:bg-finn-accent-blue hover:text-white disabled:opacity-50"
+                        >
+                            I know the months
+                        </button>
+                        <button
+                            type="button"
+                            disabled={busy}
+                            onClick={onPeriod}
+                            className="rounded-full bg-finn-snow px-3 py-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black disabled:opacity-50"
+                        >
+                            No fixed period
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 /**
  * Equipment the reader never asked for, offered rather than applied.

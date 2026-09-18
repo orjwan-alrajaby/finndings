@@ -1,0 +1,117 @@
+import type { Answers } from "@/entrypoints/compare/store";
+import type { ScopeKind } from "@/lib/lens-ai/contract";
+
+import type { Rule, SessionProfile, Understanding } from "./understanding";
+
+/**
+ * The search a conversation built, kept where the rest of Lens can find it.
+ *
+ * Without this the chat on finn.com and the recommendation page are two
+ * products: a reader explains their life to one of them and then meets the
+ * other still running last month's saved settings. The session is the bridge —
+ * the temporary profile, what it was built from, and enough of the
+ * conversation to recognise it later.
+ *
+ * It is never Lens's saved settings. Carrying it over applies it to the page
+ * in front of the reader; saving it keeps a copy they can come back to. Both
+ * leave their saved priorities and profiles exactly as they were.
+ */
+
+export const SESSION_KEY = "finnLensSession";
+export const SAVED_SEARCHES_KEY = "finnLensSavedSearches";
+
+/** How long a carried-over session still counts as "what I was just doing". */
+const FRESH_FOR_MS = 12 * 60 * 60 * 1000;
+
+export interface LensSession {
+    /** When the conversation last compared cars. */
+    at: string;
+    /** Which set of cars it was about, in the chat's own words. */
+    scope: ScopeKind;
+    headline: string;
+    /** What Lens said it understood, for showing the reader what they're continuing. */
+    summary: string;
+    focus: SessionProfile["focus"];
+    rules: Rule[];
+    /** The whole understanding, so a later turn can carry on from it. */
+    understanding: Understanding;
+    /** What the engine was given. Applied on the recommendation page as-is. */
+    answers: Answers;
+    /** The cars the chat was comparing, so the page can say what changed. */
+    carIds: number[];
+    /** The car it recommended, for continuity of the answer itself. */
+    winnerId: number | null;
+}
+
+export interface SavedSearch extends LensSession {
+    id: string;
+    name: string;
+    /** The reader's own words, kept so a search is recognisable months later. */
+    note: string;
+}
+
+const read = async <T>(key: string, fallback: T): Promise<T> => {
+    try {
+        return ((await browser.storage.local.get(key))[key] as T) ?? fallback;
+    } catch {
+        return fallback;
+    }
+};
+
+/** The session the chat last compared with, if it's recent enough to mean anything. */
+export async function loadSession(): Promise<LensSession | null> {
+    const session = await read<LensSession | null>(SESSION_KEY, null);
+
+    if (!session?.at || !session.answers) return null;
+
+    return Date.now() - new Date(session.at).getTime() < FRESH_FOR_MS ? session : null;
+}
+
+export async function saveSession(session: LensSession): Promise<void> {
+    try {
+        await browser.storage.local.set({ [SESSION_KEY]: session });
+    } catch (error) {
+        console.error("Finn Lens: could not carry this conversation over", error);
+    }
+}
+
+export async function clearSession(): Promise<void> {
+    try {
+        await browser.storage.local.remove(SESSION_KEY);
+    } catch {
+        /* Nothing to do: the banner simply stays until the tab is reloaded. */
+    }
+}
+
+export const loadSavedSearches = (): Promise<SavedSearch[]> => read<SavedSearch[]>(SAVED_SEARCHES_KEY, []);
+
+/**
+ * Keep a search the reader asked to keep.
+ *
+ * Newest first, and capped: these are shortcuts back into a conversation, not
+ * an archive, and a list nobody can read is a list nobody uses.
+ */
+export async function saveSearch(search: SavedSearch): Promise<SavedSearch[]> {
+    const kept = [search, ...(await loadSavedSearches()).filter((item) => item.id !== search.id)].slice(0, 12);
+
+    await browser.storage.local.set({ [SAVED_SEARCHES_KEY]: kept });
+
+    return kept;
+}
+
+export async function deleteSearch(id: string): Promise<SavedSearch[]> {
+    const kept = (await loadSavedSearches()).filter((item) => item.id !== id);
+
+    await browser.storage.local.set({ [SAVED_SEARCHES_KEY]: kept });
+
+    return kept;
+}
+
+/** A name a reader will recognise: what they were looking for, not when. */
+export function nameFor(session: LensSession): string {
+    const focus = session.focus.slice(0, 2).map((item) => item.label);
+
+    if (focus.length) return focus.join(" · ");
+
+    return session.summary.split(/[.;—]/)[0]?.trim() || "A search with Lens";
+}

@@ -338,6 +338,25 @@ export function readSuggestions(
         .slice(0, 2);
 }
 
+/**
+ * The two things a reader almost never volunteers, and Lens can't guess.
+ *
+ * A budget decides which cars are eligible at all, and a rental period decides
+ * which FINN term each car is priced on — so a comparison made without them is
+ * answering a different question from the one the reader is asking. Lens asks
+ * for them itself rather than spending the model's one question on it.
+ */
+export const missingEssentials = (u: Understanding): { budget: boolean; period: boolean } => ({
+    budget: u.budget == null,
+    period: u.rental == null,
+});
+
+/** A monthly maximum the reader picked from the chat, without a model turn. */
+export const withBudget = (u: Understanding, monthly: number | null, said: string): Understanding => ({
+    ...u,
+    budget: monthly == null ? null : { kind: "hardMax", monthly, stretchTo: null, said },
+});
+
 /** The reader said yes: the equipment joins the need it was offered for. */
 export function withSuggestion(u: Understanding, id: EvidenceId, why: string, needId: string): Understanding {
     const target = u.needs.find((need) => need.id === needId && need.status === "active") ?? u.needs.find((need) => need.status === "active");
