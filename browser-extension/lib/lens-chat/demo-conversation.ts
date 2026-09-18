@@ -4,6 +4,7 @@ import { demoCars } from "@/lib/demo-cars";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { tellFitStory, type FitStory } from "./fit-story";
+import type { EvidenceId } from "./evidence";
 import { alternativesWithinLimits, runLens, summariseMatch, type CarLine, type LensRun, type MatchSummary } from "./run";
 import { EMPTY_UNDERSTANDING, readUnderstanding, toAnswers, type Translation, type Understanding } from "./understanding";
 
@@ -74,6 +75,11 @@ export const DEMO_QUESTION: WireQuestion = {
     blocking: false,
     affects: ["hasThreeSixtyDegreesCamera", "hasParkingAssistant"],
 };
+
+/** One thing Lens offers to check, so setup shows that it teaches rather than assumes. */
+export const DEMO_SUGGESTIONS: { id: EvidenceId; why: string; needId: string }[] = [
+    { id: "hasThreeSixtyDegreesCamera", why: "it shows the kerb and the car's corners while you park", needId: "parking" },
+];
 
 export interface DemoConversation {
     cars: PinnedFinnCar[];

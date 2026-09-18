@@ -243,6 +243,14 @@ export interface WireUnderstanding {
     tension: string;
     /** "doesntCare" items are read and discarded: nothing to set aside when Lens never weighed it. */
     notModelled: { said: string; stance?: "wants" | "doesntCare"; explanation: string }[];
+    /** Evidence Lens offered and the reader turned down; never suggest it again. */
+    declined?: string[];
+    /**
+     * Equipment worth offering, which the reader hasn't asked for and may not
+     * know exists. Offered, never applied: Lens shows what it does and lets
+     * them decide.
+     */
+    suggestions?: { id: string; why: string; needId?: string }[];
     /** What they explicitly withdrew this turn, so it isn't carried over: "budget", "rental", "monthlyKm". */
     cleared: string[];
 }
@@ -289,6 +297,8 @@ export interface ConverseResult {
     reply: string;
     understanding: WireUnderstanding | null;
     question: WireQuestion | null;
+    /** Equipment worth offering the reader, which Lens shows but never applies. */
+    suggestions?: { id: string; why: string; needId?: string }[];
     scope?: ScopeKind | null;
 }
 

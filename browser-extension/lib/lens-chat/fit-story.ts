@@ -7,6 +7,7 @@ import { carLabel } from "@/lib/lens-ai/outcome";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { asPhrase, barePhrase, EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
+import { lengthAmong, lengthGap, parkingContext, widthContext } from "./dimensions";
 
 /** How a measured figure is introduced, and what to say when FINN has none. */
 const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
@@ -110,7 +111,11 @@ function isValid(run: LensRun, car: PinnedFinnCar): boolean {
     return budgetOk && rentalOk;
 }
 
-function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string; unwanted?: boolean }): StoryLine {
+function evidenceLine(
+    car: PinnedFinnCar,
+    entry: { id: EvidenceId; use: string; unwanted?: boolean },
+    cars: PinnedFinnCar[] = [],
+): StoryLine {
     const def = { ...EVIDENCE[entry.id], undesirable: entry.unwanted ?? EVIDENCE[entry.id].undesirable };
     const state = readEvidence(car, entry.id);
     const met = evidenceMet(car, entry.id, def.undesirable === true);
@@ -130,11 +135,33 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string; 
     const useClause = def.undesirable ? "" : entry.use;
 
     if (measured) {
+        /*
+         * A measurement says more beside something the reader can picture. It
+         * is context, not a verdict: Lens never says a car is easy to park,
+         * only how it compares with a typical bay.
+         */
+        const context = entry.id === "compactLength" ? parkingContext(car) : entry.id === "compactWidth" ? widthContext(car) : null;
+
         return {
             tone: met === false && def.undesirable ? "missing" : met ? "good" : "note",
             text:
-                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${met && useClause ? ` — ${useClause}` : ""}`) +
+                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${context ? `, ${context}` : ""}${met && useClause ? ` — ${useClause}` : ""}`) +
                 (MEASURED_CAVEAT[entry.id] ? ` ${MEASURED_CAVEAT[entry.id]}` : ""),
+        };
+    }
+
+    /*
+     * A body style is a category, not a size. Where FINN files a car as an
+     * SUV and its own measurements say it is shorter than most of the cars
+     * here, both belong in the same sentence.
+     */
+    if (entry.id === "suvBody" && state === "listed") {
+        const among = lengthAmong(car, cars);
+        const measuredSize = among && among.shorterThan > among.total / 2 ? ` — though at ${measuredDisplay(car, "compactLength") ?? "its length"} it is shorter than ${among.shorterThan} of the ${among.total} other cars here` : "";
+
+        return {
+            tone: def.undesirable && !measuredSize ? "missing" : def.undesirable ? "note" : "good",
+            text: `FINN files it as an SUV${measuredSize}.`,
         };
     }
 
@@ -341,7 +368,7 @@ export function tellFitStory(
 
         const evidence = need.evidence.filter((entry) => !lessRelevant.includes(entry.id));
         const lines = evidence
-            .map((entry) => ({ line: evidenceLine(winner, entry), share: share(entry) }))
+            .map((entry) => ({ line: evidenceLine(winner, entry, cars), share: share(entry) }))
             .sort((a, b) => orderOf[a.line.tone] - orderOf[b.line.tone] || a.share - b.share)
             .map((item) => item.line);
 
@@ -445,7 +472,9 @@ export function tellFitStory(
                     ? `FINN lists this one as ${measuredDisplay(winner, gap.entry.id) ?? asPhrase(gap.entry.id)} — worth weighing for ${lower(gap.need.label)}.`
                     : `FINN doesn't list ${lower(EVIDENCE[gap.entry.id].label)} for this car — worth weighing for ${lower(gap.need.label)}.`,
                 alternative: gap.alternative
-                    ? `${name(gap.alternative)} ${gap.entry.unwanted ?? EVIDENCE[gap.entry.id].undesirable ? "isn't one" : "has it"}${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}.`
+                    ? `${name(gap.alternative)} ${gap.entry.unwanted ?? EVIDENCE[gap.entry.id].undesirable ? "isn't one" : "has it"}${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}${
+                          lengthGap(gap.alternative, winner, "this one") ? `, and it's ${lengthGap(gap.alternative, winner, "this one")}` : ""
+                      }.`
                     : single
                       ? null
                       : "None of the other cars that fit your constraints lists it either.",

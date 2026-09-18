@@ -4,7 +4,7 @@ import { SendHorizontal, X } from "lucide-react";
 import { Thinking } from "@/entrypoints/compare/lens-ai/parts";
 import { FitCard, UnderstandingCard } from "@/entrypoints/lens-chat/conversation-cards";
 import type { CarActions } from "@/entrypoints/lens-chat/cards";
-import { DEMO_MESSAGE, DEMO_QUESTION, DEMO_REPLY, type DemoConversation } from "@/lib/lens-chat/demo-conversation";
+import { DEMO_MESSAGE, DEMO_QUESTION, DEMO_REPLY, DEMO_SUGGESTIONS, type DemoConversation } from "@/lib/lens-chat/demo-conversation";
 
 import { BrandDisc } from "../Tour/parts";
 
@@ -133,9 +133,12 @@ export function ChatMock({
                             isUpdate={false}
                             status={stage === "fit" ? "applied" : "pending"}
                             busy={false}
+                            suggestions={stage === "understood" ? DEMO_SUGGESTIONS : []}
                             onCompare={onCompare}
                             onAnswer={onCompare}
                             onCorrect={() => {}}
+                            onAcceptSuggestion={onCompare}
+                            onDeclineSuggestion={() => {}}
                         />
                     </div>
                 )}

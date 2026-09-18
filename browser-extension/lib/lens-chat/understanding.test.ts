@@ -133,7 +133,7 @@ describe("reading an understanding", () => {
         expect(readUnderstanding(wire({ cleared: ["budget"] }), second).budget).toBeNull();
     });
 
-    it("keeps what they want and Lens can't check, not what they don't care about", () => {
+    it("marks what they want apart from what they don't care about", () => {
         const u = readUnderstanding(
             wire({
                 notModelled: [
@@ -144,7 +144,10 @@ describe("reading an understanding", () => {
             EMPTY_UNDERSTANDING,
         );
 
-        expect(u.notModelled.map((item) => item.said)).toEqual(["feels luxurious"]);
+        expect(u.notModelled.map((item) => [item.said, item.stance])).toEqual([
+            ["a fast car", "doesntCare"],
+            ["feels luxurious", "wants"],
+        ]);
     });
 
     it("refuses constraints that don't make sense", () => {

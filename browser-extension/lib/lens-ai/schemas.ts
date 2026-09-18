@@ -198,6 +198,19 @@ export function converseSchema(
                 explanation: { type: "string" },
             }),
         },
+        declined: { type: "array", items: evidence },
+        suggestions: {
+            type: "array",
+            items: object({
+                id: evidence,
+                why: {
+                    type: "string",
+                    description:
+                        "One clause on why it might matter to this person, in their situation — not what the equipment is. Lens shows the reader what it does and asks whether to count it.",
+                },
+                needId: { type: "string", description: "The need it would serve, when it serves one; otherwise an empty string." },
+            }),
+        },
         cleared: { type: "array", items: { type: "string", enum: ["budget", "rental", "monthlyKm"] } },
     });
 

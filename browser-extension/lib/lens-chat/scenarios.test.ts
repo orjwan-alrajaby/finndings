@@ -139,16 +139,21 @@ describe("what people say they don't want", () => {
         expect(sectionFor(story, "not-big")?.lines.map((line) => line.text).join(" ")).toMatch(/m long/);
     });
 
-    it("drops what they said they don't care about instead of listing it as a limitation", () => {
+    /* Both are kept, and the stance is what decides where they're shown. */
+    it("keeps what they don't care about as theirs, not as a limitation", () => {
         const { understanding } = read(scenario("city-parent"));
 
-        expect(understanding.notModelled).toEqual([]);
+        expect(understanding.notModelled.map((item) => [item.said, item.stance])).toEqual([
+            ["a fast car", "doesntCare"],
+            ["anything fancy", "doesntCare"],
+        ]);
     });
 
-    it("keeps what they do want and Lens can't check", () => {
+    it("keeps what they do want and Lens can't check, as a gap", () => {
         const { understanding } = read(scenario("commuter"));
+        const gaps = understanding.notModelled.filter((item) => item.stance === "wants");
 
-        expect(understanding.notModelled.map((item) => item.said)).toEqual(["sensitive to road noise"]);
+        expect(gaps.map((item) => item.said)).toEqual(["sensitive to road noise"]);
     });
 });
 

@@ -6,6 +6,7 @@ import {
     CircleHelp,
     CircleSlash,
     Eye,
+    Info,
     MessageCircleQuestion,
     Minus,
     Pin,
@@ -21,7 +22,7 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
-import { asPhrase, barePhrase, coverage, EVIDENCE, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
+import { asPhrase, barePhrase, coverage, EVIDENCE, plainly, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
 import { budgetCeiling, ruledOut } from "@/lib/lens-chat/understanding";
@@ -129,14 +130,19 @@ export function UnderstandingCard({
     isUpdate,
     status,
     busy,
+    suggestions,
     onCompare,
     onAnswer,
     onCorrect,
+    onAcceptSuggestion,
+    onDeclineSuggestion,
 }: {
     understanding: Understanding;
     translation: Translation;
     reply: string;
     question: WireQuestion | null;
+    /** Equipment Lens is offering to take into account, not applying. */
+    suggestions: { id: EvidenceId; why: string }[];
     cars: PinnedFinnCar[];
     scopeLabel: string;
     isUpdate: boolean;
@@ -145,6 +151,8 @@ export function UnderstandingCard({
     onCompare: () => void;
     onAnswer: (answer: string) => void;
     onCorrect: () => void;
+    onAcceptSuggestion: (id: EvidenceId) => void;
+    onDeclineSuggestion: (id: EvidenceId) => void;
 }) {
     const [showWeights, setShowWeights] = useState(false);
 
@@ -171,6 +179,20 @@ export function UnderstandingCard({
 
     const active = u.needs.filter((need) => need.status === "active");
     const dropped = u.needs.filter((need) => need.status === "dropped");
+    /*
+     * Said out loud rather than quietly obeyed: a reader who told Lens they
+     * don't need a big boot should see that written down, next to the things
+     * they do need.
+     */
+    const notNeeded = [
+        ...u.droppedPriorities.map((id) => CATEGORIES[id].label),
+        ...dropped.map((need) => need.label),
+        ...ruledOut(u)
+            .filter((rule) => rule.mode === "without")
+            .map((rule) => `Anything FINN files as ${asPhrase(rule.id)}`),
+        ...u.notModelled.filter((item) => item.stance === "doesntCare").map((item) => item.said),
+    ].filter((item, index, all) => all.indexOf(item) === index);
+    const wanted = u.notModelled.filter((item) => item.stance !== "doesntCare");
     const lessRelevant = new Set(translation.lessRelevant);
     const blocking = Boolean(question?.blocking);
     const hasSomething = u.budget || u.rental || active.length || u.droppedPriorities.length;
@@ -192,10 +214,17 @@ export function UnderstandingCard({
             </div>
 
             {u.context.length > 0 && (
-                <p className="mt-3 px-4 text-xs leading-5 text-finn-iron">
-                    <span className="font-black text-finn-black">Your situation: </span>
-                    {u.context.map((item) => item.label).join(" · ")}
-                </p>
+                <div className="mt-3 px-4">
+                    <Label>How you'll use it</Label>
+                    <ul className="mt-1 space-y-0.5">
+                        {u.context.map((item) => (
+                            <li key={item.label} className="flex gap-1.5 text-xs leading-5 text-finn-black">
+                                <span aria-hidden="true" className="text-finn-accent-blue">·</span>
+                                {item.label}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {(u.budget || u.rental || u.monthlyKm || ruledOut(u).length > 0) && (
@@ -263,7 +292,7 @@ export function UnderstandingCard({
 
             {active.length > 0 && (
                 <div className="mt-3 space-y-1.5 px-4">
-                    <Label>What the car needs to do for you</Label>
+                    <Label>What matters</Label>
                     {active.map((need) => (
                         <div key={need.id} className="rounded-2xl bg-white px-3 py-2">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -321,17 +350,24 @@ export function UnderstandingCard({
                 </div>
             )}
 
-            {(u.droppedPriorities.length > 0 || dropped.length > 0) && (
-                <p className="mt-3 px-4 text-xs leading-5 text-finn-iron">
-                    <span className="font-black text-finn-black">Not counting: </span>
-                    {[...u.droppedPriorities.map((id) => CATEGORIES[id].label), ...dropped.map((need) => need.label)].join(", ")}.
-                </p>
+            {notNeeded.length > 0 && (
+                <div className="mt-3 px-4">
+                    <Label>What you don't need</Label>
+                    <ul className="mt-1 space-y-0.5">
+                        {notNeeded.map((item) => (
+                            <li key={item} className="flex gap-1.5 text-xs leading-5 text-finn-iron">
+                                <span aria-hidden="true">·</span>
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
-            {u.notModelled.length > 0 && (
+            {wanted.length > 0 && (
                 <div className="mt-3 space-y-1.5 px-4">
-                    <Label>What Lens can't take into account</Label>
-                    {u.notModelled.map((item) => (
+                    <Label>Lens can't judge</Label>
+                    {wanted.map((item) => (
                         <p key={item.said} className="flex gap-2 rounded-2xl border border-white/80 bg-white/50 px-3 py-2 text-xs leading-5 text-finn-iron">
                             <CircleSlash aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                             <span>
@@ -339,6 +375,18 @@ export function UnderstandingCard({
                             </span>
                         </p>
                     ))}
+                </div>
+            )}
+
+            {suggestions.length > 0 && status === "pending" && (
+                <div className="mt-3 px-4">
+                    <SuggestionBlock
+                        suggestions={suggestions}
+                        cars={cars}
+                        busy={busy}
+                        onAccept={onAcceptSuggestion}
+                        onDecline={onDeclineSuggestion}
+                    />
                 </div>
             )}
 
@@ -381,15 +429,29 @@ export function UnderstandingCard({
 
                 {hasSomething && (
                     <>
-                        <button
-                            type="button"
-                            onClick={() => setShowWeights((was) => !was)}
-                            className="mt-2 text-[10px] font-bold text-finn-iron hover:text-finn-black"
-                            aria-expanded={showWeights}
-                        >
-                            {showWeights ? "Hide" : "How Lens will weigh this"}
-                        </button>
-                        {showWeights && <Weights translation={translation} />}
+                        <div className="mt-2.5 rounded-2xl bg-white px-3 py-2">
+                            <p className="text-[10px] font-black uppercase tracking-wide text-finn-accent-blue">
+                                Temporary Lens profile
+                            </p>
+                            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
+                                Built from this conversation. Your saved priorities and profiles haven't changed.
+                            </p>
+                            {translation.profile.focus.length > 0 && (
+                                <p className="mt-1.5 text-xs leading-5 text-finn-black">
+                                    <span className="font-black">For this search, Lens is weighing: </span>
+                                    {translation.profile.focus.map((item) => item.label).join(" · ")}
+                                </p>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setShowWeights((was) => !was)}
+                                className="mt-1.5 text-[10px] font-bold text-finn-iron hover:text-finn-black"
+                                aria-expanded={showWeights}
+                            >
+                                {showWeights ? "Hide the detail" : "Show how that becomes a score"}
+                            </button>
+                            {showWeights && <Weights translation={translation} />}
+                        </div>
                     </>
                 )}
             </div>
@@ -405,45 +467,141 @@ export function UnderstandingCard({
  * what the chip explains on hover, with Lens's description behind it.
  */
 function EvidenceChip({ id, use, unwanted, cars }: { id: EvidenceId; use?: string; unwanted?: boolean; cars: PinnedFinnCar[] }) {
+    const [open, setOpen] = useState(false);
     const counts = coverage(cars, id);
     /* Where the reader wants it absent, the useful count is how many cars avoid it. */
     const answering = unwanted ? counts.notListed : counts.listed;
 
     return (
-        <span
-            title={[use ? `${use.charAt(0).toUpperCase()}${use.slice(1)}.` : "", EVIDENCE[id].explanation].filter(Boolean).join(" ")}
-            className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black"
-        >
-            {unwanted ? withoutLabel(id) : EVIDENCE[id].label}
-            {counts.total > 0 && (
-                <span className="font-semibold text-finn-iron">
-                    · {answering} of {counts.total}
-                </span>
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen((was) => !was)}
+                aria-expanded={open}
+                title={plainly(id)}
+                className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black transition hover:bg-finn-cotton"
+            >
+                {unwanted ? withoutLabel(id) : EVIDENCE[id].label}
+                {counts.total > 0 && (
+                    <span className="font-semibold text-finn-iron">
+                        · {answering} of {counts.total}
+                    </span>
+                )}
+                <Info aria-hidden="true" className="h-2.5 w-2.5 text-finn-iron" />
+            </button>
+            {open && (
+                <p className="w-full rounded-xl bg-finn-snow px-2.5 py-1.5 text-[11px] leading-4 text-finn-iron">
+                    <span className="font-black text-finn-black">{EVIDENCE[id].label}. </span>
+                    {plainly(id)}
+                    {use && <> {sentenceCase(use)}</>}
+                </p>
             )}
-        </span>
+        </>
+    );
+}
+
+const sentenceCase = (value: string): string =>
+    `${value.charAt(0).toUpperCase()}${value.slice(1).replace(/[.\s]+$/, "")}.`;
+
+/**
+ * Equipment the reader never asked for, offered rather than applied.
+ *
+ * Lens knows about equipment most people have never heard of, and a reader
+ * who hates parking may simply not know a camera can show the car from above.
+ * Saying so is useful; deciding for them is not — so this says what it does
+ * and leaves the choice with them.
+ */
+function SuggestionBlock({
+    suggestions,
+    cars,
+    busy,
+    onAccept,
+    onDecline,
+}: {
+    suggestions: { id: EvidenceId; why: string }[];
+    cars: PinnedFinnCar[];
+    busy: boolean;
+    onAccept: (id: EvidenceId) => void;
+    onDecline: (id: EvidenceId) => void;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <Label>Something Lens can check, if it's useful to you</Label>
+            {suggestions.map((item) => {
+                const counts = coverage(cars, item.id);
+
+                return (
+                    <div key={item.id} className="rounded-2xl bg-white px-3 py-2.5">
+                        <p className="text-sm font-black text-finn-black">
+                            {EVIDENCE[item.id].label}
+                            {counts.total > 0 && (
+                                <span className="ml-1.5 text-[10px] font-bold text-finn-iron">
+                                    on {counts.listed} of {counts.total} here
+                                </span>
+                            )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">{plainly(item.id)}</p>
+                        {item.why && <p className="mt-1 text-xs leading-5 text-finn-black">{sentenceCase(item.why)}</p>}
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <SmallButton tone="solid" onClick={() => onAccept(item.id)} disabled={busy}>
+                                Count it in
+                            </SmallButton>
+                            <SmallButton onClick={() => onDecline(item.id)} disabled={busy}>
+                                Not important to me
+                            </SmallButton>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 
 /** The engine's view, for anyone who wants to audit it — not the main answer. */
+/**
+ * The session profile with its workings shown: what was said, the Lens
+ * priority it became, the equipment raised inside it, and the share of the
+ * result that priority carries.
+ *
+ * Not reasoning — a structure. It's here so a reader can check that Lens is
+ * weighing their life rather than a profile they set months ago, and so we
+ * can debug an odd recommendation without guessing.
+ */
 function Weights({ translation }: { translation: Translation }) {
-    const weights = priorityWeights(translation.order.map((item) => item.id));
+    const { profile } = translation;
 
     return (
-        <div className="mt-1.5 space-y-1">
+        <div className="mt-1.5 space-y-1.5">
             <div className="flex flex-wrap gap-1">
-                {translation.order.map((item, index) => (
-                    <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold">
+                {profile.priorities.map((item, index) => (
+                    <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold">
                         <span className="text-finn-accent-blue">#{index + 1}</span>
                         <PriorityIcon name={CATEGORIES[item.id].icon} className="h-3 w-3" />
-                        {CATEGORIES[item.id].label}
-                        <span className="text-finn-iron">{weights[index]?.weightPercent}%</span>
+                        {item.label}
+                        <span className="text-finn-iron">{item.sharePercent}%</span>
                     </span>
                 ))}
             </div>
-            {translation.order.some((item) => item.filler) && (
+
+            {profile.trace.map((row) => (
+                <p key={row.need} className="text-[10px] leading-4 text-finn-iron">
+                    <span className="font-black text-finn-black">{row.need}</span>
+                    {row.priorities.length > 0 && <> → {row.priorities.map((item) => item.label).join(", ")}</>}
+                    {row.raised.length > 0 && (
+                        <> → raises {row.raised.map((item) => `${item.label} (${item.importance})`).join(", ")}</>
+                    )}
+                    {row.rules.map((rule) => (
+                        <span key={rule.id}> → {rule.mode === "without" ? "rules out" : "requires"} {rule.label}</span>
+                    ))}
+                    {row.unpublished && <> · FINN doesn't publish {row.unpublished}</>}
+                </p>
+            ))}
+
+            {profile.priorities.some((item) => item.filler) && (
                 <p className="text-[10px] leading-4 text-finn-iron">
-                    Lens ranks at least three priorities. {translation.order.filter((item) => item.filler).map((item) => CATEGORIES[item.id].label).join(" and ")}{" "}
-                    {translation.order.filter((item) => item.filler).length === 1 ? "comes" : "come"} from your saved settings and count least.
+                    Lens ranks at least three priorities.{" "}
+                    {profile.priorities.filter((item) => item.filler).map((item) => item.label).join(" and ")}{" "}
+                    {profile.priorities.filter((item) => item.filler).length === 1 ? "comes" : "come"} from your saved settings and count least.
                 </p>
             )}
         </div>

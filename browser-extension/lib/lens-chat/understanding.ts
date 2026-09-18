@@ -6,6 +6,7 @@ import {
     MIN_PRIORITIES,
 } from "@/lib/reasoning-engine/constants";
 import { isMonthString, MAX_RENTAL_MONTHS, monthsInclusive } from "@/lib/reasoning-engine/contract";
+import { priorityWeights } from "@/lib/reasoning-engine";
 import type { CategoryId, FeatureImportance, SignalId } from "@/lib/reasoning-engine/types";
 import type {
     NeedImportance,
@@ -55,9 +56,16 @@ export interface Understanding {
     context: { label: string; said: string }[];
     capabilities: { label: string; said: string; lessRelevant: EvidenceId[] }[];
     droppedPriorities: CategoryId[];
+    /** Evidence Lens offered and the reader turned down. Never raised again. */
+    declined: EvidenceId[];
     /** Where the choice will really be made, in the reader's terms. */
     tension: string;
-    notModelled: { said: string; explanation: string }[];
+    /**
+     * Things the reader raised that Lens can't score. "wants" is a gap Lens
+     * has to admit; "doesntCare" is a preference worth showing back to them —
+     * they said it, and seeing it listed is how they know it was heard.
+     */
+    notModelled: { said: string; stance: "wants" | "doesntCare"; explanation: string }[];
 }
 
 export const EMPTY_UNDERSTANDING: Understanding = {
@@ -68,6 +76,7 @@ export const EMPTY_UNDERSTANDING: Understanding = {
     context: [],
     capabilities: [],
     droppedPriorities: [],
+    declined: [],
     tension: "",
     notModelled: [],
 };
@@ -274,9 +283,11 @@ export function readUnderstanding(
 
     const notModelled = [
         ...listOf<{ said: string; stance?: string; explanation: string }>(wire.notModelled)
-            /* Saying you don't care about speed isn't a wish Lens has to decline. */
-            .filter((item) => item?.stance !== "doesntCare")
-            .map((item) => ({ said: text(item?.said, 120), explanation: text(item?.explanation, 220) }))
+            .map((item) => ({
+                said: text(item?.said, 120),
+                stance: item?.stance === "doesntCare" ? ("doesntCare" as const) : ("wants" as const),
+                explanation: text(item?.explanation, 220),
+            }))
             .filter((item) => item.said && item.explanation),
         ...previous.notModelled,
     ].filter((item, index, all) => all.findIndex((other) => other.said.toLowerCase() === item.said.toLowerCase()) === index)
@@ -290,10 +301,66 @@ export function readUnderstanding(
         context: context.slice(0, 8),
         capabilities: capabilities.slice(0, 5),
         droppedPriorities: droppedPriorities.filter((id) => !wanted.has(id)),
+        declined: [...new Set([...listOf<unknown>(wire.declined).filter(isEvidenceId), ...previous.declined])],
         tension: typeof wire.tension === "string" ? text(wire.tension, 200) : previous.tension,
         notModelled,
     };
 }
+
+/**
+ * Equipment worth offering: real, not already cited, not already turned down,
+ * and something the cars here actually differ on. Offering a reader a feature
+ * every car has, or one none of them has, wastes the only question they were
+ * going to read.
+ */
+export function readSuggestions(
+    raw: unknown,
+    u: Understanding,
+    cars: FinnCar[] = [],
+): { id: EvidenceId; why: string; needId: string }[] {
+    const cited = new Set(u.needs.flatMap((need) => need.evidence.map((entry) => entry.id)));
+    const seen = new Set<EvidenceId>();
+
+    return (Array.isArray(raw) ? raw : [])
+        .filter((item) => isEvidenceId(item?.id))
+        .map((item) => ({ id: item.id as EvidenceId, why: text(item?.why, 160), needId: slug(text(item?.needId, 40)) }))
+        .filter((item) => {
+            if (cited.has(item.id) || u.declined.includes(item.id) || seen.has(item.id)) return false;
+
+            seen.add(item.id);
+
+            if (cars.length < 2) return true;
+
+            const { listed, total } = coverage(cars, item.id);
+
+            return listed > 0 && listed / total < UNIVERSAL_SHARE;
+        })
+        .slice(0, 2);
+}
+
+/** The reader said yes: the equipment joins the need it was offered for. */
+export function withSuggestion(u: Understanding, id: EvidenceId, why: string, needId: string): Understanding {
+    const target = u.needs.find((need) => need.id === needId && need.status === "active") ?? u.needs.find((need) => need.status === "active");
+
+    if (!target) return u;
+
+    return {
+        ...u,
+        declined: u.declined.filter((item) => item !== id),
+        needs: u.needs.map((need) =>
+            need.id === target.id
+                ? { ...need, evidence: [...need.evidence, { id, use: why, unwanted: false, mustHave: false }].slice(0, 8) }
+                : need,
+        ),
+    };
+}
+
+/** The reader said no: never raised, never offered again. */
+export const withoutSuggestion = (u: Understanding, id: EvidenceId): Understanding => ({
+    ...u,
+    declined: [...new Set([...u.declined, id])],
+    needs: u.needs.map((need) => ({ ...need, evidence: need.evidence.filter((entry) => entry.id !== id) })),
+});
 
 /** A question worth asking, or null: well-formed, and not one already answered. */
 export function readQuestion(
@@ -448,6 +515,37 @@ export interface Translation {
     order: { id: CategoryId; from: string[]; filler: boolean }[];
     /** Evidence the person made less relevant, removed from anything raised. */
     lessRelevant: EvidenceId[];
+    /** The session's own profile: what Lens is paying attention to this time. */
+    profile: SessionProfile;
+}
+
+/**
+ * The temporary profile this conversation builds.
+ *
+ * It exists for the search in front of the reader and nothing else: their
+ * saved priorities, profiles and raised features are read for the priorities
+ * the conversation says nothing about, and are never written. Everything here
+ * is derived from what they said, so it can be shown back to them in their own
+ * words and followed from a sentence down to a score.
+ */
+export interface SessionProfile {
+    /** What Lens is paying attention to, in the reader's words: their needs. */
+    focus: { label: string; importance: NeedImportance }[];
+    /** The engine's own order and weights, for anyone who wants the numbers. */
+    priorities: { id: CategoryId; label: string; sharePercent: number; from: string[]; filler: boolean }[];
+    /** Rules that set cars aside before ranking. */
+    rules: Rule[];
+    /** One row per need: the sentence, the Lens concepts, the features raised. */
+    trace: {
+        need: string;
+        said: string;
+        importance: NeedImportance;
+        priorities: { id: CategoryId; label: string }[];
+        raised: { id: EvidenceId; label: string; importance: FeatureImportance }[];
+        rules: { id: EvidenceId; label: string; mode: "without" | "must" }[];
+        /** What this need asked for that FINN doesn't publish. */
+        unpublished: string | null;
+    }[];
 }
 
 /**
@@ -464,7 +562,7 @@ export interface Translation {
 export function toAnswers(base: Answers, u: Understanding, enabled: CategoryId[] = CATEGORY_IDS): Translation {
     const active = u.needs.filter((need) => need.status === "active");
     const dropped = new Set(u.droppedPriorities);
-    const lessRelevant = [...new Set(u.capabilities.flatMap((item) => item.lessRelevant))];
+    const lessRelevant = [...new Set([...u.capabilities.flatMap((item) => item.lessRelevant), ...u.declined])];
 
     const scores = new Map<CategoryId, { score: number; first: number; from: string[] }>();
 
@@ -505,8 +603,16 @@ export function toAnswers(base: Answers, u: Understanding, enabled: CategoryId[]
         order.push({ id, from: [], filler: true });
     }
 
+    /*
+     * A priority the conversation put there is emphasised by the conversation
+     * alone: the reader's saved raises describe a different search. Only the
+     * filler priorities — the ones nothing in the conversation speaks to —
+     * keep what the reader saved.
+     */
+    const fromNeeds = new Set(ranked.map((item) => item.id));
+
     const features = Object.fromEntries(
-        CATEGORY_IDS.map((id) => [id, [...(base.features[id] ?? [])]]),
+        CATEGORY_IDS.map((id) => [id, fromNeeds.has(id) ? [] : [...(base.features[id] ?? [])]]),
     ) as Answers["features"];
 
     for (const { id } of order) {
@@ -546,6 +652,23 @@ export function toAnswers(base: Answers, u: Understanding, enabled: CategoryId[]
     }
     if (u.monthlyKm) preferences.monthlyKm = u.monthlyKm.value;
 
+    const weights = priorityWeights(order.map((item) => item.id));
+    const rules = ruledOut(u);
+    const raisedIn = (need: Need): { id: EvidenceId; label: string; importance: FeatureImportance }[] =>
+        need.evidence
+            .filter((entry) => {
+                const def = EVIDENCE[entry.id];
+
+                return (
+                    def.raisable &&
+                    def.scoredIn != null &&
+                    order.some((item) => item.id === def.scoredIn) &&
+                    !lessRelevant.includes(entry.id) &&
+                    !entry.unwanted
+                );
+            })
+            .map((entry) => ({ id: entry.id, label: EVIDENCE[entry.id].label, importance: RAISE[need.importance] }));
+
     return {
         answers: {
             priorities: order.map((item) => item.id),
@@ -555,6 +678,37 @@ export function toAnswers(base: Answers, u: Understanding, enabled: CategoryId[]
         },
         order,
         lessRelevant,
+        profile: {
+            focus: active
+                .slice()
+                .sort((a, b) => RANK[b.importance] - RANK[a.importance])
+                .map((need) => ({ label: need.label, importance: need.importance })),
+            priorities: order.map((item) => ({
+                id: item.id,
+                label: CATEGORIES[item.id].label,
+                sharePercent: weights.find((weight) => weight.priority === item.id)?.weightPercent ?? 0,
+                from: item.from,
+                filler: item.filler,
+            })),
+            rules,
+            trace: active.map((need) => ({
+                need: need.label,
+                said: need.said,
+                importance: need.importance,
+                priorities: need.priorities
+                    .filter((id) => order.some((item) => item.id === id))
+                    .map((id) => ({ id, label: CATEGORIES[id].label })),
+                raised: raisedIn(need),
+                rules: need.evidence
+                    .filter((entry) => rules.some((rule) => rule.id === entry.id))
+                    .map((entry) => ({
+                        id: entry.id,
+                        label: EVIDENCE[entry.id].label,
+                        mode: entry.unwanted ? ("without" as const) : ("must" as const),
+                    })),
+                unpublished: need.notInData,
+            })),
+        },
     };
 }
 

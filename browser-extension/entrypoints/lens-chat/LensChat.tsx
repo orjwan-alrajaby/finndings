@@ -11,6 +11,7 @@ import type { ScopeKind, WireQuestion } from "@/lib/lens-ai/contract";
 import { carLabel, compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
 import { buildVocabulary } from "@/lib/lens-ai/vocabulary";
 import type { PageContext } from "@/lib/lens-chat/messages";
+import type { EvidenceId } from "@/lib/lens-chat/evidence";
 import { evidenceCatalogue } from "@/lib/lens-chat/evidence";
 import { evidenceForNeeds, finnsOwnWords, quotesAreFinns, tellFitStory } from "@/lib/lens-chat/fit-story";
 import { alternativesWithinLimits, compareRows, runLens, summariseMatch, type LensRun } from "@/lib/lens-chat/run";
@@ -20,8 +21,11 @@ import {
     isEmptyUnderstanding,
     readQuestion,
     groundInWhatWasSaid,
+    readSuggestions,
     readUnderstanding,
     ruledOut,
+    withoutSuggestion,
+    withSuggestion,
     toAnswers,
     toWire,
     type Translation,
@@ -74,6 +78,7 @@ type Entry = { id: number } & (
           kind: "understanding";
           understanding: Understanding;
           question: WireQuestion | null;
+          suggestions: { id: EvidenceId; why: string; needId: string }[];
           reply: string;
           isUpdate: boolean;
           status: "pending" | "applied" | "superseded";
@@ -315,6 +320,32 @@ export function LensChat() {
         [push],
     );
 
+    /**
+     * The reader's answer to an offer.
+     *
+     * Taking one re-runs the comparison, because it changes what Lens weighs;
+     * turning one down only records it, so nothing moves under them and the
+     * same offer never comes back.
+     */
+    const answerSuggestion = useCallback(
+        (entryId: number, id: EvidenceId, why: string, needId: string, take: boolean) => {
+            const current = latest.current;
+            const next = take ? withSuggestion(current.understanding, id, why, needId) : withoutSuggestion(current.understanding, id);
+
+            setUnderstanding(next);
+            setEntries((all) =>
+                all.map((entry) =>
+                    entry.id === entryId && entry.kind === "understanding"
+                        ? { ...entry, understanding: next, suggestions: entry.suggestions.filter((item) => item.id !== id) }
+                        : entry,
+                ),
+            );
+
+            if (take && current.run) void compareWith(next, current.kind);
+        },
+        [compareWith],
+    );
+
     const talk = useCallback(
         async (message: string) => {
             const current = latest.current;
@@ -404,6 +435,7 @@ export function LensChat() {
                 said,
             );
             const question = readQuestion(result.question, answered.current, current.scopes[current.kind].cars);
+            const suggestions = readSuggestions(result.suggestions, next, current.scopes[current.kind].cars);
 
             setUnderstanding(next);
             setOpenQuestion(question);
@@ -427,6 +459,7 @@ export function LensChat() {
                 understanding: next,
                 question,
                 reply,
+                suggestions,
                 isUpdate: Boolean(current.run),
                 status: "pending",
             });
@@ -617,6 +650,12 @@ export function LensChat() {
                                             isUpdate={entry.isUpdate}
                                             status={entry.status}
                                             busy={busy}
+                                            suggestions={entry.suggestions}
+                                            onAcceptSuggestion={(id) => {
+                                                const offer = entry.suggestions.find((item) => item.id === id);
+                                                if (offer) answerSuggestion(entry.id, id, offer.why, offer.needId, true);
+                                            }}
+                                            onDeclineSuggestion={(id) => answerSuggestion(entry.id, id, "", "", false)}
                                             onCompare={() => confirmUnderstanding(entry)}
                                             onAnswer={(answer) => void send(answer)}
                                             onCorrect={() => {

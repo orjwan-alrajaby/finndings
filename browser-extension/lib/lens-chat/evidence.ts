@@ -243,6 +243,49 @@ const PHRASES: Partial<Record<EvidenceId, string>> = {
 
 export const asPhrase = (id: EvidenceId): string => PHRASES[id] ?? EVIDENCE[id].label.toLowerCase();
 
+/**
+ * What a piece of equipment does, for someone who has never read a car
+ * review. One sentence: what it is, and what it does for you — never why you
+ * should want it.
+ *
+ * The engine's own explanations are written for the compare page, where a
+ * reader has come to study the reasoning. In a chat they are too long to put
+ * behind a tap, so the equipment people actually meet gets a short form here
+ * and everything else falls back to Lens's own words.
+ */
+const PLAIN: Partial<Record<EvidenceId, string>> = {
+    hasThreeSixtyDegreesCamera:
+        "Cameras around the car combine into a view from above, so you can see the space on every side while parking.",
+    hasOneEightyDegreesReversingCamera: "Shows the area behind the car on a screen while you reverse.",
+    hasParkingSensors: "Sensors that beep faster as you get closer to something you can't see.",
+    hasParkingAssistant: "Steers the car into a parking space itself while you control the pedals.",
+    hasMatrixLedHeadlights:
+        "Headlights split into sections that switch off individually, keeping more of the road lit without dazzling oncoming drivers.",
+    hasCorneringLights: "Extra lights that come on as you turn, lighting the bend rather than straight ahead.",
+    hasBackUSBPorts: "USB sockets in the back seats, for charging phones or tablets without a cable from the front.",
+    hasBlindSpotAssist: "Warns you when another car is beside you where your mirrors don't show it.",
+    hasRearCrosswalkWarning: "Warns you about traffic crossing behind while you reverse out of a space.",
+    hasEmergencyBrakingAssist: "Brakes for you if it detects a collision coming and you haven't reacted.",
+    hasAdaptiveCruiseControl: "Holds a set speed and keeps your distance from the car in front by itself.",
+    driverAssistLevel2: "Steers to stay centred in the lane while also holding speed and distance.",
+    hasLaneKeepingAssist: "Nudges the steering back if you drift out of your lane without indicating.",
+    hasIsofix: "Standard anchor points that a child seat clips straight into, instead of being belted in.",
+    hasLumbarSupport: "An adjustable support for the lower back, for long stretches behind the wheel.",
+    hasHeatedSteeringWheel: "The wheel itself warms up, so you can drive without gloves on a cold morning.",
+    hasHeatPump: "Heats the cabin far more efficiently than a normal electric heater, so winter costs less range.",
+    hasElectricTailgate: "The boot opens and closes on a motor, which helps when your hands are full.",
+    hasSplitFoldingRearSeats: "The back seat folds in sections, so you can carry something long and a passenger at once.",
+    bootVolume: "How much the boot holds, as FINN publishes it. FINN doesn't say whether the figure is with the seats up or folded.",
+    electricRange: "How far FINN says the car goes on a full charge, measured on the standard WLTP cycle.",
+    compactLength: "How long the car is, bumper to bumper.",
+    compactWidth: "How wide the car is, excluding the mirrors.",
+    suvBody: "Whether FINN files this car as an SUV. It's a category, not a measurement — some are shorter than ordinary hatchbacks.",
+    winterReadyTyres: "What FINN says is fitted: all-season tyres, or a summer and a winter set.",
+};
+
+/** The short explanation where there is one, Lens's own where there isn't. */
+export const plainly = (id: EvidenceId): string => PLAIN[id] ?? EVIDENCE[id].explanation;
+
 /** The same phrase without its article, for "no SUV" rather than "no an SUV". */
 export const barePhrase = (id: EvidenceId): string => asPhrase(id).replace(/^(a|an|the) /, "");
 
