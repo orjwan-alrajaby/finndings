@@ -84,8 +84,14 @@ const IMPORTANCE: NeedImportance[] = ["essential", "important", "niceToHave"];
 const slug = (value: string) =>
     value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 
-/** Where a piece of raisable evidence is scored, so a need that relies on it counts there. */
-const scoredHome = (id: EvidenceId): CategoryId | null => EVIDENCE[id].scoredIn;
+/**
+ * Where a need's evidence pulls its priority in — but only evidence a reader
+ * could raise there. Equipment every car in a priority is expected to have
+ * (air conditioning under climate) says nothing about what the person ranked:
+ * counting it turned "not annoying to live with" into a winter priority.
+ */
+const scoredHome = (id: EvidenceId): CategoryId | null =>
+    EVIDENCE[id].raisable ? EVIDENCE[id].scoredIn : null;
 
 /**
  * The model's understanding, kept only where it holds up, merged over the
@@ -461,7 +467,7 @@ export function toAnswers(base: Answers, u: Understanding, enabled: CategoryId[]
 
     const preferences = { ...base.preferences };
 
-    if (u.budget?.kind === "hardMax") preferences.monthlyBudget = u.budget.monthly;
+    if (u.budget) preferences.monthlyBudget = budgetCeiling(u.budget);
     if (u.rental) {
         preferences.rentalFrom = u.rental.from;
         preferences.rentalTo = u.rental.to;
@@ -487,6 +493,19 @@ const RANK_FEATURE: Record<FeatureImportance, number> = { high: 3, medium: 2, lo
 /* -------------------------------------------------------------------------- */
 
 const euros = (value: number) => `€${value.toLocaleString("en-GB")}`;
+
+/**
+ * How far above a soft figure Lens will still look.
+ *
+ * "Around €600, a bit more for a good reason" is not "no limit": ignoring it
+ * put a €1,353 car in front of someone who said €600. A target is held to a
+ * little headroom instead, and the fit story says where the line was drawn.
+ */
+export const TARGET_HEADROOM = 1.15;
+
+/** The most Lens will let a car cost, given what the person said about money. */
+export const budgetCeiling = (budget: NonNullable<Understanding["budget"]>): number =>
+    budget.kind === "hardMax" ? budget.monthly : Math.round(budget.monthly * TARGET_HEADROOM);
 
 export function budgetText(budget: Understanding["budget"]): string {
     if (!budget) return "No limit";
