@@ -76,6 +76,9 @@ export const FREE_TIER_MODELS = [
     "gemini-2.5-flash",
 ];
 
+/** Where models resting out of quota are remembered between pages. */
+const RESTING_KEY = "finnLensAiResting";
+
 /** Worth trying the next model for: out of quota, overloaded, or not offered to this key. */
 const MOVE_ON = new Set([429, 503, 404]);
 
@@ -99,8 +102,53 @@ export function createGeminiAdapter({
 }): LensAiAdapter {
     const client = new GoogleGenAI({ apiKey });
 
-    /** When each spent model is worth asking again. */
+    /**
+     * When each spent model is worth asking again — kept in storage, not just
+     * in this page.
+     *
+     * A model that's out of requests for the day is out for every page the
+     * reader opens. Holding that only in memory meant each new page, and each
+     * reopened chat, spent four requests rediscovering it before reaching the
+     * model that could answer: slower for the reader, and their own free quota
+     * burned on refusals.
+     */
     const restingUntil = new Map<string, number>();
+
+    const loaded = browser.storage.local
+        .get(RESTING_KEY)
+        .then((stored) => {
+            const saved = (stored[RESTING_KEY] ?? {}) as Record<string, number>;
+
+            for (const [model, until] of Object.entries(saved)) {
+                if (typeof until === "number" && until > Date.now()) restingUntil.set(model, until);
+            }
+        })
+        .catch(() => {});
+
+    const remember = () => {
+        const now = Date.now();
+        const keep = Object.fromEntries([...restingUntil].filter(([, until]) => until > now && Number.isFinite(until)));
+
+        void browser.storage.local.set({ [RESTING_KEY]: keep }).catch(() => {});
+    };
+
+    /**
+     * Which free-tier limit a 429 is about.
+     *
+     * Google says "please retry in 50s" for the per-minute limit and names a
+     * per-day metric for the other; the two need different words to the
+     * reader — one is "wait a minute", the other is "come back tomorrow" —
+     * and a long retry delay is the giveaway when the metric isn't named.
+     */
+    const limitKind = (error: ApiError): "daily" | "minute" => {
+        const message = error.message ?? "";
+
+        return /per\s*day/i.test(message) || retryAfter(message) > 5 * 60 ? "daily" : "minute";
+    };
+
+    /** Seconds Google asked us to wait, in either shape it writes them. */
+    const retryAfter = (message: string): number =>
+        Number(message.match(/"retryDelay":\s*"(\d+(?:\.\d+)?)s"/)?.[1] ?? message.match(/retry in (\d+(?:\.\d+)?)s/i)?.[1] ?? 60);
 
     function rest(model: string, error: ApiError): void {
         const message = error.message ?? "";
@@ -109,12 +157,13 @@ export function createGeminiAdapter({
             /* Not offered to this key: no point asking again this run. */
             restingUntil.set(model, Number.POSITIVE_INFINITY);
         } else if (error.status === 429) {
-            const retry = Number(message.match(/"retryDelay":"(\d+)s"/)?.[1] ?? 60);
-            const daily = /PerDay/i.test(message);
-
             /* A daily quota resets on Google's clock; an hour is a cheap, safe guess. */
-            restingUntil.set(model, Date.now() + (daily ? 60 * 60_000 : retry * 1000));
+            const wait = limitKind(error) === "daily" ? 60 * 60_000 : Math.max(retryAfter(message), 5) * 1000;
+
+            restingUntil.set(model, Date.now() + wait);
         }
+
+        remember();
     }
 
     const awake = () => {
@@ -136,10 +185,13 @@ export function createGeminiAdapter({
         schema: Record<string, unknown>;
         user: string;
     }): Promise<Answered<T>> {
+        await loaded;
+
         const candidates = awake();
         let response;
         let served = candidates[0]!;
-        let dailyQuota = false;
+        /* What the last model refused with — the one the reader is waiting on. */
+        let quota: "daily" | "minute" | null = null;
 
         try {
             for (const [index, candidate] of candidates.entries()) {
@@ -165,7 +217,7 @@ export function createGeminiAdapter({
 
                     if (error instanceof ApiError) {
                         rest(candidate, error);
-                        dailyQuota ||= error.status === 429 && /PerDay/i.test(error.message ?? "");
+                        if (error.status === 429) quota = limitKind(error);
                     }
 
                     if (index === candidates.length - 1) throw error;
@@ -179,9 +231,9 @@ export function createGeminiAdapter({
 
                 if (error.status === 429) {
                     throw new AdapterError(
-                        dailyQuota
+                        quota === "daily"
                             ? "Lens AI has used today's free Gemini requests. They reset daily — everything else in Lens still works."
-                            : "Lens AI has hit the free tier's rate limit — wait a minute and try again.",
+                            : "Gemini's free tier is rate-limiting Lens AI. Wait a minute and try again — everything else in Lens still works.",
                         429,
                     );
                 }

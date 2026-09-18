@@ -189,6 +189,13 @@ export function UnderstandingCard({
                 )}
             </div>
 
+            {u.context.length > 0 && (
+                <p className="mt-3 px-4 text-xs leading-5 text-finn-iron">
+                    <span className="font-black text-finn-black">Your situation: </span>
+                    {u.context.map((item) => item.label).join(" · ")}
+                </p>
+            )}
+
             {(u.budget || u.rental) && (
                 <div className="mt-3 space-y-1.5 px-4">
                     <Label>Your limits</Label>

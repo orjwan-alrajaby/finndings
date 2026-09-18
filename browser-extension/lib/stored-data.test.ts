@@ -88,6 +88,7 @@ describe("the inventory", () => {
             "pinnedCars",
             "loadedCarsFromFinnApi",
             "finnLensAi",
+            "finnLensAiResting",
         ]) {
             expect(covered).toContain(key);
         }

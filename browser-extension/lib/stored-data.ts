@@ -86,10 +86,10 @@ export const STORED_DATA_GROUPS: StoredDataGroup[] = [
         id: "lensAi",
         label: "Lens AI key",
         description:
-            "Whether Lens AI is switched on, and the Gemini API key you gave it.",
+            "Whether Lens AI is switched on, the Gemini API key you gave it, and which models are out of free requests for now.",
         consequence:
             "Lens AI turns off and forgets your key. Everything else in Lens keeps working; you can add the key again in Settings.",
-        keys: ["finnLensAi"],
+        keys: ["finnLensAi", "finnLensAiResting"],
     },
 ];
 
