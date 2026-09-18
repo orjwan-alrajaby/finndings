@@ -6,7 +6,7 @@ import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { carLabel } from "@/lib/lens-ai/outcome";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { asPhrase, EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
+import { asPhrase, barePhrase, EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
 
 /** How a measured figure is introduced, and what to say when FINN has none. */
 const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
@@ -245,25 +245,33 @@ export function tellFitStory(
     /* -- What they ruled out --------------------------------------------- */
 
     if (run.ruledOut) {
-        const phrase = run.ruledOut.evidence.map((item) => asPhrase(item.id)).join(" or ");
-        const total = cars.length + (run.ruledOut.nothingLeft ? 0 : run.ruledOut.setAside);
+        const { evidence: rules, setAside, nothingLeft } = run.ruledOut;
+        const total = cars.length + (nothingLeft ? 0 : setAside);
+        const asked = rules
+            .map((rule) => (rule.mode === "without" ? `no ${barePhrase(rule.id)}` : asPhrase(rule.id)))
+            .join(" and ");
+        const kept = rules.every((rule) => rule.mode === "without");
 
         sections.push({
             key: "ruled-out",
-            title: run.ruledOut.nothingLeft ? `Nothing here avoids ${phrase}` : `It isn't ${phrase}`,
-            short: `No ${phrase}`,
+            title: nothingLeft
+                ? `Nothing here is ${asked}`
+                : kept
+                  ? `It isn't ${rules.map((rule) => asPhrase(rule.id)).join(" or ")}`
+                  : `It is ${rules.filter((rule) => rule.mode === "must").map((rule) => asPhrase(rule.id)).join(" and ")}`,
+            short: asked,
             kind: "budget",
             importance: "constraint",
-            tone: run.ruledOut.nothingLeft ? "missing" : "good",
+            tone: nothingLeft ? "missing" : "good",
             lines: [
                 {
-                    tone: run.ruledOut.nothingLeft ? "missing" : "good",
-                    text: run.ruledOut.nothingLeft
-                        ? `You ruled ${phrase} out, but every car here is one, so Lens ranked them anyway and this is the closest.`
-                        : `You ruled ${phrase} out, so Lens set aside ${run.ruledOut.setAside} of ${total} cars here before ranking the rest.`,
+                    tone: nothingLeft ? "missing" : "good",
+                    text: nothingLeft
+                        ? `You asked for ${asked}, and nothing here matches that, so Lens ranked them all and this is the closest.`
+                        : `You asked for ${asked}, so Lens set aside ${setAside} of ${total} cars here before ranking the rest.`,
                 },
             ],
-            summary: run.ruledOut.nothingLeft ? `No car here avoids ${phrase}` : `Not ${phrase}`,
+            summary: nothingLeft ? `No car here is ${asked}` : asked,
         });
     }
 

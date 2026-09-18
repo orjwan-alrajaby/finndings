@@ -10,6 +10,7 @@ import {
     Minus,
     Pin,
     Rows3,
+    Route,
     Scale,
     ShieldQuestion,
     TriangleAlert,
@@ -197,7 +198,7 @@ export function UnderstandingCard({
                 </p>
             )}
 
-            {(u.budget || u.rental || ruledOut(u).length > 0) && (
+            {(u.budget || u.rental || u.monthlyKm || ruledOut(u).length > 0) && (
                 <div className="mt-3 space-y-1.5 px-4">
                     <Label>Your limits</Label>
                     {u.budget && (
@@ -217,12 +218,30 @@ export function UnderstandingCard({
                             </div>
                         </div>
                     )}
+                    {/* The mileage is why a €400 listing is quoted at €756 — say it where the limits are. */}
+                    {u.monthlyKm && (
+                        <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
+                            <Route aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-black">About {u.monthlyKm.value.toLocaleString("en-GB")} km a month</p>
+                                <p className="text-[11px] leading-4 text-finn-iron">
+                                    Lens prices fuel or charging and FINN's extra-kilometre charge on this, so its monthly figures sit above FINN's headline price.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {ruledOut(u).map((item) => (
                         <div key={item.id} className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
                             <CircleSlash aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
                             <div className="min-w-0">
-                                <p className="text-sm font-black">No {asPhrase(item.id)}</p>
-                                <p className="text-[11px] leading-4 text-finn-iron">Lens sets those aside before ranking, rather than scoring them lower.</p>
+                                <p className="text-sm font-black">
+                                    {item.mode === "without" ? `No ${asPhrase(item.id)}` : `Must be ${asPhrase(item.id)}`}
+                                </p>
+                                <p className="text-[11px] leading-4 text-finn-iron">
+                                    {item.mode === "without"
+                                        ? "Lens sets those cars aside before ranking, rather than scoring them lower."
+                                        : "Lens ranks only cars FINN lists that way, rather than scoring the rest lower."}
+                                </p>
                             </div>
                         </div>
                     ))}

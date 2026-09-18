@@ -168,6 +168,11 @@ export function converseSchema(
                             description:
                                 "True when the reader wants this absent — an SUV body for someone who rejects big cars, a sixth seat for someone who refuses a seven-seater. On an essential need, Lens rules those cars out.",
                         },
+                        mustHave: {
+                            type: "boolean",
+                            description:
+                                "True only when the reader states this as a rule rather than a wish — 'I want an electric car', 'it has to be an automatic'. On an essential need, Lens sets aside every car without it.",
+                        },
                     }),
                 },
                 notInData: nullable({ type: "string" }),

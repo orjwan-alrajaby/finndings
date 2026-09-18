@@ -20,7 +20,7 @@ import type { FinnCar } from "@/lib/types";
  * but it's the first thing anyone driving far asks about, and FINN publishes
  * it. So Lens can point at it even though nobody can raise it.
  */
-export type EvidenceId = SignalId | "electricRange" | "suvBody" | "winterReadyTyres";
+export type EvidenceId = SignalId | "electricRange" | "electricCar" | "suvBody" | "winterReadyTyres";
 
 /** Where Lens's own label would claim more than FINN's field says. */
 const RELABEL: Partial<Record<EvidenceId, string>> = {
@@ -108,6 +108,16 @@ export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
      * are answered by facts FINN publishes, and answering them from length
      * alone was guessing at something Lens could simply read.
      */
+    electricCar: {
+        id: "electricCar",
+        label: "Electric",
+        negativeLabel: "Not electric",
+        explanation:
+            "Whether FINN lists this car as electric. Lens doesn't score fuel type — it prices each car on what it burns or charges — but wanting one, or not, is a rule a reader can give.",
+        scoredIn: null,
+        raisable: false,
+    },
+
     suvBody: {
         id: "suvBody",
         label: "SUV",
@@ -181,6 +191,10 @@ export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
         return range == null ? "unknown" : range >= LONG_RANGE_KM ? "listed" : "notListed";
     }
 
+    if (id === "electricCar") {
+        return car.fuelType === "Electric" ? "listed" : "notListed";
+    }
+
     if (id === "suvBody") {
         return bodyWord(car) == null ? "unknown" : isSuv(car) ? "listed" : "notListed";
     }
@@ -218,6 +232,7 @@ export const withoutLabel = (id: EvidenceId): string =>
 
 /** The thing itself, in a sentence: "you ruled out an SUV". */
 const PHRASES: Partial<Record<EvidenceId, string>> = {
+    electricCar: "an electric car",
     suvBody: "an SUV",
     seatsSixPlus: "a seven-seater",
     driverAssistLevel2: "a car that steers itself",
@@ -225,6 +240,9 @@ const PHRASES: Partial<Record<EvidenceId, string>> = {
 };
 
 export const asPhrase = (id: EvidenceId): string => PHRASES[id] ?? EVIDENCE[id].label.toLowerCase();
+
+/** The same phrase without its article, for "no SUV" rather than "no an SUV". */
+export const barePhrase = (id: EvidenceId): string => asPhrase(id).replace(/^(a|an|the) /, "");
 
 /**
  * A measured fact worth quoting instead of a yes or no, in both directions:

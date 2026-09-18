@@ -42,7 +42,7 @@ export interface Need {
     importance: NeedImportance;
     said: string;
     priorities: CategoryId[];
-    evidence: { id: EvidenceId; use: string; unwanted: boolean }[];
+    evidence: { id: EvidenceId; use: string; unwanted: boolean; mustHave: boolean }[];
     notInData: string | null;
     status: "active" | "dropped";
 }
@@ -195,6 +195,7 @@ export function readUnderstanding(
                     use: COUNTS.test(use) ? "" : use,
                     /* An SUV body is unwanted unless the model says otherwise. */
                     unwanted: typeof entry.unwanted === "boolean" ? entry.unwanted : EVIDENCE[entry.id as EvidenceId].undesirable === true,
+                    mustHave: entry.mustHave === true,
                 };
             })
             .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
@@ -396,16 +397,30 @@ export function groundInWhatWasSaid(
  * making something up; setting those cars aside is what the person actually
  * asked for, and saying how many were set aside keeps it honest.
  */
-export function ruledOut(u: Understanding): { id: EvidenceId; label: string; said: string }[] {
+export function ruledOut(u: Understanding): Rule[] {
     const seen = new Set<EvidenceId>();
 
     return u.needs
         .filter((need) => need.status === "active" && need.importance === "essential")
         .flatMap((need) =>
             need.evidence
-                .filter((entry) => entry.unwanted && !seen.has(entry.id) && seen.add(entry.id))
-                .map((entry) => ({ id: entry.id, label: withoutLabel(entry.id), said: need.said || need.label })),
+                .filter((entry) => (entry.unwanted || entry.mustHave) && !seen.has(entry.id) && seen.add(entry.id))
+                .map((entry) => ({
+                    id: entry.id,
+                    mode: entry.unwanted ? ("without" as const) : ("must" as const),
+                    label: entry.unwanted ? withoutLabel(entry.id) : EVIDENCE[entry.id].label,
+                    said: need.said || need.label,
+                })),
         );
+}
+
+/** A rule the reader gave about the cars themselves, not about what they cost. */
+export interface Rule {
+    id: EvidenceId;
+    /** "without": set those cars aside. "must": keep only those cars. */
+    mode: "without" | "must";
+    label: string;
+    said: string;
 }
 
 /** The understanding sent back to the model on the next turn. */

@@ -16,6 +16,7 @@ import type { PinnedFinnCar } from "@/lib/types";
 
 import type { Answers } from "@/entrypoints/compare/store";
 import { evidenceMet, type EvidenceId } from "./evidence";
+import type { Rule } from "./understanding";
 
 /**
  * One run of the real Lens engine over a chat's candidate set, and the
@@ -31,7 +32,7 @@ export interface LensRun {
     scope: ScopeKind;
     /** What the reader ruled out, and what it cost the field. Null when nothing was. */
     ruledOut: {
-        evidence: { id: EvidenceId; label: string; said: string }[];
+        evidence: Rule[];
         setAside: number;
         /** True when every car was ruled out, so the ranking ignored the rule. */
         nothingLeft: boolean;
@@ -49,7 +50,7 @@ export function runLens(
     scope: ScopeKind,
     scopeHeadline: string,
     /** Evidence the reader ruled out: those cars are set aside before ranking. */
-    ruledOut: { id: EvidenceId; label: string; said: string }[] = [],
+    ruledOut: Rule[] = [],
 ): LensRun | null {
     if (!cars.length) return null;
 
@@ -61,7 +62,14 @@ export function runLens(
      * says so rather than pretending the constraint was met.
      */
     const allowed = ruledOut.length
-        ? cars.filter((car) => ruledOut.every((item) => evidenceMet(car, item.id, true) !== false))
+        ? cars.filter((car) =>
+              ruledOut.every((rule) =>
+                  rule.mode === "without"
+                      ? /* Unknown isn't proof the car has it, so it stays. */
+                        evidenceMet(car, rule.id, true) !== false
+                      : evidenceMet(car, rule.id, false) === true,
+              ),
+          )
         : cars;
     const setAside = cars.length - allowed.length;
     const nothingLeft = allowed.length === 0;

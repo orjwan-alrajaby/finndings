@@ -334,8 +334,8 @@ describe("what a use clause may claim", () => {
         );
 
         expect(understanding.needs[0]?.evidence).toEqual([
-            { id: "seatsFivePlus", use: "", unwanted: false },
-            { id: "rearDoors", use: "lets the children climb in themselves", unwanted: false },
+            { id: "seatsFivePlus", use: "", unwanted: false, mustHave: false },
+            { id: "rearDoors", use: "lets the children climb in themselves", unwanted: false, mustHave: false },
         ]);
     });
 });
@@ -370,7 +370,7 @@ describe("what someone rules out", () => {
 
         const story = tellFitStory(run, understanding, translation.lessRelevant, null);
         expect(story.sections.find((section) => section.key === "ruled-out")?.lines[0]?.text).toMatch(
-            /You ruled an SUV out, so Lens set aside \d+ of \d+ cars/,
+            /You asked for no SUV, so Lens set aside \d+ of \d+ cars/,
         );
     });
 
@@ -389,7 +389,53 @@ describe("what someone rules out", () => {
 
         expect(run.ruledOut?.nothingLeft).toBe(true);
         expect(story.sections.find((section) => section.key === "ruled-out")?.lines[0]?.text).toMatch(
-            /every car here is one, so Lens ranked them anyway/,
+            /nothing here matches that, so Lens ranked them all/,
+        );
+    });
+});
+
+describe("a rule about the car itself", () => {
+    const wantsElectric = {
+        ...scenario("commuter").reading,
+        budget: null,
+        needs: [
+            {
+                id: "electric",
+                label: "An electric car",
+                importance: "essential",
+                said: "you want to drive electric and can charge at home",
+                priorities: ["environmental"],
+                evidence: [{ id: "electricCar", use: "charges at home overnight", mustHave: true }],
+                notInData: null,
+                status: "active",
+            },
+        ],
+    };
+
+    it("ranks only the cars FINN lists that way", () => {
+        const understanding = readUnderstanding(wantsElectric, EMPTY_UNDERSTANDING, undefined, "2026-09");
+        const rules = ruledOut(understanding);
+        const translation = toAnswers(base(), understanding);
+        const run = runLens(cars, translation.answers, "page", "page", rules)!;
+
+        expect(rules).toEqual([expect.objectContaining({ id: "electricCar", mode: "must" })]);
+        expect(run.recommendation.winner.fuelType).toBe("Electric");
+        expect(run.recommendation.context.vehicles.every((car) => car.fuelType === "Electric")).toBe(true);
+
+        const story = tellFitStory(run, understanding, translation.lessRelevant, null);
+        expect(story.sections.find((section) => section.key === "ruled-out")?.lines[0]?.text).toMatch(
+            /You asked for an electric car, so Lens set aside \d+ of \d+ cars/,
+        );
+    });
+
+    it("says so, and ranks everything, when no car here is one", () => {
+        const petrol = cars.filter((car) => car.fuelType !== "Electric");
+        const understanding = readUnderstanding(wantsElectric, EMPTY_UNDERSTANDING, undefined, "2026-09");
+        const run = runLens(petrol, toAnswers(base(), understanding).answers, "page", "page", ruledOut(understanding))!;
+
+        expect(run.ruledOut?.nothingLeft).toBe(true);
+        expect(tellFitStory(run, understanding, [], null).sections.find((s) => s.key === "ruled-out")?.title).toMatch(
+            /Nothing here is an electric car/,
         );
     });
 });
