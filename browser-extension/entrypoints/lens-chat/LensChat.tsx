@@ -21,6 +21,7 @@ import {
     readQuestion,
     groundInWhatWasSaid,
     readUnderstanding,
+    ruledOut,
     toAnswers,
     toWire,
     type Translation,
@@ -266,7 +267,7 @@ export function LensChat() {
             }
 
             const translation = toAnswers(current.base, u, current.enabled.length ? current.enabled : undefined);
-            const result = runLens(target.cars, translation.answers, nextKind, target.headline);
+            const result = runLens(target.cars, translation.answers, nextKind, target.headline, ruledOut(u));
 
             if (!result) return null;
 
@@ -507,7 +508,7 @@ export function LensChat() {
 
         const translation = toAnswers(current.base, entry.after, current.enabled.length ? current.enabled : undefined);
         const cars = current.scopes[current.run.scope].cars;
-        const after = runLens(cars, translation.answers, current.run.scope, current.run.scopeHeadline);
+        const after = runLens(cars, translation.answers, current.run.scope, current.run.scopeHeadline, ruledOut(entry.after));
 
         if (!after) return;
 

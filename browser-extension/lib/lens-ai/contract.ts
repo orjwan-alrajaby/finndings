@@ -221,7 +221,7 @@ export interface WireNeed {
      * helps — a plain implication, never a spec: "could keep their tablets
      * charged on long drives".
      */
-    evidence: { id: string; use: string }[];
+    evidence: { id: string; use: string; unwanted?: boolean }[];
     /** What the person would ideally want that FINN's data can't show: "a built-in rear entertainment system". */
     notInData: string | null;
     status: "active" | "dropped";

@@ -158,7 +158,18 @@ export function converseSchema(
                 importance: { type: "string", enum: ["essential", "important", "niceToHave"] },
                 said,
                 priorities: { type: "array", items: { type: "string", enum: categories } },
-                evidence: { type: "array", items: object({ id: evidence, use: { type: "string" } }) },
+                evidence: {
+                    type: "array",
+                    items: object({
+                        id: evidence,
+                        use: { type: "string" },
+                        unwanted: {
+                            type: "boolean",
+                            description:
+                                "True when the reader wants this absent — an SUV body for someone who rejects big cars, a sixth seat for someone who refuses a seven-seater. On an essential need, Lens rules those cars out.",
+                        },
+                    }),
+                },
                 notInData: nullable({ type: "string" }),
                 status: { type: "string", enum: ["active", "dropped"] },
             }),

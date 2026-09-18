@@ -6,7 +6,7 @@ import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { carLabel } from "@/lib/lens-ai/outcome";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
+import { asPhrase, EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
 
 /** How a measured figure is introduced, and what to say when FINN has none. */
 const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
@@ -110,10 +110,10 @@ function isValid(run: LensRun, car: PinnedFinnCar): boolean {
     return budgetOk && rentalOk;
 }
 
-function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }): StoryLine {
-    const def = EVIDENCE[entry.id];
+function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string; unwanted?: boolean }): StoryLine {
+    const def = { ...EVIDENCE[entry.id], undesirable: entry.unwanted ?? EVIDENCE[entry.id].undesirable };
     const state = readEvidence(car, entry.id);
-    const met = evidenceMet(car, entry.id);
+    const met = evidenceMet(car, entry.id, def.undesirable === true);
     const measured = measuredDisplay(car, entry.id);
 
     /*
@@ -121,11 +121,19 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }
      * long" is the honest answer for a car that isn't small, where "FINN
      * doesn't list compact length" would read as missing data.
      */
+    /*
+     * A use clause describes the thing the reader asked about. Where they
+     * asked for it to be absent, that clause describes what they didn't want,
+     * so appending it to good news reads as nonsense: "FINN files it as a
+     * small or compact car — is classified as an SUV."
+     */
+    const useClause = def.undesirable ? "" : entry.use;
+
     if (measured) {
         return {
             tone: met === false && def.undesirable ? "missing" : met ? "good" : "note",
             text:
-                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${met && entry.use ? ` — ${entry.use}` : ""}`) +
+                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${met && useClause ? ` — ${useClause}` : ""}`) +
                 (MEASURED_CAVEAT[entry.id] ? ` ${MEASURED_CAVEAT[entry.id]}` : ""),
         };
     }
@@ -136,13 +144,13 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }
 
     if (state === "listed") {
         return def.undesirable
-            ? { tone: "missing", text: `FINN lists this one as ${lower(def.label)}.` }
-            : { tone: "good", text: sentence(`${def.label} ${entry.use ? `— ${entry.use}` : "is listed"}`) };
+            ? { tone: "missing", text: `FINN lists this one as ${asPhrase(entry.id)}, which you'd rather avoid.` }
+            : { tone: "good", text: sentence(`${def.label} ${useClause ? `— ${useClause}` : "is listed"}`) };
     }
 
     if (state === "notListed") {
         return def.undesirable
-            ? { tone: "good", text: sentence(`It isn't ${lower(def.label)}${entry.use ? ` — ${entry.use}` : ""}`) }
+            ? { tone: "good", text: `It isn't ${asPhrase(entry.id)}.` }
             : { tone: "missing", text: `FINN doesn't list ${lower(def.label)} for this car.` };
     }
 
@@ -234,6 +242,31 @@ export function tellFitStory(
         });
     }
 
+    /* -- What they ruled out --------------------------------------------- */
+
+    if (run.ruledOut) {
+        const phrase = run.ruledOut.evidence.map((item) => asPhrase(item.id)).join(" or ");
+        const total = cars.length + (run.ruledOut.nothingLeft ? 0 : run.ruledOut.setAside);
+
+        sections.push({
+            key: "ruled-out",
+            title: run.ruledOut.nothingLeft ? `Nothing here avoids ${phrase}` : `It isn't ${phrase}`,
+            short: `No ${phrase}`,
+            kind: "budget",
+            importance: "constraint",
+            tone: run.ruledOut.nothingLeft ? "missing" : "good",
+            lines: [
+                {
+                    tone: run.ruledOut.nothingLeft ? "missing" : "good",
+                    text: run.ruledOut.nothingLeft
+                        ? `You ruled ${phrase} out, but every car here is one, so Lens ranked them anyway and this is the closest.`
+                        : `You ruled ${phrase} out, so Lens set aside ${run.ruledOut.setAside} of ${total} cars here before ranking the rest.`,
+                },
+            ],
+            summary: run.ruledOut.nothingLeft ? `No car here avoids ${phrase}` : `Not ${phrase}`,
+        });
+    }
+
     /* -- The rental period ----------------------------------------------- */
 
     if (u.rental && cost) {
@@ -290,12 +323,13 @@ export function tellFitStory(
          * first. ISOFIX on 22 of 24 cars is true and worth saying, but rear USB
          * ports on 11 of 24 is what actually distinguishes a car for the kids.
          */
-        const share = (id: EvidenceId) => cars.filter((car) => evidenceMet(car, id) === true).length;
+        const share = (entry: { id: EvidenceId; unwanted?: boolean }) =>
+            cars.filter((car) => evidenceMet(car, entry.id, entry.unwanted ?? EVIDENCE[entry.id].undesirable === true) === true).length;
         const orderOf: Record<Tone, number> = { good: 0, note: 1, missing: 2, unknown: 3 };
 
         const evidence = need.evidence.filter((entry) => !lessRelevant.includes(entry.id));
         const lines = evidence
-            .map((entry) => ({ line: evidenceLine(winner, entry), share: share(entry.id) }))
+            .map((entry) => ({ line: evidenceLine(winner, entry), share: share(entry) }))
             .sort((a, b) => orderOf[a.line.tone] - orderOf[b.line.tone] || a.share - b.share)
             .map((item) => item.line);
 
@@ -313,8 +347,10 @@ export function tellFitStory(
             lines.push({ tone: "note", text: "Lens has nothing on this car it can check for this, so it didn't count toward the ranking." });
         }
 
-        const good = evidence.filter((entry) => evidenceMet(winner, entry.id) === true);
-        const missing = evidence.filter((entry) => evidenceMet(winner, entry.id) === false);
+        const met = (car: PinnedFinnCar, entry: { id: EvidenceId; unwanted?: boolean }) =>
+            evidenceMet(car, entry.id, entry.unwanted ?? EVIDENCE[entry.id].undesirable === true);
+        const good = evidence.filter((entry) => met(winner, entry) === true);
+        const missing = evidence.filter((entry) => met(winner, entry) === false);
 
         const tone: Tone = good.length && !missing.length ? "good" : good.length ? "note" : missing.length ? "missing" : "unknown";
 
@@ -363,13 +399,23 @@ export function tellFitStory(
             .filter((need) => need.importance !== "niceToHave")
             .flatMap((need) =>
                 need.evidence
-                    .filter((entry) => !lessRelevant.includes(entry.id) && evidenceMet(winner, entry.id) === false)
+                    .filter(
+                        (entry) =>
+                            !lessRelevant.includes(entry.id) &&
+                            evidenceMet(winner, entry.id, entry.unwanted ?? EVIDENCE[entry.id].undesirable === true) === false,
+                    )
                     .map((entry) => {
                         const alternative =
                             recommendation.ranked.find(
-                                (car) => car.id !== winner.id && isValid(run, car) && evidenceMet(car, entry.id) === true,
+                                (car) =>
+                                    car.id !== winner.id &&
+                                    isValid(run, car) &&
+                                    evidenceMet(car, entry.id, entry.unwanted ?? EVIDENCE[entry.id].undesirable === true) === true,
                             ) ?? null;
-                        const share = cars.filter((car) => evidenceMet(car, entry.id) === true).length / Math.max(cars.length, 1);
+                        const share =
+                            cars.filter(
+                                (car) => evidenceMet(car, entry.id, entry.unwanted ?? EVIDENCE[entry.id].undesirable === true) === true,
+                            ).length / Math.max(cars.length, 1);
 
                         return { need, entry, alternative, score: (alternative ? 10 : 0) + rank[need.importance] * 2 + share };
                     }),
@@ -387,7 +433,7 @@ export function tellFitStory(
                     ? `FINN files this one as ${measuredDisplay(winner, gap.entry.id) ?? lower(EVIDENCE[gap.entry.id].label)} — worth weighing for ${lower(gap.need.label)}.`
                     : `FINN doesn't list ${lower(EVIDENCE[gap.entry.id].label)} for this car — worth weighing for ${lower(gap.need.label)}.`,
                 alternative: gap.alternative
-                    ? `${name(gap.alternative)} has it${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}.`
+                    ? `${name(gap.alternative)} ${gap.entry.unwanted ?? EVIDENCE[gap.entry.id].undesirable ? "isn't one" : "has it"}${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}.`
                     : single
                       ? null
                       : "None of the other cars that fit your constraints lists it either.",

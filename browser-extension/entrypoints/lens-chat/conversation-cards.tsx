@@ -20,9 +20,10 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
-import { EVIDENCE, coverage, type EvidenceId } from "@/lib/lens-chat/evidence";
+import { asPhrase, coverage, EVIDENCE, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
+import { ruledOut } from "@/lib/lens-chat/understanding";
 import type { Need, Translation, Understanding } from "@/lib/lens-chat/understanding";
 import type { PinnedFinnCar } from "@/lib/types";
 
@@ -196,7 +197,7 @@ export function UnderstandingCard({
                 </p>
             )}
 
-            {(u.budget || u.rental) && (
+            {(u.budget || u.rental || ruledOut(u).length > 0) && (
                 <div className="mt-3 space-y-1.5 px-4">
                     <Label>Your limits</Label>
                     {u.budget && (
@@ -216,6 +217,15 @@ export function UnderstandingCard({
                             </div>
                         </div>
                     )}
+                    {ruledOut(u).map((item) => (
+                        <div key={item.id} className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
+                            <CircleSlash aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-black">No {asPhrase(item.id)}</p>
+                                <p className="text-[11px] leading-4 text-finn-iron">Lens sets those aside before ranking, rather than scoring them lower.</p>
+                            </div>
+                        </div>
+                    ))}
                     {u.rental && (
                         <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
                             <CalendarRange aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
@@ -255,7 +265,7 @@ export function UnderstandingCard({
                                     {need.evidence
                                         .filter((entry) => !lessRelevant.has(entry.id))
                                         .map((entry) => (
-                                            <EvidenceChip key={entry.id} id={entry.id} use={entry.use} cars={cars} />
+                                            <EvidenceChip key={entry.id} id={entry.id} use={entry.use} unwanted={entry.unwanted} cars={cars} />
                                         ))}
                                 </div>
                             )}
@@ -373,17 +383,17 @@ export function UnderstandingCard({
  * they don't know cars — so what the model said it would do for *them* is
  * what the chip explains on hover, with Lens's description behind it.
  */
-function EvidenceChip({ id, use, cars }: { id: EvidenceId; use?: string; cars: PinnedFinnCar[] }) {
+function EvidenceChip({ id, use, unwanted, cars }: { id: EvidenceId; use?: string; unwanted?: boolean; cars: PinnedFinnCar[] }) {
     const counts = coverage(cars, id);
-    /* For evidence nobody wants, the useful count is how many cars avoid it. */
-    const answering = EVIDENCE[id].undesirable ? counts.notListed : counts.listed;
+    /* Where the reader wants it absent, the useful count is how many cars avoid it. */
+    const answering = unwanted ? counts.notListed : counts.listed;
 
     return (
         <span
             title={[use ? `${use.charAt(0).toUpperCase()}${use.slice(1)}.` : "", EVIDENCE[id].explanation].filter(Boolean).join(" ")}
             className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black"
         >
-            {(EVIDENCE[id].undesirable ? EVIDENCE[id].negativeLabel : null) ?? EVIDENCE[id].label}
+            {unwanted ? withoutLabel(id) : EVIDENCE[id].label}
             {counts.total > 0 && (
                 <span className="font-semibold text-finn-iron">
                     · {answering} of {counts.total}

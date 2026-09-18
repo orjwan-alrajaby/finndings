@@ -15,6 +15,7 @@ import { configurationName } from "@/lib/car-labels";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import type { Answers } from "@/entrypoints/compare/store";
+import { evidenceMet, type EvidenceId } from "./evidence";
 
 /**
  * One run of the real Lens engine over a chat's candidate set, and the
@@ -28,6 +29,13 @@ import type { Answers } from "@/entrypoints/compare/store";
 
 export interface LensRun {
     scope: ScopeKind;
+    /** What the reader ruled out, and what it cost the field. Null when nothing was. */
+    ruledOut: {
+        evidence: { id: EvidenceId; label: string; said: string }[];
+        setAside: number;
+        /** True when every car was ruled out, so the ranking ignored the rule. */
+        nothingLeft: boolean;
+    } | null;
     /** "Comparing 12 cars on this page". */
     scopeHeadline: string;
     answers: Answers;
@@ -40,11 +48,26 @@ export function runLens(
     answers: Answers,
     scope: ScopeKind,
     scopeHeadline: string,
+    /** Evidence the reader ruled out: those cars are set aside before ranking. */
+    ruledOut: { id: EvidenceId; label: string; said: string }[] = [],
 ): LensRun | null {
     if (!cars.length) return null;
 
+    /*
+     * Ruling a car out is not scoring it. Lens has no measure of body type
+     * and shouldn't invent one — but someone who says they don't want an SUV
+     * has given a constraint, and the honest answer is the best car that
+     * isn't one. When nothing survives, everything comes back and the story
+     * says so rather than pretending the constraint was met.
+     */
+    const allowed = ruledOut.length
+        ? cars.filter((car) => ruledOut.every((item) => evidenceMet(car, item.id, true) !== false))
+        : cars;
+    const setAside = cars.length - allowed.length;
+    const nothingLeft = allowed.length === 0;
+
     const recommendation = buildRecommendation(
-        cars,
+        nothingLeft ? cars : allowed,
         answers.priorities,
         answers.preferences,
         answers.features,
@@ -56,6 +79,7 @@ export function runLens(
         scope,
         scopeHeadline,
         answers,
+        ruledOut: ruledOut.length ? { evidence: ruledOut, setAside, nothingLeft } : null,
         recommendation,
         narrative: buildAdviceNarrative(
             recommendation.evaluation,

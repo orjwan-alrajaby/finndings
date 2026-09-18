@@ -16,7 +16,7 @@ import type {
 import type { Answers } from "@/entrypoints/compare/store";
 import type { FinnCar } from "@/lib/types";
 
-import { coverage, EVIDENCE, isEvidenceId, type EvidenceId } from "./evidence";
+import { coverage, EVIDENCE, isEvidenceId, withoutLabel, type EvidenceId } from "./evidence";
 
 /** A quantity in a use clause: "four seats", "2 USB ports". */
 const COUNTS = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i;
@@ -42,7 +42,7 @@ export interface Need {
     importance: NeedImportance;
     said: string;
     priorities: CategoryId[];
-    evidence: { id: EvidenceId; use: string }[];
+    evidence: { id: EvidenceId; use: string; unwanted: boolean }[];
     notInData: string | null;
     status: "active" | "dropped";
 }
@@ -190,7 +190,12 @@ export function readUnderstanding(
                  * and the model writes such counts as words as often as
                  * digits.
                  */
-                return { id: entry.id as EvidenceId, use: COUNTS.test(use) ? "" : use };
+                return {
+                    id: entry.id as EvidenceId,
+                    use: COUNTS.test(use) ? "" : use,
+                    /* An SUV body is unwanted unless the model says otherwise. */
+                    unwanted: typeof entry.unwanted === "boolean" ? entry.unwanted : EVIDENCE[entry.id as EvidenceId].undesirable === true,
+                };
             })
             .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
             .slice(0, 6);
@@ -380,6 +385,27 @@ export function groundInWhatWasSaid(
             needs: u.needs.map((need) => (grounded(need.said) ? need : { ...need, said: "" })),
         },
     };
+}
+
+/**
+ * What the reader ruled out: evidence they want absent, on a need they call
+ * essential.
+ *
+ * This is a constraint, not a preference — the same shape as a hard budget.
+ * Lens can't score body type, and inventing a score for it would be Lens
+ * making something up; setting those cars aside is what the person actually
+ * asked for, and saying how many were set aside keeps it honest.
+ */
+export function ruledOut(u: Understanding): { id: EvidenceId; label: string; said: string }[] {
+    const seen = new Set<EvidenceId>();
+
+    return u.needs
+        .filter((need) => need.status === "active" && need.importance === "essential")
+        .flatMap((need) =>
+            need.evidence
+                .filter((entry) => entry.unwanted && !seen.has(entry.id) && seen.add(entry.id))
+                .map((entry) => ({ id: entry.id, label: withoutLabel(entry.id), said: need.said || need.label })),
+        );
 }
 
 /** The understanding sent back to the model on the next turn. */

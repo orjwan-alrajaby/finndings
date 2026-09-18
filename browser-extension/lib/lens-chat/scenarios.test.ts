@@ -13,7 +13,7 @@ import { evidenceMet, measuredDisplay, readEvidence } from "./evidence";
 import { tellFitStory, type FitStory } from "./fit-story";
 import { runLens } from "./run";
 import { SCENARIOS, type Scenario } from "./scenarios.fixture";
-import { EMPTY_UNDERSTANDING, readUnderstanding, toAnswers, type Translation, type Understanding } from "./understanding";
+import { EMPTY_UNDERSTANDING, readUnderstanding, ruledOut, toAnswers, type Translation, type Understanding } from "./understanding";
 
 /*
  * Ten people, through everything that runs without a model.
@@ -334,8 +334,62 @@ describe("what a use clause may claim", () => {
         );
 
         expect(understanding.needs[0]?.evidence).toEqual([
-            { id: "seatsFivePlus", use: "" },
-            { id: "rearDoors", use: "lets the children climb in themselves" },
+            { id: "seatsFivePlus", use: "", unwanted: false },
+            { id: "rearDoors", use: "lets the children climb in themselves", unwanted: false },
         ]);
+    });
+});
+
+describe("what someone rules out", () => {
+    const noSuv = (importance: "essential" | "important") => ({
+        ...scenario("no-big-suv").reading,
+        needs: [
+            {
+                id: "not-big",
+                label: "Nothing enormous",
+                importance,
+                said: "you don't want one of those enormous cars",
+                priorities: ["cityParking"],
+                evidence: [{ id: "suvBody", use: "keeps you out of the big cars you'd rather not drive", unwanted: true }],
+                notInData: null,
+                status: "active",
+            },
+        ],
+    });
+
+    it("sets the cars aside rather than scoring them lower", () => {
+        const understanding = readUnderstanding(noSuv("essential"), EMPTY_UNDERSTANDING, undefined, "2026-09");
+        const translation = toAnswers(base(), understanding);
+        const out = ruledOut(understanding);
+        const run = runLens(cars, translation.answers, "page", "page", out)!;
+
+        expect(out.map((item) => item.id)).toEqual(["suvBody"]);
+        expect(run.ruledOut?.setAside).toBeGreaterThan(0);
+        expect(run.ruledOut?.nothingLeft).toBe(false);
+        expect(readEvidence(run.recommendation.winner, "suvBody")).toBe("notListed");
+
+        const story = tellFitStory(run, understanding, translation.lessRelevant, null);
+        expect(story.sections.find((section) => section.key === "ruled-out")?.lines[0]?.text).toMatch(
+            /You ruled an SUV out, so Lens set aside \d+ of \d+ cars/,
+        );
+    });
+
+    it("leaves a lean as a lean: only a must-have rules cars out", () => {
+        const understanding = readUnderstanding(noSuv("important"), EMPTY_UNDERSTANDING, undefined, "2026-09");
+
+        expect(ruledOut(understanding)).toEqual([]);
+    });
+
+    it("ranks everything and says so when no car avoids it", () => {
+        const suvs = cars.filter((car) => /suv/i.test(car.vehicleType));
+        const understanding = readUnderstanding(noSuv("essential"), EMPTY_UNDERSTANDING, undefined, "2026-09");
+        const translation = toAnswers(base(), understanding);
+        const run = runLens(suvs, translation.answers, "page", "page", ruledOut(understanding))!;
+        const story = tellFitStory(run, understanding, translation.lessRelevant, null);
+
+        expect(run.ruledOut?.nothingLeft).toBe(true);
+        expect(story.sections.find((section) => section.key === "ruled-out")?.lines[0]?.text).toMatch(
+            /every car here is one, so Lens ranked them anyway/,
+        );
     });
 });

@@ -151,6 +151,18 @@ const bodyWord = (car: FinnCar): string | null => {
 
 const isSuv = (car: FinnCar): boolean => /\bsuv\b/i.test(String(car.vehicleType ?? ""));
 
+/*
+ * Names for the handful of things readers ask not to have. Everything else
+ * falls back to "No <label>", which reads well enough for equipment.
+ */
+for (const [id, label] of [
+    ["seatsSixPlus", "Not a seven-seater"],
+    ["hasTowbar", "No towbar"],
+    ["driverAssistLevel2", "Doesn't drive itself"],
+] as const) {
+    EVIDENCE[id].negativeLabel = label;
+}
+
 export const EVIDENCE_IDS = Object.keys(EVIDENCE) as EvidenceId[];
 
 export const isEvidenceId = (value: unknown): value is EvidenceId =>
@@ -192,13 +204,27 @@ export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
  * it's listed, and for evidence nobody wants (an SUV body) that it isn't.
  * Null where FINN says nothing either way.
  */
-export function evidenceMet(car: FinnCar, id: EvidenceId): boolean | null {
+export function evidenceMet(car: FinnCar, id: EvidenceId, unwanted = EVIDENCE[id].undesirable === true): boolean | null {
     const state = readEvidence(car, id);
 
     if (state === "unknown") return null;
 
-    return EVIDENCE[id].undesirable ? state === "notListed" : state === "listed";
+    return unwanted ? state === "notListed" : state === "listed";
 }
+
+/** What to call a piece of evidence where not having it is the point. */
+export const withoutLabel = (id: EvidenceId): string =>
+    EVIDENCE[id].negativeLabel ?? `No ${EVIDENCE[id].label.toLowerCase()}`;
+
+/** The thing itself, in a sentence: "you ruled out an SUV". */
+const PHRASES: Partial<Record<EvidenceId, string>> = {
+    suvBody: "an SUV",
+    seatsSixPlus: "a seven-seater",
+    driverAssistLevel2: "a car that steers itself",
+    hasTowbar: "a towbar",
+};
+
+export const asPhrase = (id: EvidenceId): string => PHRASES[id] ?? EVIDENCE[id].label.toLowerCase();
 
 /**
  * A measured fact worth quoting instead of a yes or no, in both directions:
