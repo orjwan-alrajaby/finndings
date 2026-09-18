@@ -12,7 +12,7 @@ import { carLabel, compareOutcomes, type Outcome } from "@/lib/lens-ai/outcome";
 import { buildVocabulary } from "@/lib/lens-ai/vocabulary";
 import type { PageContext } from "@/lib/lens-chat/messages";
 import { evidenceCatalogue } from "@/lib/lens-chat/evidence";
-import { evidenceForNeeds, tellFitStory } from "@/lib/lens-chat/fit-story";
+import { evidenceForNeeds, finnsOwnWords, quotesAreFinns, tellFitStory } from "@/lib/lens-chat/fit-story";
 import { alternativesWithinLimits, compareRows, runLens, summariseMatch, type LensRun } from "@/lib/lens-chat/run";
 import {
     diffUnderstanding,
@@ -331,6 +331,7 @@ export function LensChat() {
                           ...buildLensFacts(current.run.recommendation, current.run.narrative),
                           yourSituation: toWire(current.applied?.understanding ?? current.understanding),
                           evidenceForYourNeeds: evidenceForNeeds(current.run, current.applied?.understanding ?? current.understanding),
+                          finnsOwnEquipmentText: finnsOwnWords(current.run),
                       }
                     : null,
                 history: history.current.slice(-8),
@@ -366,7 +367,15 @@ export function LensChat() {
             if (result.kind === "answer" && !current.run && result.understanding) result.kind = "understanding";
 
             if (result.kind === "answer" || !result.understanding) {
-                say(text(result.reply));
+                /* An answer may quote FINN's own words; it may not invent them. */
+                const sources = current.run
+                    ? finnsOwnWords(current.run).flatMap((item) => item.finnWrites.map((entry) => `${entry.group} ${entry.text}`))
+                    : [];
+                const checked = quotesAreFinns(text(result.reply), sources);
+
+                if (checked.dropped.length) console.warn("[Lens AI] dropped a quote FINN didn't write", checked.dropped);
+
+                say(checked.reply || "I couldn't answer that from FINN's data.");
                 setOpenQuestion(readQuestion(result.question, answered.current, current.scopes[current.kind].cars) ?? (result.kind === "answer" ? current.openQuestion : null));
                 if (suggested) switchScope(suggested);
                 return;

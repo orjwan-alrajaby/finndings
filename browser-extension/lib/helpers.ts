@@ -140,6 +140,33 @@ function isYes(value: unknown): boolean {
  * those as `false`, so they're recorded here and read as unknown — while an
  * entry FINN answered `false` stays a real no.
  */
+/** How much of FINN's prose is worth carrying per car, and per group. */
+const EQUIPMENT_TEXT_GROUPS = 12;
+const EQUIPMENT_TEXT_CHARS = 600;
+
+/**
+ * FINN's equipment prose, flattened and trimmed.
+ *
+ * Kept verbatim and untranslated on purpose: reading German and working out
+ * that "Beheizbare Windschutzscheibe" answers "I hate scraping ice" is what
+ * the model is for. Lens's job is to carry FINN's words faithfully and to
+ * check anything quoted back against them.
+ */
+export function extractEquipmentText(config: FinnApiConfig): { group: string; text: string }[] {
+  const groups = [
+    ...Object.entries(config.equipment ?? {}),
+    ...Object.entries(config.equipment_packages ?? {}),
+  ];
+
+  return groups
+    .map(([group, text]) => ({
+      group: String(group).trim(),
+      text: String(text ?? "").replace(/\s+/g, " ").trim().slice(0, EQUIPMENT_TEXT_CHARS),
+    }))
+    .filter((item) => item.group && item.text)
+    .slice(0, EQUIPMENT_TEXT_GROUPS);
+}
+
 export function extractUnansweredFeatures(config: FinnApiConfig): string[] {
   if (!hasSuppliedEquipment(config)) return [];
 

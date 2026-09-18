@@ -6,7 +6,7 @@ import type { WireUnderstanding } from "@/lib/lens-ai/contract";
 import { copyFeatures, type Answers } from "@/entrypoints/compare/store";
 
 import { readEvidence } from "./evidence";
-import { evidenceForNeeds, tellFitStory } from "./fit-story";
+import { evidenceForNeeds, quotesAreFinns, tellFitStory } from "./fit-story";
 import { alternativesWithinLimits, runLens } from "./run";
 import {
     groundInWhatWasSaid,
@@ -388,5 +388,30 @@ describe("saying back only what the person said", () => {
         const later = [told, "One is 1 and the other is 4."];
 
         expect(groundInWhatWasSaid(reply, understood(), later, new Date("2026-09-17")).reply).toBe(reply);
+    });
+});
+
+describe("quoting FINN's own words", () => {
+    const sources = [
+        "safety ABS, Isofix, Überholsensor aktiv ohne Blinker",
+        "Paket WINTER Beheizbare Windschutzscheibe, Lenkrad beheizt",
+    ];
+
+    it("keeps a sentence whose German really is FINN's", () => {
+        const reply = 'FINN writes "Beheizbare Windschutzscheibe" for this car, a heated windscreen.';
+
+        expect(quotesAreFinns(reply, sources).reply).toBe(reply);
+    });
+
+    it("drops a sentence that invents the German it quotes", () => {
+        const reply = 'It has a heated windscreen. FINN writes "Beheizbare Heckscheibe mit Sensor" for this one.';
+        const checked = quotesAreFinns(reply, sources);
+
+        expect(checked.reply).toBe("It has a heated windscreen.");
+        expect(checked.dropped).toEqual(["Beheizbare Heckscheibe mit Sensor"]);
+    });
+
+    it("reads FINN's text through spelling and punctuation", () => {
+        expect(quotesAreFinns('FINN lists "uberholsensor aktiv ohne blinker".', sources).dropped).toEqual([]);
     });
 });

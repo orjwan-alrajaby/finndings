@@ -88,6 +88,14 @@ export type FinnApiConfig = {
   }>;
 
   closed_features_list?: Record<string, boolean | string | number>;
+
+  /**
+   * FINN's own equipment prose, in German, grouped as safety / comfort /
+   * interior / exterior, and its option packages. Everything here is FINN's
+   * text, not a flag Lens can score.
+   */
+  equipment?: Record<string, string | null> | null;
+  equipment_packages?: Record<string, string | null> | null;
   downpayment_fixed_amount?: number;
 
   vehicle_size: {
@@ -127,6 +135,16 @@ export interface FinnCar {
   year: string;
   engine: string;
   equipmentLine: string;
+
+  /**
+   * What FINN writes about this car's equipment in words, as FINN wrote it:
+   * German, grouped, and full of things its own checkbox list leaves out — a
+   * winter package with a heated windscreen, a driver-assistance package and
+   * what's in it. Lens never scores it and never parses it; it is handed to
+   * the model, which can read German, and quotes from it are checked back
+   * against this text before a reader sees them.
+   */
+  equipmentText?: { group: string; text: string }[];
 
   fuelType: FuelType;
   transmission: Transmission;
