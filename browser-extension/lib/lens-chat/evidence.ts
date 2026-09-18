@@ -1,5 +1,5 @@
 import { CATEGORIES, CATEGORY_IDS, SIGNALS } from "@/lib/reasoning-engine/constants";
-import { isBinarySignal, lengthMm, signalUtility } from "@/lib/reasoning-engine/evidence";
+import { bootLitres, evRangeKm, isBinarySignal, lengthMm, signalUtility } from "@/lib/reasoning-engine/evidence";
 import type { CategoryId, SignalId } from "@/lib/reasoning-engine/types";
 import type { FinnCar } from "@/lib/types";
 
@@ -14,7 +14,22 @@ import type { FinnCar } from "@/lib/types";
  * as a fact about the car, and not with a guess.
  */
 
-export type EvidenceId = SignalId;
+/**
+ * `electricRange` isn't one of the engine's signals — range reaches a score
+ * through longDistance's own trip factor rather than as a raisable feature —
+ * but it's the first thing anyone driving far asks about, and FINN publishes
+ * it. So Lens can point at it even though nobody can raise it.
+ */
+export type EvidenceId = SignalId | "electricRange";
+
+/** Evidence Lens reads but never scores, with the reason it isn't scored. */
+const READ_ONLY: Partial<Record<EvidenceId, string>> = {
+    /* FINN's single boot figure is sometimes seats-up and sometimes seats-folded. */
+    bootVolume:
+        "How much the boot holds, as FINN publishes it. FINN doesn't say whether the figure is with the rear seats up or folded, so Lens quotes it and doesn't score it.",
+    electricRange:
+        "The WLTP range FINN publishes for an electric car. Lens already weighs range inside long-distance driving; this is the figure itself.",
+};
 
 export interface EvidenceDef {
     id: EvidenceId;
@@ -44,23 +59,33 @@ const homeOf = (id: SignalId): { category: CategoryId | null; raisable: boolean 
 export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
     ...(Object.fromEntries(
         (Object.keys(SIGNALS) as SignalId[])
-            /* FINN's boot figure is ambiguous and deliberately unscored; don't offer it as evidence either. */
-            .filter((id) => id !== "bootVolume" && id !== "hasDriverAssistance")
+            /* `Fahrerassistenz` is a level, read through driverAssistLevel2 instead. */
+            .filter((id) => id !== "hasDriverAssistance")
             .map((id) => {
                 const home = homeOf(id);
+
+                const readOnly = READ_ONLY[id];
 
                 return [
                     id,
                     {
                         id,
                         label: SIGNALS[id].label,
-                        explanation: SIGNALS[id].explanation,
-                        scoredIn: home.category,
-                        raisable: home.raisable,
+                        explanation: readOnly ?? SIGNALS[id].explanation,
+                        scoredIn: readOnly ? null : home.category,
+                        raisable: readOnly ? false : home.raisable,
                     },
                 ];
             }),
     ) as Record<SignalId, EvidenceDef>),
+
+    electricRange: {
+        id: "electricRange",
+        label: "Electric range",
+        explanation: READ_ONLY.electricRange!,
+        scoredIn: null,
+        raisable: false,
+    },
 };
 
 export const EVIDENCE_IDS = Object.keys(EVIDENCE) as EvidenceId[];
@@ -70,8 +95,17 @@ export const isEvidenceId = (value: unknown): value is EvidenceId =>
 
 export type EvidenceState = "listed" | "notListed" | "unknown";
 
+/** Range enough to stop thinking about stopping, on FINN's own WLTP figure. */
+const LONG_RANGE_KM = 350;
+
 /** What FINN's data says about one piece of evidence on one car. */
 export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
+    if (id === "electricRange") {
+        const range = evRangeKm(car);
+
+        return range == null ? "unknown" : range >= LONG_RANGE_KM ? "listed" : "notListed";
+    }
+
     const utility = signalUtility(id, car);
 
     if (utility == null) return "unknown";
@@ -82,13 +116,31 @@ export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
     return utility === 1 ? "listed" : "notListed";
 }
 
-/** A measured fact worth quoting instead of a yes or no. */
+/**
+ * A measured fact worth quoting instead of a yes or no, in both directions:
+ * "4.68 m long" says more than "no", and is the honest thing to say about a
+ * car whose length FINN publishes and which simply isn't small.
+ */
 export function measuredDisplay(car: FinnCar, id: EvidenceId): string | null {
-    if (id !== "compactLength") return null;
+    if (id === "compactLength") {
+        const length = lengthMm(car);
 
-    const length = lengthMm(car);
+        return length ? `${(length / 1000).toFixed(2)} m long` : null;
+    }
 
-    return length ? `${(length / 1000).toFixed(2)} m long` : null;
+    if (id === "bootVolume") {
+        const litres = bootLitres(car);
+
+        return litres ? `a ${Math.round(litres)} L boot` : null;
+    }
+
+    if (id === "electricRange") {
+        const range = evRangeKm(car);
+
+        return range ? `${Math.round(range)} km of range on FINN's figure` : null;
+    }
+
+    return null;
 }
 
 export interface Coverage {
