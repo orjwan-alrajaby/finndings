@@ -245,12 +245,6 @@ export interface WireUnderstanding {
     notModelled: { said: string; stance?: "wants" | "doesntCare"; explanation: string }[];
     /** Evidence Lens offered and the reader turned down; never suggest it again. */
     declined?: string[];
-    /**
-     * Equipment worth offering, which the reader hasn't asked for and may not
-     * know exists. Offered, never applied: Lens shows what it does and lets
-     * them decide.
-     */
-    suggestions?: { id: string; why: string; needId?: string }[];
     /** What they explicitly withdrew this turn, so it isn't carried over: "budget", "rental", "monthlyKm". */
     cleared: string[];
 }

@@ -199,18 +199,6 @@ export function converseSchema(
             }),
         },
         declined: { type: "array", items: evidence },
-        suggestions: {
-            type: "array",
-            items: object({
-                id: evidence,
-                why: {
-                    type: "string",
-                    description:
-                        "One clause on why it might matter to this person, in their situation — not what the equipment is. Lens shows the reader what it does and asks whether to count it.",
-                },
-                needId: { type: "string", description: "The need it would serve, when it serves one; otherwise an empty string." },
-            }),
-        },
         cleared: { type: "array", items: { type: "string", enum: ["budget", "rental", "monthlyKm"] } },
     });
 
@@ -230,6 +218,20 @@ export function converseSchema(
                 "What Lens says to the reader, in its own voice. Never empty: on an answer turn this is the whole answer, including saying that FINN's data can't settle it.",
         },
         understanding: nullable(understanding),
+        suggestions: {
+            type: "array",
+            description:
+                "Equipment worth offering this reader, which they haven't asked for and may not know exists. Empty unless something plainly serves what they described. Lens shows what it does and asks; it is never applied on your say-so.",
+            items: object({
+                id: evidence,
+                why: {
+                    type: "string",
+                    description:
+                        "One clause on why it might matter to them, in their situation — not what the equipment is. Lens supplies the definition.",
+                },
+                needId: { type: "string", description: "The need it would serve, when it serves one; otherwise an empty string." },
+            }),
+        },
         question: nullable(
             object({
                 ask: { type: "string" },

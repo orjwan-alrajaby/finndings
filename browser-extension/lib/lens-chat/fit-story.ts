@@ -55,6 +55,8 @@ export interface StoryLine {
 export interface StorySection {
     key: string;
     title: string;
+    /** The reader's own words for this need, for an explanation that answers them. */
+    said: string;
     /** The need or constraint in the person's terms, for "You needed". */
     short: string;
     kind: "budget" | "rental" | "need";
@@ -263,6 +265,7 @@ export function tellFitStory(
 
         sections.push({
             key: "budget",
+            said: u.budget.said,
             title,
             short: u.budget.kind === "hardMax" ? `${formatEUR(u.budget.monthly)}/month maximum` : `Around ${formatEUR(u.budget.monthly)}/month`,
             kind: "budget",
@@ -285,6 +288,7 @@ export function tellFitStory(
 
         sections.push({
             key: "ruled-out",
+            said: rules.map((rule) => rule.said).filter(Boolean)[0] ?? "",
             title: nothingLeft
                 ? `Nothing here is ${asked}`
                 : kept
@@ -341,6 +345,7 @@ export function tellFitStory(
 
         sections.push({
             key: "rental",
+            said: u.rental.said,
             title: problem ? `It may not work for ${period}` : `It works for ${period}`,
             short: period,
             kind: "rental",
@@ -395,6 +400,7 @@ export function tellFitStory(
 
         sections.push({
             key: need.id,
+            said: need.said,
             title:
                 tone === "good"
                     ? `It helps with ${lower(need.label)}`

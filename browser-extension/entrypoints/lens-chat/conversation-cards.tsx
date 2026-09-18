@@ -190,7 +190,7 @@ export function UnderstandingCard({
         ...ruledOut(u)
             .filter((rule) => rule.mode === "without")
             .map((rule) => `Anything FINN files as ${asPhrase(rule.id)}`),
-        ...u.notModelled.filter((item) => item.stance === "doesntCare").map((item) => item.said),
+        ...u.notModelled.filter((item) => item.stance === "doesntCare").map((item) => sentenceCase(item.said)),
     ].filter((item, index, all) => all.indexOf(item) === index);
     const wanted = u.notModelled.filter((item) => item.stance !== "doesntCare");
     const lessRelevant = new Set(translation.lessRelevant);
@@ -789,26 +789,21 @@ export function WhyCard({ story, translation }: { story: FitStory; translation: 
 
             {story.sections.length > 0 ? (
                 <>
-                    <div className="px-4 py-3">
-                        <Label>You needed</Label>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {story.sections.map((section) => (
-                                <span key={section.key} className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2.5 py-1 text-[11px] font-bold">
-                                    {section.kind === "budget" ? (
-                                        <Wallet aria-hidden="true" className="h-3 w-3 text-finn-accent-blue" />
-                                    ) : section.kind === "rental" ? (
-                                        <CalendarRange aria-hidden="true" className="h-3 w-3 text-finn-accent-blue" />
-                                    ) : null}
-                                    {section.short}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2.5 border-t border-finn-cotton px-4 py-3">
-                        <Label>Lens found</Label>
+                    {/*
+                      * Each thing they said, answered where they said it —
+                      * rather than a row of needs and a row of findings the
+                      * reader has to pair up themselves.
+                      */}
+                    <div className="space-y-3 px-4 py-3">
                         {story.sections.map((section) => (
-                            <SectionView key={section.key} section={section} compact={false} />
+                            <div key={section.key}>
+                                <p className="text-xs font-black leading-5 text-finn-black">
+                                    {section.said ? `You said ${section.said.replace(/[.\s]+$/, "")}.` : section.short}
+                                </p>
+                                <div className="mt-1">
+                                    <SectionView section={section} compact={false} />
+                                </div>
+                            </div>
                         ))}
                     </div>
                 </>
