@@ -150,7 +150,7 @@ function supportingMeasurements(
           : [{ label: LOAD_VOLUME, value: trunk, unit: "L", lowerIsBetter: false }]),
       ];
 
-    /* FINN's charging time for an electric car: quoted, never scored. */
+    /* FINN's charging time for an electric car: quoted here, and limits the score past 30 minutes. */
     case "longDistance":
       return charging == null
         ? []
@@ -329,6 +329,8 @@ export function traitFacts(
   vehicle: PinnedFinnCar,
   rival: PinnedFinnCar | null,
 ): TraitFact[] {
+  if (breakdown.priority === "climateSuitability") return tyreTraits(vehicle, rival);
+
   const wantsDrivetrain =
     breakdown.priority === "environmental" ||
     breakdown.priority === "longDistance";
@@ -345,6 +347,32 @@ export function traitFacts(
         differs && rival
           ? { name: rival.name, value: rival.fuelType }
           : null,
+    },
+  ];
+}
+
+/** How FINN's tyre setup reads in a sentence. */
+export const TYRE_SETUP = {
+  allSeason: "all-season tyres",
+  summerAndWinter: "a summer and a winter set of tyres",
+} as const;
+
+/**
+ * FINN's tyre setup, under Climate Suitability: quoted, never scored. Nearly
+ * every FINN car has all-season tyres, and a summer and winter set isn't the
+ * worse option, so there's nothing to rank — but it's what the car meets snow
+ * on, and a reader asking about winter should hear it.
+ */
+function tyreTraits(vehicle: PinnedFinnCar, rival: PinnedFinnCar | null): TraitFact[] {
+  if (!vehicle.tyres) return [];
+
+  const differs = Boolean(rival?.tyres && rival.tyres !== vehicle.tyres);
+
+  return [
+    {
+      label: "Tyres",
+      value: TYRE_SETUP[vehicle.tyres],
+      rival: differs && rival?.tyres ? { name: rival.name, value: TYRE_SETUP[rival.tyres] } : null,
     },
   ];
 }

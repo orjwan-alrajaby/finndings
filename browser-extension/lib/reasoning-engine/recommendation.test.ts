@@ -669,14 +669,15 @@ describe("alternatives and the hot seat", () => {
       id: 1,
       name: "Winner Car",
       length: 4800,
-      features: ["hasBlindSpotAssist", "hasRearCrosswalkWarning", "hasMatrixLedHeadlights"],
+      /* With FINN's standard equipment, so neither car sits on the zero floor. */
+      features: [...BASELINE, "hasBlindSpotAssist", "hasRearCrosswalkWarning", "hasMatrixLedHeadlights"],
     });
 
     const shortCar = makeCar({
       id: 2,
       name: "Short Car",
       length: 3900,
-      features: ["hasBlindSpotAssist"],
+      features: [...BASELINE, "hasBlindSpotAssist"],
     });
 
     const result = buildRecommendation(
@@ -1014,6 +1015,7 @@ describe("preference migration", () => {
     });
 
     expect(migrated).toEqual({
+      automaticOnly: false,
       monthlyKm: 800,
       monthlyBudget: 750,
       petrolPrice: 1.92,

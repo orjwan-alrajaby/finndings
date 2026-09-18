@@ -516,8 +516,12 @@ describe("describeFit", () => {
 });
 
 describe("what the car has, in the reader's terms and the category's", () => {
-  /* Climate's evidence: eight items, of which the car has the first four. */
-  const CLIMATE = AVAILABLE_CATEGORY_FEATURES.climateSuitability;
+  /*
+   * Climate's first eight items, of which the car has the first four. The
+   * rest don't count for this petrol car: a heat pump means nothing without
+   * an electric motor, and all-wheel drive counts only once raised.
+   */
+  const CLIMATE = AVAILABLE_CATEGORY_FEATURES.climateSuitability.slice(0, 8);
   const [first, , third] = CLIMATE as [string, string, string];
 
   const analysis = () =>

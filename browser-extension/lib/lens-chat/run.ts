@@ -131,7 +131,9 @@ export function summariseMatch(run: LensRun): MatchSummary {
 
     const eyebrow = singleCar
         ? "How this car fits you"
-        : recommendation.rentalFallback === "noneFit"
+        : recommendation.gearboxFallback === "noneFit"
+          ? "Closest match — nothing here is an automatic"
+          : recommendation.rentalFallback === "noneFit"
           ? "Closest match — nothing here fits your rental period"
           : recommendation.isFallback
             ? "Closest match — nothing here fits your budget"

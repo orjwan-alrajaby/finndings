@@ -1,6 +1,7 @@
 import type { PinnedFinnCar } from "@/lib/types";
 import type {
   BudgetPartition,
+  GearboxPartition,
   RentalPartition,
   DependsOnGap,
   ReasoningContext,
@@ -17,15 +18,18 @@ import type {
 /**
  * The pool a winner may be drawn from, preferring certainty.
  *
- * Two hard rules, and the rental period is weighed first: a car that can't be
- * rented for the reader's dates is no use at any price, while one over budget
- * is still a car they could take. Within each, confirmed beats unknown beats
- * ruled out — so with no period set this is exactly the budget rule alone.
+ * Three hard rules. The gearbox is weighed first — a car the reader isn't
+ * allowed to drive is no use on any dates — then the rental period, since a
+ * car that can't be rented for the reader's dates is no use at any price,
+ * while one over budget is still a car they could take. Within each, confirmed
+ * beats unknown beats ruled out — so with no period and no gearbox rule set
+ * this is exactly the budget rule alone.
  */
 export function pickEligible(
   budget: BudgetPartition,
   ranked: PinnedFinnCar[],
   rental?: RentalPartition,
+  gearbox?: GearboxPartition,
 ): PinnedFinnCar[] {
   const ids = (cars: PinnedFinnCar[]) => new Set(cars.map((car) => car.id));
 
@@ -33,12 +37,16 @@ export function pickEligible(
   const budgetUnknown = ids(budget.unknown);
   const fits = rental ? ids(rental.fits) : null;
   const rentalUnknown = rental ? ids(rental.unknown) : null;
+  const drivable = gearbox ? ids(gearbox.fits) : null;
+  const gearboxUnknown = gearbox ? ids(gearbox.unknown) : null;
 
   const tier = (vehicle: PinnedFinnCar) => {
     const rentalRank = !fits || fits.has(vehicle.id) ? 0 : rentalUnknown!.has(vehicle.id) ? 1 : 2;
     const budgetRank = within.has(vehicle.id) ? 0 : budgetUnknown.has(vehicle.id) ? 1 : 2;
 
-    return rentalRank * 3 + budgetRank;
+    const gearboxRank = !drivable || drivable.has(vehicle.id) ? 0 : gearboxUnknown!.has(vehicle.id) ? 1 : 2;
+
+    return gearboxRank * 9 + rentalRank * 3 + budgetRank;
   };
 
   const tiers = new Map(ranked.map((vehicle) => [vehicle.id, tier(vehicle)]));
@@ -53,7 +61,7 @@ const scoreOf = (context: ReasoningContext, vehicle: PinnedFinnCar) =>
 /** The ranked cars in the winner's budget pool. */
 export function budgetPool(context: ReasoningContext): PinnedFinnCar[] {
   /* Already in ranked order: `pickEligible` filters `ranked` itself. */
-  return pickEligible(context.budget, context.ranked, context.rental);
+  return pickEligible(context.budget, context.ranked, context.rental, context.gearbox);
 }
 
 /**

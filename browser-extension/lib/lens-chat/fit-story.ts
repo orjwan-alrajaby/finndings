@@ -350,7 +350,9 @@ export function tellFitStory(
 
     const eyebrow = single
         ? "How this car fits what you described"
-        : recommendation.rentalFallback === "noneFit"
+        : recommendation.gearboxFallback === "noneFit"
+          ? "Closest match — nothing here is an automatic"
+          : recommendation.rentalFallback === "noneFit"
           ? "Closest match — nothing here fits your dates"
           : recommendation.isFallback && hardBudget != null
             ? `Closest match — nothing here stays within ${formatEUR(hardBudget)}`

@@ -73,6 +73,20 @@ export const LENGTH_ANCHORS: Anchors = [
   [5200, 0],
 ];
 
+/**
+ * Narrow width, in millimetres. FINN's cars run from 1.60 m to 2.24 m, most
+ * between 1.82 m and 1.90 m; flat at 1.75 m and narrower, nothing past 2.05 m.
+ */
+export const WIDTH_ANCHORS: Anchors = [
+  [1750, 1],
+  [1850, 0.7],
+  [1950, 0.35],
+  [2050, 0],
+];
+
+/** The braked towing rating that counts as able to pull a small caravan, in kg. */
+export const TOWING_THRESHOLD_KG = 1500;
+
 /** Boot volume with the seats up, in litres. Capped: beyond 650 L changes little. */
 export const BOOT_ANCHORS: Anchors = [
   [150, 0],
@@ -87,7 +101,8 @@ export const BOOT_ANCHORS: Anchors = [
  * How much an electric car's range limits Long Distance, in WLTP km.
  *
  * Flat from 480 km: past that, what separates electric cars on a long drive is
- * charging speed, which Lens doesn't score. Nothing can raise a car above 1.
+ * charging speed, which `CHARGE_FACTOR_ANCHORS` reads. Nothing can raise a car
+ * above 1.
  */
 export const TRIP_FACTOR_ANCHORS: Anchors = [
   [300, 0.55],
@@ -98,6 +113,24 @@ export const TRIP_FACTOR_ANCHORS: Anchors = [
 
 export const tripFactor = (rangeKm: number): number =>
   piecewise(TRIP_FACTOR_ANCHORS, rangeKm);
+
+/**
+ * How much an electric car's DC charging time, 10 to 80%, limits Long
+ * Distance, in minutes.
+ *
+ * Flat to 30 minutes, where most of FINN's electric cars sit (median 26):
+ * a stop that fits a coffee costs nothing. Gentler than range, because a slow
+ * charge makes a stop longer where a short range makes one more of them.
+ * FINN's slowest lists 52 minutes.
+ */
+export const CHARGE_FACTOR_ANCHORS: Anchors = [
+  [30, 1],
+  [45, 0.85],
+  [60, 0.7],
+];
+
+export const chargeFactor = (minutes: number): number =>
+  piecewise(CHARGE_FACTOR_ANCHORS, minutes);
 
 /* -------------------------------------------------------------------------- */
 /* Readings                                                                   */
@@ -133,6 +166,22 @@ export function evRangeKm(car: FinnCar): number | null {
   return Number.isFinite(range) && range > 0 ? range : null;
 }
 
+/** An electric car's DC charging time, 10 to 80%, in minutes, or null. */
+export function dcChargeMinutes(car: FinnCar): number | null {
+  if (car.fuelType !== "Electric") return null;
+
+  const minutes = Number(car.dcChargeMinutes);
+
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+/** The width FINN measured, in millimetres, or null. */
+export function widthMm(car: FinnCar): number | null {
+  const width = Number(car.dimensions?.width);
+
+  return Number.isFinite(width) && width > 0 ? width : null;
+}
+
 /** The length FINN measured, in millimetres, or null. */
 export function lengthMm(car: FinnCar): number | null {
   const length = Number(car.dimensions?.length);
@@ -147,7 +196,7 @@ export function bootLitres(car: FinnCar): number | null {
   return Number.isFinite(litres) && litres > 0 ? litres : null;
 }
 
-const MEASURES = new Set<SignalId>(["compactLength", "bootVolume"]);
+const MEASURES = new Set<SignalId>(["compactLength", "compactWidth", "bootVolume"]);
 
 /** True for yes-or-no evidence; false for a measured figure on a curve. */
 export const isBinarySignal = (key: SignalId): boolean => !MEASURES.has(key);
@@ -155,11 +204,64 @@ export const isBinarySignal = (key: SignalId): boolean => !MEASURES.has(key);
 /** True for a signal read from FINN's structured fields rather than its list. */
 export const isDerivedSignal = (key: SignalId): boolean => key in DERIVED_SIGNALS;
 
+/** Equipment entries Lens reads from a structured field FINN always states. */
+const STRUCTURED_FEATURES = new Set<SignalId>(["hasAutomaticTransmission", "hasAllWheelDrive"]);
+
+/**
+ * True for evidence that is a stated fact about the car rather than an entry
+ * in FINN's equipment list: a structured field says a car has a manual
+ * gearbox, where a list only doesn't mention something. Readable without the
+ * equipment list.
+ */
+export const isStatedFact = (key: SignalId): boolean =>
+  isDerivedSignal(key) || STRUCTURED_FEATURES.has(key);
+
+/**
+ * Whether a signal means anything for this car at all. A heat pump is what an
+ * electric car heats its cabin with; a combustion engine heats it for free, so
+ * lacking one says nothing about a petrol car and it isn't counted there.
+ */
+export function appliesTo(key: SignalId, car: FinnCar): boolean {
+  if (key === "hasHeatPump") return car.fuelType === "Electric";
+
+  return true;
+}
+
 export function signalUtility(key: SignalId, car: FinnCar): number | null {
   switch (key) {
     case "rearDoors": {
       const doors = parseCount(car.doors);
       return doors == null ? null : doors >= 4 ? 1 : 0;
+    }
+
+    case "seatsFivePlus": {
+      const seats = parseCount(car.capacity?.seats);
+      return seats == null ? null : seats >= 5 ? 1 : 0;
+    }
+
+    case "towingCapacity1500": {
+      const kg = Number(car.towingCapacityKg);
+      return Number.isFinite(kg) && kg > 0 ? (kg >= TOWING_THRESHOLD_KG ? 1 : 0) : null;
+    }
+
+    case "compactWidth": {
+      const width = widthMm(car);
+      return width == null ? null : piecewise(WIDTH_ANCHORS, width);
+    }
+
+    /*
+     * Read from the structured field every mapped car carries, so a car pinned
+     * before these were equipment entries still answers — and a car FINN sent
+     * no equipment list for still has a gearbox.
+     */
+    case "hasAutomaticTransmission": {
+      const transmission = car.transmission as string | undefined;
+      return transmission === "Automatic" ? 1 : transmission === "Manual" ? 0 : null;
+    }
+
+    case "hasAllWheelDrive": {
+      if (!car.driveType || car.driveType === "Unknown") return null;
+      return car.driveType === "All-Wheel Drive" ? 1 : 0;
     }
 
     case "seatsSixPlus": {
@@ -187,10 +289,15 @@ export function signalUtility(key: SignalId, car: FinnCar): number | null {
       if (!equipmentKnown(car)) return null;
       /* An entry FINN left empty is unknown; one it answered false is a no. */
       if (car.unansweredFeatures?.includes(key)) return null;
+      /* Read by Lens since after some cars were pinned: absent there is unknown. */
+      if (LATER_FEATURES.has(key) && !(key in (car.features ?? {}))) return null;
 
       return car.features?.[key] ? 1 : 0;
   }
 }
+
+/** Equipment entries Lens started reading after cars were already being pinned. */
+const LATER_FEATURES = new Set<SignalId>(["hasWirelessAppleCarPlaySlashAndroidAuto"]);
 
 /** A yes-or-no signal FINN's data says the car has. */
 export const hasSignal = (car: FinnCar, key: SignalId): boolean =>

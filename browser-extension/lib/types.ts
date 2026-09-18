@@ -98,6 +98,9 @@ export type FinnApiConfig = {
 
   is_refurbished: boolean;
   has_hitch: "true" | "false";
+
+  /** FINN's tyre setup: one all-season set, or a summer and a winter set. */
+  tires?: "all_season" | "summer_winter" | null;
 };
 
 
@@ -206,9 +209,23 @@ export interface FinnCar {
 
   /**
    * DC charging time from 10 to 80%, in minutes, as FINN lists it for some
-   * electric cars. Shown in explanations, never scored.
+   * electric cars. Past 30 minutes it limits Long Distance; see `CHARGE_FACTOR_ANCHORS`.
    */
   dcChargeMinutes?: number | null;
+
+  /**
+   * The most the car may tow, braked, in kilograms, from FINN's
+   * `Anhängerlast`. It's the car's rating, listed whether or not a towbar is
+   * fitted. Null when FINN doesn't list one; optional for cars pinned by
+   * earlier builds, which read as unknown.
+   */
+  towingCapacityKg?: number | null;
+
+  /**
+   * FINN's tyre setup. Shown as a fact, never scored: nearly every FINN car
+   * has all-season tyres, and a summer and winter set isn't the worse option.
+   */
+  tyres?: "allSeason" | "summerAndWinter" | null;
 
   dimensions: {
     length: number;

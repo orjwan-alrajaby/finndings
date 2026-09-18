@@ -134,7 +134,7 @@ describe("the safety merge reaches existing users without breaking them", () => 
   it("drops raises on items no longer scored, and keeps those on standard equipment", async () => {
     stored.finnLensCategoryFeatures = {
       comfort: [
-        { key: "hasSunroof", importance: "medium" },
+        { key: "hasLeatherSeats", importance: "medium" },
         { key: "hasAmbientInteriorLightning", importance: "low" },
       ],
       safetyAssistance: [{ key: "hasEmergencyBrakingAssist", importance: "high" }],

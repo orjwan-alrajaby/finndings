@@ -188,7 +188,8 @@ describe("turning an understanding into Lens's answers", () => {
         const { answers, order, lessRelevant } = toAnswers(base(), u);
 
         expect(answers.priorities.slice(0, 2).sort()).toEqual(["practicality", "safetyAssistance"]);
-        expect(order.filter((item) => !item.filler).map((item) => item.id).sort()).toEqual(["practicality", "safetyAssistance"]);
+        /* Comfort too: the rear USB ports that keep the kids' tablets charged count there. */
+        expect(order.filter((item) => !item.filler).map((item) => item.id).sort()).toEqual(["comfort", "practicality", "safetyAssistance"]);
         expect(answers.preferences.monthlyBudget).toBe(500);
         expect(answers.preferences).toMatchObject({ rentalFrom: "2099-10", rentalTo: "2100-04" });
         expect(answers.features.safetyAssistance.map((item) => item.key)).toEqual(["hasBlindSpotAssist"]);
@@ -370,6 +371,13 @@ describe("saying back only what the person said", () => {
         expect(reply).toBe("Two young children and €500 as a firm ceiling.");
         expect(understanding.context.map((item) => item.label)).toEqual(["Two young children"]);
         expect(understanding.needs[0]?.said).toBe("");
+    });
+
+    it("survives a turn that comes back with no reply at all", () => {
+        const { reply, understanding } = groundInWhatWasSaid(undefined, understood(), [told], new Date("2026-09-17"));
+
+        expect(reply).toBe("");
+        expect(understanding.budget?.monthly).toBe(500);
     });
 
     it("keeps numbers that came from them, or from the limits Lens read out of what they said", () => {

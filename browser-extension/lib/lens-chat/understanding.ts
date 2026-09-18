@@ -313,11 +313,14 @@ const numbersIn = (value: string): string[] =>
  * dropped.
  */
 export function groundInWhatWasSaid(
-    reply: string,
+    /* Whatever the model sent: a turn can come back with no reply at all. */
+    raw: unknown,
     u: Understanding,
     said: string[],
     today = new Date(),
 ): { reply: string; understanding: Understanding } {
+    const reply = text(raw, 400);
+
     const known = new Set([
         ...said.flatMap(numbersIn),
         String(today.getFullYear()),

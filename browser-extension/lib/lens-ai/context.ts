@@ -197,6 +197,7 @@ export function buildLensFacts(
                     : "no limit set",
             monthlyKm: context.preferences.monthlyKm,
             contractType: context.preferences.contractType,
+            automaticsOnly: context.preferences.automaticOnly,
             rentalPeriod: context.rental.period
                 ? `${periodLabel(context.rental.period)} (${context.rental.period.months} months)`
                 : "not set",
@@ -219,6 +220,7 @@ export function buildLensFacts(
             highestScoringCar: name(rec.topScorer),
             rulesChangedTheAnswer: rec.budgetChangedTheAnswer,
             rentalPeriodFallback: rec.rentalFallback,
+            automaticGearboxFallback: rec.gearboxFallback,
             thinEvidenceOnTopPriorities: rec.evidenceFallback,
             checkedAgainst: rec.runnerUp ? name(rec.runnerUp) : null,
         },

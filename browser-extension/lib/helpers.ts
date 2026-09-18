@@ -1,4 +1,4 @@
-import type { ContractOffer, ContractTerm, DriveType, FinnApiConfig } from "@/lib/types";
+import type { ContractOffer, ContractTerm, DriveType, FinnApiConfig, FinnCar } from "@/lib/types";
 import { addTimeToDate } from "@/lib/utils";
 
 export function brand(config: FinnApiConfig) {
@@ -37,6 +37,8 @@ const FEATURE_KEYS = {
   hasHeatedSteeringWheel: "Beheizbares Lenkrad",
   hasHeadUpDisplay: "Head-up-Display",
   hasAppleCarPlaySlashAndroidAuto: "Apple CarPlay / Android Auto",
+  /* FINN answers "Ja (Kabellos)" rather than true; read in `extractFeatures`. */
+  hasWirelessAppleCarPlaySlashAndroidAuto: "Apple CarPlay / Android Auto (Wireless)",
   hasWirelessChargingStation: "Kabellose Ladestation",
   hasPremiumSoundSystem: "Premium-Soundsystem",
   hasIntegratedNavigationSystem: "Navigationssystem integriert",
@@ -49,7 +51,7 @@ const FEATURE_KEYS = {
   hasParkingAssistant: "Parkassistent",
   hasParkingSensors: "Parksensoren",
   hasAuxiliaryHeater: "Standheizung",
-  /* Read for Ask Lens's evidence, not scored: on 49 of 728 cars, all electric. */
+  /* On 49 of 728 cars, all electric; scored for electric cars only. */
   hasHeatPump: "Wärmepumpe",
   hasBlindSpotAssist: "Toter-Winkel-Assistent",
   hasRearCrosswalkWarning: "Verkehrsquerenwarnung hinten",
@@ -118,8 +120,18 @@ export function extractFeatures(config: FinnApiConfig): Record<string, boolean> 
       features.hasKeylessEntryAndStart ||
       (getFeature(config, "Keyless Entry") === true &&
         getFeature(config, "Keyless Start") === true),
+    hasWirelessAppleCarPlaySlashAndroidAuto: isYes(
+      getFeature(config, FEATURE_KEYS.hasWirelessAppleCarPlaySlashAndroidAuto),
+    ),
     hasTowbar: config.has_hitch === "true",
+    hasAutomaticTransmission: config.gearshift === "Automatik",
+    hasAllWheelDrive: extractDriveType(config) === "All-Wheel Drive",
   };
+}
+
+/** FINN's yes: `true`, or a string answer that starts with "Ja" — "Ja (Kabellos)". */
+function isYes(value: unknown): boolean {
+  return value === true || (typeof value === "string" && /^ja\b/i.test(value.trim()));
 }
 
 /**
@@ -143,6 +155,8 @@ export function extractUnansweredFeatures(config: FinnApiConfig): string[] {
   return [
     ...unanswered.filter((key) => key !== "hasKeylessEntryAndStart" || !keylessAnswered),
     ...(isBlank(config.has_hitch) ? ["hasTowbar"] : []),
+    ...(!["Automatik", "Manuell"].includes(config.gearshift) ? ["hasAutomaticTransmission"] : []),
+    ...(extractDriveType(config) === "Unknown" ? ["hasAllWheelDrive"] : []),
   ];
 }
 
@@ -171,6 +185,26 @@ export function extractDcChargeMinutes(config: FinnApiConfig): number | null {
   const minutes = Number.parseFloat(value.replace(",", "."));
 
   return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+/** "1500 kg" → 1500. Null for anything that isn't a positive weight. */
+export function extractTowingCapacityKg(config: FinnApiConfig): number | null {
+  const value = getFeature(config, "Anhängerlast");
+
+  if (typeof value === "number") return value > 0 ? value : null;
+  if (typeof value !== "string") return null;
+
+  const kg = Number.parseFloat(value.replace(/\./g, "").replace(",", "."));
+
+  return Number.isFinite(kg) && kg > 0 ? kg : null;
+}
+
+/** FINN's `tires` field, or null when it says nothing Lens recognises. */
+export function extractTyres(config: FinnApiConfig): FinnCar["tyres"] {
+  if (config.tires === "all_season") return "allSeason";
+  if (config.tires === "summer_winter") return "summerAndWinter";
+
+  return null;
 }
 
 export function extractAvailability(config: FinnApiConfig) {
@@ -270,5 +304,5 @@ const DRIVE_TYPE_MAP: Record<string, DriveType> = {
 };
 
 export function extractDriveType(config: FinnApiConfig): DriveType {
-  return DRIVE_TYPE_MAP[config.config_drive.toLowerCase()] ?? "Unknown";
+  return DRIVE_TYPE_MAP[String(config.config_drive ?? "").toLowerCase()] ?? "Unknown";
 }

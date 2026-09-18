@@ -244,6 +244,10 @@ export function compareOutcomes({
         );
     }
 
+    if (after.gearboxFallback === "noneFit" && before.gearboxFallback !== "noneFit") {
+        details.push("None of your pinned cars is an automatic, so this is the closest match rather than one you can drive.");
+    }
+
     if (after.rentalFallback === "noneFit" && before.rentalFallback !== "noneFit") {
         details.push("None of your pinned cars fits that rental period, so this is the closest match rather than one you can rent for those months.");
     }

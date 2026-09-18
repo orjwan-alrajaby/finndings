@@ -49,6 +49,14 @@ export interface LensPreferences {
   rentalFrom: string | null;
   /** The last month the reader wants the car for, included: "2027-05". */
   rentalTo: string | null;
+  /**
+   * True when the reader may only drive an automatic — a licence limited to
+   * automatics, or simply never driving a manual.
+   *
+   * Like the budget, a hard eligibility rule and never a score: a manual car
+   * only wins when no pinned car is an automatic.
+   */
+  automaticOnly: boolean;
 }
 
 /**
@@ -65,6 +73,7 @@ export interface LegacyLensPreferences {
   contractType?: ContractType;
   rentalFrom?: string | null;
   rentalTo?: string | null;
+  automaticOnly?: boolean;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -192,6 +201,8 @@ export interface CategoryDef {
   expected?: FeatureId[];
   /** A figure that can only reduce this priority's score. */
   limit?: "evRange";
+  /** A second such figure: an electric car's DC charging time. */
+  chargeLimit?: "dcCharge";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -305,6 +316,13 @@ export interface CategoryDetail {
   numeric: NumericEvidence | null;
   /** Long Distance on an electric car: the range factor applied, ≤ 1. */
   tripFactor: number | null;
+  /**
+   * Long Distance on an electric car FINN lists a DC charging time for: the
+   * charging factor applied, ≤ 1. Null when there's no time to read.
+   */
+  chargeFactor: number | null;
+  /** The DC charging time behind `chargeFactor`, in minutes. */
+  chargeMinutes: number | null;
   /** The working behind Environmental Impact. */
   environmental?: EnvironmentalAssessment | null;
   /**
@@ -321,12 +339,14 @@ export interface CategoryDetail {
  *
  * - `item` — a piece of evidence's share of the result.
  * - `range` — Long Distance on an electric car: what a short range took away.
+ * - `charging` — the same, for slow DC charging.
  * - `emissions` — the Environmental Impact score's share.
  */
 export type Contribution =
   | { kind: "item"; priority: CategoryId; key: SignalId; points: number }
   | { kind: "missingExpected"; priority: CategoryId; key: FeatureId; points: number }
   | { kind: "range"; priority: CategoryId; points: number }
+  | { kind: "charging"; priority: CategoryId; points: number }
   | { kind: "emissions"; priority: CategoryId; points: number };
 
 /** What FINN's data didn't tell Lens about one car. */
@@ -561,6 +581,10 @@ export interface PriorityBreakdown {
   numeric: NumericEvidence | null;
   /** See `CategoryDetail.tripFactor`. */
   tripFactor: number | null;
+  /** See `CategoryDetail.chargeFactor`. */
+  chargeFactor: number | null;
+  /** See `CategoryDetail.chargeMinutes`. */
+  chargeMinutes: number | null;
   /** See `CategoryDetail.environmental`. */
   environmental: EnvironmentalAssessment | null;
 
@@ -693,6 +717,20 @@ export interface ReasoningContext {
   ranked: PinnedFinnCar[];
   budget: BudgetPartition;
   rental: RentalPartition;
+  gearbox: GearboxPartition;
+}
+
+/**
+ * Pinned cars by whether the reader can drive them. With `automaticOnly` off,
+ * every car `fits`.
+ */
+export interface GearboxPartition {
+  required: boolean;
+  fits: PinnedFinnCar[];
+  /** Manual cars, when the reader drives automatics only. */
+  doesNotFit: PinnedFinnCar[];
+  /** Cars whose gearbox FINN doesn't state. */
+  unknown: PinnedFinnCar[];
 }
 
 export interface RentalPartition {
@@ -748,6 +786,12 @@ export interface Recommendation {
    * available couldn't be confirmed either way.
    */
   rentalFallback: "noneFit" | "unconfirmed" | null;
+  /**
+   * Set when the reader drives automatics only and the winner isn't a
+   * confirmed automatic: `noneFit` when every pinned car is a manual,
+   * `unconfirmed` when FINN doesn't state the winner's gearbox.
+   */
+  gearboxFallback: "noneFit" | "unconfirmed" | null;
   /**
    * The realistic alternatives — the four cars closest to the winner overall.
    *

@@ -91,6 +91,7 @@ const cars = raw.map((car) => {
     vehicle_size: car.vehicle_size,
     is_refurbished: car.is_refurbished,
     has_hitch: car.has_hitch,
+    tires: car.tires,
     features: {
       /* Indices into `featureKeys` of entries that are `true`. */
       true: featureKeys.flatMap((key, index) => (list[key] === true ? [index] : [])),

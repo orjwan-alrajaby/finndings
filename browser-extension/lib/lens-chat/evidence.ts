@@ -8,15 +8,13 @@ import type { FinnCar } from "@/lib/types";
  * it.
  *
  * Everything Lens reads from FINN — its equipment list and the handful of
- * facts derived from its structured fields — plus one reading the chat adds
- * (all-wheel drive, from the drive type FINN states). Most of it is scored by
- * some priority; some of it isn't (rear USB ports, privacy glass, a heat
- * pump). Unscored evidence never moves a score. It is here so that "I want
+ * facts derived from its structured fields. Most of it is scored by some
+ * priority; some of it isn't (privacy glass, leather seats). Unscored evidence never moves a score. It is here so that "I want
  * the kids kept busy" can be answered with what FINN actually lists, stated
  * as a fact about the car, and not with a guess.
  */
 
-export type EvidenceId = SignalId | "allWheelDrive";
+export type EvidenceId = SignalId;
 
 export interface EvidenceDef {
     id: EvidenceId;
@@ -63,14 +61,6 @@ export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
                 ];
             }),
     ) as Record<SignalId, EvidenceDef>),
-
-    allWheelDrive: {
-        id: "allWheelDrive",
-        label: "All-wheel drive",
-        explanation: "Power goes to all four wheels, which helps pulling away and climbing on snow, ice and wet surfaces. Read from the drive type FINN lists.",
-        scoredIn: null,
-        raisable: false,
-    },
 };
 
 export const EVIDENCE_IDS = Object.keys(EVIDENCE) as EvidenceId[];
@@ -82,11 +72,6 @@ export type EvidenceState = "listed" | "notListed" | "unknown";
 
 /** What FINN's data says about one piece of evidence on one car. */
 export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
-    if (id === "allWheelDrive") {
-        if (!car.driveType || car.driveType === "Unknown") return "unknown";
-        return car.driveType === "All-Wheel Drive" ? "listed" : "notListed";
-    }
-
     const utility = signalUtility(id, car);
 
     if (utility == null) return "unknown";

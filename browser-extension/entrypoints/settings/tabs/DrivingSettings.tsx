@@ -1,4 +1,4 @@
-import { DRIVING_EXPLANATIONS, FieldLabel, RentalPeriodInput } from "@/components/DrivingAssumptions";
+import { AutomaticOnlyInput, DRIVING_EXPLANATIONS, FieldLabel, RentalPeriodInput } from "@/components/DrivingAssumptions";
 import { FINN_INCLUDED_MONTHLY_KM } from "@/lib/reasoning-engine/constants";
 import type { ContractType, LensPreferences } from "@/lib/reasoning-engine/types";
 import { NumberInput } from "@/components/NumberInput";
@@ -9,7 +9,7 @@ interface DrivingSettingsProps {
     onChange: (preferences: LensPreferences) => void;
 }
 
-type NumericField = Exclude<keyof LensPreferences, "contractType" | "rentalFrom" | "rentalTo">;
+type NumericField = Exclude<keyof LensPreferences, "contractType" | "rentalFrom" | "rentalTo" | "automaticOnly">;
 
 interface Field {
     key: NumericField;
@@ -86,6 +86,14 @@ export function DrivingSettings({ preferences, onChange }: DrivingSettingsProps)
                     to={preferences.rentalTo}
                     tone="bg-finn-snow"
                     onChange={(rentalFrom, rentalTo) => onChange({ ...preferences, rentalFrom, rentalTo })}
+                />
+            </div>
+
+            <div className="mt-5">
+                <AutomaticOnlyInput
+                    checked={preferences.automaticOnly}
+                    tone="bg-finn-snow"
+                    onChange={(automaticOnly) => onChange({ ...preferences, automaticOnly })}
                 />
             </div>
 

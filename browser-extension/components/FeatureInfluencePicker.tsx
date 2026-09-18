@@ -19,7 +19,7 @@ import {
     NICHE_INFLUENCE,
     STANDARD_INFLUENCE,
 } from "@/lib/reasoning-engine/constants";
-import { countedItems, homeOf } from "@/lib/reasoning-engine/evidence";
+import { countedItems, homeOf, isBinarySignal } from "@/lib/reasoning-engine/evidence";
 import type {
     CategoryId,
     FeatureImportance,
@@ -202,7 +202,7 @@ export function FeatureInfluencePicker({
                         importance={importanceOf.get(item.key) ?? null}
                         atCap={!importanceOf.has(item.key) && atMax}
                         niche={item.niche}
-                        measured={item.key === "compactLength"}
+                        measured={!isBinarySignal(item.key)}
                         setBy={
                             profileLabel && sourceOf.get(item.key) === "profile"
                                 ? profileLabel

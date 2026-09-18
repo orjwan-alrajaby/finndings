@@ -33,11 +33,14 @@ import {
 } from "./environmental";
 import {
   ASSESSED_SHARE,
+  appliesTo,
+  chargeFactor,
   countedItems,
+  dcChargeMinutes,
   equipmentKnown,
   evRangeKm,
   isBinarySignal,
-  isDerivedSignal,
+  isStatedFact,
   lengthMm,
   signalUtility,
   tripFactor,
@@ -163,8 +166,12 @@ function weighItem(
  * - The priority is **assessed** when at least half its counted weight is
  *   known. An unassessed priority is left out of the car's fit and said to be
  *   unassessed, rather than scored.
- * - Long Distance on an electric car is multiplied by the range factor, which
- *   can only lower it; an electric car with no published range is unassessed.
+ * - Long Distance on an electric car is multiplied by the range factor and
+ *   the DC charging factor, which can only lower it; an electric car with no
+ *   published range is unassessed, and one with no charging time simply isn't
+ *   limited by it.
+ * - An item that means nothing for this car — a heat pump on a petrol car —
+ *   isn't counted for it at all.
  * - Environmental Impact is the CO₂ reading, and is assessed when there is one.
  *
  * `vehicles` is accepted for callers that pass the comparison set and is
@@ -183,7 +190,9 @@ export function categoryDetail(
   const selection = categoryFeatures[category] ?? [];
   const known = equipmentKnown(vehicle);
 
-  const items: EvidenceItem[] = (def ? countedItems(category) : []).map(
+  const items: EvidenceItem[] = (def ? countedItems(category) : [])
+    .filter(({ key }) => appliesTo(key, vehicle))
+    .map(
     ({ key, role, niche }) => {
       const { weight, preference } = weighItem(
         role,
@@ -232,7 +241,13 @@ export function categoryDetail(
   const range = def?.limit === "evRange" ? evRangeKm(vehicle) : null;
   const isElectric = vehicle.fuelType === "Electric";
   const limited = def?.limit === "evRange" && isElectric;
-  const factor = limited && range != null ? tripFactor(range) : null;
+  const rangeFactor = limited && range != null ? tripFactor(range) : null;
+
+  /* And slow DC charging, when FINN lists a time. */
+  const minutes = def?.chargeLimit === "dcCharge" ? dcChargeMinutes(vehicle) : null;
+  const charging = minutes != null ? chargeFactor(minutes) : null;
+
+  const factor = rangeFactor == null && charging == null ? null : (rangeFactor ?? 1) * (charging ?? 1);
 
   const assessed =
     totalWeight > 0 &&
@@ -260,10 +275,14 @@ export function categoryDetail(
     else pickedMissing.push(preference);
   }
 
-  const standard: StandardCheck[] = ((def?.expected ?? []) as FeatureId[]).map((key) => ({
-    key,
-    state: !known ? "unknown" : vehicle.features?.[key] ? "listed" : "unlisted",
-  }));
+  const standard: StandardCheck[] = ((def?.expected ?? []) as FeatureId[]).map((key) => {
+    const utility = signalUtility(key, vehicle);
+
+    return {
+      key,
+      state: utility == null ? "unknown" : utility === 1 ? "listed" : "unlisted",
+    };
+  });
 
   const expectedMissing = standard
     .filter((item) => item.state === "unlisted")
@@ -292,7 +311,9 @@ export function categoryDetail(
     featureScore,
     numericScore: null,
     numeric: categoryNumeric(category, vehicle, range),
-    tripFactor: factor,
+    tripFactor: rangeFactor,
+    chargeFactor: charging,
+    chargeMinutes: minutes,
     environmental: null,
     bounds: priorityBounds(assessed, scored, expectedItems, totalWeight, earned, deduction, factor),
     hasEvidence: assessed,
@@ -385,6 +406,8 @@ function environmentalDetail(vehicle: PinnedFinnCar): CategoryDetail {
         )
       : null,
     tripFactor: null,
+    chargeFactor: null,
+    chargeMinutes: null,
     /*
      * Carried even when there is no CO₂ figure to score, so the reader can be
      * told exactly what FINN didn't publish.
@@ -553,6 +576,11 @@ function contributionsFor(
 
     if (detail.tripFactor != null && detail.tripFactor < 1) {
       lines.push({ kind: "range", priority, points: -(1 - detail.tripFactor) * itemPoints });
+      itemPoints *= detail.tripFactor;
+    }
+
+    if (detail.chargeFactor != null && detail.chargeFactor < 1) {
+      lines.push({ kind: "charging", priority, points: -(1 - detail.chargeFactor) * itemPoints });
     }
   }
 
@@ -578,7 +606,7 @@ function gapsFor(
 
     for (const key of detail.unknown) {
       /* A missing equipment list is one gap, not one per entry. */
-      if (!known && !isDerivedSignal(key)) continue;
+      if (!known && !isStatedFact(key)) continue;
       unknownItems.push({ priority, key });
     }
 

@@ -46,6 +46,9 @@ export interface CarOverrides {
   doors?: string;
   driverAssistanceLevel?: 1 | 2 | null;
   dcChargeMinutes?: number | null;
+  transmission?: "Automatic" | "Manual";
+  towingCapacityKg?: number | null;
+  width?: number;
 }
 
 export function makeCar(overrides: CarOverrides): PinnedFinnCar {
@@ -68,9 +71,19 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     doors = "5",
     driverAssistanceLevel,
     dcChargeMinutes,
+    transmission = "Automatic",
+    towingCapacityKg,
+    width = 1800,
   } = overrides;
 
   const featureMap: Record<string, boolean> = {};
+
+  /*
+   * A car mapped by this build always carries the entries Lens reads later
+   * than others, answered; only a car pinned before them lacks the key.
+   */
+  if (features.length || featuresSupplied) featureMap.hasWirelessAppleCarPlaySlashAndroidAuto = false;
+
   for (const feature of features) featureMap[feature] = true;
 
   return {
@@ -84,7 +97,7 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     equipmentLine: "",
 
     fuelType,
-    transmission: "Automatic",
+    transmission,
     driveType: "Front-Wheel Drive",
 
     power: { inKw: 100, inHp: 136 },
@@ -139,8 +152,9 @@ export function makeCar(overrides: CarOverrides): PinnedFinnCar {
     ...(featuresSupplied === undefined ? {} : { featuresSupplied }),
     ...(driverAssistanceLevel === undefined ? {} : { driverAssistanceLevel }),
     ...(dcChargeMinutes === undefined ? {} : { dcChargeMinutes }),
+    ...(towingCapacityKg === undefined ? {} : { towingCapacityKg }),
 
-    dimensions: { length, width: 1800, height: 1500, unit: "mm" },
+    dimensions: { length, width, height: 1500, unit: "mm" },
 
     url: `https://www.finn.com/car/${id}`,
     pinnedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),

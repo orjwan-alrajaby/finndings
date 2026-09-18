@@ -359,6 +359,11 @@ export const FEATURES = {
     explanation:
       "Puts your phone's maps, music and messages on the car's own screen, so you use apps you already know instead of the car's built-in ones.",
   },
+  hasWirelessAppleCarPlaySlashAndroidAuto: {
+    label: "Wireless CarPlay / Android Auto",
+    explanation:
+      "CarPlay or Android Auto without a cable: the phone connects to the car's screen by itself when you get in, so even a short trip gets your maps and music.",
+  },
   hasWirelessChargingStation: {
     /* A gerund, so it takes no article: "it has wireless phone charging". */
     label: "Wireless phone charging",
@@ -490,7 +495,7 @@ export const FEATURES = {
     article: "a",
     label: "Heat pump",
     explanation:
-      "Heats the cabin of an electric car more efficiently than a plain electric heater, so cold weather takes less of its range.",
+      "Heats the cabin of an electric car more efficiently than a plain electric heater, so cold weather takes less of its range. Only counted for electric cars.",
   },
   hasBackUSBPorts: {
     label: "Rear USB ports",
@@ -517,6 +522,17 @@ export const FEATURES = {
     label: "Alloy wheels",
     explanation:
       "Cast metal wheels instead of steel wheels with plastic covers. Mostly a cosmetic difference.",
+  },
+  hasAutomaticTransmission: {
+    article: "an",
+    label: "Automatic gearbox",
+    explanation:
+      "The car changes gear by itself, so there's no clutch to work in stop-and-go traffic and no stalling on a hill start. Read from the gearbox FINN lists.",
+  },
+  hasAllWheelDrive: {
+    label: "All-wheel drive",
+    explanation:
+      "Power goes to all four wheels, which helps the car pull away and climb on snow, ice and wet roads. It doesn't help it stop or steer. Read from the drive type FINN lists.",
   },
   hasSpareWheel: {
     article: "a",
@@ -549,6 +565,11 @@ export const DERIVED_SIGNALS = {
     explanation:
       "Doors for the back seats, so passengers and child seats go in without folding a front seat out of the way. Read from the number of doors FINN lists.",
   },
+  seatsFivePlus: {
+    label: "Five or more seats",
+    explanation:
+      "Room for at least five people. Read from the seat count FINN lists — a few small cars and coupés seat only four.",
+  },
   seatsSixPlus: {
     label: "Six or more seats",
     explanation:
@@ -563,6 +584,16 @@ export const DERIVED_SIGNALS = {
     label: "Compact length",
     explanation:
       "How long the car is, from FINN's measured length. A shorter car fits more parking spaces and garages. It isn't a measure of how the car handles.",
+  },
+  compactWidth: {
+    label: "Narrow width",
+    explanation:
+      "How wide the car is, from FINN's measured width. A narrower car fits tighter garages and parking bays and leaves more room to open the doors. FINN doesn't say whether the figure includes the mirrors.",
+  },
+  towingCapacity1500: {
+    label: "Tows 1,500 kg or more",
+    explanation:
+      "The car is rated to pull a braked trailer of at least 1,500 kg, enough for most small caravans. Read from FINN's towing figure, and only counted if you raise it.",
   },
   bootVolume: {
     label: "Boot space (seats up)",
@@ -600,8 +631,8 @@ type SignalId = keyof typeof SIGNALS;
  *   differences between them; a car FINN confirms is missing one loses what
  *   missing any Standard item here costs. Raisable, like any other item. Not
  *   explained to the reader: it is arithmetic, not a rule they need.
- * - `limit` — a figure that can only reduce the priority. Electric range under
- *   Long Distance is the one.
+ * - `limit`, `chargeLimit` — figures that can only reduce the priority. Electric
+ *   range and DC charging time, under Long Distance, are the only ones.
  */
 export const CATEGORIES = {
   safetyAssistance: {
@@ -638,9 +669,9 @@ export const CATEGORIES = {
     color: "#0D9488",
     question: "How easy is this car to park and fit into town life?",
     description:
-      "How long the car is, and the cameras that help you place it. A shorter car fits more spaces; cameras help when it doesn't. This isn't a verdict on how the car handles.",
+      "How long and wide the car is, and the cameras that help you place it. A smaller car fits more spaces; cameras help when it doesn't. An automatic gearbox is expected, for stop-and-go traffic. This isn't a verdict on how the car handles.",
     measured:
-      "The car's length, placed on a fixed scale: the shorter the car, the more of the scale it earns, whatever else you pinned",
+      "The car's length and width, each placed on a fixed scale: the smaller the car, the more of the scale it earns, whatever else you pinned",
     recommendedFor: [
       "City driving and street parking",
       "Tight garages and multi-storey car parks",
@@ -649,6 +680,7 @@ export const CATEGORIES = {
     numericOnly: false,
     features: [
       "compactLength",
+      "compactWidth",
       "hasOneEightyDegreesReversingCamera",
       "hasThreeSixtyDegreesCamera",
     ],
@@ -656,6 +688,7 @@ export const CATEGORIES = {
       "hasParkingSensors",
       "hasParkingAssistant",
       "hasElectricallyFoldingMirrors",
+      "hasAutomaticTransmission",
     ],
   },
 
@@ -666,7 +699,7 @@ export const CATEGORIES = {
     question:
       "Can you get people and things in and out, and carry what you need?",
     description:
-      "Doors for the back seats, a rear bench that folds, a tailgate that opens itself — and, if you raise them, a towbar, roof rails or room for six or more. Boot space isn't scored yet: FINN's figure sometimes means seats up and sometimes seats folded, and doesn't say which.",
+      "Doors for the back seats, a fifth seat, a rear bench that folds, a tailgate that opens itself — and, if you raise them, a towbar, a towing rating of 1,500 kg, roof rails or room for six or more. Boot space isn't scored yet: FINN's figure sometimes means seats up and sometimes seats folded, and doesn't say which.",
     recommendedFor: [
       "Families with children in car seats",
       "People carrying sports, work or holiday kit",
@@ -675,13 +708,15 @@ export const CATEGORIES = {
     numericOnly: false,
     features: [
       "rearDoors",
+      "seatsFivePlus",
       "hasSplitFoldingRearSeats",
       "hasElectricTailgate",
       "hasTowbar",
+      "towingCapacity1500",
       "hasRoofRails",
       "seatsSixPlus",
     ],
-    niche: ["hasTowbar", "hasRoofRails", "seatsSixPlus"],
+    niche: ["hasTowbar", "towingCapacity1500", "hasRoofRails", "seatsSixPlus"],
     expected: ["hasIsofix"],
   },
 
@@ -691,9 +726,9 @@ export const CATEGORIES = {
     color: "#D97706",
     question: "Would this be a good tool for regular long drives?",
     description:
-      "What takes the work out of hours on the motorway: level 2 driver assistance, lumbar support, a head-up display and matrix LED headlights. For an electric car a short range limits the result, and a long one doesn't raise it.",
+      "What takes the work out of hours on the motorway: level 2 driver assistance, lumbar support, a head-up display and matrix LED headlights. For an electric car a short range or slow DC charging limits the result, and a long range or fast charging doesn't raise it.",
     measured:
-      "Electric range, for electric cars only: below 480 km it limits how well the car can do here, and above that it makes no difference",
+      "Electric range and DC charging time, for electric cars only: a range below 480 km, or a 10–80% charge slower than 30 minutes, limits how well the car can do here, and beyond those they make no difference",
     recommendedFor: [
       "Regular long-distance drivers",
       "Motorway commuters",
@@ -709,6 +744,7 @@ export const CATEGORIES = {
     niche: ["hasSpareWheel"],
     alsoCounts: ["hasMatrixLedHeadlights"],
     limit: "evRange",
+    chargeLimit: "dcCharge",
     expected: [
       "hasCruiseControl",
       "hasAdaptiveCruiseControl",
@@ -723,7 +759,7 @@ export const CATEGORIES = {
     question:
       "Will you stay comfortable and see clearly in cold, heat and bad weather?",
     description:
-      "Equipment that only matters when the weather does: warming the car and you on a frozen morning, cooling you in August, and keeping your view clear in fog, rain and snow. It's about comfort and visibility in bad conditions — not how the car drives in them.",
+      "Equipment that only matters when the weather does: warming the car and you on a frozen morning, cooling you in August, keeping your view clear in fog, rain and snow — and, if you raise it, all-wheel drive for pulling away on snow and ice. For an electric car, a heat pump counts too. Beyond all-wheel drive, how the car drives in bad weather isn't in FINN's data.",
     recommendedFor: [
       "Winters cold enough to scrape the windscreen",
       "Summers spent in traffic with no shade",
@@ -739,7 +775,10 @@ export const CATEGORIES = {
       "hasFogLights",
       "hasAuxiliaryHeater",
       "hasHeadlightCleaningSystem",
+      "hasHeatPump",
+      "hasAllWheelDrive",
     ],
+    niche: ["hasAllWheelDrive"],
     expected: ["hasAirConditioning"],
   },
 
@@ -764,7 +803,7 @@ export const CATEGORIES = {
     color: "#DB2777",
     question: "How pleasant is it to sit in and use on an ordinary day?",
     description:
-      "The things you notice on an ordinary drive: seats you can adjust at the touch of a button, climate each passenger can set, keyless entry, and the phone and sound kit you use on every trip. It's the equipment FINN lists — how the car actually rides isn't in the data.",
+      "The things you notice on an ordinary drive: seats you can adjust at the touch of a button, climate each passenger can set, keyless entry, a glass roof, USB ports for the back seats, and the phone and sound kit you use on every trip. It's the equipment FINN lists — how the car actually rides isn't in the data.",
     recommendedFor: [
       "Drivers who spend long stretches in the car",
       "Anyone who shares the car with passengers",
@@ -777,6 +816,9 @@ export const CATEGORIES = {
       "hasPremiumSoundSystem",
       "hasThreeZoneAutomaticClimateControls",
       "hasElectricFrontSeatAdjustment",
+      "hasWirelessAppleCarPlaySlashAndroidAuto",
+      "hasSunroof",
+      "hasBackUSBPorts",
     ],
     expected: ["hasAppleCarPlaySlashAndroidAuto"],
   },
@@ -788,6 +830,7 @@ export const CATEGORIES = {
     niche?: SignalId[];
     alsoCounts?: SignalId[];
     expected?: FeatureId[];
+    chargeLimit?: "dcCharge";
   }
 >;
 
@@ -931,7 +974,7 @@ export const PROFILES = {
     assumes:
       "How little a long drive wears you out leads, then everyday comfort, with safety, carrying and weather behind.",
     doesNotGuarantee:
-      "Fast charging or real-world winter range, neither of which Lens scores.",
+      "Real-world winter range, which isn't in FINN's data, or charging speed for an electric car FINN lists no DC charging time for.",
     priorities: [
       "longDistance",
       "comfort",
@@ -1157,4 +1200,5 @@ export const DEFAULT_PREFERENCES: LensPreferences = {
   contractType: "private",
   rentalFrom: null,
   rentalTo: null,
+  automaticOnly: false,
 };

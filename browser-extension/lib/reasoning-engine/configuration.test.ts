@@ -74,9 +74,10 @@ describe("the seven priorities", () => {
     expect(def("practicality").features).not.toContain("bootVolume");
   });
 
-  it("marks towbar, roof rails, six seats and a spare wheel as counted only once raised", () => {
-    expect(def("practicality").niche).toEqual(["hasTowbar", "hasRoofRails", "seatsSixPlus"]);
+  it("marks towing, roof rails, six seats, a spare wheel and all-wheel drive as counted only once raised", () => {
+    expect(def("practicality").niche).toEqual(["hasTowbar", "towingCapacity1500", "hasRoofRails", "seatsSixPlus"]);
     expect(def("longDistance").niche).toEqual(["hasSpareWheel"]);
+    expect(def("climateSuitability").niche).toEqual(["hasAllWheelDrive"]);
 
     for (const id of CATEGORY_IDS) {
       for (const key of def(id).niche ?? []) expect(def(id).features).toContain(key);

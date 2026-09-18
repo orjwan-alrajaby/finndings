@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import * as Switch from "@radix-ui/react-switch";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 
 import { InfoTip } from "@/components/InfoTip";
@@ -10,7 +11,7 @@ import type {
     LensPreferences,
 } from "@/lib/reasoning-engine/types";
 
-type NumericField = Exclude<keyof LensPreferences, "contractType" | "rentalFrom" | "rentalTo">;
+type NumericField = Exclude<keyof LensPreferences, "contractType" | "rentalFrom" | "rentalTo" | "automaticOnly">;
 
 /**
  * What each driving figure is for, written from what the cost engine actually
@@ -38,6 +39,8 @@ export const DRIVING_EXPLANATIONS: Record<keyof LensPreferences, string> = {
         "When you need the car from and until. FINN rents on fixed terms — often 6, 12, 18 or 24 months — so Lens prices each car on the shortest term it offers that covers your whole period, and tells you if that commits you for longer. Like the budget it decides which cars can be recommended, never a car's score: a car with no term long enough, or that FINN can't deliver in your first month, only wins if nothing else fits. Optional.",
     rentalTo:
         "The last month you need the car for, included.",
+    automaticOnly:
+        "Turn this on if you can only drive an automatic — say your licence is limited to automatics, or you've never driven a manual. Like the budget it decides which cars can be recommended, never a car's score: a manual only wins if every car you pinned is one. Every car is still shown and explained. Nearly all of FINN's cars are automatics, so this rarely changes anything.",
 };
 
 /**
@@ -166,6 +169,15 @@ export function DrivingAssumptions({
                 </div>
 
                 <div className="sm:col-span-2">
+                    <AutomaticOnlyInput
+                        checked={preferences.automaticOnly}
+                        onChange={(automaticOnly) =>
+                            setPreferences({ ...preferences, automaticOnly })
+                        }
+                    />
+                </div>
+
+                <div className="sm:col-span-2">
                     <ContractTypeToggle
                         value={preferences.contractType}
                         onChange={(contractType) =>
@@ -270,6 +282,64 @@ export function RentalPeriodInput({
                         ? "Set both months to apply a period."
                         : "No particular period: each car is priced on FINN's default term, with nothing paid upfront."}
             </p>
+        </div>
+    );
+}
+
+/**
+ * Whether the reader can only drive an automatic.
+ *
+ * A switch rather than a two-way choice, because the off state isn't a
+ * preference for manuals — it's the absence of a rule.
+ */
+export function AutomaticOnlyInput({
+    checked,
+    onChange,
+    tone = "bg-finn-pale-blue",
+}: {
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    /** The field ground, which differs between the drawer and Settings. */
+    tone?: string;
+}) {
+    const id = useId();
+
+    return (
+        <div>
+            <FieldLabel
+                htmlFor={`${id}-switch`}
+                label="Automatics only"
+                explanation={DRIVING_EXPLANATIONS.automaticOnly}
+            />
+
+            <div className={`mt-1 flex min-h-11 items-center justify-between gap-3 rounded-2xl ${tone} px-3 py-2 shadow-sm`}>
+                <span id={`${id}-state`} className="text-[11px] leading-4 text-finn-iron">
+                    {checked
+                        ? "Lens only recommends a manual car if nothing you pinned is an automatic."
+                        : "Manual and automatic cars can both be recommended."}
+                </span>
+
+                <Switch.Root
+                    id={`${id}-switch`}
+                    checked={checked}
+                    onCheckedChange={onChange}
+                    aria-describedby={`${id}-state`}
+                    className={[
+                        "relative h-5 w-10 flex-shrink-0 rounded-full p-1 transition-colors",
+                        "data-[state=checked]:bg-finn-accent-blue",
+                        "data-[state=unchecked]:border data-[state=unchecked]:border-finn-iron/15",
+                        "data-[state=unchecked]:bg-finn-iron/40",
+                    ].join(" ")}
+                >
+                    <Switch.Thumb
+                        className={[
+                            "absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow",
+                            "transition-[left] duration-200 ease-in-out",
+                            "data-[state=checked]:left-6 data-[state=unchecked]:left-1",
+                        ].join(" ")}
+                    />
+                </Switch.Root>
+            </div>
         </div>
     );
 }

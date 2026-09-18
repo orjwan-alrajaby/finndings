@@ -4,6 +4,9 @@ import {
   extractDcChargeMinutes,
   extractDriverAssistanceLevel,
   extractFeatures,
+  extractTowingCapacityKg,
+  extractTyres,
+  extractUnansweredFeatures,
 } from "./helpers";
 import type { FinnApiConfig } from "./types";
 import { fleet } from "./reasoning-engine/test-data/fleet";
@@ -32,6 +35,38 @@ describe("reading FINN's equipment entries", () => {
     expect(extractDriverAssistanceLevel(config({}))).toBeNull();
   });
 
+  it("reads FINN's \"Ja (Kabellos)\" as wireless CarPlay, and false as none", () => {
+    const key = "Apple CarPlay / Android Auto (Wireless)";
+
+    expect(extractFeatures(config({ [key]: "Ja (Kabellos)" })).hasWirelessAppleCarPlaySlashAndroidAuto).toBe(true);
+    expect(extractFeatures(config({ [key]: false })).hasWirelessAppleCarPlaySlashAndroidAuto).toBe(false);
+    expect(extractUnansweredFeatures(config({ Sitzheizung: true }))).toContain("hasWirelessAppleCarPlaySlashAndroidAuto");
+  });
+
+  it("reads the gearbox and drive type from FINN's structured fields", () => {
+    const automatic = extractFeatures(config({}, { gearshift: "Automatik", config_drive: "Allrad" }));
+    const manual = extractFeatures(config({}, { gearshift: "Manuell", config_drive: "Frontantrieb" }));
+
+    expect([automatic.hasAutomaticTransmission, automatic.hasAllWheelDrive]).toEqual([true, true]);
+    expect([manual.hasAutomaticTransmission, manual.hasAllWheelDrive]).toEqual([false, false]);
+    expect(extractUnansweredFeatures(config({ Sitzheizung: true }))).toEqual(
+      expect.arrayContaining(["hasAutomaticTransmission", "hasAllWheelDrive"]),
+    );
+  });
+
+  it("reads the towing rating in kilograms", () => {
+    expect(extractTowingCapacityKg(config({ Anhängerlast: "1800 kg" }))).toBe(1800);
+    expect(extractTowingCapacityKg(config({ Anhängerlast: "1.300 kg" }))).toBe(1300);
+    expect(extractTowingCapacityKg(config({}))).toBeNull();
+  });
+
+  it("reads the tyre setup, and nothing else, as one", () => {
+    expect(extractTyres(config({}, { tires: "all_season" }))).toBe("allSeason");
+    expect(extractTyres(config({}, { tires: "summer_winter" }))).toBe("summerAndWinter");
+    expect(extractTyres(config({}, { tires: "winter" }))).toBeNull();
+    expect(extractTyres(config({}))).toBeNull();
+  });
+
   it("reads DC charging time in minutes", () => {
     expect(extractDcChargeMinutes(config({ "Ladezeit DC (10–80%)": "26 Min." }))).toBe(26);
     expect(extractDcChargeMinutes(config({ "Ladezeit DC (10–80%)": "0 Min." }))).toBeNull();
@@ -54,7 +89,13 @@ describe("the mapper over FINN's inventory snapshot", () => {
   /* FINN sends a list for every car in the snapshot, and each list is taken as sent. */
   it("reads every car's equipment list as supplied, including all-false ones", () => {
     expect(cars.every((car) => car.featuresSupplied)).toBe(true);
-    expect(cars.some((car) => !Object.values(car.features).some(Boolean))).toBe(true);
+    /* The gearbox and drive type are stated fields, not entries in the list. */
+    const listed = (car: (typeof cars)[number]) =>
+      Object.entries(car.features)
+        .filter(([key]) => key !== "hasAutomaticTransmission" && key !== "hasAllWheelDrive")
+        .map(([, value]) => value);
+
+    expect(cars.some((car) => !listed(car).some(Boolean))).toBe(true);
   });
 
   it("gives every car a length", () => {

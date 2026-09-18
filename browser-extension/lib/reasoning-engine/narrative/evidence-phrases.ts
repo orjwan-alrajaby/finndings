@@ -6,7 +6,7 @@ import type {
 } from "../types";
 
 import { CATEGORIES } from "../constants";
-import { isDerivedSignal } from "../evidence";
+import { isStatedFact } from "../evidence";
 import { featureLabel, featurePhrase } from "../scoring";
 import { joinCapped, phraseLabel } from "./phrase";
 
@@ -18,7 +18,8 @@ import { joinCapped, phraseLabel } from "./phrase";
  * every BMW is legally required to carry eCall, and FINN lists it on fewer
  * than a fifth of them — so the honest claim is about the listing. The derived
  * signals are different: the number of doors is a structured field, and a
- * three-door car genuinely has no rear doors.
+ * three-door car genuinely has no rear doors. So are the gearbox and the drive
+ * type — a car FINN lists as manual has a manual gearbox.
  */
 
 const lowerFirst = (text: string): string =>
@@ -29,8 +30,16 @@ export function absentClause(key: SignalId, subject = "it"): string {
   switch (key) {
     case "rearDoors":
       return `${subject} has no rear doors`;
+    case "seatsFivePlus":
+      return `${subject} has fewer than five seats`;
     case "seatsSixPlus":
       return `${subject} has fewer than six seats`;
+    case "towingCapacity1500":
+      return `${subject} is rated to tow less than 1,500 kg`;
+    case "hasAutomaticTransmission":
+      return `${subject} has a manual gearbox`;
+    case "hasAllWheelDrive":
+      return `${subject} doesn't have all-wheel drive`;
     case "driverAssistLevel2":
       return `FINN lists only level 1 driver assistance for ${subject}`;
     default:
@@ -46,8 +55,16 @@ export function absentPronounClause(key: SignalId): string {
   switch (key) {
     case "rearDoors":
       return "this car has no rear doors";
+    case "seatsFivePlus":
+      return "this car has fewer than five seats";
     case "seatsSixPlus":
       return "this car has fewer than six seats";
+    case "towingCapacity1500":
+      return "this car is rated to tow less";
+    case "hasAutomaticTransmission":
+      return "this car has a manual gearbox";
+    case "hasAllWheelDrive":
+      return "this car doesn't have it";
     case "driverAssistLevel2":
       return "FINN lists only level 1 for this car";
     default:
@@ -60,8 +77,8 @@ export function absentPronounClause(key: SignalId): string {
  * doesn't say "FINN doesn't list" three times.
  */
 export function absentList(keys: SignalId[], max = 5, subject = "it"): string {
-  const listed = keys.filter((key) => !isDerivedSignal(key));
-  const derived = keys.filter((key) => isDerivedSignal(key));
+  const listed = keys.filter((key) => !isStatedFact(key));
+  const derived = keys.filter((key) => isStatedFact(key));
 
   const parts = [
     ...(listed.length
@@ -78,8 +95,17 @@ export function unknownPhrase(key: SignalId): string {
   switch (key) {
     case "rearDoors":
       return "how many doors it has";
+    case "seatsFivePlus":
     case "seatsSixPlus":
       return "how many seats it has";
+    case "towingCapacity1500":
+      return "how much it can tow";
+    case "hasAutomaticTransmission":
+      return "which gearbox it has";
+    case "hasAllWheelDrive":
+      return "which wheels it drives";
+    case "compactWidth":
+      return "its width";
     case "driverAssistLevel2":
       return "its driver assistance level";
     case "compactLength":

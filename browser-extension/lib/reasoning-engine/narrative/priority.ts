@@ -210,7 +210,7 @@ function measurementPhrase(fact: MeasurementFact): string {
     case LOAD_VOLUME:
       return `a load volume of ${fact.display} as FINN lists it, without saying whether that's with the rear seats folded`;
     case DC_CHARGING:
-      return `DC charging from 10 to 80% in ${formatNumber(fact.value, 0)} minutes, which Lens shows but doesn't score`;
+      return `DC charging from 10 to 80% in ${formatNumber(fact.value, 0)} minutes`;
     case "Doors":
       return `${fact.display} doors`;
     case "Boot space":
@@ -273,7 +273,15 @@ function describeSupportingMeasurements(
  * does. Named against the rival only when the two genuinely differ.
  */
 function describeDrivetrain(traits: TraitFact[]): string | null {
-  const [drivetrain] = traits;
+  const tyres = traits.find((trait) => trait.label === "Tyres");
+
+  if (tyres) {
+    return tyres.rival
+      ? sentence(`FINN fits it with ${tyres.value}, and ${tyres.rival.name} with ${tyres.rival.value} — Lens shows this but doesn't score it`)
+      : sentence(`FINN fits it with ${tyres.value}, which Lens shows but doesn't score`);
+  }
+
+  const drivetrain = traits.find((trait) => trait.label === "Drivetrain");
   if (!drivetrain) return null;
 
   const value = drivetrain.value.toLowerCase();
@@ -437,6 +445,28 @@ function describeRangeLimit(breakdown: PriorityBreakdown): string | null {
 }
 
 /**
+ * An electric car's DC charging time under Long Distance, when FINN lists one:
+ * said when it limited the result, and said to make no difference when it
+ * didn't.
+ */
+function describeChargeLimit(breakdown: PriorityBreakdown): string | null {
+  const factor = breakdown.chargeFactor;
+  const minutes = breakdown.chargeMinutes;
+
+  if (factor == null || minutes == null) return null;
+
+  return factor < 1
+    ? sentence(
+        `Its ${formatNumber(minutes, 0)}-minute charge from 10 to 80% limits this priority: slower than 30 minutes`,
+        "Lens reduces the Long Distance result, because each stop takes longer",
+      )
+    : sentence(
+        `Its ${formatNumber(minutes, 0)}-minute charge from 10 to 80% doesn't limit this priority —`,
+        "at 30 minutes or less, charging time makes no difference here",
+      );
+}
+
+/**
  * What FINN's data didn't answer inside a priority that was still judged.
  *
  * Standard equipment FINN's list leaves out isn't said here: every surface
@@ -530,6 +560,7 @@ export function reasonAboutPriority(
               )),
 
           describeRangeLimit(breakdown),
+          describeChargeLimit(breakdown),
           describeGaps(breakdown),
 
           describeStanding(

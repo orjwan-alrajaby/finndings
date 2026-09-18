@@ -10,6 +10,8 @@ import {
   extractDriveType,
   extractDriverAssistanceLevel,
   extractDcChargeMinutes,
+  extractTowingCapacityKg,
+  extractTyres,
 } from "@/lib/helpers";
 import { germanToEnglish } from "@/lib/translate";
 
@@ -91,6 +93,8 @@ function mapFinnConfig(config: FinnApiConfig): FinnCar {
     unansweredFeatures: extractUnansweredFeatures(config),
     driverAssistanceLevel: extractDriverAssistanceLevel(config),
     dcChargeMinutes: isElectric ? extractDcChargeMinutes(config) : null,
+    towingCapacityKg: extractTowingCapacityKg(config),
+    tyres: extractTyres(config),
 
     dimensions: {
       length: config.vehicle_size.length_mm,

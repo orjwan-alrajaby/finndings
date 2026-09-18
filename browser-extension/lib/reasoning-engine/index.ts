@@ -183,6 +183,31 @@ export function buildReasoningContext(
     ranked,
     budget: partitionByBudget(vehicles, costs, preferences),
     rental: partitionByRental(vehicles, costs),
+    gearbox: partitionByGearbox(vehicles, preferences),
+  };
+}
+
+/**
+ * Splits vehicles by whether the reader can drive them, keeping all of them.
+ * Without `automaticOnly` every car fits.
+ */
+function partitionByGearbox(
+  vehicles: PinnedFinnCar[],
+  preferences: LensPreferences,
+): ReasoningContext["gearbox"] {
+  const required = preferences.automaticOnly === true;
+  const statusOf = (vehicle: PinnedFinnCar) =>
+    !required || vehicle.transmission === "Automatic"
+      ? "fits"
+      : vehicle.transmission === "Manual"
+        ? "doesNotFit"
+        : "unknown";
+
+  return {
+    required,
+    fits: vehicles.filter((vehicle) => statusOf(vehicle) === "fits"),
+    doesNotFit: vehicles.filter((vehicle) => statusOf(vehicle) === "doesNotFit"),
+    unknown: vehicles.filter((vehicle) => statusOf(vehicle) === "unknown"),
   };
 }
 
@@ -322,6 +347,8 @@ function priorityBreakdown(
     missingLabels,
     numeric: detail.numeric,
     tripFactor: detail.tripFactor,
+    chargeFactor: detail.chargeFactor,
+    chargeMinutes: detail.chargeMinutes,
     environmental: detail.environmental ?? null,
     hasEvidence: detail.hasEvidence,
     leader,
@@ -829,6 +856,7 @@ export function recommendFrom(
           : rentalTier(context.costs[winner.id]?.contract.status ?? "unknown") === 1
             ? "unconfirmed"
             : null,
+    gearboxFallback: gearboxFallbackFor(context, winner),
     alternatives,
     evidenceFallback: !winnerScore.judgeable,
     runnerUp,
@@ -840,6 +868,20 @@ export function recommendFrom(
     }),
     context,
   };
+}
+
+/** Whether the winner breaks the reader's automatic-only rule, and why. */
+function gearboxFallbackFor(
+  context: ReasoningContext,
+  winner: PinnedFinnCar,
+): Recommendation["gearboxFallback"] {
+  const { gearbox } = context;
+
+  if (!gearbox.required) return null;
+  if (gearbox.doesNotFit.some((car) => car.id === winner.id)) return "noneFit";
+  if (gearbox.unknown.some((car) => car.id === winner.id)) return "unconfirmed";
+
+  return null;
 }
 
 /**
@@ -1190,6 +1232,7 @@ export function migratePreferences(
     stored.rentalTo >= stored.rentalFrom
       ? { rentalFrom: stored.rentalFrom, rentalTo: stored.rentalTo }
       : { rentalFrom: null, rentalTo: null }),
+    automaticOnly: stored.automaticOnly === true,
   };
 }
 

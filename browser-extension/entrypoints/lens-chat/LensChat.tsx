@@ -102,6 +102,9 @@ const STARTERS = [
     "I do a lot of motorway driving.",
 ];
 
+/** The model's prose, or nothing: a reply is not guaranteed to come back. */
+const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+
 const WHY = /^\s*why\s+(this|that|the)\s+(car|one)\s*\??\s*$|^\s*why\s*\??\s*$/i;
 
 export function LensChat() {
@@ -363,7 +366,7 @@ export function LensChat() {
             if (result.kind === "answer" && !current.run && result.understanding) result.kind = "understanding";
 
             if (result.kind === "answer" || !result.understanding) {
-                say(result.reply);
+                say(text(result.reply));
                 setOpenQuestion(readQuestion(result.question, answered.current, current.scopes[current.kind].cars) ?? (result.kind === "answer" ? current.openQuestion : null));
                 if (suggested) switchScope(suggested);
                 return;
