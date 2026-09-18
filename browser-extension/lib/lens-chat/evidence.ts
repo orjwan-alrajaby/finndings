@@ -22,6 +22,12 @@ import type { FinnCar } from "@/lib/types";
  */
 export type EvidenceId = SignalId | "electricRange" | "suvBody" | "winterReadyTyres";
 
+/** Where Lens's own label would claim more than FINN's field says. */
+const RELABEL: Partial<Record<EvidenceId, string>> = {
+    /* The engine's label reads "Boot space (seats up)", which FINN never states. */
+    bootVolume: "Boot space",
+};
+
 /** Evidence Lens reads but never scores, with the reason it isn't scored. */
 const READ_ONLY: Partial<Record<EvidenceId, string>> = {
     /* FINN's single boot figure is sometimes seats-up and sometimes seats-folded. */
@@ -75,7 +81,7 @@ export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
                     id,
                     {
                         id,
-                        label: SIGNALS[id].label,
+                        label: RELABEL[id] ?? SIGNALS[id].label,
                         explanation: readOnly ?? SIGNALS[id].explanation,
                         scoredIn: readOnly ? null : home.category,
                         raisable: readOnly ? false : home.raisable,
