@@ -183,6 +183,8 @@ export function UnderstandingCard({
 }) {
     const [showDetail, setShowDetail] = useState(false);
     const missing = missingEssentials(u);
+    /* What this turn opened with, so "my answers" counts answers and not facts. */
+    const [asked] = useState(() => missingEssentials(u));
     /* Half a period is not a period, so the fields hold their own state. */
     const [period, setPeriod] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
 
@@ -205,6 +207,9 @@ export function UnderstandingCard({
     const heard = heardLines(u);
     const active = u.needs.filter((need) => need.status === "active");
     const asks = Boolean(missing.budget || missing.period || question || suggestions.length);
+    /* Everything Lens asked goes back in one message, so nothing is answered into the void. */
+    const waiting = Boolean(missing.budget || missing.period || suggestions.length);
+    const answersToSend = [asked.budget && !missing.budget, asked.period && !missing.period, picked].filter(Boolean).length;
     const hasSomething = u.budget || u.rental || active.length || u.droppedPriorities.length;
 
     return (
@@ -251,34 +256,39 @@ export function UnderstandingCard({
                     <Detail understanding={u} translation={translation} cars={cars} scopeLabel={scopeLabel} />
                 )}
 
+                {/*
+                  * The comparison is the end of the conversation, not something
+                  * that happens beside it. While Lens still has questions the
+                  * card says so and offers nothing but a correction; once they
+                  * are answered it asks for the go-ahead in as many words.
+                  */}
                 <div className="border-t border-finn-cotton bg-finn-snow px-4 py-3">
                     {status === "applied" ? (
                         <p className="flex items-center gap-1.5 text-xs font-bold text-finn-influence-emerald">
                             <Check aria-hidden="true" className="h-3.5 w-3.5" />
                             Compared with this.
                         </p>
-                    ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                            {picked ? (
-                                /*
-                                 * Answered here, sent once. Sending the moment a
-                                 * chip is tapped replaced this card — and with it
-                                 * everything else Lens had asked — before the
-                                 * reader could answer the rest.
-                                 */
-                                <SmallButton tone="solid" onClick={() => onAnswer(picked)} disabled={busy}>
-                                    <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
-                                    Send my answer
-                                </SmallButton>
-                            ) : hasSomething ? (
-                                <SmallButton tone="solid" onClick={onCompare} disabled={busy}>
-                                    <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-                                    {isUpdate ? "Update the comparison" : "Compare these cars"}
-                                </SmallButton>
-                            ) : null}
+                    ) : asks ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs leading-5 text-finn-iron">Answer what's below and Lens will compare.</p>
                             <SmallButton onClick={onCorrect} disabled={busy}>
                                 Not quite
                             </SmallButton>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {hasSomething && <p className="text-xs font-black leading-5 text-finn-black">Have I got this right?</p>}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {hasSomething && (
+                                    <SmallButton tone="solid" onClick={onCompare} disabled={busy}>
+                                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                                        {isUpdate ? "Yes, update the comparison" : "Yes, compare these cars"}
+                                    </SmallButton>
+                                )}
+                                <SmallButton onClick={onCorrect} disabled={busy}>
+                                    Not quite
+                                </SmallButton>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -292,7 +302,7 @@ export function UnderstandingCard({
             {asks && status === "pending" && (
                 <section className="space-y-2 rounded-[20px] bg-finn-pale-blue px-4 py-3.5">
                     <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
-                        {question?.blocking ? "Before I compare" : "A couple of things"}
+                        Before I compare
                     </p>
 
                     {missing.budget && (
@@ -361,7 +371,37 @@ export function UnderstandingCard({
                                     />
                                 ))}
                             </ul>
+
+                            {suggestions.length > 1 && (
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => suggestions.forEach((item) => onDeclineSuggestion(item.id))}
+                                    className="mt-2 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
+                                >
+                                    None of these matter to me
+                                </button>
+                            )}
                         </Ask>
+                    )}
+
+                    {/*
+                      * The answer goes back from where it was given. This used
+                      * to sit in the card above, so the reader chose an option
+                      * and then had to scroll back up to send it.
+                      */}
+                    {question && (
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                            <SmallButton tone="solid" onClick={() => picked && onAnswer(picked)} disabled={busy || !picked || waiting}>
+                                <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+                                {answersToSend > 1 ? "Send my answers" : "Send my answer"}
+                            </SmallButton>
+                            {!picked ? (
+                                <p className="text-[11px] leading-4 text-finn-iron">Pick an answer, or type one below.</p>
+                            ) : waiting ? (
+                                <p className="text-[11px] leading-4 text-finn-iron">There's still something above to answer.</p>
+                            ) : null}
+                        </div>
                     )}
                 </section>
             )}

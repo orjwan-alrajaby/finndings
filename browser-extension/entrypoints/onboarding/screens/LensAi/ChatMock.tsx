@@ -8,7 +8,7 @@ import { DEMO_MESSAGE, DEMO_QUESTION, DEMO_REPLY, DEMO_SUGGESTIONS, type DemoCon
 
 import { BrandDisc } from "../Tour/parts";
 
-export type ChatStage = "closed" | "listening" | "understood" | "fit";
+export type ChatStage = "closed" | "listening" | "understood" | "answered" | "fit";
 
 const NO_ACTIONS: CarActions = {
     pinnedIds: new Set(),
@@ -76,9 +76,12 @@ export function ChatMock({
     useEffect(() => {
         if (stage === "closed") return;
 
-        const target = { listening: message, understood: understanding, fit: fit }[stage].current;
+        const target = { listening: message, understood: understanding, answered: understanding, fit: fit }[stage].current;
 
-        if (body.current && target) body.current.scrollTop = target.offsetTop - 12;
+        if (!body.current || !target) return;
+
+        /* The confirmation is the end of the card, so that's what this step is about. */
+        body.current.scrollTop = stage === "answered" ? body.current.scrollHeight : target.offsetTop - 12;
     }, [stage]);
 
     /*
@@ -124,7 +127,7 @@ export function ChatMock({
                 {stage !== "listening" && (
                     <div ref={understanding}>
                         <UnderstandingCard
-                            understanding={demo.understanding}
+                            understanding={stage === "understood" ? demo.understanding : demo.answered}
                             translation={demo.translation}
                             reply={DEMO_REPLY}
                             question={stage === "understood" ? DEMO_QUESTION : null}

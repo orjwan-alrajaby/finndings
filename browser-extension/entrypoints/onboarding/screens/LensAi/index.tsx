@@ -121,11 +121,26 @@ export function LensAi({
                         content: (
                             <>
                                 Your limits, what the car has to do for you, and the equipment FINN lists that could help —
-                                with how many cars here have it. When one answer would change the pick, it asks. Nothing
-                                happens until you say compare.
+                                with how many cars here have it. When one answer would change the pick, it asks — and waits
+                                for your answer before it compares anything.
                             </>
                         ),
                         onShow: () => show("understood"),
+                    },
+                    {
+                        id: "answered",
+                        target: panel,
+                        placement: "left-start",
+                        spotlightPadding: SPOTLIGHT_PADDING,
+                        title: "You answer, then you say go",
+                        content: (
+                            <>
+                                Lens waits: no cars are compared while it still has a question open. Once you've answered,
+                                it shows what it understood one more time and asks you to confirm — or tell it what it got
+                                wrong.
+                            </>
+                        ),
+                        onShow: () => show("answered"),
                     },
                     {
                         id: "fit",

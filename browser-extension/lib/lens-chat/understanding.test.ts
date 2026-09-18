@@ -13,9 +13,12 @@ import {
     diffUnderstanding,
     EMPTY_UNDERSTANDING,
     type Understanding,
+    missingEssentials,
     readQuestion,
     readUnderstanding,
     toAnswers,
+    withBudget,
+    withRental,
 } from "./understanding";
 
 /*
@@ -166,8 +169,8 @@ describe("reading an understanding", () => {
     it("never asks a question that was already answered", () => {
         const answered = [{ question: "How old are your children?", answer: "1 and 4" }];
 
-        expect(readQuestion({ ask: "How old are your children?", why: "", options: [], blocking: true }, answered)).toBeNull();
-        expect(readQuestion({ ask: "What part of driving makes you most nervous?", why: "", options: ["Parking"], blocking: false }, answered)?.options).toEqual(["Parking"]);
+        expect(readQuestion({ ask: "How old are your children?", why: "", options: [] }, answered)).toBeNull();
+        expect(readQuestion({ ask: "What part of driving makes you most nervous?", why: "", options: ["Parking"] }, answered)?.options).toEqual(["Parking"]);
     });
 
     it("doesn't ask what no answer could change: evidence every car here has", () => {
@@ -176,8 +179,8 @@ describe("reading an understanding", () => {
             garageCar({ id: 2, extra: ["hasIsofix", "hasBlindSpotAssist"] }),
             garageCar({ id: 3, extra: ["hasIsofix"] }),
         ];
-        const ages = { ask: "How old is your child?", why: "", options: [], blocking: false, affects: ["hasIsofix"] };
-        const nerves = { ask: "What makes you nervous?", why: "", options: [], blocking: false, affects: ["hasIsofix", "hasBlindSpotAssist"] };
+        const ages = { ask: "How old is your child?", why: "", options: [], affects: ["hasIsofix"] };
+        const nerves = { ask: "What makes you nervous?", why: "", options: [], affects: ["hasIsofix", "hasBlindSpotAssist"] };
 
         expect(readQuestion(ages, [], cars)).toBeNull();
         expect(readQuestion(nerves, [], cars)?.ask).toBe("What makes you nervous?");
@@ -423,5 +426,70 @@ describe("quoting FINN's own words", () => {
 
         expect(quotesAreFinns(reply, sources).reply).toBe("");
         expect(quotesAreFinns(reply, sources).dropped).toEqual(["Beheizbare Windschutzscheibe"]);
+    });
+});
+
+/*
+ * Lens waits for an answer before it compares, so "no limit" and "no fixed
+ * dates" have to count as answers. If they read as silence, the question comes
+ * back every turn and the reader never reaches a recommendation.
+ */
+describe("the two things Lens asks for itself", () => {
+    it("asks for both when neither was given", () => {
+        expect(missingEssentials(EMPTY_UNDERSTANDING)).toEqual({ budget: true, period: true });
+    });
+
+    it("stops asking once a figure is given", () => {
+        const u = withBudget(EMPTY_UNDERSTANDING, 600, "you said up to €600 a month");
+
+        expect(missingEssentials(u).budget).toBe(false);
+        expect(u.budget?.monthly).toBe(600);
+    });
+
+    it("treats no limit as an answer, not as silence", () => {
+        const u = withBudget(EMPTY_UNDERSTANDING, null, "you said you have no limit in mind");
+
+        expect(u.budget).toBeNull();
+        expect(missingEssentials(u).budget).toBe(false);
+    });
+
+    it("treats no fixed dates as an answer too", () => {
+        const u = withRental(EMPTY_UNDERSTANDING, null, null, "you have no fixed dates");
+
+        expect(u.rental).toBeNull();
+        expect(missingEssentials(u).period).toBe(false);
+    });
+
+    it("asks again when they clear a figure they had given", () => {
+        const given = withBudget(EMPTY_UNDERSTANDING, 600, "you said up to €600 a month");
+        const cleared = readUnderstanding(wire({ cleared: ["budget"] }), given, undefined, "2026-09");
+
+        expect(missingEssentials(cleared).budget).toBe(true);
+    });
+
+    it("keeps the waiver across a turn that says nothing about money", () => {
+        const waived = withBudget(EMPTY_UNDERSTANDING, null, "you said you have no limit in mind");
+        const later = readUnderstanding(wire({ tension: "Something else entirely." }), waived, undefined, "2026-09");
+
+        expect(missingEssentials(later).budget).toBe(false);
+    });
+
+    it("drops the waiver when they name a figure after all", () => {
+        const waived = withBudget(EMPTY_UNDERSTANDING, null, "you said you have no limit in mind");
+        const later = readUnderstanding(
+            wire({ budget: { kind: "hardMax", monthly: 500, said: "actually, no more than 500" } }),
+            waived,
+            undefined,
+            "2026-09",
+        );
+
+        expect(later.waived).toEqual([]);
+        expect(missingEssentials(later).budget).toBe(false);
+    });
+
+    it("reads a session stored before Lens kept waivers", () => {
+        const old = { ...EMPTY_UNDERSTANDING, waived: undefined } as unknown as Understanding;
+
+        expect(missingEssentials(old)).toEqual({ budget: true, period: true });
     });
 });

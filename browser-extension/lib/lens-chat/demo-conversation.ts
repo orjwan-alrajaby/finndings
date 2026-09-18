@@ -6,7 +6,15 @@ import type { PinnedFinnCar } from "@/lib/types";
 import { tellFitStory, type FitStory } from "./fit-story";
 import type { EvidenceId } from "./evidence";
 import { alternativesWithinLimits, runLens, summariseMatch, type CarLine, type LensRun, type MatchSummary } from "./run";
-import { EMPTY_UNDERSTANDING, readUnderstanding, toAnswers, type Translation, type Understanding } from "./understanding";
+import {
+    EMPTY_UNDERSTANDING,
+    readUnderstanding,
+    toAnswers,
+    withRental,
+    withSuggestion,
+    type Translation,
+    type Understanding,
+} from "./understanding";
 
 /**
  * One Ask Lens conversation, for the setup flow to show before anyone has a key.
@@ -72,7 +80,6 @@ export const DEMO_QUESTION: WireQuestion = {
     ask: "Where do you usually park?",
     why: "tight garages and street parking call for different help",
     options: ["On the street", "A tight garage", "A car park"],
-    blocking: false,
     affects: ["hasThreeSixtyDegreesCamera", "hasParkingAssistant"],
 };
 
@@ -84,6 +91,8 @@ export const DEMO_SUGGESTIONS: { id: EvidenceId; why: string; needId: string }[]
 export interface DemoConversation {
     cars: PinnedFinnCar[];
     understanding: Understanding;
+    /** The same reading once the reader has answered what Lens asked. */
+    answered: Understanding;
     translation: Translation;
     run: LensRun | null;
     story: FitStory | null;
@@ -101,6 +110,13 @@ export function demoConversation(base: Answers): DemoConversation {
     return {
         cars,
         understanding,
+        /* Setup shows the whole loop: Lens asks, they answer, then they say go. */
+        answered: withSuggestion(
+            withRental(understanding, null, null, "you have no fixed dates"),
+            DEMO_SUGGESTIONS[0]!.id,
+            DEMO_SUGGESTIONS[0]!.why,
+            DEMO_SUGGESTIONS[0]!.needId,
+        ),
         translation,
         run,
         story: run ? tellFitStory(run, understanding, translation.lessRelevant, null) : null,

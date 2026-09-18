@@ -66,6 +66,12 @@ export interface Understanding {
      * they said it, and seeing it listed is how they know it was heard.
      */
     notModelled: { said: string; stance: "wants" | "doesntCare"; explanation: string }[];
+    /**
+     * Essentials the reader was asked for and chose not to give. Lens waits
+     * for an answer before it compares, and "no limit" is an answer — without
+     * this it looks exactly like silence, and the question comes back forever.
+     */
+    waived: ("budget" | "rental")[];
 }
 
 export const EMPTY_UNDERSTANDING: Understanding = {
@@ -79,6 +85,7 @@ export const EMPTY_UNDERSTANDING: Understanding = {
     declined: [],
     tension: "",
     notModelled: [],
+    waived: [],
 };
 
 export const isEmptyUnderstanding = (u: Understanding): boolean =>
@@ -336,6 +343,11 @@ export function readUnderstanding(
         declined: [...new Set([...listOf<unknown>(wire.declined).filter(isEvidenceId), ...previous.declined])],
         tension: typeof wire.tension === "string" ? text(wire.tension, 200) : previous.tension,
         notModelled,
+        /*
+         * The reader's own answer, not the model's: a turn that sets a budget
+         * takes the waiver off it, and anything else leaves it as it was.
+         */
+        waived: (previous.waived ?? []).filter((part) => (part === "budget" ? !budget : !rental)),
     };
 }
 
@@ -378,21 +390,37 @@ export function readSuggestions(
  * answering a different question from the one the reader is asking. Lens asks
  * for them itself rather than spending the model's one question on it.
  */
-export const missingEssentials = (u: Understanding): { budget: boolean; period: boolean } => ({
-    budget: u.budget == null,
-    period: u.rental == null,
-});
+export const missingEssentials = (u: Understanding): { budget: boolean; period: boolean } => {
+    /* Sessions written before Lens kept this come back without it. */
+    const waived = u.waived ?? [];
+
+    return {
+        budget: u.budget == null && !waived.includes("budget"),
+        period: u.rental == null && !waived.includes("rental"),
+    };
+};
+
+const waiving = (u: Understanding, part: "budget" | "rental", waived: boolean): ("budget" | "rental")[] => {
+    const kept = (u.waived ?? []).filter((item) => item !== part);
+
+    return waived ? [...kept, part] : kept;
+};
 
 /** Months the reader picked from the chat, without a model turn. */
-export const withRental = (u: Understanding, from: string | null, to: string | null, said: string): Understanding => ({
-    ...u,
-    rental: from && to && isMonthString(from) && isMonthString(to) && monthsInclusive(from, to) >= 1 ? { from, to, startDay: null, said } : null,
-});
+export const withRental = (u: Understanding, from: string | null, to: string | null, said: string): Understanding => {
+    const rental =
+        from && to && isMonthString(from) && isMonthString(to) && monthsInclusive(from, to) >= 1
+            ? { from, to, startDay: null, said }
+            : null;
+
+    return { ...u, rental, waived: waiving(u, "rental", rental == null) };
+};
 
 /** A monthly maximum the reader picked from the chat, without a model turn. */
 export const withBudget = (u: Understanding, monthly: number | null, said: string): Understanding => ({
     ...u,
     budget: monthly == null ? null : { kind: "hardMax", monthly, stretchTo: null, said },
+    waived: waiving(u, "budget", monthly == null),
 });
 
 /** The reader said yes: the equipment joins the need it was offered for. */
@@ -457,7 +485,6 @@ export function readQuestion(
             .map((option) => text(option, 40))
             .filter(Boolean)
             .slice(0, 4),
-        blocking: Boolean(wire?.blocking),
         affects,
     };
 }

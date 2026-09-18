@@ -255,8 +255,6 @@ export interface WireQuestion {
     why: string;
     /** Up to four short tap-to-answer options. */
     options: string[];
-    /** True when comparing before the answer would likely give the wrong recommendation. */
-    blocking: boolean;
     /** Evidence ids whose use depends on the answer; empty when it bears on something else. */
     affects: string[];
 }

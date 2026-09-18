@@ -237,7 +237,6 @@ export function converseSchema(
                 ask: { type: "string" },
                 why: { type: "string" },
                 options: { type: "array", items: { type: "string" } },
-                blocking: { type: "boolean" },
                 affects: { type: "array", items: evidence },
             }),
         ),
