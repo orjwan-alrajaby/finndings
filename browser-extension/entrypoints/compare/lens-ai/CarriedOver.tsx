@@ -6,10 +6,12 @@ import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { asPhrase, ruleLabel } from "@/lib/lens-chat/evidence";
 import {
     clearSession,
+    loadSavedSearches,
     loadSession,
     nameFor,
     saveSearch,
     type LensSession,
+    type SavedSearch,
 } from "@/lib/lens-chat/session";
 
 import { useCompareStore } from "../store";
@@ -28,14 +30,18 @@ import { useCompareStore } from "../store";
  */
 export function CarriedOver() {
     const [session, setSession] = useState<LensSession | null>(null);
+    const [searches, setSearches] = useState<SavedSearch[]>([]);
+    const [used, setUsed] = useState<string | null>(null);
     const [state, setState] = useState<"offered" | "using" | "saved">("offered");
     const applyAnswers = useCompareStore((store) => store.applyAnswers);
 
     useEffect(() => {
         void loadSession().then(setSession);
+        void loadSavedSearches().then(setSearches);
     }, []);
 
-    if (!session) return null;
+    /* Nothing from a conversation to offer, but perhaps one they kept. */
+    if (!session) return searches.length ? <Kept searches={searches} used={used} onUse={(search) => { applyAnswers(search.answers, "session"); setUsed(search.id); }} /> : null;
 
     const budget = session.answers.preferences.monthlyBudget;
     const when = session.at ? new Date(session.at) : null;
@@ -132,6 +138,60 @@ export function CarriedOver() {
                 {session.rules.some((rule) => rule.mode === "without")
                     ? `, and ${session.rules.filter((rule) => rule.mode === "without").map((rule) => `cars FINN files as ${asPhrase(rule.id)}`).join(" and ")} are set aside here as they were in the chat.`
                     : "."}
+            </p>
+        </section>
+    );
+}
+
+/**
+ * Searches the reader kept, for coming back to one.
+ *
+ * A search is a conversation they had: the note is what it was about, which is
+ * the only thing that makes one recognisable weeks later. Using one changes
+ * this page and nothing else.
+ */
+function Kept({
+    searches,
+    used,
+    onUse,
+}: {
+    searches: SavedSearch[];
+    used: string | null;
+    onUse: (search: SavedSearch) => void;
+}) {
+    return (
+        <section className="finn-lens-screen-only mb-4 rounded-[22px] bg-white p-4 ring-1 ring-finn-cotton">
+            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
+                <Save aria-hidden="true" className="h-3.5 w-3.5" />
+                Searches you kept
+            </p>
+
+            <ul className="mt-2 space-y-1.5">
+                {searches.slice(0, 4).map((search) => (
+                    <li key={search.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-finn-snow px-3 py-2">
+                        <span className="min-w-0">
+                            <span className="block text-xs font-black text-finn-black">{search.name}</span>
+                            {search.note && <span className="block text-[11px] leading-4 text-finn-iron">{search.note}</span>}
+                        </span>
+
+                        {used === search.id ? (
+                            <span className="text-[11px] font-bold text-finn-influence-emerald">In use on this page</span>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => onUse(search)}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-finn-accent-blue ring-1 ring-finn-cotton transition hover:bg-finn-pale-blue"
+                            >
+                                <ArrowRight aria-hidden="true" className="h-3 w-3" />
+                                Use it
+                            </button>
+                        )}
+                    </li>
+                ))}
+            </ul>
+
+            <p className="mt-2 text-[11px] leading-4 text-finn-iron">
+                Each one is a conversation you had with Lens. Using one applies it to this page; your saved settings stay as they are.
             </p>
         </section>
     );
