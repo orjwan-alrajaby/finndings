@@ -154,8 +154,12 @@ export function createGeminiAdapter({
         const message = error.message ?? "";
 
         if (error.status === 404) {
-            /* Not offered to this key: no point asking again this run. */
-            restingUntil.set(model, Number.POSITIVE_INFINITY);
+            /*
+             * Not offered to this key. Remembered for a month rather than
+             * forever, so a key that gains the model later isn't shut out —
+             * and so it's a finite number the storage record can hold.
+             */
+            restingUntil.set(model, Date.now() + 30 * 24 * 60 * 60_000);
         } else if (error.status === 429) {
             /* A daily quota resets on Google's clock; an hour is a cheap, safe guess. */
             const wait = limitKind(error) === "daily" ? 60 * 60_000 : Math.max(retryAfter(message), 5) * 1000;
@@ -190,7 +194,13 @@ export function createGeminiAdapter({
         const candidates = awake();
         let response;
         let served = candidates[0]!;
-        /* What the last model refused with — the one the reader is waiting on. */
+        /*
+         * What the chain refused with, kept across the whole walk. The last
+         * model's error alone misleads: a key that isn't offered the oldest
+         * model ends every rate-limited turn on its 404, and the reader was
+         * told none of Lens's models were available to them when the truth
+         * was that the rest were busy.
+         */
         let quota: "daily" | "minute" | null = null;
 
         try {
@@ -229,7 +239,7 @@ export function createGeminiAdapter({
             if (error instanceof ApiError) {
                 log.error(route, `API error ${error.status}`, error.message);
 
-                if (error.status === 429) {
+                if (error.status === 429 || quota) {
                     throw new AdapterError(
                         quota === "daily"
                             ? "Lens AI has used today's free Gemini requests. They reset daily — everything else in Lens still works."
