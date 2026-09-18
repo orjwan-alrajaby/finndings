@@ -3,7 +3,7 @@ import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 
 import { asPhrase } from "./evidence";
 import type { FitStory } from "./fit-story";
-import { budgetCeiling, ruledOut, type Understanding } from "./understanding";
+import { ruledOut, type Understanding } from "./understanding";
 
 /**
  * What Lens understood, and what it found, in sentences.
@@ -26,6 +26,23 @@ const join = (parts: string[]): string => {
     if (kept.length === 2) return `${kept[0]} and ${kept[1]}`;
 
     return `${kept.slice(0, -1).join(", ")} and ${kept.at(-1)}`;
+};
+
+/**
+ * The same list, without the pile-up of "and"s.
+ *
+ * Need labels are phrases with their own conjunctions — "getting a child seat
+ * in and out", "knowing what's beside and behind you" — and joining two of
+ * them with another "and" reads as one run-on thought. When any of them has an
+ * "and" of its own, commas do the joining and the phrases keep their wording;
+ * splitting them up instead gave "getting a child seat in, out".
+ */
+const joinLabels = (parts: string[]): string => {
+    const kept = parts.filter(Boolean).filter((part, index, all) => all.indexOf(part) === index);
+
+    if (kept.length > 1 && kept.some((part) => /\sand\s/.test(part))) return kept.join(", ");
+
+    return join(kept);
 };
 
 const lower = (value: string): string =>
@@ -51,14 +68,19 @@ export function heardLines(u: Understanding): HeardLines {
     const limits: string[] = [];
 
     if (u.budget) {
-        const ceiling = budgetCeiling(u.budget);
-
+        /*
+         * What they said, not what Lens does with it. The headroom Lens allows
+         * itself on a target it was never given a stretch for is a rule of the
+         * engine's, and reading it back as though they had said it — "around
+         * €600 a month, and no further than €690" — put a number in their
+         * mouth and ran the line on. Where it matters, the answer says it.
+         */
         limits.push(
             u.budget.kind === "hardMax"
-                ? `up to ${formatEUR(u.budget.monthly)} a month, all in`
+                ? `up to ${formatEUR(u.budget.monthly)} a month all in`
                 : u.budget.stretchTo
                   ? `around ${formatEUR(u.budget.monthly)} a month, ${formatEUR(u.budget.stretchTo)} at a stretch`
-                  : `around ${formatEUR(u.budget.monthly)} a month, and no further than ${formatEUR(ceiling)}`,
+                  : `around ${formatEUR(u.budget.monthly)} a month`,
         );
     }
 
@@ -76,11 +98,11 @@ export function heardLines(u: Understanding): HeardLines {
     ].filter((item, index, all) => all.indexOf(item) === index);
 
     return {
-        situation: join(u.context.map((item) => lower(item.label))),
+        situation: joinLabels(u.context.map((item) => lower(item.label))),
         limits: join(limits),
-        lookingFor: join(active.map((need) => lower(need.label))),
-        notChasing: join(notChasing),
-        cantJudge: join(u.notModelled.filter((item) => item.stance !== "doesntCare").map((item) => lower(item.said))),
+        lookingFor: joinLabels(active.map((need) => lower(need.label))),
+        notChasing: joinLabels(notChasing),
+        cantJudge: joinLabels(u.notModelled.filter((item) => item.stance !== "doesntCare").map((item) => lower(item.said))),
     };
 }
 
@@ -97,10 +119,30 @@ export function matchSentence(story: FitStory): string {
     const partly = story.sections.filter((section) => section.kind === "need" && section.tone === "note");
     const money = story.sections.find((section) => section.kind === "budget");
 
-    const needs = join([...covered, ...partly].slice(0, 3).map((section) => lower(section.short)));
-    const opening = needs ? `Covers ${needs}` : "The closest Lens can get to what you described";
+    const labels = [...covered, ...partly].slice(0, 3).map((section) => lower(section.short));
+    /*
+     * "I don't want anything big" comes back as a need called "Nothing big",
+     * and a sentence that opens "Covers nothing big" says the opposite of what
+     * the car does. What they ruled out is stated as something the car avoids.
+     */
+    const avoided = labels.filter((label) => /^(nothing|no)\s/.test(label));
+    const wanted = labels.filter((label) => !avoided.includes(label));
+
+    const needs = joinLabels(wanted);
+    const away = joinLabels(avoided.map((label) => label.replace(/^nothing\s/, "anything ").replace(/^no\s/, "")));
+
+    const opening = needs && away
+        ? `Covers ${needs}, and avoids ${away}`
+        : needs
+          ? `Covers ${needs}`
+          : away
+            ? `Avoids ${away}`
+            : "The closest Lens can get to what you described";
 
     if (!money) return `${opening}.`;
 
-    return money.tone === "good" ? `${opening}, within what you wanted to spend.` : `${opening} — but not what you wanted to spend.`;
+    /* A list that already has commas in it can't take another one. */
+    const before = opening.includes(",") ? " — " : ", ";
+
+    return money.tone === "good" ? `${opening}${before}within what you wanted to spend.` : `${opening} — but not what you wanted to spend.`;
 }

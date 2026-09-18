@@ -106,6 +106,26 @@ const scoredHome = (id: EvidenceId): CategoryId | null =>
     EVIDENCE[id].raisable ? EVIDENCE[id].scoredIn : null;
 
 /**
+ * Words that name a subject rather than describe a life.
+ *
+ * A label built only from these — "Family setup", "Driving routine", "City
+ * commuting" — is a filing category, and reading it back to someone tells them
+ * nothing they didn't just say.
+ */
+const TOPIC_WORDS = new Set([
+    "arrangement", "budget", "car", "cars", "circumstances", "city", "commute", "commuting", "context", "daily",
+    "driving", "family", "general", "habits", "lifestyle", "needs", "overall", "plans", "preferences", "profile",
+    "requirements", "routine", "setup", "situation", "transport", "travel", "trips", "usage", "use", "weekend",
+    "weekends",
+]);
+
+const isTopicName = (label: string): boolean => {
+    const words = label.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+
+    return words.length > 0 && words.length <= 3 && words.every((word) => TOPIC_WORDS.has(word));
+};
+
+/**
  * The model's understanding, kept only where it holds up, merged over the
  * previous one.
  *
@@ -257,7 +277,19 @@ export function readUnderstanding(
 
     const context = [
         ...listOf<{ label: string; said: string }>(wire.context)
-            .map((item) => ({ label: text(item?.label, 60), said: text(item?.said, 200) }))
+            .map((item) => {
+                const label = text(item?.label, 60);
+                const said = text(item?.said, 200);
+
+                /*
+                 * A reader reads this back as "You: …", so it has to be their
+                 * life and not the name of a subject. When a label comes back
+                 * as "Family setup", their own sentence is the better line —
+                 * and if that won't fit either, nothing is better than a
+                 * heading.
+                 */
+                return { label: isTopicName(label) ? (said.length <= 60 ? said : "") : label, said };
+            })
             .filter((item) => item.label),
         ...previous.context,
     ].filter((item, index, all) => all.findIndex((other) => other.label.toLowerCase() === item.label.toLowerCase()) === index);

@@ -816,47 +816,57 @@ export function LensChat() {
                                     );
 
                                 case "saveOffer":
+                                    /*
+                                     * Stacked, not side by side: the sentence and
+                                     * two buttons on one row left the sentence a
+                                     * word wide on a phone.
+                                     */
                                     return (
-                                        <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-white px-3 py-2.5">
-                                            <p className="min-w-0 flex-1 text-[11px] leading-4 text-finn-iron">
+                                        <div key={entry.id} className="rounded-2xl bg-white px-3 py-2.5">
+                                            <p className="text-[11px] leading-4 text-finn-iron">
                                                 {entry.saved
                                                     ? "Kept. It's on the recommendation page too, and your saved settings are as they were."
-                                                    : "This applies to this conversation, and carries over to the recommendation page. Your saved Lens settings haven't changed."}
+                                                    : "This search carries over to the recommendation page on its own. Your saved Lens settings haven't changed."}
                                             </p>
-                                            {!entry.saved && applied && run && (
-                                                <SmallButton
-                                                    onClick={() => {
-                                                        const session = sessionFrom(applied, scope, kind, run);
 
-                                                        void saveSearch({
-                                                            ...session,
-                                                            id: `search-${Date.now()}`,
-                                                            name: nameFor(session),
-                                                            note: [session.summary, ...session.focus.map((item) => item.label)].filter(Boolean).join(" · "),
-                                                        });
-                                                        update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
-                                                    }}
-                                                >
-                                                    <Save aria-hidden="true" className="h-3.5 w-3.5" />
-                                                    Keep this search
-                                                </SmallButton>
-                                            )}
                                             {!entry.saved && (
-                                                <SmallButton
-                                                    onClick={async () => {
-                                                        if (!applied) return;
-                                                        await saveLensSettings({
-                                                            priorities: applied.translation.answers.priorities,
-                                                            preferences: applied.translation.answers.preferences,
-                                                            categoryFeatures: applied.translation.answers.features,
-                                                            basedOn: null,
-                                                        });
-                                                        update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
-                                                    }}
-                                                >
-                                                    <Save aria-hidden="true" className="h-3.5 w-3.5" />
-                                                    Save as my settings
-                                                </SmallButton>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {applied && run && (
+                                                        <SmallButton
+                                                            onClick={() => {
+                                                                const session = sessionFrom(applied, scope, kind, run);
+
+                                                                void saveSearch({
+                                                                    ...session,
+                                                                    id: `search-${Date.now()}`,
+                                                                    name: nameFor(session),
+                                                                    note: [session.summary, ...session.focus.map((item) => item.label)].filter(Boolean).join(" · "),
+                                                                });
+                                                                update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
+                                                            }}
+                                                        >
+                                                            <Save aria-hidden="true" className="h-3.5 w-3.5" />
+                                                            Keep this search
+                                                        </SmallButton>
+                                                    )}
+
+                                                    <SmallButton
+                                                        onClick={async () => {
+                                                            if (!applied) return;
+
+                                                            await saveLensSettings({
+                                                                priorities: applied.translation.answers.priorities,
+                                                                preferences: applied.translation.answers.preferences,
+                                                                categoryFeatures: applied.translation.answers.features,
+                                                                basedOn: null,
+                                                            });
+                                                            update(entry.id, (item) => (item.kind === "saveOffer" ? { ...item, saved: true } : item));
+                                                        }}
+                                                    >
+                                                        <Save aria-hidden="true" className="h-3.5 w-3.5" />
+                                                        Save as my settings
+                                                    </SmallButton>
+                                                </div>
                                             )}
                                         </div>
                                     );

@@ -344,23 +344,25 @@ export function UnderstandingCard({
                         </Ask>
                     )}
 
-                    {suggestions.map((item) => (
+                    {suggestions.length > 0 && (
                         <Ask
-                            key={item.id}
-                            title={`Shall I look for ${lowerLabel(item.id)}?`}
-                            note={plainly(item.id)}
-                            hint={item.why ? sentenceCase(item.why) : ""}
+                            title={suggestions.length === 1 ? "One thing you didn't mention" : "A few things you didn't mention"}
+                            note="Lens can check these on every car. You never asked for them, so it won't unless you say so."
                         >
-                            <div className="flex flex-wrap gap-1.5">
-                                <Chip onClick={() => onAcceptSuggestion(item.id)} disabled={busy}>
-                                    Yes, count it
-                                </Chip>
-                                <Chip quiet onClick={() => onDeclineSuggestion(item.id)} disabled={busy}>
-                                    Not important to me
-                                </Chip>
-                            </div>
+                            <ul className="space-y-2.5">
+                                {suggestions.map((item) => (
+                                    <SuggestionRow
+                                        key={item.id}
+                                        id={item.id}
+                                        why={item.why}
+                                        busy={busy}
+                                        onAccept={() => onAcceptSuggestion(item.id)}
+                                        onDecline={() => onDeclineSuggestion(item.id)}
+                                    />
+                                ))}
+                            </ul>
                         </Ask>
-                    ))}
+                    )}
                 </section>
             )}
         </div>
@@ -422,6 +424,64 @@ function Chip({
             {chosen && <Check aria-hidden="true" className="h-3 w-3" />}
             {children}
         </button>
+    );
+}
+
+/**
+ * One piece of equipment Lens noticed and the reader never asked for.
+ *
+ * Each of these used to be its own card, with what the feature is and why it
+ * might matter to this reader stacked one under the other — three suggestions
+ * filled a phone screen and read as a form rather than an offer. The reason
+ * that is about them stays visible; the general explanation waits behind the
+ * name for anyone who hasn't met the feature before.
+ */
+function SuggestionRow({
+    id,
+    why,
+    busy,
+    onAccept,
+    onDecline,
+}: {
+    id: EvidenceId;
+    why: string;
+    busy: boolean;
+    onAccept: () => void;
+    onDecline: () => void;
+}) {
+    const [showWhat, setShowWhat] = useState(false);
+    const general = plainly(id);
+    /* With no reason of its own, the explanation is the reason. */
+    const reason = why ? sentenceCase(why) : general;
+
+    return (
+        <li className="border-t border-finn-cotton pt-2.5 first:border-0 first:pt-0">
+            {why ? (
+                <button
+                    type="button"
+                    onClick={() => setShowWhat((was) => !was)}
+                    aria-expanded={showWhat}
+                    className="text-left text-xs font-black leading-5 text-finn-black underline decoration-finn-cotton decoration-dotted underline-offset-2"
+                >
+                    {sentenceCase(lowerLabel(id)).replace(/\.$/, "")}
+                </button>
+            ) : (
+                <p className="text-xs font-black leading-5 text-finn-black">{sentenceCase(lowerLabel(id)).replace(/\.$/, "")}</p>
+            )}
+
+            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">{reason}</p>
+
+            {showWhat && <p className="mt-1 text-[11px] leading-4 text-finn-iron">{general}</p>}
+
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <Chip onClick={onAccept} disabled={busy}>
+                    Count it
+                </Chip>
+                <Chip quiet onClick={onDecline} disabled={busy}>
+                    Not important to me
+                </Chip>
+            </div>
+        </li>
     );
 }
 
@@ -505,7 +565,6 @@ function Detail({
     );
 }
 
-/** The amounts most readers pick, and the wording Lens keeps for each. */
 /** The amounts most readers pick, offered before anyone types one. */
 const BUDGET_CHOICES = [400, 500, 600, 750];
 
@@ -658,6 +717,14 @@ export function FitCard({
     const [showChecked, setShowChecked] = useState(false);
     const { car } = match;
     const pinned = actions.pinnedIds.has(car.id);
+    /*
+     * The obvious question when the best match costs more than they said they
+     * would spend: then why not the cheaper one? Lens ranks on everything they
+     * asked for, so it owes them the answer here rather than in a follow-up.
+     */
+    const withinInstead = car.budget === "over"
+        ? alternatives.find((alt) => alt.budget === "within" && alt.rental !== "doesNotFit") ?? null
+        : null;
 
     return (
         <section className="overflow-hidden rounded-[22px] bg-finn-pale-blue">
@@ -733,16 +800,20 @@ export function FitCard({
             {alternatives.length > 0 && (
                 <div className="bg-white px-4 py-3">
                     <Label>Other options</Label>
-                    {alternatives.every((alt) => alt.budget === "over" || alt.rental === "doesNotFit") && (
+                    {withinInstead ? (
+                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
+                            {withinInstead.name} is the best Lens found within your limit.
+                        </p>
+                    ) : alternatives.every((alt) => alt.budget === "over" || alt.rental === "doesNotFit") ? (
                         <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">Nothing else here fits your limits — these are the closest.</p>
-                    )}
+                    ) : null}
                     <ul className="mt-1.5 divide-y divide-finn-cotton">
                         {alternatives.map((alt) => (
                             <li key={alt.id} className="flex items-center justify-between gap-2 py-1.5">
                                 <span className="min-w-0 truncate text-xs font-black text-finn-black">{alt.name}</span>
                                 <span className="flex shrink-0 items-center gap-1.5">
                                     <span className="text-[10px] font-bold text-finn-iron">
-                                        ~{formatEUR(alt.monthly)}/mo{alt.budget === "over" ? " · over your limit" : alt.rental === "doesNotFit" ? " · wrong dates" : ""}
+                                        ~{formatEUR(alt.monthly)}/mo{alt.budget === "over" ? " · over your limit" : alt.rental === "doesNotFit" ? " · wrong dates" : alt.id === withinInstead?.id ? " · within your limit" : ""}
                                     </span>
                                     <BandChip car={alt} />
                                 </span>
