@@ -7,7 +7,26 @@ import { carLabel } from "@/lib/lens-ai/outcome";
 import type { PinnedFinnCar } from "@/lib/types";
 
 import { EVIDENCE, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
+
+/** How a measured figure is introduced, and what to say when FINN has none. */
+const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
+    compactLength: "It's",
+    compactWidth: "It's",
+    bootVolume: "It has",
+    electricRange: "It has",
+};
+
+/** Said next to the figure, because FINN's own field is ambiguous. */
+const MEASURED_CAVEAT: Partial<Record<EvidenceId, string>> = {
+    bootVolume: "FINN doesn't say whether that's with the rear seats up or folded.",
+};
+
+const MEASURED_UNKNOWN: Partial<Record<EvidenceId, string>> = {
+    bootVolume: "FINN doesn't publish a boot figure for this car.",
+    electricRange: "It isn't electric, so FINN publishes no range for it.",
+};
 import type { LensRun } from "./run";
+import { budgetCeiling } from "./understanding";
 import type { Need, Understanding } from "./understanding";
 
 /**
@@ -92,11 +111,22 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }
     const state = readEvidence(car, entry.id);
     const measured = measuredDisplay(car, entry.id);
 
+    /*
+     * A figure FINN publishes is worth quoting whichever way it falls: "4.68 m
+     * long" is the honest answer for a car that isn't small, where "FINN
+     * doesn't list compact length" would read as missing data.
+     */
     if (measured) {
         return {
             tone: state === "listed" ? "good" : "note",
-            text: sentence(`It's ${measured}${state === "listed" && entry.use ? ` — ${entry.use}` : ""}`),
+            text:
+                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${state === "listed" && entry.use ? ` — ${entry.use}` : ""}`) +
+                (MEASURED_CAVEAT[entry.id] ? ` ${MEASURED_CAVEAT[entry.id]}` : ""),
         };
+    }
+
+    if (state === "unknown" && MEASURED_LEAD[entry.id]) {
+        return { tone: "unknown", text: MEASURED_UNKNOWN[entry.id]! };
     }
 
     if (state === "listed") {
@@ -160,12 +190,26 @@ export function tellFitStory(
                 });
             }
         } else {
+            /*
+             * A soft figure still draws a line — see `budgetCeiling`. Saying
+             * where it was drawn is the difference between "you said around
+             * €600" and a €1,353 car turning up as the answer.
+             */
             const gap = monthly - u.budget.monthly;
-            tone = gap > 0 ? "note" : "good";
-            title = gap > 0 ? `It's a little above the ${formatEUR(u.budget.monthly)} you mentioned` : `It's within the ${formatEUR(u.budget.monthly)} you mentioned`;
+            const ceiling = budgetCeiling(u.budget);
+            const beyond = monthly > ceiling;
+
+            tone = beyond ? "missing" : gap > 0 ? "note" : "good";
+            title = beyond
+                ? `Nothing here comes near the ${formatEUR(u.budget.monthly)} you mentioned`
+                : gap > 0
+                  ? `A little above the ${formatEUR(u.budget.monthly)} you mentioned`
+                  : `Within the ${formatEUR(u.budget.monthly)} you mentioned`;
             lines.push({
                 tone,
-                text: `About ${formatEUR(monthly)}/month${Math.abs(gap) >= 1 ? ` — ${formatEUR(Math.abs(gap))} ${gap > 0 ? "above" : "below"} it` : ""}. You didn't call it a hard limit, so it didn't rule any car out.`,
+                text: beyond
+                    ? `The closest match costs about ${formatEUR(monthly)}/month — ${formatEUR(gap)} above it. Lens stretched to ${formatEUR(ceiling)} for a figure you called a target, and nothing here fits even that.`
+                    : `About ${formatEUR(monthly)}/month${Math.abs(gap) >= 1 ? ` — ${formatEUR(Math.abs(gap))} ${gap > 0 ? "above" : "below"} it` : ""}. You called it a figure to aim at rather than a limit, so Lens looked at cars up to about ${formatEUR(ceiling)} and no further.`,
             });
         }
 
@@ -251,8 +295,8 @@ export function tellFitStory(
             lines.push({
                 tone: "unknown",
                 text: related
-                    ? `FINN has no information on ${need.notInData}, so I'm not assuming it has one — the above is what could still help.`
-                    : `FINN has no information on ${need.notInData}, so I'm not assuming this car has it.`,
+                    ? `FINN doesn't publish ${need.notInData}, so Lens can't check that part — what's above is what it can.`
+                    : `FINN doesn't publish ${need.notInData}, so Lens has no way to tell you about that part.`,
             });
         }
 
@@ -346,7 +390,9 @@ export function tellFitStory(
 
     /* -- The label ------------------------------------------------------- */
 
+    /* A target is a line too, so the eyebrow names it — in the words the reader used. */
     const hardBudget = u.budget?.kind === "hardMax" ? u.budget.monthly : null;
+    const nearBudget = u.budget?.kind === "target" ? u.budget.monthly : null;
 
     const eyebrow = single
         ? "How this car fits what you described"
@@ -356,8 +402,12 @@ export function tellFitStory(
           ? "Closest match — nothing here fits your dates"
           : recommendation.isFallback && hardBudget != null
             ? `Closest match — nothing here stays within ${formatEUR(hardBudget)}`
-            : hardBudget != null
-              ? `Strongest match within your ${formatEUR(hardBudget)} limit`
+            : recommendation.isFallback && nearBudget != null
+              ? `Closest match — nothing here comes near ${formatEUR(nearBudget)}`
+              : hardBudget != null
+                ? `Strongest match within your ${formatEUR(hardBudget)} limit`
+                : nearBudget != null
+                  ? `Strongest match near your ${formatEUR(nearBudget)}`
               : "Strongest match for what you described";
 
     return {
