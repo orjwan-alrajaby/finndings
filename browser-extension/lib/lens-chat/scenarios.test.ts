@@ -474,3 +474,37 @@ describe("the catch, when the car has what they didn't want", () => {
         expect(story.catch?.text ?? "").not.toMatch(/doesn't list level 2 driver assistance/i);
     });
 });
+
+describe("a budget with a stretch the reader named", () => {
+    const withStretch = (stretchTo: number | null) => ({
+        ...scenario("small-car-long-trips").reading,
+        budget: { kind: "target" as const, monthly: 400, stretchTo, said: "€400, maybe €425 if it's really worth it" },
+    });
+
+    it("looks no further than the figure they gave", () => {
+        const understanding = readUnderstanding(withStretch(425), EMPTY_UNDERSTANDING, undefined, "2026-09");
+
+        expect(understanding.budget?.stretchTo).toBe(425);
+        expect(toAnswers(base(), understanding).answers.preferences.monthlyBudget).toBe(425);
+    });
+
+    it("falls back to its own headroom only when they don't name one", () => {
+        const understanding = readUnderstanding(withStretch(null), EMPTY_UNDERSTANDING, undefined, "2026-09");
+
+        expect(toAnswers(base(), understanding).answers.preferences.monthlyBudget).toBe(460);
+    });
+
+    it("ignores a stretch that isn't a stretch", () => {
+        expect(readUnderstanding(withStretch(300), EMPTY_UNDERSTANDING, undefined, "2026-09").budget?.stretchTo).toBeNull();
+        expect(readUnderstanding(withStretch(4000), EMPTY_UNDERSTANDING, undefined, "2026-09").budget?.stretchTo).toBeNull();
+    });
+
+    it("says where the line came from", () => {
+        const understanding = readUnderstanding(withStretch(425), EMPTY_UNDERSTANDING, undefined, "2026-09");
+        const translation = toAnswers(base(), understanding);
+        const run = runLens(cars, translation.answers, "page", "page")!;
+        const story = tellFitStory(run, understanding, translation.lessRelevant, null);
+
+        expect(story.sections[0]?.lines[0]?.text).toMatch(/You said you could stretch to €425, so Lens looked no further/);
+    });
+});

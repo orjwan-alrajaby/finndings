@@ -48,7 +48,7 @@ export interface Need {
 }
 
 export interface Understanding {
-    budget: { kind: "hardMax" | "target"; monthly: number; said: string } | null;
+    budget: { kind: "hardMax" | "target"; monthly: number; stretchTo: number | null; said: string } | null;
     rental: { from: string; to: string; startDay: number | null; said: string } | null;
     monthlyKm: { value: number; said: string } | null;
     needs: Need[];
@@ -125,9 +125,13 @@ export function readUnderstanding(
         const monthly = Math.round(wire.budget.monthly);
 
         if (monthly > 0 && monthly <= 10_000) {
+            const stretch = Math.round(Number(wire.budget.stretchTo));
+
             budget = {
                 kind: wire.budget.kind === "target" ? "target" : "hardMax",
                 monthly,
+                /* Only a stretch above the figure itself, and never a fantasy one. */
+                stretchTo: Number.isFinite(stretch) && stretch > monthly && stretch <= monthly * 2 ? stretch : null,
                 said: text(wire.budget.said, 160),
             };
         }
@@ -563,17 +567,20 @@ const RANK_FEATURE: Record<FeatureImportance, number> = { high: 3, medium: 2, lo
 const euros = (value: number) => `€${value.toLocaleString("en-GB")}`;
 
 /**
- * How far above a soft figure Lens will still look.
+ * How far above a soft figure Lens will still look, when the reader doesn't
+ * say.
  *
  * "Around €600, a bit more for a good reason" is not "no limit": ignoring it
  * put a €1,353 car in front of someone who said €600. A target is held to a
  * little headroom instead, and the fit story says where the line was drawn.
+ * Where they name the stretch themselves — "€400, maybe €425" — that figure
+ * is the line, because a guess has no business overriding what they said.
  */
 export const TARGET_HEADROOM = 1.15;
 
 /** The most Lens will let a car cost, given what the person said about money. */
 export const budgetCeiling = (budget: NonNullable<Understanding["budget"]>): number =>
-    budget.kind === "hardMax" ? budget.monthly : Math.round(budget.monthly * TARGET_HEADROOM);
+    budget.stretchTo ?? (budget.kind === "hardMax" ? budget.monthly : Math.round(budget.monthly * TARGET_HEADROOM));
 
 export function budgetText(budget: Understanding["budget"]): string {
     if (!budget) return "No limit";

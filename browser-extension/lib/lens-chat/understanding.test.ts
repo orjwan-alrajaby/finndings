@@ -343,7 +343,7 @@ describe("saying back only what the person said", () => {
 
     const understood = (): Understanding => ({
         ...EMPTY_UNDERSTANDING,
-        budget: { kind: "hardMax", monthly: 500, said: "€500 and no more" },
+        budget: { kind: "hardMax", monthly: 500, stretchTo: null, said: "€500 and no more" },
         rental: { from: "2026-10", to: "2027-04", startDay: 8, said: "8 October until April" },
         context: [
             { label: "Two young children", said: "you have 2 young children" },

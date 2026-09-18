@@ -226,7 +226,11 @@ export function tellFitStory(
                 tone,
                 text: beyond
                     ? `The closest match costs about ${formatEUR(monthly)}/month — ${formatEUR(gap)} above it. Lens stretched to ${formatEUR(ceiling)} for a figure you called a target, and nothing here fits even that.`
-                    : `About ${formatEUR(monthly)}/month${Math.abs(gap) >= 1 ? ` — ${formatEUR(Math.abs(gap))} ${gap > 0 ? "above" : "below"} it` : ""}. You called it a figure to aim at rather than a limit, so Lens looked at cars up to about ${formatEUR(ceiling)} and no further.`,
+                    : `About ${formatEUR(monthly)}/month${Math.abs(gap) >= 1 ? ` — ${formatEUR(Math.abs(gap))} ${gap > 0 ? "above" : "below"} it` : ""}. ${
+                          u.budget.stretchTo
+                              ? `You said you could stretch to ${formatEUR(u.budget.stretchTo)}, so Lens looked no further than that.`
+                              : `You called it a figure to aim at rather than a limit, so Lens looked at cars up to about ${formatEUR(ceiling)} and no further.`
+                      }`,
             });
         }
 

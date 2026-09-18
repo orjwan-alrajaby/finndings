@@ -228,7 +228,7 @@ export interface WireNeed {
 }
 
 export interface WireUnderstanding {
-    budget: { kind: "hardMax" | "target"; monthly: number; said: string } | null;
+    budget: { kind: "hardMax" | "target"; monthly: number; stretchTo?: number | null; said: string } | null;
     rental: { from: string; to: string; startDay: number | null; said: string } | null;
     monthlyKm: { value: number; said: string } | null;
     needs: WireNeed[];

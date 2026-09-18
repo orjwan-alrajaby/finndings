@@ -138,6 +138,11 @@ export function converseSchema(
             object({
                 kind: { type: "string", enum: ["hardMax", "target"] },
                 monthly: { type: "number" },
+                stretchTo: nullable({
+                    type: "number",
+                    description:
+                        "The most they'd stretch to, when they name it — 'I can pay €400, maybe €425' is monthly 400 and stretchTo 425. Lens looks no further than this figure.",
+                }),
                 said,
             }),
         ),

@@ -24,7 +24,7 @@ import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { asPhrase, coverage, EVIDENCE, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
-import { ruledOut } from "@/lib/lens-chat/understanding";
+import { budgetCeiling, ruledOut } from "@/lib/lens-chat/understanding";
 import type { Need, Translation, Understanding } from "@/lib/lens-chat/understanding";
 import type { PinnedFinnCar } from "@/lib/types";
 
@@ -208,12 +208,14 @@ export function UnderstandingCard({
                                 <p className="text-sm font-black">
                                     {u.budget.kind === "hardMax"
                                         ? `${formatEUR(u.budget.monthly)}/month — a hard maximum`
-                                        : `Around ${formatEUR(u.budget.monthly)}/month — a target, not a limit`}
+                                        : u.budget.stretchTo
+                                          ? `Around ${formatEUR(u.budget.monthly)}/month — ${formatEUR(u.budget.stretchTo)} at a stretch`
+                                          : `Around ${formatEUR(u.budget.monthly)}/month — a target, not a limit`}
                                 </p>
                                 <p className="text-[11px] leading-4 text-finn-iron">
                                     {u.budget.kind === "hardMax"
                                         ? "Cars Lens estimates above it won't be recommended."
-                                        : "It won't rule cars out; Lens will say how each compares."}
+                                        : `Lens looks no further than ${formatEUR(budgetCeiling(u.budget))} a month.`}
                                 </p>
                             </div>
                         </div>
