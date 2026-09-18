@@ -248,14 +248,14 @@ export function UnderstandingCard({
                                     {need.evidence
                                         .filter((entry) => !lessRelevant.has(entry.id))
                                         .map((entry) => (
-                                            <EvidenceChip key={entry.id} id={entry.id} cars={cars} />
+                                            <EvidenceChip key={entry.id} id={entry.id} use={entry.use} cars={cars} />
                                         ))}
                                 </div>
                             )}
 
                             {need.notInData && (
                                 <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                                    FINN has no data on {need.notInData}, so I won't assume any car has it.
+                                    FINN doesn't publish {need.notInData}, so Lens can't check that part.
                                 </p>
                             )}
                         </div>
@@ -356,12 +356,19 @@ export function UnderstandingCard({
     );
 }
 
-function EvidenceChip({ id, cars }: { id: EvidenceId; cars: PinnedFinnCar[] }) {
+/**
+ * One thing Lens can check, and how common it is here.
+ *
+ * The label is equipment's own name, which is no help to someone who says
+ * they don't know cars — so what the model said it would do for *them* is
+ * what the chip explains on hover, with Lens's description behind it.
+ */
+function EvidenceChip({ id, use, cars }: { id: EvidenceId; use?: string; cars: PinnedFinnCar[] }) {
     const counts = coverage(cars, id);
 
     return (
         <span
-            title={EVIDENCE[id].explanation}
+            title={[use ? `${use.charAt(0).toUpperCase()}${use.slice(1)}.` : "", EVIDENCE[id].explanation].filter(Boolean).join(" ")}
             className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black"
         >
             {EVIDENCE[id].label}
