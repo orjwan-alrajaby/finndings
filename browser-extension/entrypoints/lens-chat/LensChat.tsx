@@ -26,6 +26,7 @@ import {
     readUnderstanding,
     ruledOut,
     withBudget,
+    withRental,
     withoutSuggestion,
     withSuggestion,
     toAnswers,
@@ -81,6 +82,8 @@ type Entry = { id: number } & (
           understanding: Understanding;
           question: WireQuestion | null;
           suggestions: { id: EvidenceId; why: string; needId: string }[];
+          /** An answer chosen on the card and not yet sent. */
+          picked: string | null;
           reply: string;
           isUpdate: boolean;
           status: "pending" | "applied" | "superseded";
@@ -368,9 +371,10 @@ export function LensChat() {
     /**
      * The reader's answer to an offer.
      *
-     * Taking one re-runs the comparison, because it changes what Lens weighs;
-     * turning one down only records it, so nothing moves under them and the
-     * same offer never comes back.
+     * Both only record: the reader may still be working through the rest of
+     * what Lens asked, and a comparison appearing under them mid-answer is
+     * what made the other questions feel lost. The Compare button is the one
+     * place anything runs.
      */
     const answerSuggestion = useCallback(
         (entryId: number, id: EvidenceId, why: string, needId: string, take: boolean) => {
@@ -386,9 +390,8 @@ export function LensChat() {
                 ),
             );
 
-            if (take && current.run) void compareWith(next, current.kind);
         },
-        [compareWith],
+        [],
     );
 
     const talk = useCallback(
@@ -505,6 +508,7 @@ export function LensChat() {
                 question,
                 reply,
                 suggestions,
+                picked: null,
                 isUpdate: Boolean(current.run),
                 status: "pending",
             });
@@ -718,12 +722,30 @@ export function LensChat() {
                                                     role: "reader",
                                                     text: monthly ? `My maximum is €${monthly} a month.` : "I don't have a fixed budget.",
                                                 });
-                                                if (latest.current.run) void compareWith(next, latest.current.kind);
                                             }}
-                                            onPeriod={() => {
-                                                setInput("I need the car from ");
-                                                inputRef.current?.focus();
+                                            onPeriod={(from, to) => {
+                                                const next = withRental(
+                                                    latest.current.understanding,
+                                                    from,
+                                                    to,
+                                                    from && to ? `you need it from ${from} to ${to}` : "you have no fixed dates",
+                                                );
+
+                                                setUnderstanding(next);
+                                                setEntries((all) =>
+                                                    all.map((item) =>
+                                                        item.id === entry.id && item.kind === "understanding" ? { ...item, understanding: next } : item,
+                                                    ),
+                                                );
                                             }}
+                                            picked={entry.picked}
+                                            onPick={(answer) =>
+                                                setEntries((all) =>
+                                                    all.map((item) =>
+                                                        item.id === entry.id && item.kind === "understanding" ? { ...item, picked: answer || null } : item,
+                                                    ),
+                                                )
+                                            }
                                             onCompare={() => confirmUnderstanding(entry)}
                                             onAnswer={(answer) => void send(answer)}
                                             onCorrect={() => {

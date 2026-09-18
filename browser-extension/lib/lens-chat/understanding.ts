@@ -351,6 +351,12 @@ export const missingEssentials = (u: Understanding): { budget: boolean; period: 
     period: u.rental == null,
 });
 
+/** Months the reader picked from the chat, without a model turn. */
+export const withRental = (u: Understanding, from: string | null, to: string | null, said: string): Understanding => ({
+    ...u,
+    rental: from && to && isMonthString(from) && isMonthString(to) && monthsInclusive(from, to) >= 1 ? { from, to, startDay: null, said } : null,
+});
+
 /** A monthly maximum the reader picked from the chat, without a model turn. */
 export const withBudget = (u: Understanding, monthly: number | null, said: string): Understanding => ({
     ...u,

@@ -141,6 +141,8 @@ export function ChatMock({
                             onDeclineSuggestion={() => {}}
                             onBudget={() => {}}
                             onPeriod={() => {}}
+                            picked={null}
+                            onPick={() => {}}
                         />
                     </div>
                 )}

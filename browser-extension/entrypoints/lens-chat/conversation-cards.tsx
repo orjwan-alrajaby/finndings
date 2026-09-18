@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
     ArrowRight,
+    ArrowUp,
     CalendarRange,
     Check,
     CircleHelp,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
+import { RentalPeriodInput } from "@/components/DrivingAssumptions";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
@@ -77,11 +79,14 @@ const periodText = (rental: NonNullable<Understanding["rental"]>) =>
 export function QuestionBlock({
     question,
     lead,
+    picked,
     onAnswer,
     disabled,
 }: {
     question: WireQuestion;
     lead: string;
+    /** What the reader has chosen but not sent yet. */
+    picked?: string | null;
     onAnswer: (answer: string) => void;
     disabled?: boolean;
 }) {
@@ -99,17 +104,28 @@ export function QuestionBlock({
             )}
             {question.options.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                    {question.options.map((option) => (
-                        <button
-                            key={option}
-                            type="button"
-                            disabled={disabled}
-                            onClick={() => onAnswer(option)}
-                            className="rounded-full bg-finn-pale-blue px-3 py-1.5 text-[11px] font-bold text-finn-accent-blue transition hover:bg-finn-accent-blue hover:text-white disabled:opacity-50"
-                        >
-                            {option}
-                        </button>
-                    ))}
+                    {question.options.map((option) => {
+                        const chosen = picked === option;
+
+                        return (
+                            <button
+                                key={option}
+                                type="button"
+                                disabled={disabled}
+                                aria-pressed={chosen}
+                                onClick={() => onAnswer(chosen ? "" : option)}
+                                className={[
+                                    "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
+                                    chosen
+                                        ? "bg-finn-accent-blue text-white"
+                                        : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
+                                ].join(" ")}
+                            >
+                                {chosen && <Check aria-hidden="true" className="h-3 w-3" />}
+                                {option}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -138,6 +154,8 @@ export function UnderstandingCard({
     onDeclineSuggestion,
     onBudget,
     onPeriod,
+    picked,
+    onPick,
 }: {
     understanding: Understanding;
     translation: Translation;
@@ -157,9 +175,14 @@ export function UnderstandingCard({
     onDeclineSuggestion: (id: EvidenceId) => void;
     /** The budget and period Lens asks for itself when the reader hasn't said. */
     onBudget: (monthly: number | null) => void;
-    onPeriod: () => void;
+    onPeriod: (from: string | null, to: string | null) => void;
+    /** What the reader has chosen on this card and not sent yet. */
+    picked: string | null;
+    onPick: (answer: string) => void;
 }) {
     const missing = missingEssentials(u);
+    /* Half a period is not a period, so the fields hold their own state. */
+    const [period, setPeriod] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
     const [showWeights, setShowWeights] = useState(false);
 
     /*
@@ -386,7 +409,16 @@ export function UnderstandingCard({
 
             {status === "pending" && (missing.budget || missing.period) && (
                 <div className="mt-3 px-4">
-                    <EssentialsBlock missing={missing} busy={busy} onBudget={onBudget} onPeriod={onPeriod} />
+                    <EssentialsBlock
+                        missing={missing}
+                        period={period}
+                        busy={busy}
+                        onBudget={onBudget}
+                        onPeriod={(from, to) => {
+                            setPeriod({ from, to });
+                            onPeriod(from, to);
+                        }}
+                    />
                 </div>
             )}
 
@@ -407,7 +439,8 @@ export function UnderstandingCard({
                     <QuestionBlock
                         question={question}
                         lead={blocking ? "Before I compare cars" : "One thing that would help"}
-                        onAnswer={onAnswer}
+                        picked={picked}
+                        onAnswer={onPick}
                         disabled={busy}
                     />
                 </div>
@@ -421,7 +454,18 @@ export function UnderstandingCard({
                     </p>
                 ) : (
                     <div className="flex flex-wrap items-center gap-2">
-                        {hasSomething ? (
+                        {picked ? (
+                            /*
+                             * Answered here, sent once. Sending the moment a
+                             * chip is tapped replaced this card — and with it
+                             * everything else Lens had asked — before the
+                             * reader could answer the rest.
+                             */
+                            <SmallButton tone="solid" onClick={() => onAnswer(picked)} disabled={busy}>
+                                <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+                                Send my answer
+                            </SmallButton>
+                        ) : hasSomething ? (
                             blocking ? (
                                 <SmallButton onClick={onCompare} disabled={busy}>
                                     Compare anyway
@@ -528,14 +572,17 @@ const BUDGET_CHOICES = [400, 500, 600, 750];
  */
 function EssentialsBlock({
     missing,
+    period,
     busy,
     onBudget,
     onPeriod,
 }: {
     missing: { budget: boolean; period: boolean };
+    /** What's typed in the period fields so far — neither month alone sets it. */
+    period: { from: string | null; to: string | null };
     busy: boolean;
     onBudget: (monthly: number | null) => void;
-    onPeriod: () => void;
+    onPeriod: (from: string | null, to: string | null) => void;
 }) {
     return (
         <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-finn-accent-blue/25">
@@ -580,24 +627,17 @@ function EssentialsBlock({
                     <p className="text-[11px] leading-4 text-finn-iron">
                         FINN rents on fixed terms, so the months you need decide which term each car is priced on — and whether it can be delivered in time.
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                        <button
-                            type="button"
-                            disabled={busy}
-                            onClick={onPeriod}
-                            className="rounded-full bg-finn-pale-blue px-3 py-1.5 text-[11px] font-bold text-finn-accent-blue transition hover:bg-finn-accent-blue hover:text-white disabled:opacity-50"
-                        >
-                            I know the months
-                        </button>
-                        <button
-                            type="button"
-                            disabled={busy}
-                            onClick={onPeriod}
-                            className="rounded-full bg-finn-snow px-3 py-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black disabled:opacity-50"
-                        >
-                            No fixed period
-                        </button>
+                    <div className="mt-2">
+                        <RentalPeriodInput from={period.from} to={period.to} tone="bg-finn-snow" onChange={onPeriod} />
                     </div>
+                    <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onPeriod(null, null)}
+                        className="mt-1.5 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
+                    >
+                        I don't have fixed dates
+                    </button>
                 </div>
             )}
         </div>
