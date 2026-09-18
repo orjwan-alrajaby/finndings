@@ -6,7 +6,7 @@ import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { carLabel } from "@/lib/lens-ai/outcome";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { EVIDENCE, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
+import { EVIDENCE, evidenceMet, measuredDisplay, readEvidence, type EvidenceId } from "./evidence";
 
 /** How a measured figure is introduced, and what to say when FINN has none. */
 const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
@@ -14,6 +14,8 @@ const MEASURED_LEAD: Partial<Record<EvidenceId, string>> = {
     compactWidth: "It's",
     bootVolume: "It has",
     electricRange: "It has",
+    suvBody: "FINN files it as",
+    winterReadyTyres: "It comes on",
 };
 
 /** Said next to the figure, because FINN's own field is ambiguous. */
@@ -23,6 +25,8 @@ const MEASURED_CAVEAT: Partial<Record<EvidenceId, string>> = {
 
 const MEASURED_UNKNOWN: Partial<Record<EvidenceId, string>> = {
     bootVolume: "FINN doesn't publish a boot figure for this car.",
+    winterReadyTyres: "FINN doesn't say which tyres this one comes on.",
+    suvBody: "FINN doesn't say what body type this one is.",
     electricRange: "It isn't electric, so FINN publishes no range for it.",
 };
 import type { LensRun } from "./run";
@@ -109,6 +113,7 @@ function isValid(run: LensRun, car: PinnedFinnCar): boolean {
 function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }): StoryLine {
     const def = EVIDENCE[entry.id];
     const state = readEvidence(car, entry.id);
+    const met = evidenceMet(car, entry.id);
     const measured = measuredDisplay(car, entry.id);
 
     /*
@@ -118,9 +123,9 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }
      */
     if (measured) {
         return {
-            tone: state === "listed" ? "good" : "note",
+            tone: met === false && def.undesirable ? "missing" : met ? "good" : "note",
             text:
-                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${state === "listed" && entry.use ? ` — ${entry.use}` : ""}`) +
+                sentence(`${MEASURED_LEAD[entry.id] ?? "It's"} ${measured}${met && entry.use ? ` — ${entry.use}` : ""}`) +
                 (MEASURED_CAVEAT[entry.id] ? ` ${MEASURED_CAVEAT[entry.id]}` : ""),
         };
     }
@@ -130,11 +135,15 @@ function evidenceLine(car: PinnedFinnCar, entry: { id: EvidenceId; use: string }
     }
 
     if (state === "listed") {
-        return { tone: "good", text: sentence(`${def.label} ${entry.use ? `— ${entry.use}` : "is listed"}`) };
+        return def.undesirable
+            ? { tone: "missing", text: `FINN lists this one as ${lower(def.label)}.` }
+            : { tone: "good", text: sentence(`${def.label} ${entry.use ? `— ${entry.use}` : "is listed"}`) };
     }
 
     if (state === "notListed") {
-        return { tone: "missing", text: `FINN doesn't list ${lower(def.label)} for this car.` };
+        return def.undesirable
+            ? { tone: "good", text: sentence(`It isn't ${lower(def.label)}${entry.use ? ` — ${entry.use}` : ""}`) }
+            : { tone: "missing", text: `FINN doesn't list ${lower(def.label)} for this car.` };
     }
 
     return { tone: "unknown", text: `FINN doesn't say whether it has ${lower(def.label)}.` };
@@ -281,7 +290,7 @@ export function tellFitStory(
          * first. ISOFIX on 22 of 24 cars is true and worth saying, but rear USB
          * ports on 11 of 24 is what actually distinguishes a car for the kids.
          */
-        const share = (id: EvidenceId) => cars.filter((car) => readEvidence(car, id) === "listed").length;
+        const share = (id: EvidenceId) => cars.filter((car) => evidenceMet(car, id) === true).length;
         const orderOf: Record<Tone, number> = { good: 0, note: 1, missing: 2, unknown: 3 };
 
         const evidence = need.evidence.filter((entry) => !lessRelevant.includes(entry.id));
@@ -304,8 +313,8 @@ export function tellFitStory(
             lines.push({ tone: "note", text: "Lens has nothing on this car it can check for this, so it didn't count toward the ranking." });
         }
 
-        const good = evidence.filter((entry) => readEvidence(winner, entry.id) === "listed");
-        const missing = evidence.filter((entry) => readEvidence(winner, entry.id) === "notListed");
+        const good = evidence.filter((entry) => evidenceMet(winner, entry.id) === true);
+        const missing = evidence.filter((entry) => evidenceMet(winner, entry.id) === false);
 
         const tone: Tone = good.length && !missing.length ? "good" : good.length ? "note" : missing.length ? "missing" : "unknown";
 
@@ -354,13 +363,13 @@ export function tellFitStory(
             .filter((need) => need.importance !== "niceToHave")
             .flatMap((need) =>
                 need.evidence
-                    .filter((entry) => !lessRelevant.includes(entry.id) && readEvidence(winner, entry.id) === "notListed")
+                    .filter((entry) => !lessRelevant.includes(entry.id) && evidenceMet(winner, entry.id) === false)
                     .map((entry) => {
                         const alternative =
                             recommendation.ranked.find(
-                                (car) => car.id !== winner.id && isValid(run, car) && readEvidence(car, entry.id) === "listed",
+                                (car) => car.id !== winner.id && isValid(run, car) && evidenceMet(car, entry.id) === true,
                             ) ?? null;
-                        const share = cars.filter((car) => readEvidence(car, entry.id) === "listed").length / Math.max(cars.length, 1);
+                        const share = cars.filter((car) => evidenceMet(car, entry.id) === true).length / Math.max(cars.length, 1);
 
                         return { need, entry, alternative, score: (alternative ? 10 : 0) + rank[need.importance] * 2 + share };
                     }),
@@ -374,7 +383,9 @@ export function tellFitStory(
 
             catchNote = {
                 /* Named by the need's own label, so the sentence can't inherit a paraphrase's grammar. */
-                text: `FINN doesn't list ${lower(EVIDENCE[gap.entry.id].label)} for this car — worth weighing for ${lower(gap.need.label)}.`,
+                text: EVIDENCE[gap.entry.id].undesirable
+                    ? `FINN files this one as ${lower(EVIDENCE[gap.entry.id].label)} — worth weighing for ${lower(gap.need.label)}.`
+                    : `FINN doesn't list ${lower(EVIDENCE[gap.entry.id].label)} for this car — worth weighing for ${lower(gap.need.label)}.`,
                 alternative: gap.alternative
                     ? `${name(gap.alternative)} has it${altCost ? `, at about ${formatEUR(altCost.totalMonthly)}/month` : ""}${u.budget?.kind === "hardMax" ? " — still within your maximum" : ""}.`
                     : single

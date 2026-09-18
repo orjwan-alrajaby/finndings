@@ -9,6 +9,7 @@ import {
 import { fleet } from "@/lib/reasoning-engine/test-data/fleet";
 import type { PinnedFinnCar } from "@/lib/types";
 
+import { evidenceMet, measuredDisplay, readEvidence } from "./evidence";
 import { tellFitStory, type FitStory } from "./fit-story";
 import { runLens } from "./run";
 import { SCENARIOS, type Scenario } from "./scenarios.fixture";
@@ -133,7 +134,7 @@ describe("what people say they don't want", () => {
         const { understanding, translation, story } = read(scenario("no-big-suv"));
         const need = understanding.needs.find((item) => item.id === "not-big")!;
 
-        expect(need.evidence.map((entry) => entry.id)).toEqual(["compactLength", "compactWidth"]);
+        expect(need.evidence.map((entry) => entry.id)).toEqual(["suvBody", "compactLength", "compactWidth"]);
         expect(translation.order[0]?.id).toBe("cityParking");
         expect(sectionFor(story, "not-big")?.lines.map((line) => line.text).join(" ")).toMatch(/m long/);
     });
@@ -164,6 +165,34 @@ describe("what someone is already confident about", () => {
     });
 });
 
+describe("what FINN does publish, and Lens used to guess at", () => {
+    it("reads the body type FINN files rather than inferring it from length", () => {
+        const { story } = read(scenario("no-big-suv"));
+        const section = sectionFor(story, "not-big")!;
+        const bodyLine = section.lines.find((line) => /files it as/.test(line.text))!;
+
+        expect(bodyLine.text).toMatch(/files it as (a|an) /);
+        /* The winner isn't an SUV, which is what the reader asked for. */
+        expect(bodyLine.tone).toBe("good");
+    });
+
+    it("marks an SUV as the bad news for someone who didn't want one", () => {
+        const suv = cars.find((car) => /suv/i.test(car.vehicleType))!;
+        const notSuv = cars.find((car) => !/suv/i.test(car.vehicleType))!;
+
+        expect(evidenceMet(suv, "suvBody")).toBe(false);
+        expect(evidenceMet(notSuv, "suvBody")).toBe(true);
+    });
+
+    it("answers a winter need from FINN's tyre field, and says so when it's missing", () => {
+        const car = cars[0]!;
+
+        expect(readEvidence({ ...car, tyres: "allSeason" }, "winterReadyTyres")).toBe("listed");
+        expect(measuredDisplay({ ...car, tyres: "summerAndWinter" }, "winterReadyTyres")).toMatch(/summer set and a winter set/);
+        expect(readEvidence({ ...car, tyres: null }, "winterReadyTyres")).toBe("unknown");
+    });
+});
+
 describe("what FINN doesn't publish", () => {
     it("says so for a rear-facing seat rather than implying Lens checked", () => {
         const { story } = read(scenario("rear-facing-parent"));
@@ -176,6 +205,7 @@ describe("what FINN doesn't publish", () => {
 
     it("quotes FINN's boot figure with the caveat its own field carries", () => {
         const { story } = read(scenario("winter-outdoors"));
+
         const boot = sectionFor(story, "muddy-kit")!.lines.map((line) => line.text).join(" ");
 
         expect(boot).toMatch(/L boot/);

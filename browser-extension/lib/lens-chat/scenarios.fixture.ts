@@ -238,10 +238,11 @@ export const SCENARIOS: Scenario[] = [
                     priorities: ["climateSuitability"],
                     evidence: [
                         { id: "hasAllWheelDrive", use: "puts power through all four wheels when it's slippery" },
+                        { id: "winterReadyTyres", use: "grip when the road is cold and wet" },
                         { id: "hasHeatedSeats", use: "warms you before the cabin does" },
                         { id: "hasRainSlashLightSensors", use: "manage wipers and lights as the weather turns" },
                     ],
-                    notInData: "which tyres are fitted",
+                    notInData: null,
                     status: "active",
                 },
                 {
@@ -495,6 +496,7 @@ export const SCENARIOS: Scenario[] = [
                     said: "you find big cars stressful to drive and park, and don't want a massive SUV",
                     priorities: ["cityParking"],
                     evidence: [
+                        { id: "suvBody", use: "keeps you out of the big, stressful cars you'd rather not drive" },
                         { id: "compactLength", use: "keeps it short enough to place easily" },
                         { id: "compactWidth", use: "keeps it narrow in traffic and car parks" },
                     ],
@@ -567,10 +569,11 @@ export const SCENARIOS: Scenario[] = [
                     priorities: ["climateSuitability"],
                     evidence: [
                         { id: "hasAllWheelDrive", use: "drives all four wheels when it's slippery" },
+                        { id: "winterReadyTyres", use: "grip when the road is cold and wet" },
                         { id: "hasHeatedSeats", use: "warm you before the cabin does" },
                         { id: "hasCorneringLights", use: "light the bend on a dark road" },
                     ],
-                    notInData: "which tyres are fitted",
+                    notInData: null,
                     status: "active",
                 },
                 {

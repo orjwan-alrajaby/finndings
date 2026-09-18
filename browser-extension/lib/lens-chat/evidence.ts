@@ -20,7 +20,7 @@ import type { FinnCar } from "@/lib/types";
  * but it's the first thing anyone driving far asks about, and FINN publishes
  * it. So Lens can point at it even though nobody can raise it.
  */
-export type EvidenceId = SignalId | "electricRange";
+export type EvidenceId = SignalId | "electricRange" | "suvBody" | "winterReadyTyres";
 
 /** Evidence Lens reads but never scores, with the reason it isn't scored. */
 const READ_ONLY: Partial<Record<EvidenceId, string>> = {
@@ -39,6 +39,11 @@ export interface EvidenceDef {
     scoredIn: CategoryId | null;
     /** Whether a reader can raise it inside that priority. */
     raisable: boolean;
+    /**
+     * True where finding it is the bad news: "I really don't want an SUV" is
+     * a need, and the car being one is what answers it — the wrong way.
+     */
+    undesirable?: boolean;
 }
 
 const homeOf = (id: SignalId): { category: CategoryId | null; raisable: boolean } => {
@@ -86,7 +91,56 @@ export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
         scoredIn: null,
         raisable: false,
     },
+
+    /*
+     * Body type and tyres come from FINN's own structured fields — `cartype`
+     * and `tires` — rather than from the equipment list. Neither is scored:
+     * Lens ranks on what a car has, not on what shape it is. They're here
+     * because "I don't want a massive SUV" and "winter is unpleasant here"
+     * are answered by facts FINN publishes, and answering them from length
+     * alone was guessing at something Lens could simply read.
+     */
+    suvBody: {
+        id: "suvBody",
+        label: "SUV body",
+        explanation:
+            "Whether FINN files this car as an SUV. Lens doesn't score body type — it reads it, so a reader who doesn't want one can see what they're being offered.",
+        scoredIn: null,
+        raisable: false,
+        undesirable: true,
+    },
+
+    winterReadyTyres: {
+        id: "winterReadyTyres",
+        label: "All-season or winter tyres",
+        explanation:
+            "What FINN says is fitted: all-season tyres, or a summer and a winter set. Not scored — nearly every FINN car comes on all-season tyres — but it's the answer to what the car is shod with in winter.",
+        scoredIn: null,
+        raisable: false,
+    },
 };
+
+/** How FINN's `cartype` reads in a sentence. */
+const BODY_WORDS: Record<string, string> = {
+    suv: "an SUV",
+    "klein- und kompaktwagen": "a small or compact car",
+    kompaktwagen: "a compact car",
+    kleinwagen: "a small car",
+    kombi: "an estate",
+    limousine: "a saloon",
+    cabriolet: "a convertible",
+    hatchback: "a hatchback",
+    van: "a van",
+    transporter: "a van",
+};
+
+const bodyWord = (car: FinnCar): string | null => {
+    const type = String(car.vehicleType ?? "").trim();
+
+    return type ? (BODY_WORDS[type.toLowerCase()] ?? `a ${type.toLowerCase()}`) : null;
+};
+
+const isSuv = (car: FinnCar): boolean => /\bsuv\b/i.test(String(car.vehicleType ?? ""));
 
 export const EVIDENCE_IDS = Object.keys(EVIDENCE) as EvidenceId[];
 
@@ -106,6 +160,14 @@ export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
         return range == null ? "unknown" : range >= LONG_RANGE_KM ? "listed" : "notListed";
     }
 
+    if (id === "suvBody") {
+        return bodyWord(car) == null ? "unknown" : isSuv(car) ? "listed" : "notListed";
+    }
+
+    if (id === "winterReadyTyres") {
+        return car.tyres == null ? "unknown" : "listed";
+    }
+
     const utility = signalUtility(id, car);
 
     if (utility == null) return "unknown";
@@ -114,6 +176,19 @@ export function readEvidence(car: FinnCar, id: EvidenceId): EvidenceState {
     if (!isBinarySignal(id)) return utility >= 0.6 ? "listed" : "notListed";
 
     return utility === 1 ? "listed" : "notListed";
+}
+
+/**
+ * Whether this car answers the need the evidence was cited for: normally that
+ * it's listed, and for evidence nobody wants (an SUV body) that it isn't.
+ * Null where FINN says nothing either way.
+ */
+export function evidenceMet(car: FinnCar, id: EvidenceId): boolean | null {
+    const state = readEvidence(car, id);
+
+    if (state === "unknown") return null;
+
+    return EVIDENCE[id].undesirable ? state === "notListed" : state === "listed";
 }
 
 /**
@@ -138,6 +213,16 @@ export function measuredDisplay(car: FinnCar, id: EvidenceId): string | null {
         const range = evRangeKm(car);
 
         return range ? `${Math.round(range)} km of range on FINN's figure` : null;
+    }
+
+    if (id === "suvBody") return bodyWord(car);
+
+    if (id === "winterReadyTyres") {
+        return car.tyres === "summerAndWinter"
+            ? "a summer set and a winter set, in FINN's data"
+            : car.tyres === "allSeason"
+              ? "all-season tyres, in FINN's data"
+              : null;
     }
 
     return null;
