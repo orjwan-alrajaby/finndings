@@ -50,6 +50,8 @@ export interface EvidenceDef {
      * a need, and the car being one is what answers it — the wrong way.
      */
     undesirable?: boolean;
+    /** How to name it where not having it is the point: "Not an SUV". */
+    negativeLabel?: string;
 }
 
 const homeOf = (id: SignalId): { category: CategoryId | null; raisable: boolean } => {
@@ -108,7 +110,8 @@ export const EVIDENCE: Record<EvidenceId, EvidenceDef> = {
      */
     suvBody: {
         id: "suvBody",
-        label: "SUV body",
+        label: "SUV",
+        negativeLabel: "Not an SUV",
         explanation:
             "Whether FINN files this car as an SUV. Lens doesn't score body type — it reads it, so a reader who doesn't want one can see what they're being offered.",
         scoredIn: null,

@@ -18,6 +18,9 @@ import type { FinnCar } from "@/lib/types";
 
 import { coverage, EVIDENCE, isEvidenceId, type EvidenceId } from "./evidence";
 
+/** A quantity in a use clause: "four seats", "2 USB ports". */
+const COUNTS = /\d|\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i;
+
 /** Evidence on at least this share of the cars in scope can't tell them apart. */
 const UNIVERSAL_SHARE = 0.9;
 
@@ -177,7 +180,18 @@ export function readUnderstanding(
 
         const evidence = (Array.isArray(item.evidence) ? item.evidence : [])
             .filter((entry) => isEvidenceId(entry?.id) && !lessRelevant.has(entry.id))
-            .map((entry) => ({ id: entry.id as EvidenceId, use: text(entry.use, 120) }))
+            .map((entry) => {
+                const use = text(entry.use, 120);
+
+                /*
+                 * A use clause says what equipment does, not how much of it
+                 * there is. Left alone, "Five or more seats — provides four
+                 * seats" reaches the reader as a fact Lens never checked —
+                 * and the model writes such counts as words as often as
+                 * digits.
+                 */
+                return { id: entry.id as EvidenceId, use: COUNTS.test(use) ? "" : use };
+            })
             .filter((entry, index, all) => all.findIndex((other) => other.id === entry.id) === index)
             .slice(0, 6);
 

@@ -35,8 +35,6 @@ import { BandChip, SmallButton, type CarActions } from "./cards";
  * `Translation` and a `FitStory`.
  */
 
-const lowerFirst = (value: string): string => `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
-
 const IMPORTANCE_LABEL: Record<Need["importance"], string> = {
     essential: "Must have",
     important: "Important",
@@ -385,7 +383,7 @@ function EvidenceChip({ id, use, cars }: { id: EvidenceId; use?: string; cars: P
             title={[use ? `${use.charAt(0).toUpperCase()}${use.slice(1)}.` : "", EVIDENCE[id].explanation].filter(Boolean).join(" ")}
             className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black"
         >
-            {EVIDENCE[id].undesirable ? `Not ${lowerFirst(EVIDENCE[id].label)}` : EVIDENCE[id].label}
+            {(EVIDENCE[id].undesirable ? EVIDENCE[id].negativeLabel : null) ?? EVIDENCE[id].label}
             {counts.total > 0 && (
                 <span className="font-semibold text-finn-iron">
                     · {answering} of {counts.total}

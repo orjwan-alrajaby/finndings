@@ -306,3 +306,36 @@ describe("a need the model left unplaced", () => {
         expect(toAnswers(base(), understanding).order[0]?.id).toBe("practicality");
     });
 });
+
+describe("what a use clause may claim", () => {
+    it("drops a clause that puts a number on the evidence", () => {
+        const understanding = readUnderstanding(
+            {
+                ...scenario("family-road-trip").reading,
+                needs: [
+                    {
+                        id: "seats",
+                        label: "Everyone in one car",
+                        importance: "essential",
+                        said: "there are five of you",
+                        priorities: ["practicality"],
+                        evidence: [
+                            { id: "seatsFivePlus", use: "provides four seats so everyone travels together" },
+                            { id: "rearDoors", use: "lets the children climb in themselves" },
+                        ],
+                        notInData: null,
+                        status: "active",
+                    },
+                ],
+            },
+            EMPTY_UNDERSTANDING,
+            undefined,
+            "2026-09",
+        );
+
+        expect(understanding.needs[0]?.evidence).toEqual([
+            { id: "seatsFivePlus", use: "" },
+            { id: "rearDoors", use: "lets the children climb in themselves" },
+        ]);
+    });
+});
