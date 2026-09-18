@@ -142,7 +142,7 @@ function isYes(value: unknown): boolean {
  */
 /** How much of FINN's prose is worth carrying per car, and per group. */
 const EQUIPMENT_TEXT_GROUPS = 12;
-const EQUIPMENT_TEXT_CHARS = 600;
+const EQUIPMENT_TEXT_CHARS = 320;
 
 /**
  * FINN's equipment prose, flattened and trimmed.
@@ -153,9 +153,16 @@ const EQUIPMENT_TEXT_CHARS = 600;
  * check anything quoted back against them.
  */
 export function extractEquipmentText(config: FinnApiConfig): { group: string; text: string }[] {
+  /*
+   * Packages first. They're short, they're named ("Winter-Paket"), and they
+   * carry what the checkbox list doesn't — a heated windscreen, what a driver
+   * assistance package contains. The long safety and comfort prose was
+   * filling the budget before the packages were reached, so the model was
+   * told FINN says nothing about a heated windscreen while FINN said it.
+   */
   const groups = [
-    ...Object.entries(config.equipment ?? {}),
     ...Object.entries(config.equipment_packages ?? {}),
+    ...Object.entries(config.equipment ?? {}),
   ];
 
   return groups

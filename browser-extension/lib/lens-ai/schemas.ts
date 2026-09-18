@@ -103,7 +103,6 @@ export function interpretSchema(vocabulary: LensVocabulary, scope?: Conversation
     return object({
         summary: { type: "string" },
         change: changeSchema(vocabulary),
-        reply: { type: "string" },
         ...scopeField(scope),
     });
 }
@@ -183,7 +182,19 @@ export function converseSchema(
 
     return object({
         kind: { type: "string", enum: ["understanding", "answer", "whatIf"] },
-        /* Understanding before reply: the model works out the situation, then speaks. */
+        /*
+         * Reply first, and described as required.
+         *
+         * Understanding used to come first, so the model worked the situation
+         * out before speaking. It also came back with an empty reply on
+         * answer turns — where `understanding` is null and there was nothing
+         * to work out first — which left the reader with nothing said.
+         */
+        reply: {
+            type: "string",
+            description:
+                "What Lens says to the reader, in its own voice. Never empty: on an answer turn this is the whole answer, including saying that FINN's data can't settle it.",
+        },
         understanding: nullable(understanding),
         question: nullable(
             object({

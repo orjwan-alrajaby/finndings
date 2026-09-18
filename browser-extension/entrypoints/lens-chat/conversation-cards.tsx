@@ -269,7 +269,10 @@ export function UnderstandingCard({
                             )}
                         </div>
                     ))}
-                    <p className="text-[10px] leading-4 text-finn-iron">Counts are listings across {scopeLabel}.</p>
+                    {/* The counts sentence needs a count — on a page whose cars haven't loaded, the headline is a sentence of its own. */}
+                    {cars.length > 0 && (
+                        <p className="text-[10px] leading-4 text-finn-iron">Counts are listings across {scopeLabel}.</p>
+                    )}
                 </div>
             )}
 

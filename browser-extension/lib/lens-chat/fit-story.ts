@@ -455,7 +455,7 @@ export function evidenceForNeeds(run: LensRun, u: Understanding) {
  * about, and a budget in characters, because this rides on every turn.
  */
 const WORDS_FOR_CARS = 4;
-const WORDS_PER_CAR = 900;
+const WORDS_PER_CAR = 1400;
 
 /**
  * FINN's German equipment prose for the cars in front of the reader.
@@ -502,12 +502,26 @@ const flatten = (value: string): string =>
  * phrase that isn't in the text Lens sent is a fabricated source, so the
  * sentence carrying it is dropped rather than shown.
  */
-export function quotesAreFinns(reply: string, sources: string[]): { reply: string; dropped: string[] } {
-    const haystack = sources.map(flatten);
+export function quotesAreFinns(
+    reply: string,
+    sources: { car: string; text: string }[],
+): { reply: string; dropped: string[] } {
+    const flat = sources.map((source) => ({ car: flatten(source.car), text: flatten(source.text) }));
     const dropped: string[] = [];
 
     const kept = (reply.match(/[^.!?]+(?:[.!?]+|$)/g) ?? []).filter((sentence) => {
-        const invented = quoted(sentence).filter((phrase) => !haystack.some((text) => text.includes(flatten(phrase))));
+        const phrases = quoted(sentence);
+
+        if (!phrases.length) return true;
+
+        /*
+         * A sentence about one car is checked against that car's text: FINN's
+         * words for the Ford are not evidence about the MG.
+         */
+        const flatSentence = flatten(sentence);
+        const named = flat.filter((source) => source.car && flatSentence.includes(source.car));
+        const searched = named.length === 1 ? named : flat;
+        const invented = phrases.filter((phrase) => !searched.some((source) => source.text.includes(flatten(phrase))));
 
         if (invented.length) dropped.push(...invented);
 

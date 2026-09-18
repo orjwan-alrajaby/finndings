@@ -393,8 +393,8 @@ describe("saying back only what the person said", () => {
 
 describe("quoting FINN's own words", () => {
     const sources = [
-        "safety ABS, Isofix, Überholsensor aktiv ohne Blinker",
-        "Paket WINTER Beheizbare Windschutzscheibe, Lenkrad beheizt",
+        { car: "MG ZS", text: "safety ABS, Isofix, Überholsensor aktiv ohne Blinker" },
+        { car: "Ford Puma", text: "Paket WINTER Beheizbare Windschutzscheibe, Lenkrad beheizt" },
     ];
 
     it("keeps a sentence whose German really is FINN's", () => {
@@ -413,5 +413,12 @@ describe("quoting FINN's own words", () => {
 
     it("reads FINN's text through spelling and punctuation", () => {
         expect(quotesAreFinns('FINN lists "uberholsensor aktiv ohne blinker".', sources).dropped).toEqual([]);
+    });
+
+    it("won't let one car's words stand as evidence about another", () => {
+        const reply = 'The MG ZS includes "Beheizbare Windschutzscheibe".';
+
+        expect(quotesAreFinns(reply, sources).reply).toBe("");
+        expect(quotesAreFinns(reply, sources).dropped).toEqual(["Beheizbare Windschutzscheibe"]);
     });
 });

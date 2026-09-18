@@ -369,7 +369,10 @@ export function LensChat() {
             if (result.kind === "answer" || !result.understanding) {
                 /* An answer may quote FINN's own words; it may not invent them. */
                 const sources = current.run
-                    ? finnsOwnWords(current.run).flatMap((item) => item.finnWrites.map((entry) => `${entry.group} ${entry.text}`))
+                    ? finnsOwnWords(current.run).map((item) => ({
+                          car: item.car,
+                          text: item.finnWrites.map((entry) => `${entry.group} ${entry.text}`).join(" "),
+                      }))
                     : [];
                 const checked = quotesAreFinns(text(result.reply), sources);
 
