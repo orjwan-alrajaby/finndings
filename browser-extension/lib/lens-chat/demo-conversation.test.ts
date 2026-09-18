@@ -32,7 +32,7 @@ describe("the setup flow's Lens AI example", () => {
     });
 
     it("picks a car within the limit, and names the higher scorer that breaks it", () => {
-        expect(demo.story?.eyebrow).toMatch(/within your €650 limit/);
+        expect(demo.story?.eyebrow).toBe("Best match");
         expect(demo.alternatives[0]?.budget).toBe("over");
         expect(demo.story?.sections[0]?.lines.map((line) => line.text).join(" ")).toMatch(/scores higher overall, but .* breaks your maximum/);
         expect(demo.story?.catch).not.toBeNull();

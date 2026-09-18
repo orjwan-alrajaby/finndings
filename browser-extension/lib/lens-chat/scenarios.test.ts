@@ -109,7 +109,7 @@ describe("what the person said about money", () => {
         const { story, monthly } = read(scenario("city-parent"));
 
         expect(monthly).toBeLessThanOrEqual(450);
-        expect(story.eyebrow).toContain("within your €450");
+        expect(story.eyebrow).toBe("Best match");
         expect(lines(story)).toMatch(/scores higher overall, but .* breaks your maximum/);
     });
 

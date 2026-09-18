@@ -6,6 +6,7 @@ import {
     Check,
     CircleHelp,
     CircleSlash,
+    ChevronDown,
     Eye,
     Info,
     MessageCircleQuestion,
@@ -25,6 +26,7 @@ import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
 import { asPhrase, coverage, EVIDENCE, plainly, ruleLabel, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
+import { heardLines, matchSentence } from "@/lib/lens-chat/plain";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
 import { budgetCeiling, missingEssentials, ruledOut } from "@/lib/lens-chat/understanding";
@@ -173,17 +175,16 @@ export function UnderstandingCard({
     onCorrect: () => void;
     onAcceptSuggestion: (id: EvidenceId) => void;
     onDeclineSuggestion: (id: EvidenceId) => void;
-    /** The budget and period Lens asks for itself when the reader hasn't said. */
     onBudget: (monthly: number | null) => void;
     onPeriod: (from: string | null, to: string | null) => void;
     /** What the reader has chosen on this card and not sent yet. */
     picked: string | null;
     onPick: (answer: string) => void;
 }) {
+    const [showDetail, setShowDetail] = useState(false);
     const missing = missingEssentials(u);
     /* Half a period is not a period, so the fields hold their own state. */
     const [period, setPeriod] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
-    const [showWeights, setShowWeights] = useState(false);
 
     /*
      * A newer understanding replaced this one, but what Lens said and asked
@@ -194,511 +195,326 @@ export function UnderstandingCard({
         if (!reply && !question) return null;
 
         return (
-            <section className="rounded-[22px] bg-finn-pale-blue/60 px-4 py-3">
+            <div className="max-w-[92%] space-y-1.5">
                 {reply && <p className="text-sm leading-6 text-finn-black">{reply}</p>}
-                {question && (
-                    <p className={`${reply ? "mt-1.5" : ""} flex gap-1.5 text-sm font-black text-finn-black`}>
-                        <ShieldQuestion aria-hidden="true" className="mt-1 h-3.5 w-3.5 shrink-0 text-finn-accent-blue" />
-                        {question.ask}
-                    </p>
-                )}
-            </section>
+                {question && <p className="text-sm font-black leading-5 text-finn-black">{question.ask}</p>}
+            </div>
         );
     }
 
+    const heard = heardLines(u);
     const active = u.needs.filter((need) => need.status === "active");
-    const dropped = u.needs.filter((need) => need.status === "dropped");
-    /*
-     * Said out loud rather than quietly obeyed: a reader who told Lens they
-     * don't need a big boot should see that written down, next to the things
-     * they do need.
-     */
-    const notNeeded = [
-        ...u.droppedPriorities.map((id) => CATEGORIES[id].label),
-        ...dropped.map((need) => need.label),
-        ...ruledOut(u)
-            .filter((rule) => rule.mode === "without")
-            .map((rule) => `Anything FINN files as ${asPhrase(rule.id)}`),
-        ...u.notModelled.filter((item) => item.stance === "doesntCare").map((item) => sentenceCase(item.said)),
-    ].filter((item, index, all) => all.indexOf(item) === index);
-    const wanted = u.notModelled.filter((item) => item.stance !== "doesntCare");
-    const lessRelevant = new Set(translation.lessRelevant);
-    const blocking = Boolean(question?.blocking);
+    const asks = Boolean(missing.budget || missing.period || question || suggestions.length);
     const hasSomething = u.budget || u.rental || active.length || u.droppedPriorities.length;
 
     return (
-        <section className="overflow-hidden rounded-[22px] bg-finn-pale-blue">
-            <div className="px-4 pt-4">
-                <Eyebrow>{isUpdate ? "What I understand now" : "Here's what I understood"}</Eyebrow>
-                {reply && <p className="mt-1.5 text-sm font-semibold leading-6 text-finn-black">{reply}</p>}
-                {u.tension && (
-                    <p className="mt-2 flex gap-1.5 rounded-2xl bg-finn-warning/10 px-3 py-2 text-xs leading-5 text-finn-black">
-                        <Scale aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-finn-warning-deep" />
-                        <span>
-                            <span className="font-black">Where the choice will be made: </span>
+        <div className="space-y-2">
+            {/*
+              * Lens speaks first, as itself. The recap under it is a note, not
+              * the message — which is how a person reads a conversation.
+              */}
+            {reply && <p className="max-w-[92%] text-sm leading-6 text-finn-black">{reply}</p>}
+
+            <section className="overflow-hidden rounded-[20px] bg-white ring-1 ring-finn-cotton">
+                <div className="px-4 pt-3.5 pb-3">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-iron">
+                        {isUpdate ? "What I understand now" : "What I heard"}
+                    </p>
+
+                    <dl className="mt-2 space-y-1.5">
+                        <HeardLine label="You" value={heard.situation} />
+                        <HeardLine label="Limits" value={heard.limits} />
+                        <HeardLine label="I'll look for" value={heard.lookingFor} strong />
+                        <HeardLine label="Not chasing" value={heard.notChasing} />
+                        <HeardLine label="Can't judge" value={heard.cantJudge} />
+                    </dl>
+
+                    {u.tension && (
+                        <p className="mt-2.5 text-xs leading-5 text-finn-iron">
+                            <span className="font-black text-finn-black">The trade-off: </span>
                             {u.tension.charAt(0).toLowerCase() + u.tension.slice(1)}
-                        </span>
-                    </p>
+                        </p>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={() => setShowDetail((was) => !was)}
+                        aria-expanded={showDetail}
+                        className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-finn-accent-blue hover:underline"
+                    >
+                        {showDetail ? "Hide what Lens will check" : "See what Lens will check"}
+                        <ChevronDown aria-hidden="true" className={`h-3 w-3 transition ${showDetail ? "rotate-180" : ""}`} />
+                    </button>
+                </div>
+
+                {showDetail && (
+                    <Detail understanding={u} translation={translation} cars={cars} scopeLabel={scopeLabel} />
                 )}
-            </div>
 
-            {u.context.length > 0 && (
-                <div className="mt-3 px-4">
-                    <Label>How you'll use it</Label>
-                    <ul className="mt-1 space-y-0.5">
-                        {u.context.map((item) => (
-                            <li key={item.label} className="flex gap-1.5 text-xs leading-5 text-finn-black">
-                                <span aria-hidden="true" className="text-finn-accent-blue">·</span>
-                                {item.label}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {(u.budget || u.rental || u.monthlyKm || ruledOut(u).length > 0) && (
-                <div className="mt-3 space-y-1.5 px-4">
-                    <Label>Your limits</Label>
-                    {u.budget && (
-                        <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
-                            <Wallet aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-black">
-                                    {u.budget.kind === "hardMax"
-                                        ? `${formatEUR(u.budget.monthly)}/month — a hard maximum`
-                                        : u.budget.stretchTo
-                                          ? `Around ${formatEUR(u.budget.monthly)}/month — ${formatEUR(u.budget.stretchTo)} at a stretch`
-                                          : `Around ${formatEUR(u.budget.monthly)}/month — a target, not a limit`}
-                                </p>
-                                <p className="text-[11px] leading-4 text-finn-iron">
-                                    {u.budget.kind === "hardMax"
-                                        ? "Cars Lens estimates above it won't be recommended."
-                                        : `Lens looks no further than ${formatEUR(budgetCeiling(u.budget))} a month.`}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    {/* The mileage is why a €400 listing is quoted at €756 — say it where the limits are. */}
-                    {u.monthlyKm && (
-                        <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
-                            <Route aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-black">About {u.monthlyKm.value.toLocaleString("en-GB")} km a month</p>
-                                <p className="text-[11px] leading-4 text-finn-iron">
-                                    Lens prices fuel or charging and FINN's extra-kilometre charge on this, so its monthly figures sit above FINN's headline price.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                    {ruledOut(u).map((item) => (
-                        <div key={item.id} className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
-                            <CircleSlash aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-black">
-                                    {ruleLabel(item.id, item.mode)}
-                                </p>
-                                <p className="text-[11px] leading-4 text-finn-iron">
-                                    {item.mode === "without"
-                                        ? "Lens sets those cars aside before ranking, rather than scoring them lower."
-                                        : "Lens ranks only cars FINN lists that way, rather than scoring the rest lower."}
-                                </p>
-                            </div>
-                        </div>
-                    ))}
-                    {u.rental && (
-                        <div className="flex items-start gap-2 rounded-2xl bg-white px-3 py-2">
-                            <CalendarRange aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-black">{periodText(u.rental)}</p>
-                                <p className="text-[11px] leading-4 text-finn-iron">
-                                    Lens will price each car on the shortest FINN term that covers it, and check it can be delivered in time.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {active.length > 0 && (
-                <div className="mt-3 space-y-1.5 px-4">
-                    <Label>What matters</Label>
-                    {active.map((need) => (
-                        <div key={need.id} className="rounded-2xl bg-white px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="text-sm font-black">{need.label}</span>
-                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${IMPORTANCE_CLASS[need.importance]}`}>
-                                    {IMPORTANCE_LABEL[need.importance]}
-                                </span>
-                            </div>
-                            {need.said && (
-                                <p className="text-[11px] leading-4 text-finn-iron">
-                                    {/* "Because you're…" only reads when the paraphrase is second person. */}
-                                    {/^(you|your)\b/i.test(need.said)
-                                        ? `Because ${need.said.replace(/[.\s]+$/, "")}.`
-                                        : `From what you said: ${need.said.replace(/[.\s]+$/, "")}.`}
-                                </p>
-                            )}
-
-                            {need.evidence.filter((entry) => !lessRelevant.has(entry.id)).length > 0 && (
-                                <div className="mt-1.5 flex flex-wrap gap-1">
-                                    {need.evidence
-                                        .filter((entry) => !lessRelevant.has(entry.id))
-                                        .map((entry) => (
-                                            <EvidenceChip key={entry.id} id={entry.id} use={entry.use} unwanted={entry.unwanted} cars={cars} />
-                                        ))}
-                                </div>
-                            )}
-
-                            {need.notInData && (
-                                <p className="mt-1 text-[11px] leading-4 text-finn-iron">
-                                    FINN doesn't publish {need.notInData}, so Lens can't check that part.
-                                </p>
-                            )}
-                        </div>
-                    ))}
-                    {/* The counts sentence needs a count — on a page whose cars haven't loaded, the headline is a sentence of its own. */}
-                    {cars.length > 0 && (
-                        <p className="text-[10px] leading-4 text-finn-iron">Counts are listings across {scopeLabel}.</p>
-                    )}
-                </div>
-            )}
-
-            {u.capabilities.length > 0 && (
-                <div className="mt-3 space-y-1.5 px-4">
-                    <Label>You're already confident with</Label>
-                    {u.capabilities.map((item) => (
-                        <p key={item.label} className="rounded-2xl bg-white/70 px-3 py-2 text-xs leading-5">
-                            <span className="font-black">{item.label}</span>
-                            {item.lessRelevant.length > 0 && (
-                                <span className="text-finn-iron">
-                                    {" "}— so I won't lean on {item.lessRelevant.map((id) => EVIDENCE[id].label.toLowerCase()).join(" or ")}.
-                                </span>
-                            )}
+                <div className="border-t border-finn-cotton bg-finn-snow px-4 py-3">
+                    {status === "applied" ? (
+                        <p className="flex items-center gap-1.5 text-xs font-bold text-finn-influence-emerald">
+                            <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                            Compared with this.
                         </p>
-                    ))}
-                </div>
-            )}
-
-            {notNeeded.length > 0 && (
-                <div className="mt-3 px-4">
-                    <Label>What you don't need</Label>
-                    <ul className="mt-1 space-y-0.5">
-                        {notNeeded.map((item) => (
-                            <li key={item} className="flex gap-1.5 text-xs leading-5 text-finn-iron">
-                                <span aria-hidden="true">·</span>
-                                {item}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {wanted.length > 0 && (
-                <div className="mt-3 space-y-1.5 px-4">
-                    <Label>Lens can't judge</Label>
-                    {wanted.map((item) => (
-                        <p key={item.said} className="flex gap-2 rounded-2xl border border-white/80 bg-white/50 px-3 py-2 text-xs leading-5 text-finn-iron">
-                            <CircleSlash aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            <span>
-                                <span className="font-black text-finn-black">"{item.said}"</span> — {item.explanation}
-                            </span>
-                        </p>
-                    ))}
-                </div>
-            )}
-
-            {status === "pending" && (missing.budget || missing.period) && (
-                <div className="mt-3 px-4">
-                    <EssentialsBlock
-                        missing={missing}
-                        period={period}
-                        busy={busy}
-                        onBudget={onBudget}
-                        onPeriod={(from, to) => {
-                            setPeriod({ from, to });
-                            onPeriod(from, to);
-                        }}
-                    />
-                </div>
-            )}
-
-            {suggestions.length > 0 && status === "pending" && (
-                <div className="mt-3 px-4">
-                    <SuggestionBlock
-                        suggestions={suggestions}
-                        cars={cars}
-                        busy={busy}
-                        onAccept={onAcceptSuggestion}
-                        onDecline={onDeclineSuggestion}
-                    />
-                </div>
-            )}
-
-            {question && status === "pending" && (
-                <div className="mt-3 px-4">
-                    <QuestionBlock
-                        question={question}
-                        lead={blocking ? "Before I compare cars" : "One thing that would help"}
-                        picked={picked}
-                        onAnswer={onPick}
-                        disabled={busy}
-                    />
-                </div>
-            )}
-
-            <div className="mt-3 border-t border-white/70 bg-white/60 px-4 py-3">
-                {status === "applied" ? (
-                    <p className="flex items-center gap-1.5 text-xs font-bold text-finn-influence-emerald">
-                        <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                        Compared with this.
-                    </p>
-                ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                        {picked ? (
-                            /*
-                             * Answered here, sent once. Sending the moment a
-                             * chip is tapped replaced this card — and with it
-                             * everything else Lens had asked — before the
-                             * reader could answer the rest.
-                             */
-                            <SmallButton tone="solid" onClick={() => onAnswer(picked)} disabled={busy}>
-                                <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
-                                Send my answer
-                            </SmallButton>
-                        ) : hasSomething ? (
-                            blocking ? (
-                                <SmallButton onClick={onCompare} disabled={busy}>
-                                    Compare anyway
+                    ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                            {picked ? (
+                                /*
+                                 * Answered here, sent once. Sending the moment a
+                                 * chip is tapped replaced this card — and with it
+                                 * everything else Lens had asked — before the
+                                 * reader could answer the rest.
+                                 */
+                                <SmallButton tone="solid" onClick={() => onAnswer(picked)} disabled={busy}>
+                                    <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+                                    Send my answer
                                 </SmallButton>
-                            ) : (
+                            ) : hasSomething ? (
                                 <SmallButton tone="solid" onClick={onCompare} disabled={busy}>
                                     <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-                                    {isUpdate ? "Update the comparison" : "Compare cars"}
+                                    {isUpdate ? "Update the comparison" : "Compare these cars"}
                                 </SmallButton>
-                            )
-                        ) : null}
-                        <SmallButton onClick={onCorrect} disabled={busy}>
-                            Not quite
-                        </SmallButton>
-                    </div>
-                )}
+                            ) : null}
+                            <SmallButton onClick={onCorrect} disabled={busy}>
+                                Not quite
+                            </SmallButton>
+                        </div>
+                    )}
+                </div>
+            </section>
 
-                {hasSomething && (
-                    <>
-                        <div className="mt-2.5 rounded-2xl bg-white px-3 py-2">
-                            <p className="text-[10px] font-black uppercase tracking-wide text-finn-accent-blue">
-                                Temporary Lens profile
-                            </p>
-                            <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">
-                                Built from this conversation. Your saved priorities and profiles haven't changed.
-                            </p>
-                            {translation.profile.focus.length > 0 && (
-                                <p className="mt-1.5 text-xs leading-5 text-finn-black">
-                                    <span className="font-black">For this search, Lens is weighing: </span>
-                                    {translation.profile.focus.map((item) => item.label).join(" · ")}
-                                </p>
-                            )}
+            {/*
+              * Everything Lens wants from the reader, in one place and in one
+              * voice. They used to arrive as three differently-shaped blocks,
+              * which made a conversation feel like a stack of forms.
+              */}
+            {asks && status === "pending" && (
+                <section className="space-y-2 rounded-[20px] bg-finn-pale-blue px-4 py-3.5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-finn-accent-blue">
+                        {question?.blocking ? "Before I compare" : "A couple of things"}
+                    </p>
+
+                    {missing.budget && (
+                        <Ask title="What's the most you'd spend a month?" note="Lens counts the subscription and the running costs together.">
+                            <div className="flex flex-wrap gap-1.5">
+                                {BUDGET_CHOICES.map((amount) => (
+                                    <Chip key={amount} onClick={() => onBudget(amount)} disabled={busy}>
+                                        Up to {formatEUR(amount)}
+                                    </Chip>
+                                ))}
+                                <Chip quiet onClick={() => onBudget(null)} disabled={busy}>
+                                    No limit
+                                </Chip>
+                            </div>
+                        </Ask>
+                    )}
+
+                    {missing.period && (
+                        <Ask title="When do you need it, and for how long?" note="FINN rents on fixed terms, so the months decide the price and whether it can arrive in time.">
+                            <RentalPeriodInput
+                                from={period.from}
+                                to={period.to}
+                                tone="bg-white"
+                                onChange={(from, to) => {
+                                    setPeriod({ from, to });
+                                    onPeriod(from, to);
+                                }}
+                            />
                             <button
                                 type="button"
-                                onClick={() => setShowWeights((was) => !was)}
-                                className="mt-1.5 text-[10px] font-bold text-finn-iron hover:text-finn-black"
-                                aria-expanded={showWeights}
+                                disabled={busy}
+                                onClick={() => onPeriod(null, null)}
+                                className="mt-1.5 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
                             >
-                                {showWeights ? "Hide the detail" : "Show how that becomes a score"}
+                                I don't have fixed dates
                             </button>
-                            {showWeights && <Weights translation={translation} />}
-                        </div>
-                    </>
-                )}
-            </div>
-        </section>
+                        </Ask>
+                    )}
+
+                    {question && (
+                        <Ask title={question.ask} note={question.why ? `${question.why.charAt(0).toUpperCase()}${question.why.slice(1).replace(/[.\s]+$/, "")}.` : ""}>
+                            <div className="flex flex-wrap gap-1.5">
+                                {question.options.map((option) => (
+                                    <Chip key={option} chosen={picked === option} onClick={() => onPick(picked === option ? "" : option)} disabled={busy}>
+                                        {option}
+                                    </Chip>
+                                ))}
+                            </div>
+                        </Ask>
+                    )}
+
+                    {suggestions.map((item) => (
+                        <Ask
+                            key={item.id}
+                            title={`Shall I look for ${lowerLabel(item.id)}?`}
+                            note={plainly(item.id)}
+                            hint={item.why ? sentenceCase(item.why) : ""}
+                        >
+                            <div className="flex flex-wrap gap-1.5">
+                                <Chip onClick={() => onAcceptSuggestion(item.id)} disabled={busy}>
+                                    Yes, count it
+                                </Chip>
+                                <Chip quiet onClick={() => onDeclineSuggestion(item.id)} disabled={busy}>
+                                    Not important to me
+                                </Chip>
+                            </div>
+                        </Ask>
+                    ))}
+                </section>
+            )}
+        </div>
     );
 }
 
-/**
- * One thing Lens can check, and how common it is here.
- *
- * The label is equipment's own name, which is no help to someone who says
- * they don't know cars — so what the model said it would do for *them* is
- * what the chip explains on hover, with Lens's description behind it.
- */
-function EvidenceChip({ id, use, unwanted, cars }: { id: EvidenceId; use?: string; unwanted?: boolean; cars: PinnedFinnCar[] }) {
-    const [open, setOpen] = useState(false);
-    const counts = coverage(cars, id);
-    /* Where the reader wants it absent, the useful count is how many cars avoid it. */
-    const answering = unwanted ? counts.notListed : counts.listed;
+/** One line of the recap: skipped entirely when there's nothing to say. */
+function HeardLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+    if (!value) return null;
 
     return (
-        <>
-            <button
-                type="button"
-                onClick={() => setOpen((was) => !was)}
-                aria-expanded={open}
-                title={plainly(id)}
-                className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold text-finn-black transition hover:bg-finn-cotton"
-            >
-                {unwanted ? withoutLabel(id) : EVIDENCE[id].label}
-                {counts.total > 0 && (
-                    <span className="font-semibold text-finn-iron">
-                        · {answering} of {counts.total}
-                    </span>
-                )}
-                <Info aria-hidden="true" className="h-2.5 w-2.5 text-finn-iron" />
-            </button>
-            {open && (
-                <p className="w-full rounded-xl bg-finn-snow px-2.5 py-1.5 text-[11px] leading-4 text-finn-iron">
-                    <span className="font-black text-finn-black">{EVIDENCE[id].label}. </span>
-                    {plainly(id)}
-                    {use && <> {sentenceCase(use)}</>}
-                </p>
-            )}
-        </>
+        <div className="flex gap-2 text-xs leading-5">
+            <dt className="w-20 shrink-0 font-bold text-finn-iron">{label}</dt>
+            <dd className={strong ? "font-bold text-finn-black" : "text-finn-black"}>{value}</dd>
+        </div>
     );
 }
+
+/** One thing Lens wants from the reader, asked the same way every time. */
+function Ask({ title, note, hint, children }: { title: string; note?: string; hint?: string; children: ReactNode }) {
+    return (
+        <div className="rounded-2xl bg-white px-3 py-2.5">
+            <p className="text-sm font-black leading-5 text-finn-black">{title}</p>
+            {note && <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">{note}</p>}
+            {hint && <p className="mt-1 text-xs leading-5 text-finn-black">{hint}</p>}
+            <div className="mt-2">{children}</div>
+        </div>
+    );
+}
+
+function Chip({
+    children,
+    chosen,
+    quiet,
+    onClick,
+    disabled,
+}: {
+    children: ReactNode;
+    chosen?: boolean;
+    quiet?: boolean;
+    onClick: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            aria-pressed={chosen}
+            className={[
+                "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-50",
+                chosen
+                    ? "bg-finn-accent-blue text-white"
+                    : quiet
+                      ? "bg-finn-snow text-finn-iron hover:text-finn-black"
+                      : "bg-finn-pale-blue text-finn-accent-blue hover:bg-finn-accent-blue hover:text-white",
+            ].join(" ")}
+        >
+            {chosen && <Check aria-hidden="true" className="h-3 w-3" />}
+            {children}
+        </button>
+    );
+}
+
+const lowerLabel = (id: EvidenceId): string => {
+    const label = EVIDENCE[id].label;
+
+    return /^[A-Z0-9]{2,}/.test(label) ? label : `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+};
+
+/**
+ * What Lens will actually check, for a reader who wants to see it.
+ *
+ * Everything here was in the conversation itself until it crowded out the
+ * conversation: the equipment behind each need, how many of these cars carry
+ * it, what the reader is already confident about, and the order Lens will
+ * weigh things in. One tap away is close enough.
+ */
+function Detail({
+    understanding: u,
+    translation,
+    cars,
+    scopeLabel,
+}: {
+    understanding: Understanding;
+    translation: Translation;
+    cars: PinnedFinnCar[];
+    scopeLabel: string;
+}) {
+    const [showWeights, setShowWeights] = useState(false);
+    const active = u.needs.filter((need) => need.status === "active");
+    const lessRelevant = new Set(translation.lessRelevant);
+
+    return (
+        <div className="space-y-2 border-t border-finn-cotton bg-finn-snow px-4 py-3">
+            {active.map((need) => (
+                <div key={need.id}>
+                    <p className="flex flex-wrap items-center gap-x-1.5 text-xs font-black text-finn-black">
+                        {need.label}
+                        <span className="text-[10px] font-bold text-finn-iron">{IMPORTANCE_LABEL[need.importance]}</span>
+                    </p>
+
+                    {need.evidence.filter((entry) => !lessRelevant.has(entry.id)).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                            {need.evidence
+                                .filter((entry) => !lessRelevant.has(entry.id))
+                                .map((entry) => (
+                                    <EvidenceChip key={entry.id} id={entry.id} use={entry.use} unwanted={entry.unwanted} cars={cars} />
+                                ))}
+                        </div>
+                    )}
+
+                    {need.notInData && (
+                        <p className="mt-1 text-[11px] leading-4 text-finn-iron">
+                            FINN doesn't publish {need.notInData}, so Lens can't check that part.
+                        </p>
+                    )}
+                </div>
+            ))}
+
+            {u.capabilities.map((item) => (
+                <p key={item.label} className="text-[11px] leading-4 text-finn-iron">
+                    You're confident with {lower(item.label)}
+                    {item.lessRelevant.length > 0 && <> — so Lens won't lean on {item.lessRelevant.map((id) => EVIDENCE[id].label.toLowerCase()).join(" or ")}</>}.
+                </p>
+            ))}
+
+            {cars.length > 0 && <p className="text-[10px] leading-4 text-finn-iron">Counts are across {scopeLabel}.</p>}
+
+            <div>
+                <button
+                    type="button"
+                    onClick={() => setShowWeights((was) => !was)}
+                    aria-expanded={showWeights}
+                    className="text-[11px] font-bold text-finn-iron hover:text-finn-black"
+                >
+                    {showWeights ? "Hide how this is weighed" : "How Lens weighs this"}
+                </button>
+                {showWeights && <Weights translation={translation} />}
+            </div>
+        </div>
+    );
+}
+
+/** The amounts most readers pick, and the wording Lens keeps for each. */
+/** The amounts most readers pick, offered before anyone types one. */
+const BUDGET_CHOICES = [400, 500, 600, 750];
 
 const sentenceCase = (value: string): string =>
     `${value.charAt(0).toUpperCase()}${value.slice(1).replace(/[.\s]+$/, "")}.`;
 
-/** The amounts most readers pick, and the wording Lens keeps for each. */
-const BUDGET_CHOICES = [400, 500, 600, 750];
+const lower = (value: string): string =>
+    /^[A-Z]{2,}|^I\b/.test(value) ? value : `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
 
-/**
- * What Lens needs and nobody thinks to say.
- *
- * A comparison without a budget ranks cars the reader can't have, and one
- * without a period prices every car on FINN's longest term. Both are cheap to
- * ask for and expensive to leave out, and neither needs the model — so the
- * question is asked here, and answered in one tap.
- */
-function EssentialsBlock({
-    missing,
-    period,
-    busy,
-    onBudget,
-    onPeriod,
-}: {
-    missing: { budget: boolean; period: boolean };
-    /** What's typed in the period fields so far — neither month alone sets it. */
-    period: { from: string | null; to: string | null };
-    busy: boolean;
-    onBudget: (monthly: number | null) => void;
-    onPeriod: (from: string | null, to: string | null) => void;
-}) {
-    return (
-        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-finn-accent-blue/25">
-            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-finn-accent-blue">
-                <Wallet aria-hidden="true" className="h-3.5 w-3.5" />
-                {missing.budget && missing.period ? "Two things Lens needs" : "One thing Lens needs"}
-            </p>
-
-            {missing.budget && (
-                <div className="mt-1.5">
-                    <p className="text-sm font-black text-finn-black">What's the most you'd spend a month?</p>
-                    <p className="text-[11px] leading-4 text-finn-iron">
-                        Lens counts the subscription and the running costs together, and won't recommend a car above it.
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                        {BUDGET_CHOICES.map((amount) => (
-                            <button
-                                key={amount}
-                                type="button"
-                                disabled={busy}
-                                onClick={() => onBudget(amount)}
-                                className="rounded-full bg-finn-pale-blue px-3 py-1.5 text-[11px] font-bold text-finn-accent-blue transition hover:bg-finn-accent-blue hover:text-white disabled:opacity-50"
-                            >
-                                Up to {formatEUR(amount)}
-                            </button>
-                        ))}
-                        <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => onBudget(null)}
-                            className="rounded-full bg-finn-snow px-3 py-1.5 text-[11px] font-bold text-finn-iron transition hover:text-finn-black disabled:opacity-50"
-                        >
-                            No limit
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {missing.period && (
-                <div className={missing.budget ? "mt-3" : "mt-1.5"}>
-                    <p className="text-sm font-black text-finn-black">When do you need it, and for how long?</p>
-                    <p className="text-[11px] leading-4 text-finn-iron">
-                        FINN rents on fixed terms, so the months you need decide which term each car is priced on — and whether it can be delivered in time.
-                    </p>
-                    <div className="mt-2">
-                        <RentalPeriodInput from={period.from} to={period.to} tone="bg-finn-snow" onChange={onPeriod} />
-                    </div>
-                    <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => onPeriod(null, null)}
-                        className="mt-1.5 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
-                    >
-                        I don't have fixed dates
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/**
- * Equipment the reader never asked for, offered rather than applied.
- *
- * Lens knows about equipment most people have never heard of, and a reader
- * who hates parking may simply not know a camera can show the car from above.
- * Saying so is useful; deciding for them is not — so this says what it does
- * and leaves the choice with them.
- */
-function SuggestionBlock({
-    suggestions,
-    cars,
-    busy,
-    onAccept,
-    onDecline,
-}: {
-    suggestions: { id: EvidenceId; why: string }[];
-    cars: PinnedFinnCar[];
-    busy: boolean;
-    onAccept: (id: EvidenceId) => void;
-    onDecline: (id: EvidenceId) => void;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <Label>Something Lens can check, if it's useful to you</Label>
-            {suggestions.map((item) => {
-                const counts = coverage(cars, item.id);
-
-                return (
-                    <div key={item.id} className="rounded-2xl bg-white px-3 py-2.5">
-                        <p className="text-sm font-black text-finn-black">
-                            {EVIDENCE[item.id].label}
-                            {counts.total > 0 && (
-                                <span className="ml-1.5 text-[10px] font-bold text-finn-iron">
-                                    on {counts.listed} of {counts.total} here
-                                </span>
-                            )}
-                        </p>
-                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">{plainly(item.id)}</p>
-                        {item.why && <p className="mt-1 text-xs leading-5 text-finn-black">{sentenceCase(item.why)}</p>}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <SmallButton tone="solid" onClick={() => onAccept(item.id)} disabled={busy}>
-                                Count it in
-                            </SmallButton>
-                            <SmallButton onClick={() => onDecline(item.id)} disabled={busy}>
-                                Not important to me
-                            </SmallButton>
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-/** The engine's view, for anyone who wants to audit it — not the main answer. */
 /**
  * The session profile with its workings shown: what was said, the Lens
  * priority it became, the equipment raised inside it, and the share of the
@@ -715,7 +531,7 @@ function Weights({ translation }: { translation: Translation }) {
         <div className="mt-1.5 space-y-1.5">
             <div className="flex flex-wrap gap-1">
                 {profile.priorities.map((item, index) => (
-                    <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-finn-snow px-2 py-0.5 text-[10px] font-bold">
+                    <span key={item.id} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold ring-1 ring-finn-cotton">
                         <span className="text-finn-accent-blue">#{index + 1}</span>
                         <PriorityIcon name={CATEGORIES[item.id].icon} className="h-3 w-3" />
                         {item.label}
@@ -728,9 +544,7 @@ function Weights({ translation }: { translation: Translation }) {
                 <p key={row.need} className="text-[10px] leading-4 text-finn-iron">
                     <span className="font-black text-finn-black">{row.need}</span>
                     {row.priorities.length > 0 && <> → {row.priorities.map((item) => item.label).join(", ")}</>}
-                    {row.raised.length > 0 && (
-                        <> → raises {row.raised.map((item) => `${item.label} (${item.importance})`).join(", ")}</>
-                    )}
+                    {row.raised.length > 0 && <> → raises {row.raised.map((item) => `${item.label} (${item.importance})`).join(", ")}</>}
                     {row.rules.map((rule) => (
                         <span key={rule.id}> → {rule.mode === "without" ? "rules out" : "requires"} {rule.label}</span>
                     ))}
@@ -740,12 +554,53 @@ function Weights({ translation }: { translation: Translation }) {
 
             {profile.priorities.some((item) => item.filler) && (
                 <p className="text-[10px] leading-4 text-finn-iron">
-                    Lens ranks at least three priorities.{" "}
+                    Lens weighs at least three things.{" "}
                     {profile.priorities.filter((item) => item.filler).map((item) => item.label).join(" and ")}{" "}
                     {profile.priorities.filter((item) => item.filler).length === 1 ? "comes" : "come"} from your saved settings and count least.
                 </p>
             )}
         </div>
+    );
+}
+
+/**
+ * One thing Lens can check, with its own explanation a tap away.
+ *
+ * The label is equipment's own name, which is no help to someone who has
+ * never read a car review — so the chip opens into what it does for them, and
+ * how many of the cars in front of them have it.
+ */
+function EvidenceChip({ id, use, unwanted, cars }: { id: EvidenceId; use?: string; unwanted?: boolean; cars: PinnedFinnCar[] }) {
+    const [open, setOpen] = useState(false);
+    const counts = coverage(cars, id);
+    /* Where the reader wants it absent, the useful count is how many cars avoid it. */
+    const answering = unwanted ? counts.notListed : counts.listed;
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen((was) => !was)}
+                aria-expanded={open}
+                title={plainly(id)}
+                className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-finn-black ring-1 ring-finn-cotton transition hover:bg-finn-pale-blue"
+            >
+                {unwanted ? withoutLabel(id) : EVIDENCE[id].label}
+                {counts.total > 0 && (
+                    <span className="font-semibold text-finn-iron">
+                        · {answering} of {counts.total}
+                    </span>
+                )}
+                <Info aria-hidden="true" className="h-2.5 w-2.5 text-finn-iron" />
+            </button>
+            {open && (
+                <p className="w-full rounded-xl bg-white px-2.5 py-1.5 text-[11px] leading-4 text-finn-iron">
+                    <span className="font-black text-finn-black">{EVIDENCE[id].label}. </span>
+                    {plainly(id)}
+                    {use && <> {sentenceCase(use)}</>}
+                </p>
+            )}
+        </>
     );
 }
 
@@ -800,6 +655,7 @@ export function FitCard({
     onCompare: () => void;
     onAnswer: (answer: string) => void;
 }) {
+    const [showChecked, setShowChecked] = useState(false);
     const { car } = match;
     const pinned = actions.pinnedIds.has(car.id);
 
@@ -830,18 +686,37 @@ export function FitCard({
                     </div>
                 </div>
 
-                {story.sections.length > 0 ? (
-                    <div className="mt-3 space-y-2.5">
-                        <p className="text-[10px] font-black uppercase tracking-wide text-finn-iron">Why it fits what you described</p>
-                        {story.sections.map((section) => (
-                            <SectionView key={section.key} section={section} compact />
-                        ))}
-                    </div>
-                ) : (
-                    match.reason && <p className="mt-3 text-[13px] font-semibold leading-5 text-finn-black">{match.reason}</p>
-                )}
+                {/*
+                  * One sentence about the car, then the checking behind a tap.
+                  * The list of headings that used to sit here was Lens's
+                  * working, and it buried the answer the reader asked for.
+                  */}
+                <p className="mt-2.5 text-[13px] font-semibold leading-5 text-finn-black">
+                    {story.sections.length > 0 ? matchSentence(story) : match.reason}
+                </p>
 
-                <p className="mt-3 text-[11px] leading-4 text-finn-iron">{story.bandMeaning}</p>
+                {story.sections.length > 0 && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => setShowChecked((was) => !was)}
+                            aria-expanded={showChecked}
+                            className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-finn-accent-blue hover:underline"
+                        >
+                            {showChecked ? "Hide what Lens checked" : "What Lens checked"}
+                            <ChevronDown aria-hidden="true" className={`h-3 w-3 transition ${showChecked ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {showChecked && (
+                            <div className="mt-2 space-y-2.5">
+                                {story.sections.map((section) => (
+                                    <SectionView key={section.key} section={section} compact />
+                                ))}
+                                <p className="text-[11px] leading-4 text-finn-iron">{story.bandMeaning}</p>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {story.catch && (
@@ -855,19 +730,12 @@ export function FitCard({
                 </div>
             )}
 
-            {story.stillToKnow && (
-                <div className="bg-white px-4 py-3">
-                    <QuestionBlock question={story.stillToKnow} lead="One thing I still need to know" onAnswer={onAnswer} disabled={busy} />
-                </div>
-            )}
-
             {alternatives.length > 0 && (
                 <div className="bg-white px-4 py-3">
-                    <Label>
-                        {alternatives.every((alt) => alt.budget === "over" || alt.rental === "doesNotFit")
-                            ? "Nothing else fits your limits · closest others"
-                            : "Next best options"}
-                    </Label>
+                    <Label>Other options</Label>
+                    {alternatives.every((alt) => alt.budget === "over" || alt.rental === "doesNotFit") && (
+                        <p className="mt-0.5 text-[11px] leading-4 text-finn-iron">Nothing else here fits your limits — these are the closest.</p>
+                    )}
                     <ul className="mt-1.5 divide-y divide-finn-cotton">
                         {alternatives.map((alt) => (
                             <li key={alt.id} className="flex items-center justify-between gap-2 py-1.5">

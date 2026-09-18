@@ -296,7 +296,7 @@ describe("explaining a match in the person's terms", () => {
         const budget = story.sections.find((section) => section.kind === "budget")!;
 
         expect(run.recommendation.winner.id).not.toBe(203);
-        expect(story.eyebrow).toBe("Strongest match within your €500 limit");
+        expect(story.eyebrow).toBe("Best match");
         expect(budget.title).toBe("It stays within your €500 limit");
         expect(budget.lines.map((line) => line.text).join(" ")).toMatch(/Everything Suv scores higher overall.*breaks your maximum/);
     });

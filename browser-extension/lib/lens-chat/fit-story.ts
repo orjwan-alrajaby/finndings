@@ -498,21 +498,25 @@ export function tellFitStory(
     const hardBudget = u.budget?.kind === "hardMax" ? u.budget.monthly : null;
     const nearBudget = u.budget?.kind === "target" ? u.budget.monthly : null;
 
-    const eyebrow = single
-        ? "How this car fits what you described"
-        : recommendation.gearboxFallback === "noneFit"
-          ? "Closest match — nothing here is an automatic"
-          : recommendation.rentalFallback === "noneFit"
-          ? "Closest match — nothing here fits your dates"
-          : recommendation.isFallback && hardBudget != null
-            ? `Closest match — nothing here stays within ${formatEUR(hardBudget)}`
-            : recommendation.isFallback && nearBudget != null
-              ? `Closest match — nothing here comes near ${formatEUR(nearBudget)}`
-              : hardBudget != null
-                ? `Strongest match within your ${formatEUR(hardBudget)} limit`
-                : nearBudget != null
-                  ? `Strongest match near your ${formatEUR(nearBudget)}`
-              : "Strongest match for what you described";
+    /*
+     * Two words, because the card underneath says the rest. This used to
+     * carry the whole verdict — "Strongest match within your €450 limit" —
+     * shouted in capitals above the car's own name, which read as a banner
+     * rather than as an answer. Where nothing fits, that is worth the extra
+     * clause; where something does, the sentence below says so.
+     */
+    const missed =
+        recommendation.gearboxFallback === "noneFit"
+            ? "nothing here is an automatic"
+            : recommendation.rentalFallback === "noneFit"
+              ? "nothing here fits your dates"
+              : recommendation.isFallback && hardBudget != null
+                ? `nothing here stays within ${formatEUR(hardBudget)}`
+                : recommendation.isFallback && nearBudget != null
+                  ? `nothing here comes near ${formatEUR(nearBudget)}`
+                  : null;
+
+    const eyebrow = single ? "How this car fits you" : missed ? `Closest match — ${missed}` : "Best match";
 
     return {
         eyebrow,
