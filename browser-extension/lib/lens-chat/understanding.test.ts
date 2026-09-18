@@ -248,10 +248,13 @@ describe("turning an understanding into Lens's answers", () => {
         expect(toAnswers(base(), u).answers.priorities).toEqual(["safetyAssistance", "environmental", "climateSuitability"]);
     });
 
-    it("treats a target as information, and only a hard maximum as a rule", () => {
+    /* "Around €500" is a line with headroom; "€500 and no more" is the line itself. */
+    it("holds a hard maximum exactly, and a target with a little headroom", () => {
         const target = readUnderstanding(wire({ budget: { kind: "target", monthly: 500, said: "around 500" } }), EMPTY_UNDERSTANDING);
+        const hard = readUnderstanding(wire({ budget: { kind: "hardMax", monthly: 500, said: "no more than 500" } }), EMPTY_UNDERSTANDING);
 
-        expect(toAnswers(base(), target).answers.preferences.monthlyBudget).toBe(DEFAULT_PREFERENCES.monthlyBudget);
+        expect(toAnswers(base(), target).answers.preferences.monthlyBudget).toBe(575);
+        expect(toAnswers(base(), hard).answers.preferences.monthlyBudget).toBe(500);
     });
 
     it("describes a what-if as the change it makes", () => {
@@ -304,7 +307,7 @@ describe("explaining a match in the person's terms", () => {
         expect(winner.id).toBe(201);
         expect(readEvidence(winner, "hasBackUSBPorts")).toBe("listed");
         expect(lines).toContain("Rear USB ports — could keep their tablets charged on long drives.");
-        expect(lines.join(" ")).toMatch(/no information on a built-in rear entertainment system, so I'm not assuming it has one/);
+        expect(lines.join(" ")).toMatch(/FINN doesn't publish a built-in rear entertainment system, so Lens can't check that part/);
 
         /* Adaptive cruise control was made less relevant by what the person is confident with. */
         const confidence = story.sections.find((section) => section.key === "confidence")!;
