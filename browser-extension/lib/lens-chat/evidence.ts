@@ -233,6 +233,8 @@ export const withoutLabel = (id: EvidenceId): string =>
 /** The thing itself, in a sentence: "you ruled out an SUV". */
 const PHRASES: Partial<Record<EvidenceId, string>> = {
     electricCar: "an electric car",
+    seatsFivePlus: "a five-seater or bigger",
+    hasAutomaticTransmission: "an automatic",
     suvBody: "an SUV",
     seatsSixPlus: "a seven-seater",
     driverAssistLevel2: "a car that steers itself",

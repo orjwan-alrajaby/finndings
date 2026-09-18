@@ -73,6 +73,11 @@ export const FREE_TIER_MODELS = [
     "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
+    /*
+     * A preview alias, and a separate quota bucket: on a key whose numbered
+     * models are spent for the day this is often the one left answering.
+     */
+    "gemini-3-flash-preview",
     "gemini-2.5-flash",
 ];
 

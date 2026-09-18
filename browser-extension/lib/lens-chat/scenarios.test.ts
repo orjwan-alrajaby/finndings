@@ -9,7 +9,7 @@ import {
 import { fleet } from "@/lib/reasoning-engine/test-data/fleet";
 import type { PinnedFinnCar } from "@/lib/types";
 
-import { evidenceMet, measuredDisplay, readEvidence } from "./evidence";
+import { asPhrase, barePhrase, evidenceMet, measuredDisplay, readEvidence } from "./evidence";
 import { tellFitStory, type FitStory } from "./fit-story";
 import { runLens } from "./run";
 import { SCENARIOS, type Scenario } from "./scenarios.fixture";
@@ -506,5 +506,14 @@ describe("a budget with a stretch the reader named", () => {
         const story = tellFitStory(run, understanding, translation.lessRelevant, null);
 
         expect(story.sections[0]?.lines[0]?.text).toMatch(/You said you could stretch to €425, so Lens looked no further/);
+    });
+});
+
+describe("naming a rule in a sentence", () => {
+    it("reads as English in both directions", () => {
+        expect(`No ${barePhrase("seatsSixPlus")}`).toBe("No seven-seater");
+        expect(`Must be ${asPhrase("seatsFivePlus")}`).toBe("Must be a five-seater or bigger");
+        expect(`Must be ${asPhrase("electricCar")}`).toBe("Must be an electric car");
+        expect(`No ${barePhrase("suvBody")}`).toBe("No SUV");
     });
 });

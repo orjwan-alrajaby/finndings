@@ -21,7 +21,7 @@ import { PriorityIcon } from "@/components/PriorityIcon";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
-import { asPhrase, coverage, EVIDENCE, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
+import { asPhrase, barePhrase, coverage, EVIDENCE, withoutLabel, type EvidenceId } from "@/lib/lens-chat/evidence";
 import type { FitStory, StorySection, Tone } from "@/lib/lens-chat/fit-story";
 import type { CarLine, MatchSummary } from "@/lib/lens-chat/run";
 import { budgetCeiling, ruledOut } from "@/lib/lens-chat/understanding";
@@ -237,7 +237,7 @@ export function UnderstandingCard({
                             <CircleSlash aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-finn-accent-blue" />
                             <div className="min-w-0">
                                 <p className="text-sm font-black">
-                                    {item.mode === "without" ? `No ${asPhrase(item.id)}` : `Must be ${asPhrase(item.id)}`}
+                                    {item.mode === "without" ? `No ${barePhrase(item.id)}` : `Must be ${asPhrase(item.id)}`}
                                 </p>
                                 <p className="text-[11px] leading-4 text-finn-iron">
                                     {item.mode === "without"
