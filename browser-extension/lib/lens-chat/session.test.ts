@@ -164,3 +164,13 @@ describe("what Lens asks for itself", () => {
         expect(withBudget(understanding(), null, "no limit").budget).toBeNull();
     });
 });
+
+describe("a key pasted with something after it", () => {
+    it("takes the key and leaves the note behind", async () => {
+        const { loadLensAiSettings, saveLensAiSettings } = await import("@/lib/lens-ai/settings");
+
+        await saveLensAiSettings({ enabled: true, apiKey: "AQ.abc123def456 # the misc account" });
+
+        expect((await loadLensAiSettings()).apiKey).toBe("AQ.abc123def456");
+    });
+});

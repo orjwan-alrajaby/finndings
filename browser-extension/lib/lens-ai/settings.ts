@@ -25,7 +25,13 @@ function read(value: unknown): LensAiSettings {
 
     return {
         enabled: raw.enabled === true,
-        apiKey: typeof raw.apiKey === "string" ? raw.apiKey.trim() : "",
+        /*
+         * The first token, not the whole field. A key copied out of a notes
+         * file or an .env line arrives with a trailing comment attached, and
+         * sending that gets a 401 the reader can only read as "my key is
+         * wrong". Keys have no spaces in them.
+         */
+        apiKey: typeof raw.apiKey === "string" ? (raw.apiKey.trim().split(/\s+/)[0] ?? "") : "",
     };
 }
 
