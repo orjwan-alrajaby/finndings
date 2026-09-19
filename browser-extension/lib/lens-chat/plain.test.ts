@@ -136,3 +136,19 @@ describe("why this car, in one sentence", () => {
         ).toBe("Covers parking without the stress — but not what you wanted to spend.");
     });
 });
+
+describe("the limits line", () => {
+    it("keeps the day someone said they need the car", () => {
+        const heard = heardLines(
+            read({ rental: { from: "2027-03", to: "2027-09", startDay: 3, said: "from the 3rd of March until September" } }),
+        );
+
+        expect(heard.limits).toBe("from 3 March 2027 to September 2027");
+    });
+
+    it("says months when no day was given", () => {
+        const heard = heardLines(read({ rental: { from: "2027-03", to: "2027-09", startDay: null, said: "March to September" } }));
+
+        expect(heard.limits).toBe("from March 2027 to September 2027");
+    });
+});

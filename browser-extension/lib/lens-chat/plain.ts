@@ -84,7 +84,12 @@ export function heardLines(u: Understanding): HeardLines {
         );
     }
 
-    if (u.rental) limits.push(`from ${monthLabel(u.rental.from)} to ${monthLabel(u.rental.to)}`);
+    if (u.rental) {
+        /* The day matters: FINN publishes an earliest delivery date. */
+        const from = u.rental.startDay ? `${u.rental.startDay} ${monthLabel(u.rental.from)}` : monthLabel(u.rental.from);
+
+        limits.push(`from ${from} to ${monthLabel(u.rental.to)}`);
+    }
     if (u.monthlyKm) limits.push(`about ${u.monthlyKm.value.toLocaleString("en-GB")} km a month`);
 
     for (const rule of ruledOut(u)) {

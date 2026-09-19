@@ -17,6 +17,7 @@ import {
     readQuestion,
     readUnderstanding,
     toAnswers,
+    waiveEssential,
     withBudget,
     withRental,
 } from "./understanding";
@@ -454,10 +455,37 @@ describe("the two things Lens asks for itself", () => {
     });
 
     it("treats no fixed dates as an answer too", () => {
-        const u = withRental(EMPTY_UNDERSTANDING, null, null, "you have no fixed dates");
+        const u = waiveEssential(EMPTY_UNDERSTANDING, "rental");
 
         expect(u.rental).toBeNull();
         expect(missingEssentials(u).period).toBe(false);
+    });
+
+    /*
+     * The bug this guards: reporting a half-filled period as "no dates" waived
+     * the question, so it vanished the moment the reader filled in the first
+     * field and they could never give the second.
+     */
+    it("leaves the question standing while only one date is filled in", () => {
+        const u = withRental(EMPTY_UNDERSTANDING, "2027-03", null, "half a period");
+
+        expect(u.rental).toBeNull();
+        expect(missingEssentials(u).period).toBe(true);
+    });
+
+    it("keeps the day the reader asked for it", () => {
+        const u = withRental(EMPTY_UNDERSTANDING, "2027-03", "2027-09", "from the 3rd of March", 3);
+
+        expect(u.rental).toEqual({ from: "2027-03", to: "2027-09", startDay: 3, said: "from the 3rd of March" });
+        expect(missingEssentials(u).period).toBe(false);
+    });
+
+    it("takes the dates after a waiver, and stops counting it waived", () => {
+        const waived = waiveEssential(EMPTY_UNDERSTANDING, "rental");
+        const dated = withRental(waived, "2027-03", "2027-09", "from March to September");
+
+        expect(dated.waived).toEqual([]);
+        expect(dated.rental?.from).toBe("2027-03");
     });
 
     it("asks again when they clear a figure they had given", () => {

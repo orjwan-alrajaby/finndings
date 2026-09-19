@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUp, Check, Save, X } from "lucide-react";
 
-import { loadLensSettings, saveLensSettings } from "@/lib/reasoning-engine";
+import { loadLensSettings, monthLabel, saveLensSettings } from "@/lib/reasoning-engine";
 import type { LensSettings } from "@/lib/reasoning-engine/types";
 import { isPersonalised } from "@/lib/personalisation";
 import { converse } from "@/lib/lens-ai/client";
@@ -13,7 +13,7 @@ import { buildVocabulary } from "@/lib/lens-ai/vocabulary";
 import type { PageContext } from "@/lib/lens-chat/messages";
 import type { EvidenceId } from "@/lib/lens-chat/evidence";
 import { nameFor, saveSearch, saveSession, type LensSession } from "@/lib/lens-chat/session";
-import { evidenceCatalogue } from "@/lib/lens-chat/evidence";
+import { asPhrase, barePhrase, evidenceCatalogue } from "@/lib/lens-chat/evidence";
 import { evidenceForNeeds, finnsOwnWords, quotesAreFinns, tellFitStory } from "@/lib/lens-chat/fit-story";
 import { alternativesWithinLimits, compareRows, runLens, summariseMatch, type LensRun } from "@/lib/lens-chat/run";
 import {
@@ -25,6 +25,7 @@ import {
     readSuggestions,
     readUnderstanding,
     ruledOut,
+    waiveEssential,
     withBudget,
     withRental,
     withoutSuggestion,
@@ -376,6 +377,35 @@ export function LensChat() {
      * what made the other questions feel lost. The Compare button is the one
      * place anything runs.
      */
+    /**
+     * What the reader just answered, said back into the conversation.
+     *
+     * Tapping a chip used to change the understanding silently and take the
+     * question away with it, so the reader had no record of what they had told
+     * Lens. Every answer is a message now — the same bubble a typed one gets —
+     * and the model sees it on the next turn like anything else they said.
+     */
+    const recordAnswer = useCallback(
+        (raw: string) => {
+            const text = `${raw.charAt(0).toUpperCase()}${raw.slice(1)}`;
+
+            push({ kind: "user", text });
+            history.current.push({ role: "reader", text });
+        },
+        [push],
+    );
+
+    const answerEssential = useCallback(
+        (entryId: number, next: Understanding, said: string) => {
+            setUnderstanding(next);
+            setEntries((all) =>
+                all.map((item) => (item.id === entryId && item.kind === "understanding" ? { ...item, understanding: next } : item)),
+            );
+            recordAnswer(said);
+        },
+        [recordAnswer],
+    );
+
     const answerSuggestion = useCallback(
         (entryId: number, id: EvidenceId, why: string, needId: string, take: boolean) => {
             const current = latest.current;
@@ -390,8 +420,9 @@ export function LensChat() {
                 ),
             );
 
+            recordAnswer(take ? `Yes, count ${barePhrase(id)}.` : `${asPhrase(id)} isn't important to me.`);
         },
-        [],
+        [recordAnswer],
     );
 
     const talk = useCallback(
@@ -706,36 +737,33 @@ export function LensChat() {
                                             }}
                                             onDeclineSuggestion={(id) => answerSuggestion(entry.id, id, "", "", false)}
                                             onBudget={(monthly) => {
-                                                const next = withBudget(
-                                                    latest.current.understanding,
-                                                    monthly,
-                                                    monthly ? `you said up to €${monthly} a month` : "you said you have no limit in mind",
+                                                answerEssential(
+                                                    entry.id,
+                                                    monthly
+                                                        ? withBudget(latest.current.understanding, monthly, `you said up to €${monthly} a month`)
+                                                        : waiveEssential(latest.current.understanding, "budget"),
+                                                    monthly ? `My maximum is €${monthly} a month.` : "I don't have a fixed budget.",
                                                 );
-
-                                                setUnderstanding(next);
-                                                setEntries((all) =>
-                                                    all.map((item) =>
-                                                        item.id === entry.id && item.kind === "understanding" ? { ...item, understanding: next } : item,
-                                                    ),
-                                                );
-                                                history.current.push({
-                                                    role: "reader",
-                                                    text: monthly ? `My maximum is €${monthly} a month.` : "I don't have a fixed budget.",
-                                                });
                                             }}
-                                            onPeriod={(from, to) => {
-                                                const next = withRental(
-                                                    latest.current.understanding,
-                                                    from,
-                                                    to,
-                                                    from && to ? `you need it from ${from} to ${to}` : "you have no fixed dates",
-                                                );
+                                            onPeriod={(from, to, startDay) => {
+                                                const dated = from && to;
+                                                /* One month format either side of "until", as anyone would say it. */
+                                                const start = dated ? (startDay ? `${startDay} ${monthLabel(from)}` : monthLabel(from)) : "";
 
-                                                setUnderstanding(next);
-                                                setEntries((all) =>
-                                                    all.map((item) =>
-                                                        item.id === entry.id && item.kind === "understanding" ? { ...item, understanding: next } : item,
-                                                    ),
+                                                answerEssential(
+                                                    entry.id,
+                                                    dated
+                                                        ? withRental(
+                                                              latest.current.understanding,
+                                                              from,
+                                                              to,
+                                                              `you need it from ${start} to ${monthLabel(to)}`,
+                                                              startDay,
+                                                          )
+                                                        : waiveEssential(latest.current.understanding, "rental"),
+                                                    dated
+                                                        ? `I need it from ${start} until ${monthLabel(to)}.`
+                                                        : "I don't have fixed dates.",
                                                 );
                                             }}
                                             picked={entry.picked}

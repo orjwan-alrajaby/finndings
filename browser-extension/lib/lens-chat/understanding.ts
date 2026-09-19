@@ -120,10 +120,10 @@ const scoredHome = (id: EvidenceId): CategoryId | null =>
  * nothing they didn't just say.
  */
 const TOPIC_WORDS = new Set([
-    "arrangement", "budget", "car", "cars", "circumstances", "city", "commute", "commuting", "context", "daily",
-    "driving", "family", "general", "habits", "lifestyle", "needs", "overall", "plans", "preferences", "profile",
-    "requirements", "routine", "setup", "situation", "transport", "travel", "trips", "usage", "use", "weekend",
-    "weekends",
+    "area", "arrangement", "budget", "car", "cars", "circumstances", "city", "commute", "commuting", "context",
+    "daily", "driving", "family", "general", "habits", "household", "life", "lifestyle", "living", "location",
+    "needs", "overall", "plans", "preferences", "profile", "requirements", "routine", "setup", "situation",
+    "transport", "travel", "trips", "usage", "use", "weekend", "weekends",
 ]);
 
 const isTopicName = (label: string): boolean => {
@@ -406,15 +406,34 @@ const waiving = (u: Understanding, part: "budget" | "rental", waived: boolean): 
     return waived ? [...kept, part] : kept;
 };
 
-/** Months the reader picked from the chat, without a model turn. */
-export const withRental = (u: Understanding, from: string | null, to: string | null, said: string): Understanding => {
-    const rental =
-        from && to && isMonthString(from) && isMonthString(to) && monthsInclusive(from, to) >= 1
-            ? { from, to, startDay: null, said }
-            : null;
+/**
+ * Dates the reader picked from the chat, without a model turn.
+ *
+ * Half a period is not a period, and it is not a refusal either: a partial
+ * entry leaves the understanding alone rather than recording "no dates", which
+ * made the question vanish the moment the first field was filled in.
+ */
+export const withRental = (
+    u: Understanding,
+    from: string | null,
+    to: string | null,
+    said: string,
+    startDay: number | null = null,
+): Understanding =>
+    from && to && isMonthString(from) && isMonthString(to) && monthsInclusive(from, to) >= 1
+        ? {
+              ...u,
+              rental: { from, to, startDay: startDay && startDay >= 1 && startDay <= 31 ? startDay : null, said },
+              waived: waiving(u, "rental", false),
+          }
+        : u;
 
-    return { ...u, rental, waived: waiving(u, "rental", rental == null) };
-};
+/** They were asked and had nothing to give: an answer, and Lens stops asking. */
+export const waiveEssential = (u: Understanding, part: "budget" | "rental"): Understanding => ({
+    ...u,
+    ...(part === "budget" ? { budget: null } : { rental: null }),
+    waived: waiving(u, part, true),
+});
 
 /** A monthly maximum the reader picked from the chat, without a model turn. */
 export const withBudget = (u: Understanding, monthly: number | null, said: string): Understanding => ({

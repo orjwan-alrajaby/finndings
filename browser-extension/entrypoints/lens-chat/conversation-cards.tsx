@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 
 import { PriorityIcon } from "@/components/PriorityIcon";
-import { RentalPeriodInput } from "@/components/DrivingAssumptions";
 import { CATEGORIES } from "@/lib/reasoning-engine/constants";
 import { formatEUR, monthLabel, priorityWeights } from "@/lib/reasoning-engine";
 import type { WireQuestion } from "@/lib/lens-ai/contract";
@@ -176,7 +175,7 @@ export function UnderstandingCard({
     onAcceptSuggestion: (id: EvidenceId) => void;
     onDeclineSuggestion: (id: EvidenceId) => void;
     onBudget: (monthly: number | null) => void;
-    onPeriod: (from: string | null, to: string | null) => void;
+    onPeriod: (from: string | null, to: string | null, startDay: number | null) => void;
     /** What the reader has chosen on this card and not sent yet. */
     picked: string | null;
     onPick: (answer: string) => void;
@@ -185,8 +184,6 @@ export function UnderstandingCard({
     const missing = missingEssentials(u);
     /* What this turn opened with, so "my answers" counts answers and not facts. */
     const [asked] = useState(() => missingEssentials(u));
-    /* Half a period is not a period, so the fields hold their own state. */
-    const [period, setPeriod] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
 
     /*
      * A newer understanding replaced this one, but what Lens said and asked
@@ -321,24 +318,11 @@ export function UnderstandingCard({
                     )}
 
                     {missing.period && (
-                        <Ask title="When do you need it, and for how long?" note="FINN rents on fixed terms, so the months decide the price and whether it can arrive in time.">
-                            <RentalPeriodInput
-                                from={period.from}
-                                to={period.to}
-                                tone="bg-white"
-                                onChange={(from, to) => {
-                                    setPeriod({ from, to });
-                                    onPeriod(from, to);
-                                }}
-                            />
-                            <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => onPeriod(null, null)}
-                                className="mt-1.5 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
-                            >
-                                I don't have fixed dates
-                            </button>
+                        <Ask
+                            title="When do you need it, and for how long?"
+                            note="FINN rents in whole months, so Lens uses the months your dates fall in — and checks the day you want it against FINN's earliest delivery."
+                        >
+                            <PeriodAsk busy={busy} onPeriod={onPeriod} />
                         </Ask>
                     )}
 
@@ -417,6 +401,87 @@ function HeardLine({ label, value, strong }: { label: string; value: string; str
         <div className="flex gap-2 text-xs leading-5">
             <dt className="w-20 shrink-0 font-bold text-finn-iron">{label}</dt>
             <dd className={strong ? "font-bold text-finn-black" : "text-finn-black"}>{value}</dd>
+        </div>
+    );
+}
+
+/**
+ * The days someone needs a car between, in a panel 375px wide.
+ *
+ * Two full-width date fields, one under the other: the month pickers this
+ * replaced sat in a four-column row that squeezed the year out of reach on a
+ * phone. Days rather than months because FINN publishes an earliest delivery
+ * date, and "I need it by the 3rd" is a real answer to whether a car can
+ * arrive in time — the months are what the rental itself is priced on.
+ *
+ * Nothing is reported until both ends are in: a half-filled period is neither
+ * a period nor a refusal, and reporting it as one made the question disappear
+ * as soon as the reader touched the first field.
+ */
+function PeriodAsk({
+    busy,
+    onPeriod,
+}: {
+    busy: boolean;
+    onPeriod: (from: string | null, to: string | null, startDay: number | null) => void;
+}) {
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
+
+    const backwards = Boolean(from && to && to < from);
+    const field =
+        "mt-1 h-11 w-full min-w-0 rounded-2xl bg-finn-snow px-3 text-sm font-bold text-finn-black outline-none focus:ring-2 focus:ring-finn-accent-blue";
+
+    const send = (start: string, end: string) => {
+        if (!start || !end || end < start) return;
+
+        onPeriod(start.slice(0, 7), end.slice(0, 7), Number(start.slice(8, 10)));
+    };
+
+    return (
+        <div>
+            <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-finn-iron">
+                    I need it from
+                    <input
+                        type="date"
+                        value={from}
+                        disabled={busy}
+                        onChange={(event) => {
+                            setFrom(event.target.value);
+                            send(event.target.value, to);
+                        }}
+                        className={field}
+                    />
+                </label>
+
+                <label className="block text-[11px] font-bold text-finn-iron">
+                    until
+                    <input
+                        type="date"
+                        value={to}
+                        min={from || undefined}
+                        disabled={busy}
+                        onChange={(event) => {
+                            setTo(event.target.value);
+                            send(from, event.target.value);
+                        }}
+                        aria-invalid={backwards || undefined}
+                        className={`${field} aria-invalid:text-finn-error`}
+                    />
+                </label>
+            </div>
+
+            {backwards && <p className="mt-1 text-[11px] leading-4 text-finn-error">The second date is before the first.</p>}
+
+            <button
+                type="button"
+                disabled={busy}
+                onClick={() => onPeriod(null, null, null)}
+                className="mt-2 text-[11px] font-bold text-finn-iron hover:text-finn-black disabled:opacity-50"
+            >
+                I don't have fixed dates
+            </button>
         </div>
     );
 }
