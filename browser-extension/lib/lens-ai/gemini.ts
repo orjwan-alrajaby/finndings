@@ -67,7 +67,14 @@ const log = {
     },
 };
 
-/** Models the free tier offers new keys, best first. Each has its own quota. */
+/**
+ * Models the free tier offers new keys, best first. Each has its own quota.
+ *
+ * Only models a new key can actually reach: gemini-2.5-flash sat at the end of
+ * this list until Google closed it to new keys, and a model that answers every
+ * request with 404 buys nothing but a wrong line in the refusal when the rest
+ * are spent.
+ */
 export const FREE_TIER_MODELS = [
     "gemini-3.8-flash",
     "gemini-3.7-flash",
@@ -78,7 +85,6 @@ export const FREE_TIER_MODELS = [
      * models are spent for the day this is often the one left answering.
      */
     "gemini-3-flash-preview",
-    "gemini-2.5-flash",
 ];
 
 /** Where models resting out of quota are remembered between pages. */
